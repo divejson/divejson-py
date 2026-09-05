@@ -1,0 +1,65 @@
+name: Release
+
+# A release is a `v*` tag on `main`, pushed by a maintainer. Nothing else publishes: the
+# filename of this workflow, the repository and the environment below are three of the
+# four things PyPI's trusted publisher for this project is registered against, so a
+# rename here is a release that stops working rather than one that publishes wrongly.
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    name: Build and check what is about to be published
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build hatchling
+
+      - name: Build the sdist, and the wheel from the sdist
+        run: python -m build --no-isolation
+
+      # The version is declared once, in the package, and the tag is written by hand — so
+      # this is the one place they can disagree. A tag that names a version nobody built
+      # would otherwise publish the previous one under the new name.
+      - name: The tag names the version that was built
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if [ ! -f "dist/divejson-$version.tar.gz" ]; then
+            echo "::error::$GITHUB_REF_NAME does not name the version that was built"
+            ls -1 dist
+            exit 1
+          fi
+
+      # Against the built wheel rather than the checkout: what gets published is what has
+      # to run the corpus, and an artefact that cannot is one nobody should be able to
+      # `pip install` a minute later.
+      - name: The wheel that is about to be published runs the corpus
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install dist/*.whl
+          "$RUNNER_TEMP/venv/bin/divejson" conform fixtures --strict
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      # Trusted publishing: PyPI mints a short-lived token from this job's OIDC identity,
+      # so there is no API token anywhere in this repository's secrets.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

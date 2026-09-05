@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<uddf xmlns="http://www.streit.cc/uddf/3.2/" version="3.2.2">
+  <generator>
+    <name>Open Diving</name>
+    <type>logbook</type>
+    <version>0.1.0</version>
+    <datetime>2026-09-02T18:27:26.302137+00:00</datetime>
+  </generator>
+  <diver>
+    <owner id="owner">
+      <personal>
+        <firstname>Sam</firstname>
+        <lastname>Reef</lastname>
+      </personal>
+      <equipment>
+        <buoyancycontroldevice id="gear-0198a6f0-2222-7001-8000-000000000001">
+          <name>Hydros Pro</name>
+          <manufacturer id="mfr-0198a6f0-2222-7001-8000-000000000001">
+            <name>Scubapro</name>
+          </manufacturer>
+        </buoyancycontroldevice>
+        <divecomputer id="gear-0198a6f0-2222-7002-8000-000000000002">
+          <name>Ocean</name>
+          <manufacturer id="mfr-0198a6f0-2222-7002-8000-000000000002">
+            <name>Suunto</name>
+          </manufacturer>
+          <notes>
+            <para>Firmware 2.4.1; wrist strap replaced 2026-03.</para>
+          </notes>
+        </divecomputer>
+        <suit id="gear-0198a6f0-2222-7003-8000-000000000003">
+          <name>Everflex 5/4</name>
+          <suittype>dry-suit</suittype>
+        </suit>
+      </equipment>
+    </owner>
+  </diver>
+  <divesite>
+    <site id="site-0198a6f0-3333-7001-8000-000000000001">
+      <name>SS Thistlegorm</name>
+      <geography>
+        <location>Sha'ab Ali, Red Sea</location>
+        <latitude>27.813611</latitude>
+        <longitude>33.920833</longitude>
+      </geography>
+      <notes>
+        <para>Cargo holds on the second pass; the bow is the current side.</para>
+      </notes>
+    </site>
+  </divesite>
+  <divetrip>
+    <trip id="trip-0198a6f0-4444-7001-8000-000000000001">
+      <name>Red Sea Liveaboard</name>
+      <trippart>
+        <name>Red Sea Liveaboard</name>
+        <dateoftrip startdate="2026-04-18T00:00:00" enddate="2026-04-25T00:00:00"/>
+        <geography>
+          <location>Sha'ab Ali, Egypt</location>
+        </geography>
+        <notes>
+          <para>Northern wrecks itinerary out of Hurghada.</para>
+        </notes>
+      </trippart>
+    </trip>
+  </divetrip>
+  <gasdefinitions>
+    <mix id="mix-1">
+      <name>Air</name>
+      <o2>0.21</o2>
+      <he>0</he>
+      <maximumpo2>1.4</maximumpo2>
+    </mix>
+    <mix id="mix-2">
+      <name>EAN50</name>
+      <o2>0.5</o2>
+      <he>0</he>
+      <maximumpo2>1.6</maximumpo2>
+    </mix>
+  </gasdefinitions>
+  <profiledata>
+    <repetitiongroup id="rg-1">
+      <dive id="dive-0198a6f0-5555-7001-8000-000000000001">
+        <informationbeforedive>
+          <link ref="site-0198a6f0-3333-7001-8000-000000000001"/>
+          <divenumber>46</divenumber>
+          <datetime>2026-04-19T08:12:00+02:00</datetime>
+          <altitude>0</altitude>
+          <equipmentused>
+            <leadquantity>6</leadquantity>
+            <link ref="gear-0198a6f0-2222-7001-8000-000000000001"/>
+            <link ref="gear-0198a6f0-2222-7002-8000-000000000002"/>
+            <link ref="gear-0198a6f0-2222-7003-8000-000000000003"/>
+          </equipmentused>
+          <tripmembership ref="trip-0198a6f0-4444-7001-8000-000000000001"/>
+          <surfacepressure>101300</surfacepressure>
+        </informationbeforedive>
+        <tankdata>
+          <link ref="mix-1"/>
+          <tankvolume>0.012</tankvolume>
+          <tankpressurebegin>21000000</tankpressurebegin>
+          <tankpressureend>6000000</tankpressureend>
+        </tankdata>
+        <tankdata>
+          <link ref="mix-2"/>
+          <tankvolume>0.007</tankvolume>
+          <tankpressurebegin>20000000</tankpressurebegin>
+          <tankpressureend>15000000</tankpressureend>
+        </tankdata>
+        <samples>
+          <waypoint>
+            <depth>0</depth>
+            <divetime>0</divetime>
+            <switchmix ref="mix-1"/>
+            <tankpressure ref="mix-1">21000000</tankpressure>
+            <temperature>297.55</temperature>
+          </waypoint>
+          <waypoint>
+            <depth>14.6</depth>
+            <divetime>120</divetime>
+            <tankpressure ref="mix-1">19400000</tankpressure>
+            <temperature>296.75</temperature>
+          </waypoint>
+          <waypoint>
+            <depth>29.6</depth>
+            <divetime>600</divetime>
+            <setmarker>Deepest point</setmarker>
+            <tankpressure ref="mix-1">14200000</tankpressure>
+            <temperature>295.15</temperature>
+          </waypoint>
+          <waypoint>
+            <depth>6</depth>
+            <divetime>2400</divetime>
+            <switchmix ref="mix-2"/>
+            <tankpressure ref="mix-2">20000000</tankpressure>
+          </waypoint>
+          <waypoint>
+            <depth>5</depth>
+            <divetime>2700</divetime>
+            <setmarker>safety_stop</setmarker>
+            <tankpressure ref="mix-2">15000000</tankpressure>
+          </waypoint>
+          <waypoint>
+            <depth>0</depth>
+            <divetime>2880</divetime>
+            <tankpressure ref="mix-1">6000000</tankpressure>
+          </waypoint>
+        </samples>
+        <informationafterdive>
+          <lowesttemperature>295.15</lowesttemperature>
+          <greatestdepth>29.6</greatestdepth>
+          <visibility>20</visibility>
+          <notes>
+            <para>Wreck penetration on the second pass; deco gas staged on the shot line.</para>
+          </notes>
+          <diveduration>2880</diveduration>
+          <averagedepth>17.2</averagedepth>
+        </informationafterdive>
+      </dive>
+    </repetitiongroup>
+  </profiledata>
+</uddf>

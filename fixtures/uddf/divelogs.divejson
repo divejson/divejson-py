@@ -1,0 +1,95 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-05T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.1.0"
+  },
+  "dives": [
+    {
+      "uuid": "76bdb612-a42f-5a1c-a271-d521b1935ab3",
+      "dive_number": 1,
+      "started_at": "2026-04-17T11:49:00",
+      "duration": 4001,
+      "notes": "Every other sample reads zero: divelogs.de stores a waypoint with no recorded depth as a depth of zero, and its own profile chart draws the comb that produces.",
+      "max_depth": 45.9,
+      "avg_depth": 20.9,
+      "bottom_temperature": 22.0,
+      "site_uuids": [
+        "3c7a70ee-b290-560b-8be1-d4919397c58d"
+      ],
+      "cylinders": [
+        {
+          "volume": 12.0,
+          "start_pressure": 200.0,
+          "end_pressure": 80.0,
+          "oxygen": 21.0,
+          "helium": 0.0
+        }
+      ],
+      "profile": {
+        "duration": 16,
+        "depth": {
+          "times": [
+            0,
+            4,
+            8,
+            12,
+            16
+          ],
+          "values": [
+            0,
+            140,
+            0,
+            250,
+            0
+          ]
+        },
+        "temperature": {
+          "times": [
+            4
+          ],
+          "values": [
+            244
+          ]
+        }
+      }
+    },
+    {
+      "uuid": "6306fa65-83db-5858-911e-69b17ce5089a",
+      "dive_number": 2,
+      "started_at": "2026-04-19T08:12:00",
+      "duration": 2880,
+      "notes": "Its only site has no name, so the dive arrives with no site at all rather than one this converter invented a name for.",
+      "max_depth": 29.6,
+      "avg_depth": 17.2,
+      "bottom_temperature": 24.0,
+      "cylinders": [
+        {
+          "volume": 12.0,
+          "start_pressure": 210.0,
+          "end_pressure": 60.0,
+          "oxygen": 21.0,
+          "helium": 0.0
+        }
+      ]
+    }
+  ],
+  "sites": [
+    {
+      "uuid": "3c7a70ee-b290-560b-8be1-d4919397c58d",
+      "name": "El Puertito",
+      "location": "Tenerife"
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "uddf",
+      "uddf_version": "3.2.1",
+      "source_generator": {
+        "name": "divelogs.de"
+      }
+    }
+  }
+}

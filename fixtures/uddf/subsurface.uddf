@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<uddf xmlns="http://www.streit.cc/uddf/3.2/" version="3.2.0">
+  <generator>
+    <name>Subsurface Divelog</name>
+    <manufacturer id="subsurface">
+      <name>Subsurface Team</name>
+      <contact>
+        <homepage>http://subsurface-divelog.org/</homepage>
+      </contact>
+    </manufacturer>
+    <version>3</version>
+  </generator>
+  <mediadata/>
+  <diver>
+    <owner id="owner">
+      <personal>
+        <firstname/>
+        <lastname/>
+      </personal>
+      <equipment/>
+    </owner>
+  </diver>
+  <divesite>
+    <divebase id="allbase">
+      <name>Subsurface Divebase</name>
+    </divebase>
+    <site id=" ff47210">
+      <name>Small Brother</name>
+      <geography>
+        <location>Small Brother</location>
+        <latitude/>
+        <longitude/>
+      </geography>
+    </site>
+    <site id="2bbb3390">
+      <name>SS Thistlegorm</name>
+      <geography>
+        <location>SS Thistlegorm</location>
+        <latitude/>
+        <longitude/>
+      </geography>
+    </site>
+  </divesite>
+  <divetrip/>
+  <gasdefinitions>
+    <mix id="mix(21/0)">
+      <name>air</name>
+      <o2>0.21</o2>
+      <he>0.00</he>
+    </mix>
+    <mix id="mix(32/0)">
+      <name>EANx 32</name>
+      <o2>0.32</o2>
+      <he>0.00</he>
+    </mix>
+  </gasdefinitions>
+  <profiledata>
+    <repetitiongroup id="idp5747615184931662520">
+      <dive id="idp5747615184931662520">
+        <informationbeforedive>
+          <link ref=" ff47210"/>
+          <divenumber>45</divenumber>
+          <datetime>2026-04-17T11:49:23</datetime>
+          <equipmentused>
+            <leadquantity>0</leadquantity>
+          </equipmentused>
+        </informationbeforedive>
+        <tankdata>
+          <link ref="mix(21/0)"/>
+          <tankvolume>0.012</tankvolume>
+          <tankpressurebegin>20000000</tankpressurebegin>
+          <tankpressureend>8000000</tankpressureend>
+        </tankdata>
+        <samples>
+          <waypoint>
+            <depth>1.45</depth>
+            <divetime>0</divetime>
+          </waypoint>
+          <waypoint>
+            <depth>1.83</depth>
+            <divetime>10</divetime>
+          </waypoint>
+          <waypoint>
+            <depth>2.22</depth>
+            <divetime>20</divetime>
+          </waypoint>
+          <waypoint>
+            <depth>2.57</depth>
+            <divetime>30</divetime>
+            <temperature>297.55</temperature>
+          </waypoint>
+          <waypoint>
+            <depth>2.6</depth>
+            <divetime>40</divetime>
+          </waypoint>
+          <waypoint>
+            <depth>3.32</depth>
+            <divetime>80</divetime>
+            <temperature>297.15</temperature>
+          </waypoint>
+          <waypoint>
+            <depth>9.109999999999999</depth>
+            <divetime>170</divetime>
+          </waypoint>
+          <waypoint>
+            <depth>0</depth>
+            <divetime>4300</divetime>
+          </waypoint>
+        </samples>
+        <informationafterdive>
+          <greatestdepth>45.91</greatestdepth>
+          <averagedepth>20.841</averagedepth>
+          <diveduration>4010</diveduration>
+          <notes>
+            <para>House-reef checkout dive - profile, temperature and tank pressure pulled straight from the export.</para>
+          </notes>
+          <visibility>15</visibility>
+        </informationafterdive>
+      </dive>
+    </repetitiongroup>
+    <repetitiongroup id="idp5747615184931910968">
+      <dive id="idp5747615184931910968">
+        <informationbeforedive>
+          <link ref="2bbb3390"/>
+          <divenumber>38</divenumber>
+          <datetime>2026-04-19T08:12:00</datetime>
+          <equipmentused>
+            <leadquantity>0</leadquantity>
+          </equipmentused>
+        </informationbeforedive>
+        <tankdata>
+          <link ref="mix(32/0)"/>
+          <tankvolume>0.012</tankvolume>
+          <tankpressurebegin>21000000</tankpressurebegin>
+          <tankpressureend>6000000</tankpressureend>
+        </tankdata>
+        <samples>
+          <waypoint>
+            <depth>0</depth>
+            <divetime>0</divetime>
+          </waypoint>
+          <waypoint>
+            <depth>29.6</depth>
+            <divetime>576</divetime>
+          </waypoint>
+          <waypoint>
+            <depth>0</depth>
+            <divetime>2880</divetime>
+          </waypoint>
+        </samples>
+        <informationafterdive>
+          <greatestdepth>29.6</greatestdepth>
+          <averagedepth>17.2</averagedepth>
+          <diveduration>2880</diveduration>
+          <notes>
+            <para>Subsurface builds a depth profile from max depth and duration for a dive that has none; these three samples are that fabrication, carried through as recorded rather than trimmed away.</para>
+          </notes>
+          <visibility>15</visibility>
+        </informationafterdive>
+      </dive>
+    </repetitiongroup>
+  </profiledata>
+</uddf>

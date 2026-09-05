@@ -1,0 +1,64 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-05T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.1.0"
+  },
+  "dives": [
+    {
+      "uuid": "2d15ba8f-aad9-59bb-ba1a-9aa35a26adde",
+      "dive_number": 12,
+      "started_at": "2002-06-18T00:00:00",
+      "duration": 2400,
+      "notes": "Four writer habits in one dive: element names in upper case, a whole-percent oxygen fraction, a tank volume in litres where UDDF specifies cubic metres, and a midnight dive whose time of day the exporter never wrote.",
+      "max_depth": 18.4,
+      "site_uuids": [
+        "ea58bb9e-dd47-5727-8360-47261cb768bd"
+      ],
+      "cylinders": [
+        {
+          "volume": 12.0,
+          "end_pressure": 70.0,
+          "oxygen": 34.0,
+          "helium": 0.0
+        }
+      ],
+      "profile": {
+        "duration": 120,
+        "depth": {
+          "times": [
+            30,
+            120
+          ],
+          "values": [
+            250,
+            1840
+          ]
+        }
+      }
+    }
+  ],
+  "sites": [
+    {
+      "uuid": "ea58bb9e-dd47-5727-8360-47261cb768bd",
+      "name": "Um El Faroud",
+      "location": "Wied iz-Zurrieq, Malta",
+      "position": {
+        "latitude": 35.8225,
+        "longitude": 14.4392
+      }
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "uddf",
+      "uddf_version": "2.2.0",
+      "source_generator": {
+        "name": "Legacy Logbook",
+        "version": "2.0"
+      }
+    }
+  }
+}

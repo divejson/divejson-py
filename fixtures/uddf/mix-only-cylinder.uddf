@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<uddf xmlns="http://www.streit.cc/uddf/3.2/" version="3.2.2">
+  <generator>
+    <name>DiveJSON fixtures</name>
+  </generator>
+  <diver>
+    <owner id="owner">
+      <personal>
+        <firstname>Alex</firstname>
+        <lastname>Trim</lastname>
+      </personal>
+    </owner>
+  </diver>
+  <divesite>
+    <site id="site-1">
+      <name>Condesito Wreck</name>
+      <geography>
+        <location>Las Galletas, Tenerife</location>
+        <latitude>28.001389</latitude>
+        <longitude>-16.653611</longitude>
+      </geography>
+    </site>
+  </divesite>
+  <gasdefinitions>
+    <mix id="mix-1">
+      <name>EAN32</name>
+      <o2>0.32</o2>
+      <he>0.00</he>
+    </mix>
+  </gasdefinitions>
+  <profiledata>
+    <repetitiongroup id="rg-1">
+      <dive id="dive-1">
+        <informationbeforedive>
+          <link ref="site-1"/>
+          <divenumber>1</divenumber>
+          <datetime>2026-05-02T09:30:00+01:00</datetime>
+        </informationbeforedive>
+        <tankdata>
+          <link ref="mix-1"/>
+          <tankpressurebegin>20000000</tankpressurebegin>
+          <tankpressureend>8000000</tankpressureend>
+        </tankdata>
+        <informationafterdive>
+          <greatestdepth>28.4</greatestdepth>
+          <averagedepth>16.2</averagedepth>
+          <diveduration>2760</diveduration>
+          <notes>
+            <para>A rental cylinder whose size nobody wrote down. The gas, both pressures and a real drop between them are recorded, so the size is the only input a gas-consumption figure lacks.</para>
+          </notes>
+        </informationafterdive>
+      </dive>
+      <dive id="dive-2">
+        <informationbeforedive>
+          <link ref="site-1"/>
+          <divenumber>2</divenumber>
+          <datetime>2026-05-02T14:05:00+01:00</datetime>
+        </informationbeforedive>
+        <informationafterdive>
+          <greatestdepth>18.1</greatestdepth>
+          <averagedepth>11.4</averagedepth>
+          <diveduration>3180</diveduration>
+          <notes>
+            <para>No tankdata at all, which is what APD DiveSight exports for every dive. The dive arrives with no cylinder rather than with an invented one.</para>
+          </notes>
+        </informationafterdive>
+      </dive>
+    </repetitiongroup>
+  </profiledata>
+</uddf>

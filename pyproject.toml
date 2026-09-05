@@ -1,0 +1,61 @@
+[project]
+name = "divejson"
+description = "Validator, converters and conformance runner for DiveJSON, an open dive-log interchange format"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+# `fitdecode` is here before anything imports it, and deliberately not behind an extra:
+# `pip install divejson==<release>` has to be the whole install everywhere — the
+# specification repository's CI, an application, a diver's machine — and a format left
+# out of the core is a format every consumer has to learn to ask for, and every runner
+# can quietly skip. FIT is the format most dive computers write, so it is the one that
+# must not be optional.
+dependencies = ["jsonschema>=4.18", "fitdecode>=0.11.0"]
+keywords = ["scuba", "diving", "dive-log", "interchange", "json"]
+dynamic = ["version"]
+
+# An extra rather than a PEP 735 dependency group, so that `pip install -e ".[dev]"` works
+# on every pip the declared Python floor can have. `--group` needs pip 25.1.
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+divejson = "divejson.cli:main"
+
+[project.urls]
+Homepage = "https://divejson.org"
+Repository = "https://github.com/divejson/divejson-py"
+Specification = "https://github.com/divejson/divejson/blob/main/spec/divejson.md"
+Changelog = "https://github.com/divejson/divejson-py/blob/main/CHANGELOG.md"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# One version, in the package, where `divejson --version` and `generator.version` already
+# read it. A release is then one line to move and a tag to push, rather than two numbers
+# that agree until they don't.
+[tool.hatch.version]
+path = "divejson/__init__.py"
+
+# The normative schema lives in the specification repository under `schema/<minor>/`, and
+# is vendored here at the commit `SPEC_REF` names. A built wheel carries a copy of every
+# minor that tree has — spec §7 gives each minor its own — so an installed `divejson`
+# resolves its schema with no checkout of anything beside it. Hatchling treats a missing
+# source as a build error, which is what stops a wheel being published with no schema in
+# it; nothing is fetched, so an sdist still builds offline.
+[tool.hatch.build.targets.wheel.force-include]
+"schema/" = "divejson/_schema/"
+
+# Named explicitly now that `tests/` sits beside `divejson/`: hatchling infers the package
+# from the project name today, and an inference is a thing to stop relying on the moment a
+# second top-level directory appears.
+[tool.hatch.build.targets.wheel]
+packages = ["divejson"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# A warning is a failure. The converter's own DeprecationWarnings are the ones this is
+# for: `ElementTree` warns that an element's truth value will stop meaning "has children",
+# and a converter that reads XML has that mistake available on every line.
+filterwarnings = ["error"]
