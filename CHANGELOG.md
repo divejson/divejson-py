@@ -22,9 +22,11 @@ this file is about the package, whose version moves independently.
   account export is an archive of them, so the members are converted together, in
   member-name order, into one document — with every `where` path and every positional
   identity prefixed by the member it came from, so two files whose dives carry no ids do
-  not collide. An archive that mixes formats, or holds something nothing reads, is refused
-  rather than partly imported. `max_members` and `max_member_size` bound the walk for a
-  caller that needs them, and a member is measured before it is opened.
+  not collide. A record two members both define — every per-dive export repeats the site it
+  was at — is one record: written once, referred to by both. An archive that mixes formats,
+  or holds something nothing reads, is refused rather than partly imported. `max_members`
+  and `max_member_size` bound the walk for a caller that needs them, and a member is
+  measured before it is opened.
 
 - **A note carries a kind** — `absent` for what the source never recorded, `dropped` for
   what it recorded and this format cannot hold, `inferred` for what the converter decided.

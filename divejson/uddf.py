@@ -451,8 +451,24 @@ class _Converter:
 
     # -- identity ----------------------------------------------------------------
 
-    def uuid_for(self, kind: str, source_id: str | None, where: str, index: int) -> str | None:
-        """A stable UUID for one source record, or `None` when it collides irreparably."""
+    def uuid_for(self, kind: str, source_id: str | None, where: str, index: int) -> tuple[str | None, bool]:
+        """A record's stable UUID, and whether **this** file is the one that carries it.
+
+        Three outcomes, and the middle one is the whole of what an archive needs.
+
+        The identity is nobody's yet: `(uuid, True)`, and the record is written here.
+
+        The identity belongs to a record in **another member of the same archive**:
+        `(uuid, False)`. That is one record defined twice, which is the ordinary shape of a
+        per-dive export — each file repeats the site it was at and the gear it was dived
+        with — so its row is written once and this file's references resolve to it. Not a
+        note: nothing was lost, and a note per repeat would be one line for every file in
+        the archive saying that the archive is shaped the way archives are.
+
+        The identity belongs to another record in **this same file**: `(None, False)`,
+        reported. Two records in one file cannot share one identity (spec §5.3), and there
+        is no other record to resolve to.
+        """
         if source_id is None:
             self.note(
                 where,
@@ -466,17 +482,20 @@ class _Converter:
 
         derived = str(uuid_pkg.uuid5(UDDF_ID_NAMESPACE, f"{kind}:{source_id}"))
         for candidate in dict.fromkeys((_embedded_uuid(source_id) or derived, derived)):
-            if candidate not in self.claimed:
-                self.claimed[candidate] = self.scope.where(where)
-                return candidate
+            holder = self.claimed.get(candidate)
+            if holder is None:
+                self.claimed[candidate] = (self.scope.member, self.scope.where(where))
+                return candidate, True
+            if holder[0] != self.scope.member:
+                return candidate, False
 
         self.note(
             where,
-            f"a second {kind} carries the id {source_id!r}, already used by {self.claimed[derived]}; the "
+            f"a second {kind} carries the id {source_id!r}, already used by {self.claimed[derived][1]}; the "
             "record is dropped, because two records cannot share one identity (spec §5.3)",
             "dropped",
         )
-        return None
+        return None, False
 
     # -- text --------------------------------------------------------------------
 
@@ -571,9 +590,10 @@ class _Converter:
                 document[member] = rows
         document["extensions"] = {PRODUCER_KEY: self.provenance()}
 
-        issues = validate_document(document)
-        if issues:
-            raise NonConformingOutputError(issues)
+        if self.scope.validates_alone:
+            issues = validate_document(document)
+            if issues:
+                raise NonConformingOutputError(issues)
         return Conversion(document, tuple(self.notes))
 
     def provenance(self) -> dict[str, Any]:
@@ -627,8 +647,12 @@ class _Converter:
             self.note(where, "the source records nothing about the logbook's owner; no diver is written (spec §6.1)", "absent")
             return None
 
+        claimed, carried = self.uuid_for("diver", _attr(owner, "id"), where, 0)
+        if claimed is not None and not carried:
+            # The same owner, recorded again by another file in this archive.
+            return None
+
         diver: dict[str, Any] = {}
-        claimed = self.uuid_for("diver", _attr(owner, "id"), where, 0)
         if claimed is not None:
             diver["uuid"] = claimed
         if names:
@@ -652,8 +676,16 @@ class _Converter:
                     "dropped",
                 )
                 continue
-            claimed = self.uuid_for("site", _attr(element, "id"), where, index)
+            claimed, carried = self.uuid_for("site", _attr(element, "id"), where, index)
             if claimed is None:
+                continue
+            source_id = _attr(element, "id")
+            if source_id:
+                # Recorded before the row is written, and whether or not it is: a repeat of
+                # another archive member's record is not carried again, and this file's
+                # references to it still have to resolve to the one that is.
+                self.site_uuids[source_id] = claimed
+            if not carried:
                 continue
 
             site: dict[str, Any] = {"uuid": claimed, "name": self.capped(name, MAX_NAME, where, "the site name")}
@@ -668,9 +700,6 @@ class _Converter:
             if notes:
                 site["notes"] = notes
 
-            source_id = _attr(element, "id")
-            if source_id:
-                self.site_uuids[source_id] = claimed
             sites.append(site)
         return sites
 
@@ -701,8 +730,16 @@ class _Converter:
                     "dropped",
                 )
                 continue
-            claimed = self.uuid_for("trip", _attr(element, "id"), where, index)
+            claimed, carried = self.uuid_for("trip", _attr(element, "id"), where, index)
             if claimed is None:
+                continue
+            source_id = _attr(element, "id")
+            if source_id:
+                # Recorded before the row is written, and whether or not it is: a repeat of
+                # another archive member's record is not carried again, and this file's
+                # references to it still have to resolve to the one that is.
+                self.trip_uuids[source_id] = claimed
+            if not carried:
                 continue
 
             trip: dict[str, Any] = {"uuid": claimed, "name": self.capped(name, MAX_NAME, where, "the trip name")}
@@ -716,9 +753,6 @@ class _Converter:
             if notes:
                 trip["notes"] = notes
 
-            source_id = _attr(element, "id")
-            if source_id:
-                self.trip_uuids[source_id] = claimed
             trips.append(trip)
         return trips
 
@@ -794,8 +828,16 @@ class _Converter:
                     "dropped",
                 )
                 continue
-            claimed = self.uuid_for("gear", _attr(element, "id"), where, index)
+            claimed, carried = self.uuid_for("gear", _attr(element, "id"), where, index)
             if claimed is None:
+                continue
+            source_id = _attr(element, "id")
+            if source_id:
+                # Recorded before the row is written, and whether or not it is: a repeat of
+                # another archive member's record is not carried again, and this file's
+                # references to it still have to resolve to the one that is.
+                self.gear_uuids[source_id] = claimed
+            if not carried:
                 continue
 
             item: dict[str, Any] = {"uuid": claimed, "name": self.capped(name, MAX_NAME, where, "the gear name")}
@@ -810,9 +852,6 @@ class _Converter:
             if notes:
                 item["notes"] = notes
 
-            source_id = _attr(element, "id")
-            if source_id:
-                self.gear_uuids[source_id] = claimed
             gear.append(item)
         return gear
 
@@ -889,8 +928,9 @@ class _Converter:
         started_at = self.read_started_at(before, where)
         if started_at is None:
             return None
-        claimed = self.uuid_for("dive", _attr(element, "id"), where, index)
-        if claimed is None:
+        claimed, carried = self.uuid_for("dive", _attr(element, "id"), where, index)
+        if claimed is None or not carried:
+            # `not carried`: an archive holding one dive twice carries it once.
             return None
 
         dive: dict[str, Any] = {"uuid": claimed}

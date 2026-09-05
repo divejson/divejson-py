@@ -17,6 +17,7 @@ from divejson import Conversion, Note
 from divejson.converter import (
     INFERRED,
     NOTE_KINDS,
+    Claimed,
     Scope,
     header,
     record_inferred,
@@ -104,11 +105,17 @@ def test_an_archive_member_prefixes_its_paths_and_its_positions() -> None:
 
 
 def test_members_of_one_archive_share_what_has_been_claimed() -> None:
-    shared: dict[str, str] = {}
+    """And the claim says which member made it, which is what separates the two cases.
+
+    A record another *member* already carries is one record defined twice; a record this
+    same file already named is a source defect. The member is the only thing that tells
+    them apart.
+    """
+    shared: Claimed = {}
     first = Scope(member="a.uddf", claimed=shared)
     second = Scope(member="b.uddf", claimed=shared)
-    first.claimed["1b85a949-d5f7-5d67-9d04-dcc78342f907"] = "a.uddf/dive/0"
-    assert "1b85a949-d5f7-5d67-9d04-dcc78342f907" in second.claimed
+    first.claimed["1b85a949-d5f7-5d67-9d04-dcc78342f907"] = ("a.uddf", "a.uddf/site/0")
+    assert second.claimed["1b85a949-d5f7-5d67-9d04-dcc78342f907"][0] != second.member
 
 
 # -- the document header --------------------------------------------------------------

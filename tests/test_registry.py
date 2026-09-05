@@ -171,11 +171,52 @@ def test_a_notes_path_says_which_member_raised_it() -> None:
     assert [note.where for note in conversion.notes] == ["a.uddf/dive/0"]
 
 
-def test_two_members_still_cannot_hand_out_one_identity() -> None:
-    """The same file twice is the same logbook twice, and its records are the same records."""
-    conversion = convert(_zip({"a.uddf": DIVELOGS, "b.uddf": DIVELOGS}), exported_at=EXPORTED_AT)
-    uuids = [dive["uuid"] for dive in conversion.document["dives"]]
-    assert len(uuids) == len(set(uuids))
+def test_the_same_logbook_twice_is_one_logbook() -> None:
+    """Two members naming one id are naming one record, so it is carried once."""
+    twice = convert(_zip({"a.uddf": DIVELOGS, "b.uddf": DIVELOGS}), exported_at=EXPORTED_AT)
+    once = convert(_zip({"a.uddf": DIVELOGS}), exported_at=EXPORTED_AT)
+    assert compared(twice.document) == compared(once.document)
+
+
+def test_a_record_two_members_share_is_carried_once_and_referred_to_by_both() -> None:
+    """The ordinary shape of a per-dive export, and the one that has to keep working.
+
+    A watch writes one file per dive and every one of them repeats the site it was at. The
+    site is one record, so it is written once — and the second file's dive still has to
+    point at it, rather than being told the site is not carried when it plainly is.
+    """
+    def logbook(dive_id: str) -> bytes:
+        return uddf(
+            "<divesite><site id='s1'><name>Um El Faroud</name></site></divesite>"
+            f"<profiledata><repetitiongroup><dive id='{dive_id}'><informationbeforedive>"
+            "<link ref='s1'/><datetime>2026-04-17T09:00:00+02:00</datetime>"
+            "</informationbeforedive></dive></repetitiongroup></profiledata>"
+        )
+
+    conversion = convert(_zip({"a.uddf": logbook("d1"), "b.uddf": logbook("d2")}), exported_at=EXPORTED_AT)
+    document = conversion.document
+    site = document["sites"][0]["uuid"]
+    assert len(document["sites"]) == 1
+    assert [dive["site_uuids"] for dive in document["dives"]] == [[site], [site]]
+    # Nothing was lost, so nothing is reported as lost.
+    assert not any("not a dive site this converter carries" in note.message for note in conversion.notes)
+
+
+def test_one_file_naming_two_records_the_same_is_still_a_source_defect() -> None:
+    """The opposite case, and the one the collision rule was written for.
+
+    Two records in one file cannot share an identity (spec §5.3), and unlike the archive
+    case there is no other record for a reference to resolve to.
+    """
+    data = uddf(
+        "<divesite><site id='s1'><name>Um El Faroud</name></site>"
+        "<site id='s1'><name>Blue Hole</name></site></divesite>"
+        "<profiledata><repetitiongroup><dive id='d1'><informationbeforedive>"
+        "<datetime>2026-04-17T09:00:00+02:00</datetime></informationbeforedive></dive>"
+        "</repetitiongroup></profiledata>"
+    )
+    conversion = convert(data, exported_at=EXPORTED_AT)
+    assert len(conversion.document["sites"]) == 1
     assert any("cannot share one identity" in note.message for note in conversion.notes)
 
 
@@ -274,8 +315,8 @@ def test_an_inferred_path_is_re_indexed_for_its_place_in_the_merged_document(mon
     """A path that still named its own file's dive 0 would label somebody else's dive.
 
     No reader in this build infers anything — UDDF's two ambiguities are resolved scales
-    rather than derived values — so the adapter under test here is a stand-in for `py-4`'s,
-    which reads a maximum depth off the samples when a file recorded none.
+    rather than derived values — so the adapter under test is a stand-in for one that does:
+    a reader taking a maximum depth off the samples of a file that recorded none.
     """
 
     real = adapter_for("uddf")

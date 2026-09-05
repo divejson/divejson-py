@@ -61,7 +61,7 @@ exported_at, scope)`. Register it in `divejson/registry.py` and nothing else in 
 has to be told — the CLI's `--from`, the sniffer, the archive walk and the conformance
 runner all read the registry.
 
-Four things are already decided, and re-deciding any of them in an adapter is the mistake
+The rules below are already decided, and re-deciding any of them in an adapter is the mistake
 this arrangement exists to prevent:
 
 - **The namespace is `uuid5(NAMESPACE_URL, "https://divejson.org/ns/<format>")`**, frozen
@@ -74,6 +74,9 @@ this arrangement exists to prevent:
   format can hold. `noun` and `time_member` keep the report speaking the source's language.
 - **Ask `converter.recorded` which way a zero reads.** The member's own schema constraint
   decides, and the answer differs between members that look alike.
+- **Validate the document before returning it, unless `scope.validates_alone` is false.**
+  A member of an archive is an intermediate — its dive may refer to a site another member
+  carries, so its references close only after the merge, which the registry validates.
 
 An adapter lands with its pairs under `fixtures/<format>/` and its mapping document under
 `docs/`, both of which the specification adopts afterwards — the second order above. It

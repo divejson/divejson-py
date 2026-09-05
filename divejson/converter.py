@@ -25,8 +25,13 @@ samples of a file that recorded none is both.
 
 **Identity is shared across an archive's members, and position is not.** A `Scope` carries
 the member name a conversion sits under and the UUIDs the whole upload has already handed
-out. Two members cannot hand out one identity; two members whose records carry no ids of
-their own do not collide, because the positional stand-in is prefixed by the member name.
+out, each with the member that claimed it. Two members whose records carry no ids of their
+own do not collide, because the positional stand-in is prefixed by the member name. And a
+record two members *both* define — every per-dive export repeats the site and the gear it
+used — is one record: the first member carries its row, the rest resolve their references
+to it and add nothing. A repeat inside **one** file is the different thing, and stays what
+it always was: a source defect, dropped and reported, because two records in one file
+cannot share an identity.
 
 **Which way a zero reads is the schema's decision, not the adapter's.** `recorded` asks the
 member's own constraint: `exclusiveMinimum: 0` means a zero was a placeholder the writer
@@ -49,6 +54,7 @@ from .validate import Issue, load_schema
 __all__ = [
     "INFERRED",
     "PRODUCER_KEY",
+    "Claimed",
     "Conversion",
     "ConverterError",
     "DoctypeRefusedError",
@@ -189,20 +195,27 @@ class Conversion:
         return list(groups.values())
 
 
+# Every UUID an upload has handed out, against the archive member that claimed it and the
+# path it was claimed at. The member is what separates "another file in this archive
+# already carries this record" from "this file names two records the same", which are
+# opposite answers: the first resolves references to the record that is carried, the second
+# drops a record that cannot be.
+Claimed = dict[str, tuple[str | None, str]]
+
+
 @dataclass(frozen=True, slots=True)
 class Scope:
     """Where one conversion sits inside the upload that produced it.
 
     A bare document is one conversion: no member name, and identities of its own. A member
-    of an archive shares `claimed` with its siblings, so two members cannot hand out one
-    UUID; and it prefixes both its `where` paths and its **positional** identities with its
-    own name, so two members whose records carry no ids do not collide. A record the source
-    *did* give an id is deliberately not prefixed — two members claiming one id are
-    claiming one record, which is what the collision rule is for.
+    of an archive shares `claimed` with its siblings, and prefixes both its `where` paths
+    and its **positional** identities with its own name, so two members whose records carry
+    no ids do not collide. A record the source *did* give an id is deliberately not
+    prefixed — two members naming one id are naming one record, and that is the point.
     """
 
     member: str | None = None
-    claimed: dict[str, str] = field(default_factory=dict)
+    claimed: Claimed = field(default_factory=dict)
 
     def where(self, path: str) -> str:
         return path if self.member is None else f"{self.member}/{path}"
@@ -210,6 +223,18 @@ class Scope:
     def positional(self, index: int) -> str:
         """The stand-in source id for a record the source gave none."""
         return f"#{index}" if self.member is None else f"{self.member}#{index}"
+
+    @property
+    def validates_alone(self) -> bool:
+        """Whether this conversion's own document is the one that gets written.
+
+        The converter validates its own output before writing it, and for a member of an
+        archive that output is an intermediate: the merged logbook is what is written, and
+        a member whose dive refers to a site *another* member carries cannot validate on
+        its own — its references close only after the merge. The registry validates there
+        instead, so the rule is kept once over the document that leaves the library.
+        """
+        return self.member is None
 
 
 def header(exported_at: datetime) -> dict[str, Any]:

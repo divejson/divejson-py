@@ -58,6 +58,25 @@ def test_a_sample_with_no_time_is_dropped_and_reported_where_it_sat() -> None:
     ]
 
 
+def test_a_notes_path_counts_samples_in_document_order() -> None:
+    """Including the ones that were dropped, because the path is where a diver would look.
+
+    Counting only the samples that found a place would number a drop after the last good
+    one, and send someone to an element that converted perfectly.
+    """
+    report = Reported()
+    axis = _axis(report)
+    axis.offer(None, "no time")
+    axis.offer(10, "kept")
+    axis.offer(None, "no time")
+    axis.offer(None, "no time")
+    assert [where for where, _, _ in report.notes] == [
+        "dive/0/record/0",
+        "dive/0/record/2",
+        "dive/0/record/3",
+    ]
+
+
 def test_a_sample_before_the_dive_began_is_dropped() -> None:
     report = Reported()
     axis = _axis(report)

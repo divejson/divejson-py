@@ -86,7 +86,7 @@ class SampleAxis:
     is reported through the `note` this was built with.
     """
 
-    __slots__ = ("_note", "_where", "_noun", "_time_member", "_offered", "_ordered")
+    __slots__ = ("_note", "_where", "_noun", "_time_member", "_seen", "_offered", "_ordered")
 
     def __init__(
         self,
@@ -100,6 +100,11 @@ class SampleAxis:
         self._where = where
         self._noun = noun
         self._time_member = time_member
+        # Every sample offered, not only the ones that found a place: a note's path counts
+        # samples in document order, because it is a path back into the file a diver would
+        # open. Counting the kept ones would number a dropped sample after the last good
+        # one, which is somebody else's element.
+        self._seen = 0
         self._offered: list[tuple[int, Any]] = []
         self._ordered: list[tuple[int, Any]] | None = None
 
@@ -109,7 +114,8 @@ class SampleAxis:
         `payload` is whatever the adapter needs to read the sample's channels off again on
         the second pass; this class never looks inside it.
         """
-        at = f"{self._where}/{self._noun}/{len(self._offered)}"
+        at = f"{self._where}/{self._noun}/{self._seen}"
+        self._seen += 1
         if second is None:
             self._note(
                 at,

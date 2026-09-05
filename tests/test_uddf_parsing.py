@@ -427,6 +427,22 @@ def test_waypoints_are_ordered_by_their_recorded_time() -> None:
     assert found["depth"]["values"] == [100, 300]
 
 
+def test_a_dropped_waypoint_is_reported_at_its_own_position_in_the_file() -> None:
+    """The path is where a diver would open the file, so it counts every waypoint.
+
+    A path that counted only the waypoints that survived would send someone to the one
+    element on the dive that converted perfectly.
+    """
+    samples = (
+        "<waypoint><depth>1.0</depth></waypoint>"
+        "<waypoint><depth>2.0</depth><divetime>10</divetime></waypoint>"
+        "<waypoint><depth>3.0</depth></waypoint>"
+    )
+    conversion = convert(one_dive(f"{STARTED_AT}<samples>{samples}</samples>"))
+    dropped = [note.where for note in conversion.notes if "no place on the profile" in note.message]
+    assert dropped == ["dive/0/waypoint/0", "dive/0/waypoint/2"]
+
+
 def test_waypoints_landing_on_one_second_keep_the_first() -> None:
     """`<divetime>` is `xs:float`, and §6.5's `times` are strictly increasing integers."""
     samples = (

@@ -38,6 +38,7 @@ from typing import Any, BinaryIO, Protocol
 from .converter import (
     INFERRED,
     PRODUCER_KEY,
+    Claimed,
     Conversion,
     MalformedArchiveError,
     NonConformingOutputError,
@@ -91,7 +92,9 @@ class Adapter(Protocol):
     `sniff` is given a bounded head of bytes and says whether this reader claims them.
     `convert` is given the whole source and returns a document and its report; provenance
     is written inside it, under `extensions.divejson`, because what a file says about
-    itself is only knowable once it has been parsed.
+    itself is only knowable once it has been parsed. It validates its own output before
+    returning it — unless `scope.validates_alone` says the document is an archive member's,
+    in which case the merged logbook is what gets validated, here.
     """
 
     format: str
@@ -243,7 +246,7 @@ def _archive(
         )
 
     reader = adapter_for(formats[0])
-    shared: dict[str, str] = {}
+    shared: Claimed = {}
     converted: list[tuple[str, Conversion]] = []
     for name in names:
         data = _member_bytes(archive, name, max_member_size)
@@ -283,10 +286,12 @@ def _member_bytes(
 def _merged(converted: list[tuple[str, Conversion]], *, exported_at: datetime) -> Conversion:
     """One document out of an archive's members, in member-name order.
 
-    Identity needed no reconciling — the members shared a `Scope`, so no two of them handed
-    out one UUID and every positional identity carried its member's name — so this is
-    concatenation plus the two members that are the *document's* rather than a record's:
-    the diver, of which a logbook has one, and the provenance block.
+    Identity was reconciled as the members converted, not here: they shared a `Scope`, so
+    no two of them handed out one UUID, every positional identity carried its member's
+    name, and a record two members both defined was written by the first and referred to by
+    the rest. What is left is concatenation, plus the one member that is the *document's*
+    rather than a record's — the diver, of which a logbook has one — and the provenance
+    block, which is this converter's own statement about the whole archive.
     """
     documents = [conversion.document for _, conversion in converted]
     notes: list[Note] = [note for _, conversion in converted for note in conversion.notes]
