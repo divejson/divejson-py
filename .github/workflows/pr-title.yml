@@ -1,0 +1,65 @@
+name: PR Title
+
+on:
+  pull_request:
+    # `edited` is the one that matters: it re-runs the check when a title is
+    # corrected, so a failing PR goes green without an empty commit to push.
+    #
+    # `synchronize` is not about the title at all - it is what would let this be
+    # a required check. A required check has to have passed on the PR's *latest*
+    # head SHA, so without a run per push, a PR that gains a second commit would
+    # sit at "Expected - waiting for status" for good. The title is read from the
+    # event payload rather than from the tree, so the extra runs reach the same
+    # verdict. Nothing is required on `main` today; this keeps the option open at
+    # no cost.
+    types: [opened, edited, reopened, synchronize]
+
+# The one list of types. CONTRIBUTING.md spells the same list out in prose -
+# keep the two in step.
+env:
+  TYPES: feat|fix|refactor|docs|test|chore|perf|ci|build|revert
+
+jobs:
+  semantic-title:
+    runs-on: ubuntu-latest
+
+    # Nothing is checked out and no API call is made - the title arrives in the
+    # event payload - so this job needs no token at all.
+    permissions: {}
+
+    steps:
+      # `main`'s ruleset allows only squash merges, and the repository's squash
+      # subject source is PR_TITLE rather than COMMIT_OR_PR_TITLE, so this title
+      # *is* the commit subject that lands. It is the only part of a branch that
+      # outlives the branch, which is why it is checked and the individual
+      # commits are not. That setting was corrected by hand after a non-semantic
+      # subject reached a default branch in this org; this check is the half that
+      # stops the bad title from being written in the first place.
+      #
+      # The title is passed through `env` rather than interpolated into the
+      # script. `${{ github.event.pull_request.title }}` written inside `run:`
+      # is substituted before bash parses the line, so a title containing
+      # backticks or `$(...)` would execute as shell.
+      - name: Check title is a conventional commit subject
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          PATTERN="^($TYPES)(\([a-z0-9._-]+\))?!?: .+"
+
+          if printf '%s' "$TITLE" | grep -Eq "$PATTERN"; then
+            echo "OK: $TITLE"
+            exit 0
+          fi
+
+          echo "PR title is not a semantic commit subject:"
+          echo "    $TITLE"
+          echo
+          echo "Expected: <type>[(scope)][!]: <description>"
+          echo "Types:    ${TYPES//|/, }"
+          echo
+          echo "Examples: feat(schema): a cylinder may record a mix without a vessel"
+          echo "          fix(spec): profile.duration spans the samples, not the events"
+          echo "          docs(spec)!: the draft becomes 1.0"
+          echo
+          echo "Edit the title - this check re-runs on edit, no push needed."
+          exit 1
