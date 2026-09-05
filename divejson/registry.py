@@ -300,15 +300,17 @@ def _merged(converted: list[tuple[str, Conversion]], *, exported_at: datetime) -
     owners = [(name, conversion.document["diver"]) for name, conversion in converted if "diver" in conversion.document]
     if owners:
         document["diver"] = owners[0][1]
-        for name, _ in owners[1:]:
-            notes.append(
-                Note(
-                    name,
-                    "this file records its own logbook owner, and the archive's owner is the one "
-                    f"{owners[0][0]} records; a logbook has one diver (spec §6.1)",
-                    "dropped",
+        for name, other in owners[1:]:
+            if _recorded_owner(other) != _recorded_owner(owners[0][1]):
+                notes.append(
+                    Note(
+                        name,
+                        "this file records a different logbook owner from the one "
+                        f"{owners[0][0]} records, and a logbook has one; the owner recorded here is "
+                        "dropped (spec §6.1)",
+                        "dropped",
+                    )
                 )
-            )
 
     for member in COLLECTIONS:
         rows = [row for doc in documents for row in doc.get(member, ())]
@@ -321,6 +323,18 @@ def _merged(converted: list[tuple[str, Conversion]], *, exported_at: datetime) -
     if issues:
         raise NonConformingOutputError(issues)
     return Conversion(document, tuple(notes))
+
+
+def _recorded_owner(diver: dict[str, Any]) -> dict[str, Any]:
+    """A diver reduced to what the source actually recorded about the person.
+
+    Without the UUID, which for this one record says nothing: it is derived from an
+    `<owner id>` that every UDDF writer spells `owner`, so it is the same for two different
+    people and different for one person whose two exports spell it differently. What
+    separates an archive of one diver's dives — where every file repeats the same owner and
+    nothing is lost — from two people's exports in one zip is the name and the email.
+    """
+    return {member: value for member, value in diver.items() if member != "uuid"}
 
 
 def _merged_provenance(converted: list[tuple[str, Conversion]], notes: list[Note]) -> dict[str, Any]:

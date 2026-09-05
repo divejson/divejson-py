@@ -370,7 +370,7 @@ def _owned(first_name: str, owner_id: str, dive_id: str) -> bytes:
 
 
 @pytest.mark.parametrize("second_owner_id", ["owner", "owner2"])
-def test_a_second_members_diver_is_reported_rather_than_silently_dropped(second_owner_id: str) -> None:
+def test_a_second_persons_diver_is_reported_rather_than_silently_dropped(second_owner_id: str) -> None:
     """The one record that does not take the shared-record path, and why.
 
     Every UDDF writer in the corpus spells the owner's id `owner`, so two *different*
@@ -384,4 +384,20 @@ def test_a_second_members_diver_is_reported_rather_than_silently_dropped(second_
         exported_at=EXPORTED_AT,
     )
     assert conversion.document["diver"]["name"] == "Sam"
-    assert [note.where for note in conversion.notes if "a logbook has one diver" in note.message] == ["b.uddf"]
+    assert [note.where for note in conversion.notes if "a logbook has one" in note.message] == ["b.uddf"]
+
+
+def test_one_persons_export_repeating_its_owner_is_not_a_report_line() -> None:
+    """The shape the archive walk was written for: one diver, one file per dive.
+
+    Nothing is lost when every file names the same person, so nothing is reported. A
+    `dropped` line per file would be the report saying, once per dive, that the archive is
+    shaped the way archives are.
+    """
+    conversion = convert(
+        _zip({f"dive-{index}.uddf": _owned("Sam", "owner", f"d{index}") for index in range(5)}),
+        exported_at=EXPORTED_AT,
+    )
+    assert conversion.document["diver"]["name"] == "Sam"
+    assert len(conversion.document["dives"]) == 5
+    assert [note.message for note in conversion.notes if "a logbook has one" in note.message] == []
