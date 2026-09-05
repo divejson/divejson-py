@@ -13,7 +13,6 @@ import io
 import json
 import zipfile
 from datetime import datetime, timezone
-from pathlib import Path
 
 import pytest
 from helpers import FIXTURES, uddf
@@ -360,15 +359,29 @@ def test_the_archives_own_exported_at_is_the_one_the_caller_passed() -> None:
     assert conversion.document["exported_at"] == "2026-09-05T00:00:00+00:00"
 
 
-def test_a_second_members_diver_is_dropped_because_a_logbook_has_one(tmp_path: Path) -> None:
-    owner = uddf(
-        "<diver><owner id='owner'><personal><firstname>Sam</firstname></personal></owner></diver>"
-        "<profiledata><repetitiongroup><dive id='d1'><informationbeforedive>"
+def _owned(first_name: str, owner_id: str, dive_id: str) -> bytes:
+    return uddf(
+        f"<diver><owner id='{owner_id}'><personal><firstname>{first_name}</firstname></personal>"
+        "</owner></diver>"
+        f"<profiledata><repetitiongroup><dive id='{dive_id}'><informationbeforedive>"
         "<datetime>2026-04-17T09:00:00+02:00</datetime></informationbeforedive></dive>"
         "</repetitiongroup></profiledata>"
     )
-    other = owner.replace(b"Sam", b"Alex").replace(b"id='owner'", b"id='owner2'").replace(b"id='d1'", b"id='d2'")
 
-    conversion = convert(_zip({"a.uddf": owner, "b.uddf": other}), exported_at=EXPORTED_AT)
+
+@pytest.mark.parametrize("second_owner_id", ["owner", "owner2"])
+def test_a_second_members_diver_is_reported_rather_than_silently_dropped(second_owner_id: str) -> None:
+    """The one record that does not take the shared-record path, and why.
+
+    Every UDDF writer in the corpus spells the owner's id `owner`, so two *different*
+    people's exports collide on it by convention rather than by being one person. Treating
+    that the way a shared site is treated would discard the second person's name and email
+    without a line in the report — which is why the parametrization runs the colliding id
+    as well as the distinct one, and expects the same answer from both.
+    """
+    conversion = convert(
+        _zip({"a.uddf": _owned("Sam", "owner", "d1"), "b.uddf": _owned("Alex", second_owner_id, "d2")}),
+        exported_at=EXPORTED_AT,
+    )
     assert conversion.document["diver"]["name"] == "Sam"
-    assert any("a logbook has one diver" in note.message for note in conversion.notes)
+    assert [note.where for note in conversion.notes if "a logbook has one diver" in note.message] == ["b.uddf"]

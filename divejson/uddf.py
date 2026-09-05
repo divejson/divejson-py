@@ -433,8 +433,10 @@ class _Converter:
         self.exported_at = exported_at
         self.scope = scope
         self.notes: list[Note] = []
-        # Shared with the rest of the archive this file came from, if it came from one:
-        # two members cannot hand out one identity.
+        # Shared with the rest of the archive this file came from, if it came from one, so
+        # that a record two members both define is written once and referred to by both —
+        # see `uuid_for`, which is where that is decided and where the *other* case, two
+        # records in one file naming one id, is still refused.
         self.claimed = scope.claimed
         self.inferred: list[str] = []
         self.source_ids: set[str] = set()
@@ -632,6 +634,14 @@ class _Converter:
         the member entirely — minting identity for one would be §5.4's fabrication applied
         to people. `<owner id>` is deliberately not read as a name or a handle: it is an
         XML id, and Subsurface's is the literal string "owner".
+
+        **That is also why the diver is the one record that does not take `uuid_for`'s
+        shared-record path.** Two archive members naming one site id are naming one site;
+        two naming one *owner* id are naming nothing, because the id is a convention rather
+        than an identity and every UDDF writer in the corpus spells it `owner`. So a second
+        member's diver is written out — without the identity that is not its own — and the
+        merge is where a logbook's one owner is chosen and the rest reported. Collapsing it
+        here would discard a second person's name and email in silence.
         """
         owner = _dig(self.root, "diver", "owner")
         if owner is None:
@@ -648,12 +658,8 @@ class _Converter:
             return None
 
         claimed, carried = self.uuid_for("diver", _attr(owner, "id"), where, 0)
-        if claimed is not None and not carried:
-            # The same owner, recorded again by another file in this archive.
-            return None
-
         diver: dict[str, Any] = {}
-        if claimed is not None:
+        if claimed is not None and carried:
             diver["uuid"] = claimed
         if names:
             diver["name"] = self.capped(" ".join(names), MAX_NAME, where, "the diver's name")
