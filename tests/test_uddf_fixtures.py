@@ -21,8 +21,7 @@ import json
 import pytest
 from helpers import EXPORTED_AT, FIXTURES
 
-from divejson.conform import compared
-from divejson.uddf import convert_uddf_file
+from divejson import compared, convert
 from divejson.validate import validate_document
 
 # A glob that silently matches nothing is how a suite stops testing anything, and the
@@ -38,7 +37,7 @@ def test_fixture_converts_to_its_expected_document(uddf) -> None:
     expected_path = uddf.with_suffix(".divejson")
     assert expected_path.is_file(), f"{uddf.name} has no expected output beside it"
     expected = json.loads(expected_path.read_text(encoding="utf-8"))
-    produced = convert_uddf_file(uddf, exported_at=EXPORTED_AT).document
+    produced = convert(uddf.read_bytes(), exported_at=EXPORTED_AT).document
     assert compared(produced) == compared(expected)
 
 
@@ -67,7 +66,7 @@ def test_the_mix_only_cylinder_keeps_its_gas_and_loses_only_its_size() -> None:
     size is the *only* input a gas-consumption figure lacks — which is what makes this
     fixture able to reach a reader's size-specific refusal rather than an earlier one.
     """
-    dives = convert_uddf_file(FIXTURES / "uddf" / "mix-only-cylinder.uddf").document["dives"]
+    dives = convert((FIXTURES / "uddf" / "mix-only-cylinder.uddf").read_bytes()).document["dives"]
     cylinder = dives[0]["cylinders"][0]
     assert "volume" not in cylinder
     assert cylinder["oxygen"] == 32.0
@@ -84,7 +83,7 @@ def test_the_reference_implementations_own_identities_survive_the_round_trip() -
     real uuids has to prefix them to satisfy `xs:ID`, and recovering them is what keeps a
     logbook that went out through UDDF recognisable when it comes back.
     """
-    document = convert_uddf_file(FIXTURES / "uddf" / "opendiving.uddf").document
+    document = convert((FIXTURES / "uddf" / "opendiving.uddf").read_bytes()).document
     assert document["dives"][0]["uuid"] == "0198a6f0-5555-7001-8000-000000000001"
     assert document["sites"][0]["uuid"] == "0198a6f0-3333-7001-8000-000000000001"
     assert document["trips"][0]["uuid"] == "0198a6f0-4444-7001-8000-000000000001"

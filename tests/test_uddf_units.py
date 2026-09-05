@@ -20,16 +20,16 @@ from __future__ import annotations
 import pytest
 from helpers import FIXTURES, STARTED_AT, before, one_dive
 
-from divejson.uddf import convert_uddf, convert_uddf_file
+from divejson import convert
 
 
 def cylinder(body: str, *, mix: str = "") -> dict:
-    document = convert_uddf(one_dive(f"{STARTED_AT}<tankdata>{body}</tankdata>", header=mix)).document
+    document = convert(one_dive(f"{STARTED_AT}<tankdata>{body}</tankdata>", header=mix)).document
     return document["dives"][0]["cylinders"][0]
 
 
 def profile(samples: str) -> dict:
-    document = convert_uddf(one_dive(f"{STARTED_AT}<samples>{samples}</samples>")).document
+    document = convert(one_dive(f"{STARTED_AT}<samples>{samples}</samples>")).document
     return document["dives"][0]["profile"]
 
 
@@ -67,7 +67,7 @@ def test_temperature_samples_are_tenths_of_a_degree(kelvin: str, tenths: int) ->
 
 def test_bottom_temperature_is_plain_celsius() -> None:
     """The scalar member takes no tenths scale, which is the pair this file exists to keep apart."""
-    document = convert_uddf(
+    document = convert(
         one_dive(f"{STARTED_AT}<informationafterdive><lowesttemperature>295.15</lowesttemperature></informationafterdive>")
     ).document
     assert document["dives"][0]["bottom_temperature"] == 22.0  # 295.15 - 273.15
@@ -81,7 +81,7 @@ def test_tank_pressure_samples_are_tenths_of_a_bar() -> None:
     )
     body = f'{STARTED_AT}<tankdata><link ref="mix-1"/></tankdata><samples>{samples}</samples>'
     header = '<gasdefinitions><mix id="mix-1"><name>Air</name><o2>0.21</o2></mix></gasdefinitions>'
-    document = convert_uddf(one_dive(body, header=header)).document
+    document = convert(one_dive(body, header=header)).document
     assert document["dives"][0]["profile"]["pressures"][0]["values"] == [2100]
 
 
@@ -94,7 +94,7 @@ def test_cylinder_pressures_are_plain_bar() -> None:
 
 def test_surface_pressure_is_plain_bar() -> None:
     """101 300 Pa / 100 000 = 1.013 bar."""
-    document = convert_uddf(one_dive(before("<surfacepressure>101300</surfacepressure>"))).document
+    document = convert(one_dive(before("<surfacepressure>101300</surfacepressure>"))).document
     assert document["dives"][0]["surface_pressure"] == 1.013
 
 
@@ -121,7 +121,7 @@ def test_tank_volume_at_or_above_one_is_already_litres(written: str) -> None:
 
 
 def test_reinterpreting_a_tank_volume_is_reported() -> None:
-    conversion = convert_uddf(one_dive(f"{STARTED_AT}<tankdata><tankvolume>12</tankvolume></tankdata>"))
+    conversion = convert(one_dive(f"{STARTED_AT}<tankdata><tankvolume>12</tankvolume></tankdata>"))
     assert any("read as 12 litres" in note.message for note in conversion.notes)
 
 
@@ -142,7 +142,7 @@ def test_gas_fractions_become_percentages(written: str, percent: float) -> None:
 
 def test_reinterpreting_a_gas_fraction_is_reported() -> None:
     header = '<gasdefinitions><mix id="m"><name>Gas</name><o2>34</o2></mix></gasdefinitions>'
-    conversion = convert_uddf(one_dive(f'{STARTED_AT}<tankdata><link ref="m"/></tankdata>', header=header))
+    conversion = convert(one_dive(f'{STARTED_AT}<tankdata><link ref="m"/></tankdata>', header=header))
     assert any("read as 34 percent" in note.message for note in conversion.notes)
 
 
@@ -157,7 +157,7 @@ def test_depths_and_temperatures_match_the_reference_export() -> None:
     the head of that comparison, and they are what makes this a known answer rather than a
     fixture agreeing with the code that produced it.
     """
-    found = convert_uddf_file(FIXTURES / "uddf" / "subsurface.uddf").document["dives"][0]["profile"]
+    found = convert((FIXTURES / "uddf" / "subsurface.uddf").read_bytes()).document["dives"][0]["profile"]
     assert found["depth"]["times"] == [0, 10, 20, 30, 40, 80, 170, 4300]
     assert found["depth"]["values"] == [145, 183, 222, 257, 260, 332, 911, 0]
     assert found["temperature"]["times"] == [30, 80]

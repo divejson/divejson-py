@@ -37,7 +37,7 @@ STARTED_AT = before()
 
 
 def uddf(body: str, *, version: str = "3.2.2", namespace: str | None = UDDF_NAMESPACE) -> bytes:
-    """One UDDF document around `body`, as the bytes `convert_uddf` takes."""
+    """One UDDF document around `body`, as the bytes `convert` takes."""
     declared = f' xmlns="{namespace}"' if namespace else ""
     return f'<?xml version="1.0" encoding="utf-8"?>\n<uddf{declared} version="{version}">{body}</uddf>'.encode()
 

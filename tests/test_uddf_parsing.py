@@ -13,11 +13,7 @@ import json
 import pytest
 from helpers import STARTED_AT, before, one_dive, uddf
 
-from divejson.uddf import (
-    DoctypeRefusedError,
-    MalformedUddfError,
-    convert_uddf,
-)
+from divejson import DoctypeRefusedError, MalformedUddfError, convert
 from divejson.validate import validate_document
 
 
@@ -26,11 +22,11 @@ def _refuse_non_json(token: str) -> None:
 
 
 def dive(body: str, **kwargs) -> dict:
-    return convert_uddf(one_dive(body, **kwargs)).document["dives"][0]
+    return convert(one_dive(body, **kwargs)).document["dives"][0]
 
 
 def messages(data: bytes) -> list[str]:
-    return [note.message for note in convert_uddf(data).notes]
+    return [note.message for note in convert(data).notes]
 
 
 # -- root shapes ---------------------------------------------------------------------
@@ -46,7 +42,7 @@ def messages(data: bytes) -> list[str]:
     ],
 )
 def test_every_root_shape_is_read(version: str, namespace: str | None) -> None:
-    document = convert_uddf(one_dive(STARTED_AT, version=version, namespace=namespace)).document
+    document = convert(one_dive(STARTED_AT, version=version, namespace=namespace)).document
     assert len(document["dives"]) == 1
     assert document["extensions"]["divejson"]["uddf_version"] == version
 
@@ -56,19 +52,25 @@ def test_an_uppercase_root_is_read() -> None:
     data = b'<UDDF VERSION="2.2.0"><PROFILEDATA><REPETITIONGROUP ID="g"><DIVE ID="d">'
     data += b"<INFORMATIONBEFOREDIVE><DATETIME>2002-06-18T09:00:00</DATETIME></INFORMATIONBEFOREDIVE>"
     data += b"</DIVE></REPETITIONGROUP></PROFILEDATA></UDDF>"
-    document = convert_uddf(data).document
+    document = convert(data).document
     assert document["dives"][0]["started_at"] == "2002-06-18T09:00:00"
     assert document["extensions"]["divejson"]["uddf_version"] == "2.2.0"
 
 
 def test_a_root_that_is_not_uddf_is_refused() -> None:
+    """`--from uddf`, because the sniffer would not have handed these bytes here at all.
+
+    The two refusals are different answers to different questions and both have to keep
+    working: "nothing reads this" is what a diver uploading a spreadsheet gets, and "this
+    is not UDDF" is what someone who said it was gets.
+    """
     with pytest.raises(MalformedUddfError, match="not <uddf>"):
-        convert_uddf(b"<dives/>")
+        convert(b"<dives/>", format="uddf")
 
 
 def test_input_that_is_not_xml_is_refused() -> None:
     with pytest.raises(MalformedUddfError, match="not well-formed"):
-        convert_uddf(b"{}")
+        convert(b"{}", format="uddf")
 
 
 # -- the doctype refusal -------------------------------------------------------------
@@ -83,7 +85,7 @@ def test_a_doctype_is_refused() -> None:
     """
     data = b'<!DOCTYPE uddf [<!ENTITY a "b">]><uddf version="3.2.2"/>'
     with pytest.raises(DoctypeRefusedError, match="DOCTYPE"):
-        convert_uddf(data)
+        convert(data)
 
 
 def test_an_entity_bomb_never_expands() -> None:
@@ -95,7 +97,7 @@ def test_an_entity_bomb_never_expands() -> None:
     )
     data = b'<!DOCTYPE uddf [' + entities + b'<!ENTITY lol0 "lol">]><uddf version="3.2.2"><n>&lol9;</n></uddf>'
     with pytest.raises(DoctypeRefusedError):
-        convert_uddf(data)
+        convert(data)
 
 
 # -- leniency ------------------------------------------------------------------------
@@ -120,7 +122,7 @@ def test_children_are_taken_by_name_rather_than_by_position() -> None:
 def test_ids_and_refs_are_stripped_of_whitespace() -> None:
     """Subsurface writes one site id as `" ff47210"`, and the links to it carry the space."""
     header = '<divesite><site id=" ff47210"><name>Small Brother</name></site></divesite>'
-    document = convert_uddf(one_dive(before('<link ref=" ff47210"/>'), header=header)).document
+    document = convert(one_dive(before('<link ref=" ff47210"/>'), header=header)).document
     assert document["dives"][0]["site_uuids"] == [document["sites"][0]["uuid"]]
 
 
@@ -134,7 +136,7 @@ def test_an_id_that_is_not_an_ncname_is_read_anyway() -> None:
 def test_an_empty_element_is_absent_rather_than_zero() -> None:
     """Subsurface writes `<latitude/>` for a site whose coordinates it does not have."""
     header = "<divesite><site id='s'><name>Small Brother</name><geography><location>Egypt</location><latitude/><longitude/></geography></site></divesite>"
-    site = convert_uddf(one_dive(STARTED_AT, header=header)).document["sites"][0]
+    site = convert(one_dive(STARTED_AT, header=header)).document["sites"][0]
     assert "position" not in site
     assert site["location"] == "Egypt"
 
@@ -145,7 +147,7 @@ def test_an_empty_element_is_absent_rather_than_zero() -> None:
 def test_null_island_is_not_a_position() -> None:
     """Every site in a divelogs.de export carries an exact 0.000000 pair."""
     header = "<divesite><site id='s'><name>SS Thistlegorm</name><geography><location>Red Sea</location><latitude>0.000000</latitude><longitude>0.000000</longitude></geography></site></divesite>"
-    conversion = convert_uddf(one_dive(STARTED_AT, header=header))
+    conversion = convert(one_dive(STARTED_AT, header=header))
     assert "position" not in conversion.document["sites"][0]
     assert any("Null Island" in note.message for note in conversion.notes)
 
@@ -182,7 +184,7 @@ def test_a_zero_lead_quantity_is_a_recorded_no_lead() -> None:
 def test_an_offset_less_start_time_stays_offset_less() -> None:
     """§5.2: never assume an offset, and never convert to UTC."""
     data = one_dive(before(datetime_text="2026-04-17T11:49:23"))
-    found = convert_uddf(data).document["dives"][0]
+    found = convert(data).document["dives"][0]
     assert found["started_at"] == "2026-04-17T11:49:23"
     assert any("no UTC offset" in message for message in messages(data))
 
@@ -214,13 +216,13 @@ def test_a_truncated_midnight_is_read_as_midnight_and_reported() -> None:
     reading is stated in the report rather than made silently.
     """
     data = one_dive(before(datetime_text="2002-06-18T"))
-    assert convert_uddf(data).document["dives"][0]["started_at"] == "2002-06-18T00:00:00"
+    assert convert(data).document["dives"][0]["started_at"] == "2002-06-18T00:00:00"
     assert any("no time of day" in message for message in messages(data))
 
 
 def test_a_dive_with_no_start_time_is_dropped_rather_than_dated() -> None:
     data = one_dive("<informationafterdive><greatestdepth>18.4</greatestdepth></informationafterdive>")
-    conversion = convert_uddf(data)
+    conversion = convert(data)
     assert "dives" not in conversion.document
     assert any("the dive is dropped" in note.message for note in conversion.notes)
 
@@ -228,7 +230,7 @@ def test_a_dive_with_no_start_time_is_dropped_rather_than_dated() -> None:
 def test_a_site_with_no_name_is_dropped_along_with_the_reference_to_it() -> None:
     """§6.10 requires a name and §5.3 forbids a dangling reference, so both have to go."""
     header = "<divesite><site id='s'><name/><geography><location>Sinai, Red Sea</location></geography></site></divesite>"
-    conversion = convert_uddf(one_dive(before("<link ref='s'/>"), header=header))
+    conversion = convert(one_dive(before("<link ref='s'/>"), header=header))
     assert "sites" not in conversion.document
     assert "site_uuids" not in conversion.document["dives"][0]
     assert any("cannot be invented" in note.message for note in conversion.notes)
@@ -237,7 +239,7 @@ def test_a_site_with_no_name_is_dropped_along_with_the_reference_to_it() -> None
 def test_an_owner_with_nothing_recorded_is_no_diver_at_all() -> None:
     """§6.1: minting identity for an ownerless logbook is §5.4 applied to people."""
     header = "<diver><owner id='owner'><personal><firstname/><lastname/></personal></owner></diver>"
-    conversion = convert_uddf(one_dive(STARTED_AT, header=header))
+    conversion = convert(one_dive(STARTED_AT, header=header))
     assert "diver" not in conversion.document
     assert any("records nothing about the logbook's owner" in note.message for note in conversion.notes)
 
@@ -247,7 +249,7 @@ def test_an_owner_with_a_name_becomes_a_diver() -> None:
         "<diver><owner id='owner'><personal><firstname>Sam</firstname><lastname>Reef</lastname></personal>"
         "<contact><email>sam@example.org</email></contact></owner></diver>"
     )
-    diver = convert_uddf(one_dive(STARTED_AT, header=header)).document["diver"]
+    diver = convert(one_dive(STARTED_AT, header=header)).document["diver"]
     assert diver["name"] == "Sam Reef"
     assert diver["email"] == "sam@example.org"
 
@@ -265,7 +267,7 @@ def test_an_email_that_is_not_an_address_costs_one_member_and_not_the_logbook(wr
         "<diver><owner id='owner'><personal><firstname>Sam</firstname><lastname>Reef</lastname></personal>"
         f"<contact><email>{written}</email></contact></owner></diver>"
     )
-    conversion = convert_uddf(one_dive(STARTED_AT, header=header))
+    conversion = convert(one_dive(STARTED_AT, header=header))
     assert conversion.document["diver"] == {"uuid": conversion.document["diver"]["uuid"], "name": "Sam Reef"}
     assert len(conversion.document["dives"]) == 1
     assert any("is not an address" in note.message for note in conversion.notes)
@@ -290,7 +292,7 @@ def test_a_number_too_large_to_carry_is_not_a_number(written: str) -> None:
         f"<informationafterdive><greatestdepth>{written}</greatestdepth>"
         f"<diveduration>{written}</diveduration></informationafterdive>"
     )
-    conversion = convert_uddf(one_dive(body, header=header))
+    conversion = convert(one_dive(body, header=header))
     assert validate_document(conversion.document) == []
     found = conversion.document["dives"][0]
     assert found["cylinders"][0] == {}
@@ -330,7 +332,7 @@ def test_hostile_source_strings_still_produce_a_conforming_document() -> None:
         + f"<samples><waypoint><depth>1.0</depth><divetime>0</divetime><setmarker>{long_name}</setmarker></waypoint></samples>"
         + f"<informationafterdive><notes><para>{long_note}</para></notes></informationafterdive>"
     )
-    conversion = convert_uddf(one_dive(body, header=header))
+    conversion = convert(one_dive(body, header=header))
     assert validate_document(conversion.document) == []
     assert "email" not in conversion.document["diver"]
     assert len(conversion.document["dives"][0]["notes"]) == 10_000
@@ -343,7 +345,7 @@ def test_hostile_source_strings_still_produce_a_conforming_document() -> None:
 def test_converting_the_same_file_twice_gives_the_same_identities() -> None:
     """§5.3 asks for identifiers stable across exports of the same data."""
     data = one_dive(STARTED_AT)
-    assert convert_uddf(data).document["dives"][0]["uuid"] == convert_uddf(data).document["dives"][0]["uuid"]
+    assert convert(data).document["dives"][0]["uuid"] == convert(data).document["dives"][0]["uuid"]
 
 
 def test_a_dive_and_its_repetition_group_do_not_share_an_identity() -> None:
@@ -359,7 +361,7 @@ def test_a_dive_and_its_repetition_group_do_not_share_an_identity() -> None:
         f'<profiledata><repetitiongroup id="{shared}"><dive id="{shared}">{STARTED_AT}</dive>'
         "</repetitiongroup></profiledata>"
     )
-    document = convert_uddf(data).document
+    document = convert(data).document
     assert document["dives"][0]["uuid"] != document["sites"][0]["uuid"]
 
 
@@ -367,14 +369,14 @@ def test_two_records_of_one_kind_sharing_an_id_is_reported_and_the_second_droppe
     header = (
         "<divesite><site id='s'><name>One</name></site><site id='s'><name>Two</name></site></divesite>"
     )
-    conversion = convert_uddf(one_dive(STARTED_AT, header=header))
+    conversion = convert(one_dive(STARTED_AT, header=header))
     assert [site["name"] for site in conversion.document["sites"]] == ["One"]
     assert any("cannot share one identity" in note.message for note in conversion.notes)
 
 
 def test_a_record_with_no_id_gets_a_positional_identity_and_says_so() -> None:
     header = "<divesite><site><name>Unnamed by its writer</name></site></divesite>"
-    conversion = convert_uddf(one_dive(STARTED_AT, header=header))
+    conversion = convert(one_dive(STARTED_AT, header=header))
     assert len(conversion.document["sites"]) == 1
     assert any("derived from its position" in note.message for note in conversion.notes)
 
@@ -432,7 +434,7 @@ def test_waypoints_landing_on_one_second_keep_the_first() -> None:
         "<waypoint><depth>2.0</depth><divetime>30.4</divetime></waypoint>"
     )
     data = one_dive(f"{STARTED_AT}<samples>{samples}</samples>")
-    found = convert_uddf(data).document["dives"][0]["profile"]
+    found = convert(data).document["dives"][0]["profile"]
     assert found["depth"]["times"] == [30]
     assert found["depth"]["values"] == [100]
     assert any("strictly increasing" in message for message in messages(data))
@@ -452,7 +454,7 @@ def test_waypoints_with_no_usable_reading_produce_no_profile_and_say_so() -> Non
         "<waypoint><depth/><divetime>10</divetime></waypoint>"
     )
     data = one_dive(f"{STARTED_AT}<samples>{samples}</samples>")
-    assert "profile" not in convert_uddf(data).document["dives"][0]
+    assert "profile" not in convert(data).document["dives"][0]
     assert "the dive's 2 waypoints carry a time but no reading this format can hold" in " ".join(messages(data))
 
 
@@ -474,7 +476,7 @@ def test_a_dive_with_no_samples_at_all_is_not_reported() -> None:
 def test_a_waypoint_with_no_time_has_no_place_on_the_axis() -> None:
     samples = "<waypoint><depth>1.0</depth></waypoint><waypoint><depth>2.0</depth><divetime>10</divetime></waypoint>"
     data = one_dive(f"{STARTED_AT}<samples>{samples}</samples>")
-    assert convert_uddf(data).document["dives"][0]["profile"]["depth"]["times"] == [10]
+    assert convert(data).document["dives"][0]["profile"]["depth"]["times"] == [10]
     assert any("no place on the profile's time axis" in message for message in messages(data))
 
 

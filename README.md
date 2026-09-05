@@ -43,9 +43,38 @@ writes `my-logbook.divejson` beside the input and reports, line by line, what th
 did not carry — no UTC offsets, a cylinder whose size nobody recorded, coordinates that
 were `0.000000`. **Nothing absent is filled in**: that report is the other half of the
 output, not a diagnostic, and it is what tells a diver which parts of their history their
-old application never kept. The mapping rules, the three places UDDF is genuinely
-ambiguous, and what is deliberately left unmapped are in
+old application never kept. Every line says which kind of news it is:
+
+| kind | what it means |
+| --- | --- |
+| `absent` | the source never recorded this |
+| `dropped` | the source recorded it and this format cannot hold it |
+| `inferred` | the converter decided it — a value computed from other readings, or a number whose scale the source left ambiguous |
+
+A member whose *value* was computed rather than read is also listed under
+`extensions.divejson.inferred` in the document itself, so a reader can tell a derivation
+from a reading (spec §5.4).
+
+**The format is recognised from the file's own bytes**, not from its extension, and
+`--from <format>` says what a file is when the bytes do not. A **zip** whose files are all
+one format is read as one logbook — which is what a watch that writes one file per dive
+produces — and an archive that mixes formats, or holds something no reader claims, is
+refused rather than partly imported.
+
+The mapping rules, the three places UDDF is genuinely ambiguous, and what is deliberately
+left unmapped are in
 [`docs/uddf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/uddf-mapping.md).
+
+From Python, the same two steps an application takes:
+
+```python
+import divejson
+
+divejson.sniff(head)          # a format id, "zip", or None — from divejson.SNIFF_BYTES bytes
+conversion = divejson.convert(open("my-logbook.uddf", "rb"))
+conversion.document           # the DiveJSON document
+conversion.grouped()          # NoteGroup(kind, message, wheres), one per finding
+```
 
 ## Run a conformance corpus
 
@@ -69,10 +98,15 @@ the corpus has no pairs for from a warning into an error.
 
 ## What it reads
 
-| format | what this package does | versions |
-| --- | --- | --- |
-| DiveJSON | validates | 1.0 |
-| UDDF | reads into DiveJSON | 3.0 – 3.2.3 |
+| format | id | what this package does | versions |
+| --- | --- | --- | --- |
+| DiveJSON | — | validates | 1.0 |
+| UDDF | `uddf` | reads into DiveJSON | 3.0 – 3.2.3 |
+
+The **id** is the whole coupling between this package and everything around it: it is what
+`sniff` returns, what `--from` takes, and what a conformance corpus names a directory of
+pairs after. A zip of files in one format sniffs as `zip`, which is a container rather than
+a format — it has no reader, no identity namespace and no pair directory.
 
 The UDDF reader matches element names rather than the declared version, so older
 documents using the same names are read too: the corpus it is checked against carries

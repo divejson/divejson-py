@@ -5,6 +5,53 @@ Notable changes to the DiveJSON tools for Python. The format's own version
 is versioned in [the specification repository](https://github.com/divejson/divejson);
 this file is about the package, whose version moves independently.
 
+## Unreleased
+
+- **One entry point for every source format.** `divejson.convert(source)` recognises what a
+  file is from its own bytes and reads it through the adapter registered for it;
+  `divejson.sniff(head)` answers the same question on a bounded head — `SNIFF_BYTES` of
+  them — for an application that has to decide before it has the whole upload, and returns
+  `None` for bytes nothing here claims rather than a parse error from whichever reader was
+  asked first. `divejson convert --from <format>` says what a file is when the bytes do not.
+
+  **`convert_uddf` and `convert_uddf_file` are gone**, renamed rather than aliased:
+  `convert(data)` and `convert(data, format="uddf")` are what replace them, and both
+  produce exactly the document `convert_uddf` did.
+
+- **A zip of files in one format is one logbook.** A watch writes one file per dive and an
+  account export is an archive of them, so the members are converted together, in
+  member-name order, into one document — with every `where` path and every positional
+  identity prefixed by the member it came from, so two files whose dives carry no ids do
+  not collide. An archive that mixes formats, or holds something nothing reads, is refused
+  rather than partly imported. `max_members` and `max_member_size` bound the walk for a
+  caller that needs them, and a member is measured before it is opened.
+
+- **A note carries a kind** — `absent` for what the source never recorded, `dropped` for
+  what it recorded and this format cannot hold, `inferred` for what the converter decided.
+  `Conversion.grouped()` groups on the kind as well as the message and returns
+  `NoteGroup(kind, message, wheres)`, and `divejson convert` prints the kind beside each
+  line. A converter that computes a value the source never recorded lists the member under
+  `extensions.divejson.inferred`; the list is written only when it is non-empty, so nothing
+  a UDDF conversion produces has changed.
+
+- **One error base.** Everything a converter raises is a `ConverterError`:
+  `UnsupportedSourceError`, `SourceTooLargeError`, `MalformedArchiveError`,
+  `DoctypeRefusedError`, `NonConformingOutputError`, and a per-format branch —
+  `UddfError`, `MalformedUddfError` — under it. `DoctypeRefusedError` moved off `UddfError`,
+  because spec §9 binds every reader rather than the UDDF one.
+
+- **The rules that are not any one format's now live in one place**, so the readers after
+  this one inherit them instead of re-deriving them: the `<!DOCTYPE>` refusal and the parse
+  target every XML source goes through, the sample axis (ordered by recorded time, one
+  reading per second, each channel taking only the samples that carried one, no profile at
+  all rather than one of zero length), and which way a source zero reads — asked of the
+  member's own schema constraint, so `max_depth` of 0 is absence and `weight` of 0 is a
+  diver's "no lead".
+
+- **`divejson conform` walks a corpus by registry id.** A pair directory is checked against
+  what this build registers rather than against a table beside the runner, so an adapter
+  arrives with its pairs and nothing else has to be told.
+
 ## 0.2.0
 
 - **The package moved here**, out of the specification repository. That repository keeps

@@ -9,9 +9,10 @@ from datetime import datetime
 from pathlib import Path
 
 from . import __version__
-from .conform import Result, known_formats
+from .conform import Result
 from .conform import run as run_conform
-from .uddf import NonConformingOutputError, UddfError, convert_uddf
+from .converter import ConverterError, NonConformingOutputError, NoteGroup
+from .registry import convert, known_formats, read_formats
 from .validate import DuplicateMemberError, parse_document, validate_document
 
 # How many source locations one grouped finding names before it stops listing them. A
@@ -41,26 +42,34 @@ def main(argv: list[str] | None = None) -> int:
     )
     validate.add_argument("files", nargs="+", type=Path, help="DiveJSON documents")
 
-    convert = commands.add_parser(
+    convert_parser = commands.add_parser(
         "convert",
-        help="convert UDDF dive logs into DiveJSON",
+        help="convert dive logs into DiveJSON",
         description=(
-            "Reads each UDDF file and writes a DiveJSON document beside it, named after "
-            "the input with a .divejson extension. Nothing the source did not record is "
+            "Reads each dive log and writes a DiveJSON document beside it, named after "
+            "the input with a .divejson extension. The source format is recognised from "
+            "the file's own bytes; a zip of files in one format is read as one logbook. "
+            "Nothing the source did not record is "
             "filled in, and everything it did not carry is reported: those lines are the "
             "other half of the output, not a diagnostic. Exits non-zero if any file "
             "could not be converted."
         ),
     )
-    convert.add_argument("files", nargs="+", type=Path, help="UDDF documents")
-    convert.add_argument(
+    convert_parser.add_argument("files", nargs="+", type=Path, help="dive logs, or zips of them")
+    convert_parser.add_argument(
+        "--from",
+        dest="source_format",
+        choices=sorted(read_formats()),
+        help="read every input as this format instead of recognising it from the bytes",
+    )
+    convert_parser.add_argument(
         "-o",
         "--output",
         type=Path,
         help="write the document here instead of beside the input; only with one input file",
     )
-    convert.add_argument("-f", "--force", action="store_true", help="overwrite an existing output file")
-    convert.add_argument(
+    convert_parser.add_argument("-f", "--force", action="store_true", help="overwrite an existing output file")
+    convert_parser.add_argument(
         "--exported-at",
         type=_offset_aware,
         help="the document's exported_at, as an offset-aware date-time; defaults to now",
@@ -102,7 +111,13 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     if args.command == "convert":
-        return _convert_command(args.files, args.output, force=args.force, exported_at=args.exported_at)
+        return _convert_command(
+            args.files,
+            args.output,
+            force=args.force,
+            exported_at=args.exported_at,
+            source_format=args.source_format,
+        )
     if args.command == "conform":
         return _conform_command(args.corpus, strict=args.strict, only=args.only, skip=args.skip)
     return _validate_command(args.files)
@@ -160,9 +175,14 @@ def _validate_command(files: list[Path]) -> int:
 
 
 def _convert_command(
-    files: list[Path], output: Path | None, *, force: bool, exported_at: datetime | None = None
+    files: list[Path],
+    output: Path | None,
+    *,
+    force: bool,
+    exported_at: datetime | None = None,
+    source_format: str | None = None,
 ) -> int:
-    """Convert each UDDF file, writing the document to a file and the report to stdout.
+    """Convert each file, writing the document to a file and the report to stdout.
 
     **The document goes to a file and never to stdout**, which is why there is no `-`
     destination. The report is the half of this command's output a diver has to read, and
@@ -183,13 +203,14 @@ def _convert_command(
             failed = True
             continue
         try:
-            data = path.read_bytes()
+            # A file object rather than its bytes: an archive is read through its own
+            # directory, which needs to seek rather than to hold the whole upload.
+            with open(path, "rb") as handle:
+                conversion = convert(handle, format=source_format, exported_at=exported_at)
         except OSError as error:
             print(f"{path}: unreadable — {error}")
             failed = True
             continue
-        try:
-            conversion = convert_uddf(data, exported_at=exported_at)
         except NonConformingOutputError as error:
             # Not a property of the file: every way a source can be wrong is meant to
             # resolve to an omission and a note, so reaching here is this converter's bug.
@@ -198,7 +219,7 @@ def _convert_command(
                 print(f"  {issue}")
             failed = True
             continue
-        except UddfError as error:
+        except ConverterError as error:
             print(f"{path}: {error}")
             failed = True
             continue
@@ -215,9 +236,19 @@ def _convert_command(
             continue
 
         print(f"{path}: {_counted(conversion.document)} → {destination}")
-        for message, wheres in conversion.grouped():
-            print(f"  {_listed(wheres)}: {message}")
+        for group in conversion.grouped():
+            print(f"  {_kind(group)} {_listed(group.wheres)}: {group.message}")
     return 1 if failed else 0
+
+
+def _kind(group: NoteGroup) -> str:
+    """A report line's kind, padded so the three of them line up down the left.
+
+    Worth the column: `absent` and `dropped` are different news — one is what the diver's
+    old application never kept, the other is what it kept and this format cannot hold — and
+    a report that reads as one undifferentiated list of complaints gets skimmed.
+    """
+    return f"{group.kind:<8}"
 
 
 def _conform_command(corpus: Path, *, strict: bool, only: list[str], skip: list[str]) -> int:
