@@ -305,9 +305,8 @@ def _merged(converted: list[tuple[str, Conversion]], *, exported_at: datetime) -
                 notes.append(
                     Note(
                         name,
-                        "this file records a different logbook owner from the one "
-                        f"{owners[0][0]} records, and a logbook has one; the owner recorded here is "
-                        "dropped (spec §6.1)",
+                        f"the logbook's owner is the one {owners[0][0]} records, and a logbook has one; "
+                        "what this file records about the owner is dropped (spec §6.1)",
                         "dropped",
                     )
                 )
@@ -330,9 +329,16 @@ def _recorded_owner(diver: dict[str, Any]) -> dict[str, Any]:
 
     Without the UUID, which for this one record says nothing: it is derived from an
     `<owner id>` that every UDDF writer spells `owner`, so it is the same for two different
-    people and different for one person whose two exports spell it differently. What
-    separates an archive of one diver's dives — where every file repeats the same owner and
-    nothing is lost — from two people's exports in one zip is the name and the email.
+    people and different for one person whose two exports spell it differently. What is
+    left is the name and the email — and comparing those is what separates an archive of
+    one diver's dives, where every file repeats the same owner and nothing is lost, from
+    one where something is.
+
+    Any difference is a drop, and the report says only that. Two people's exports in one
+    zip and one person's two files where the later adds an email the first omitted are both
+    "this member recorded something about the owner that the merged logbook does not
+    carry", which is true of each; deciding *which* of the two it was would mean deciding
+    when two names are one person, and this converter does not know that.
     """
     return {member: value for member, value in diver.items() if member != "uuid"}
 

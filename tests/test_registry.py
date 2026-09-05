@@ -359,10 +359,11 @@ def test_the_archives_own_exported_at_is_the_one_the_caller_passed() -> None:
     assert conversion.document["exported_at"] == "2026-09-05T00:00:00+00:00"
 
 
-def _owned(first_name: str, owner_id: str, dive_id: str) -> bytes:
+def _owned(first_name: str, owner_id: str, dive_id: str, *, email: str = "") -> bytes:
+    contact = f"<contact><email>{email}</email></contact>" if email else ""
     return uddf(
         f"<diver><owner id='{owner_id}'><personal><firstname>{first_name}</firstname></personal>"
-        "</owner></diver>"
+        f"{contact}</owner></diver>"
         f"<profiledata><repetitiongroup><dive id='{dive_id}'><informationbeforedive>"
         "<datetime>2026-04-17T09:00:00+02:00</datetime></informationbeforedive></dive>"
         "</repetitiongroup></profiledata>"
@@ -384,6 +385,26 @@ def test_a_second_persons_diver_is_reported_rather_than_silently_dropped(second_
         exported_at=EXPORTED_AT,
     )
     assert conversion.document["diver"]["name"] == "Sam"
+    assert [note.where for note in conversion.notes if "a logbook has one" in note.message] == ["b.uddf"]
+
+
+def test_a_member_recording_more_about_the_owner_than_the_merge_keeps_is_reported() -> None:
+    """The same person, and something about them is still dropped.
+
+    The report says what happened — the merged logbook does not carry what this file
+    recorded about the owner — and not which of the two cases it was. Deciding that would
+    mean deciding when two names are one person.
+    """
+    conversion = convert(
+        _zip(
+            {
+                "a.uddf": _owned("Sam", "owner", "d1"),
+                "b.uddf": _owned("Sam", "owner", "d2", email="sam@example.com"),
+            }
+        ),
+        exported_at=EXPORTED_AT,
+    )
+    assert "email" not in conversion.document["diver"]
     assert [note.where for note in conversion.notes if "a logbook has one" in note.message] == ["b.uddf"]
 
 
