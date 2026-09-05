@@ -1,0 +1,197 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-05T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.1.0"
+  },
+  "diver": {
+    "uuid": "d8b9bbd3-c66e-52c1-b8e8-d908f921af7e",
+    "name": "Sam Reef"
+  },
+  "dives": [
+    {
+      "uuid": "0198a6f0-5555-7001-8000-000000000001",
+      "dive_number": 46,
+      "started_at": "2026-04-19T08:12:00+02:00",
+      "duration": 2880,
+      "notes": "Wreck penetration on the second pass; deco gas staged on the shot line.",
+      "max_depth": 29.6,
+      "avg_depth": 17.2,
+      "bottom_temperature": 22.0,
+      "visibility": 20.0,
+      "weight": 6.0,
+      "altitude": 0,
+      "surface_pressure": 1.013,
+      "trip_uuid": "0198a6f0-4444-7001-8000-000000000001",
+      "site_uuids": [
+        "0198a6f0-3333-7001-8000-000000000001"
+      ],
+      "gear_uuids": [
+        "0198a6f0-2222-7001-8000-000000000001",
+        "0198a6f0-2222-7002-8000-000000000002",
+        "0198a6f0-2222-7003-8000-000000000003"
+      ],
+      "cylinders": [
+        {
+          "volume": 12.0,
+          "start_pressure": 210.0,
+          "end_pressure": 60.0,
+          "oxygen": 21.0,
+          "helium": 0.0,
+          "po2_limit": 1.4,
+          "gas_number": 0
+        },
+        {
+          "volume": 7.0,
+          "start_pressure": 200.0,
+          "end_pressure": 150.0,
+          "oxygen": 50.0,
+          "helium": 0.0,
+          "po2_limit": 1.6,
+          "gas_number": 1
+        }
+      ],
+      "profile": {
+        "duration": 2880,
+        "depth": {
+          "times": [
+            0,
+            120,
+            600,
+            2400,
+            2700,
+            2880
+          ],
+          "values": [
+            0,
+            1460,
+            2960,
+            600,
+            500,
+            0
+          ]
+        },
+        "temperature": {
+          "times": [
+            0,
+            120,
+            600
+          ],
+          "values": [
+            244,
+            236,
+            220
+          ]
+        },
+        "pressures": [
+          {
+            "times": [
+              0,
+              120,
+              600,
+              2880
+            ],
+            "values": [
+              2100,
+              1940,
+              1420,
+              600
+            ],
+            "gas_number": 0
+          },
+          {
+            "times": [
+              2400,
+              2700
+            ],
+            "values": [
+              2000,
+              1500
+            ],
+            "gas_number": 1
+          }
+        ],
+        "events": [
+          {
+            "time": 0,
+            "type": "gas_switch",
+            "gas_number": 0
+          },
+          {
+            "time": 600,
+            "type": "other",
+            "label": "Deepest point"
+          },
+          {
+            "time": 2400,
+            "type": "gas_switch",
+            "gas_number": 1
+          },
+          {
+            "time": 2700,
+            "type": "safety_stop"
+          }
+        ]
+      }
+    }
+  ],
+  "trips": [
+    {
+      "uuid": "0198a6f0-4444-7001-8000-000000000001",
+      "name": "Red Sea Liveaboard",
+      "locations": [
+        {
+          "name": "Red Sea Liveaboard",
+          "display_name": "Sha'ab Ali, Egypt"
+        }
+      ],
+      "starts_on": "2026-04-18",
+      "ends_on": "2026-04-25",
+      "notes": "Northern wrecks itinerary out of Hurghada."
+    }
+  ],
+  "sites": [
+    {
+      "uuid": "0198a6f0-3333-7001-8000-000000000001",
+      "name": "SS Thistlegorm",
+      "location": "Sha'ab Ali, Red Sea",
+      "position": {
+        "latitude": 27.813611,
+        "longitude": 33.920833
+      },
+      "notes": "Cargo holds on the second pass; the bow is the current side."
+    }
+  ],
+  "gear": [
+    {
+      "uuid": "0198a6f0-2222-7001-8000-000000000001",
+      "name": "Hydros Pro",
+      "brand": "Scubapro",
+      "type": "bcd"
+    },
+    {
+      "uuid": "0198a6f0-2222-7002-8000-000000000002",
+      "name": "Ocean",
+      "brand": "Suunto",
+      "type": "computer",
+      "notes": "Firmware 2.4.1; wrist strap replaced 2026-03."
+    },
+    {
+      "uuid": "0198a6f0-2222-7003-8000-000000000003",
+      "name": "Everflex 5/4",
+      "type": "drysuit"
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "uddf",
+      "uddf_version": "3.2.2",
+      "source_generator": {
+        "name": "Open Diving",
+        "version": "0.1.0"
+      }
+    }
+  }
+}

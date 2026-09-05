@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<uddf version="3.2.1">
+  <generator>
+    <name>divelogs.de</name>
+    <datetime>2026-08-14T19:16:15</datetime>
+  </generator>
+  <diver>
+    <owner id="owner"/>
+  </diver>
+  <divesite>
+    <site id="site_df4ecfbd8a93e738aa12d696f15d3ad7">
+      <name>El Puertito</name>
+      <geography>
+        <location>Tenerife</location>
+        <latitude>0.000000</latitude>
+        <longitude>0.000000</longitude>
+      </geography>
+    </site>
+    <site id="site_208b05a2ada342951953b31e52269a60">
+      <name/>
+      <geography>
+        <location>Sinai, Red Sea</location>
+        <latitude>0.000000</latitude>
+        <longitude>0.000000</longitude>
+      </geography>
+    </site>
+  </divesite>
+  <gasdefinitions>
+    <mix id="mix_21_0.0">
+      <name>Air</name>
+      <o2>0.21</o2>
+      <he>0</he>
+    </mix>
+  </gasdefinitions>
+  <profiledata>
+    <repetitiongroup id="rg_4397152">
+      <dive id="dive_4397152">
+        <tankdata>
+          <link ref="mix_21_0.0"/>
+          <tankvolume>0.012</tankvolume>
+          <tankpressurebegin>20000000</tankpressurebegin>
+          <tankpressureend>8000000</tankpressureend>
+        </tankdata>
+        <informationbeforedive>
+          <divenumber>1</divenumber>
+          <link ref="site_df4ecfbd8a93e738aa12d696f15d3ad7"/>
+          <datetime>2026-04-17T11:49:00</datetime>
+          <surfaceintervalbeforedive>
+            <inifinity/>
+          </surfaceintervalbeforedive>
+        </informationbeforedive>
+        <samples>
+          <waypoint>
+            <depth>0</depth>
+            <divetime>0</divetime>
+          </waypoint>
+          <waypoint>
+            <depth>1.4</depth>
+            <divetime>4</divetime>
+            <temperature>297.55</temperature>
+          </waypoint>
+          <waypoint>
+            <depth>0</depth>
+            <divetime>8</divetime>
+          </waypoint>
+          <waypoint>
+            <depth>2.5</depth>
+            <divetime>12</divetime>
+          </waypoint>
+          <waypoint>
+            <depth>0</depth>
+            <divetime>16</divetime>
+          </waypoint>
+        </samples>
+        <informationafterdive>
+          <lowesttemperature>295.15</lowesttemperature>
+          <greatestdepth>45.9</greatestdepth>
+          <notes>
+            <para>Every other sample reads zero: divelogs.de stores a waypoint with no recorded depth as a depth of zero, and its own profile chart draws the comb that produces.</para>
+          </notes>
+          <diveduration>4001</diveduration>
+          <averagedepth>20.9</averagedepth>
+        </informationafterdive>
+      </dive>
+      <dive id="dive_4397153">
+        <tankdata>
+          <link ref="mix_21_0.0"/>
+          <tankvolume>0.012</tankvolume>
+          <tankpressurebegin>21000000</tankpressurebegin>
+          <tankpressureend>6000000</tankpressureend>
+        </tankdata>
+        <informationbeforedive>
+          <divenumber>2</divenumber>
+          <link ref="site_208b05a2ada342951953b31e52269a60"/>
+          <datetime>2026-04-19T08:12:00</datetime>
+          <surfaceintervalbeforedive>
+            <passedtime>19320</passedtime>
+          </surfaceintervalbeforedive>
+        </informationbeforedive>
+        <informationafterdive>
+          <lowesttemperature>297.15</lowesttemperature>
+          <greatestdepth>29.6</greatestdepth>
+          <notes>
+            <para>Its only site has no name, so the dive arrives with no site at all rather than one this converter invented a name for.</para>
+          </notes>
+          <diveduration>2880</diveduration>
+          <averagedepth>17.2</averagedepth>
+        </informationafterdive>
+      </dive>
+    </repetitiongroup>
+  </profiledata>
+</uddf>

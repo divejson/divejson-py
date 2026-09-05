@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    name: Tests and the vendored corpus
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # The floor, a current version, and the one the applications that install this
+        # package run. 3.10's stricter datetime.fromisoformat is exactly the kind of
+        # thing only running the floor catches, and until 3.14 was in this matrix the
+        # converter had never been run on the interpreter its first consumer uses.
+        python-version: ["3.10", "3.12", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # Editable, which is the install that has no `divejson/_schema/`: a `force-include`
+      # reaches a built wheel and not an editable install, so this leg is what exercises
+      # the vendored corpus as the schema's source. The `wheel` job below covers the other.
+      - name: Install the package
+        run: pip install -e ".[dev]"
+
+      - name: The tests pass
+        run: pytest
+
+      # The conformance runner over this repository's own copy of the corpus, exactly as
+      # the specification repository runs it over the original against a pinned release.
+      # `--strict`, so that a format this implementation reads and the corpus has no
+      # pairs for fails the build rather than warning into a log nobody reads.
+      - name: The vendored corpus conforms
+        run: divejson conform fixtures --strict
+
+  specification:
+    name: The vendored tree is the specification at SPEC_REF
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the specification out at SPEC_REF
+        run: |
+          ref="$(tr -d '[:space:]' < SPEC_REF)"
+          echo "SPEC_REF=$ref" >> "$GITHUB_ENV"
+          git clone --quiet https://github.com/divejson/divejson.git "$RUNNER_TEMP/spec"
+          git -C "$RUNNER_TEMP/spec" checkout --quiet "$ref"
+
+      # A subset check, not an equality one: this repository may carry pairs and mapping
+      # documents the specification has not adopted yet, and that is how an adapter lands
+      # self-contained. What it may never do is *change* a file the specification owns —
+      # that always goes to the specification first, and comes back on the next pin bump.
+      - name: Every file the specification owns is byte-identical here
+        run: |
+          differing=0
+          while IFS= read -r file; do
+            if ! cmp -s "$RUNNER_TEMP/spec/$file" "$file"; then
+              echo "::error file=$file::differs from the specification at $SPEC_REF"
+              differing=1
+            fi
+          done < <(git -C "$RUNNER_TEMP/spec" ls-files -- schema fixtures docs)
+          exit $differing
+
+      # A pin on a commit that never landed — a branch someone force-pushed away, a PR
+      # head that was rewritten — would leave this implementing a specification nobody
+      # else has, and the byte check above would pass happily.
+      - name: SPEC_REF is an ancestor of the specification's main
+        run: git -C "$RUNNER_TEMP/spec" merge-base --is-ancestor "$SPEC_REF" origin/main
+
+  wheel:
+    name: An installed wheel carries its own schema
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build hatchling
+
+      # `python -m build` builds the sdist and then builds the wheel *from the sdist*,
+      # which is the artefact question worth asking: a wheel built from the source tree
+      # can carry files the sdist forgot. `--no-isolation`, with the backend installed
+      # above, so nothing is fetched while building — an sdist that needed the network
+      # would make that fetch part of every `pip install` from source.
+      - name: Build the sdist, and the wheel from the sdist
+        run: python -m build --no-isolation
+
+      - name: Install the wheel into a virtualenv of its own
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install dist/*.whl
+
+      # Run from `$RUNNER_TEMP`, where there is no checkout to fall back to: this is the
+      # position every application that installs the package is in.
+      - name: The installed package resolves the schema it carries, with no checkout near
+        working-directory: ${{ runner.temp }}
+        run: |
+          cp "$GITHUB_WORKSPACE/fixtures/valid/technical-dive.divejson" .
+          "$RUNNER_TEMP/venv/bin/divejson" validate technical-dive.divejson
+          "$RUNNER_TEMP/venv/bin/divejson" conform "$GITHUB_WORKSPACE/fixtures" --strict
+          "$RUNNER_TEMP/venv/bin/python" - <<'EOF'
+          import os, pathlib
+          import divejson
+
+          installed = pathlib.Path(divejson.__file__).resolve().parent
+          assert "site-packages" in str(installed), installed
+          vendored = pathlib.Path(os.environ["GITHUB_WORKSPACE"]) / "schema"
+          sources = sorted(vendored.glob("*/divejson.schema.json"))
+          assert sources, "the vendored tree carries no schema at all"
+          for source in sources:
+              packaged = installed / "_schema" / source.parent.name / "divejson.schema.json"
+              assert packaged.read_bytes() == source.read_bytes(), packaged
+          print(f"schemas checked against the vendored tree: {len(sources)}")
+          EOF

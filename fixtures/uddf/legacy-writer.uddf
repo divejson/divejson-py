@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<UDDF version="2.2.0">
+  <GENERATOR>
+    <NAME>Legacy Logbook</NAME>
+    <VERSION>2.0</VERSION>
+  </GENERATOR>
+  <DIVESITE>
+    <SITE ID="wreck1">
+      <NAME>Um El Faroud</NAME>
+      <GEOGRAPHY>
+        <LOCATION>Wied iz-Zurrieq, Malta</LOCATION>
+        <LATITUDE>35.8225</LATITUDE>
+        <LONGITUDE>14.4392</LONGITUDE>
+      </GEOGRAPHY>
+    </SITE>
+  </DIVESITE>
+  <GASDEFINITIONS>
+    <MIX ID="ean34">
+      <NAME>Nitrox 34</NAME>
+      <O2>34</O2>
+      <HE>0</HE>
+    </MIX>
+  </GASDEFINITIONS>
+  <PROFILEDATA>
+    <REPETITIONGROUP ID="rg1">
+      <DIVE ID="d1">
+        <INFORMATIONBEFOREDIVE>
+          <LINK REF="wreck1"/>
+          <DIVENUMBER>12</DIVENUMBER>
+          <DATETIME>2002-06-18T</DATETIME>
+        </INFORMATIONBEFOREDIVE>
+        <TANKDATA>
+          <LINK REF="ean34"/>
+          <TANKVOLUME>12</TANKVOLUME>
+          <TANKPRESSUREBEGIN>0</TANKPRESSUREBEGIN>
+          <TANKPRESSUREEND>7000000</TANKPRESSUREEND>
+        </TANKDATA>
+        <SAMPLES>
+          <WAYPOINT>
+            <DEPTH>18.4</DEPTH>
+            <DIVETIME>120</DIVETIME>
+          </WAYPOINT>
+          <WAYPOINT>
+            <DEPTH>2.5</DEPTH>
+            <DIVETIME>30</DIVETIME>
+          </WAYPOINT>
+          <WAYPOINT>
+            <DEPTH>3.1</DEPTH>
+            <DIVETIME>30.4</DIVETIME>
+          </WAYPOINT>
+          <WAYPOINT>
+            <DEPTH>0</DEPTH>
+          </WAYPOINT>
+        </SAMPLES>
+        <INFORMATIONAFTERDIVE>
+          <GREATESTDEPTH>18.4</GREATESTDEPTH>
+          <AVERAGEDEPTH>0</AVERAGEDEPTH>
+          <DIVEDURATION>2400</DIVEDURATION>
+          <NOTES>
+            <PARA>Four writer habits in one dive: element names in upper case, a whole-percent oxygen fraction, a tank volume in litres where UDDF specifies cubic metres, and a midnight dive whose time of day the exporter never wrote.</PARA>
+          </NOTES>
+        </INFORMATIONAFTERDIVE>
+      </DIVE>
+    </REPETITIONGROUP>
+  </PROFILEDATA>
+</UDDF>

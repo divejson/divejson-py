@@ -1,0 +1,450 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://divejson.org/schema/1.0/divejson.schema.json",
+  "title": "DiveJSON 1.0",
+  "description": "A DiveJSON document: an open dive-log interchange format. This schema describes exactly the members version 1.0 defines; the normative specification is spec/divejson.md, and the requirements it lists as beyond-schema are checked by the reference validator, not here. Absence is the only spelling of \"not recorded\": no member accepts null.",
+  "type": "object",
+  "properties": {
+    "format": { "const": "divejson" },
+    "version": { "const": "1.0" },
+    "exported_at": { "$ref": "#/$defs/offset_date_time" },
+    "generator": { "$ref": "#/$defs/generator" },
+    "diver": { "$ref": "#/$defs/diver" },
+    "dives": { "type": "array", "items": { "$ref": "#/$defs/dive" } },
+    "trips": { "type": "array", "items": { "$ref": "#/$defs/trip" } },
+    "courses": { "type": "array", "items": { "$ref": "#/$defs/course" } },
+    "sites": { "type": "array", "items": { "$ref": "#/$defs/dive_site" } },
+    "species": { "type": "array", "items": { "$ref": "#/$defs/species" } },
+    "gear": { "type": "array", "items": { "$ref": "#/$defs/gear_item" } },
+    "gear_sets": { "type": "array", "items": { "$ref": "#/$defs/gear_set" } },
+    "gear_service_schedules": { "type": "array", "items": { "$ref": "#/$defs/gear_service_schedule" } },
+    "gear_service_records": { "type": "array", "items": { "$ref": "#/$defs/gear_service_record" } },
+    "certifications": { "type": "array", "items": { "$ref": "#/$defs/certification" } },
+    "extensions": { "$ref": "#/$defs/extensions" }
+  },
+  "required": ["format", "version", "exported_at"],
+  "additionalProperties": false,
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "uuid_list": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/uuid" },
+      "uniqueItems": true
+    },
+    "date_time": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[+-][0-9]{2}:[0-9]{2})?$"
+    },
+    "offset_date_time": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?([Zz]|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 10000
+    },
+    "extensions": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z0-9][a-z0-9._-]*$" }
+    },
+    "position": {
+      "type": "object",
+      "properties": {
+        "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+        "longitude": { "type": "number", "minimum": -180, "maximum": 180 },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["latitude", "longitude"],
+      "additionalProperties": false
+    },
+    "bounding_box": {
+      "type": "object",
+      "properties": {
+        "south": { "type": "number", "minimum": -90, "maximum": 90 },
+        "north": { "type": "number", "minimum": -90, "maximum": 90 },
+        "west": { "type": "number", "minimum": -180, "maximum": 180 },
+        "east": { "type": "number", "minimum": -180, "maximum": 180 },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["south", "north", "west", "east"],
+      "additionalProperties": false
+    },
+    "generator": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "diver": {
+      "type": "object",
+      "properties": {
+        "uuid": { "$ref": "#/$defs/uuid" },
+        "name": { "type": "string" },
+        "username": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "created_at": { "$ref": "#/$defs/date_time" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "additionalProperties": false
+    },
+    "dive": {
+      "type": "object",
+      "properties": {
+        "uuid": { "$ref": "#/$defs/uuid" },
+        "dive_number": { "type": "integer" },
+        "started_at": { "$ref": "#/$defs/date_time" },
+        "duration": { "type": "integer", "exclusiveMinimum": 0 },
+        "notes": { "$ref": "#/$defs/notes" },
+        "max_depth": { "type": "number", "exclusiveMinimum": 0 },
+        "avg_depth": { "type": "number", "exclusiveMinimum": 0 },
+        "bottom_temperature": { "type": "number" },
+        "visibility": { "type": "number", "minimum": 0 },
+        "weight": { "type": "number", "minimum": 0 },
+        "water_type": { "enum": ["salt", "fresh", "brackish", "en13319"] },
+        "altitude": { "type": "integer", "minimum": -450, "maximum": 6500 },
+        "cns_start": { "type": "number", "minimum": 0 },
+        "cns_end": { "type": "number", "minimum": 0 },
+        "otu_start": { "type": "number", "minimum": 0 },
+        "otu_end": { "type": "number", "minimum": 0 },
+        "surface_pressure": { "type": "number", "minimum": 0.4, "maximum": 1.2 },
+        "entry_position": { "$ref": "#/$defs/position" },
+        "exit_position": { "$ref": "#/$defs/position" },
+        "trip_uuid": { "$ref": "#/$defs/uuid" },
+        "course_uuid": { "$ref": "#/$defs/uuid" },
+        "site_uuids": { "$ref": "#/$defs/uuid_list" },
+        "gear_uuids": { "$ref": "#/$defs/uuid_list" },
+        "species_uuids": { "$ref": "#/$defs/uuid_list" },
+        "cylinders": { "type": "array", "items": { "$ref": "#/$defs/cylinder" } },
+        "source_file": { "$ref": "#/$defs/stored_file" },
+        "profile": { "$ref": "#/$defs/profile" },
+        "created_at": { "$ref": "#/$defs/date_time" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["uuid", "started_at"],
+      "additionalProperties": false
+    },
+    "cylinder": {
+      "type": "object",
+      "properties": {
+        "volume": { "type": "number", "exclusiveMinimum": 0 },
+        "start_pressure": { "type": "number", "exclusiveMinimum": 0, "maximum": 350 },
+        "end_pressure": { "type": "number", "minimum": 0, "maximum": 350 },
+        "oxygen": { "type": "number", "minimum": 0, "maximum": 100 },
+        "helium": { "type": "number", "minimum": 0, "maximum": 100 },
+        "po2_limit": { "type": "number", "minimum": 0.4, "maximum": 2.0 },
+        "gas_number": { "type": "integer", "minimum": 0 },
+        "role": { "enum": ["bottom", "deco", "diluent", "oxygen"] },
+        "usage": { "enum": ["parallel", "staged"] },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "additionalProperties": false
+    },
+    "profile": {
+      "type": "object",
+      "properties": {
+        "duration": { "type": "integer", "minimum": 0 },
+        "depth": { "$ref": "#/$defs/series" },
+        "ceiling": { "$ref": "#/$defs/series" },
+        "temperature": { "$ref": "#/$defs/series" },
+        "pressures": { "type": "array", "items": { "$ref": "#/$defs/pressure_series" } },
+        "events": { "type": "array", "items": { "$ref": "#/$defs/event" } },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["duration"],
+      "additionalProperties": false
+    },
+    "series": {
+      "type": "object",
+      "properties": {
+        "times": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+        "values": { "type": "array", "items": { "type": "integer" } },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["times", "values"],
+      "additionalProperties": false
+    },
+    "pressure_series": {
+      "type": "object",
+      "properties": {
+        "times": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+        "values": { "type": "array", "items": { "type": "integer" } },
+        "gas_number": { "type": "integer", "minimum": 0 },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["times", "values", "gas_number"],
+      "additionalProperties": false
+    },
+    "event": {
+      "type": "object",
+      "properties": {
+        "time": { "type": "integer", "minimum": 0 },
+        "type": { "enum": ["gas_switch", "deep_stop", "safety_stop", "bookmark", "other"] },
+        "gas_number": { "type": "integer", "minimum": 0 },
+        "label": { "type": "string" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["time", "type"],
+      "additionalProperties": false,
+      "if": {
+        "properties": { "type": { "const": "other" } },
+        "required": ["type"]
+      },
+      "then": {
+        "required": ["label"],
+        "properties": { "label": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "stored_file": {
+      "type": "object",
+      "properties": {
+        "uuid": { "$ref": "#/$defs/uuid" },
+        "original_filename": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "content_type": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "byte_size": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "archive_path": { "type": "string", "minLength": 1 },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["uuid", "original_filename", "content_type", "byte_size", "sha256"],
+      "additionalProperties": false
+    },
+    "trip": {
+      "type": "object",
+      "properties": {
+        "uuid": { "$ref": "#/$defs/uuid" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "locations": { "type": "array", "items": { "$ref": "#/$defs/trip_location" } },
+        "starts_on": { "$ref": "#/$defs/date" },
+        "ends_on": { "$ref": "#/$defs/date" },
+        "notes": { "$ref": "#/$defs/notes" },
+        "created_at": { "$ref": "#/$defs/date_time" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["uuid", "name", "starts_on"],
+      "additionalProperties": false
+    },
+    "trip_location": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "display_name": { "type": "string", "maxLength": 512 },
+        "position": { "$ref": "#/$defs/position" },
+        "bbox": { "$ref": "#/$defs/bounding_box" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["name"],
+      "additionalProperties": false,
+      "dependentRequired": { "bbox": ["position"] }
+    },
+    "course": {
+      "type": "object",
+      "properties": {
+        "uuid": { "$ref": "#/$defs/uuid" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "agency": {
+          "enum": [
+            "padi", "ssi", "naui", "sdi", "tdi", "cmas", "raid", "bsac",
+            "gue", "iantd", "psai", "dan", "efr", "andi", "snsi", "acuc",
+            "pss", "ida", "other"
+          ]
+        },
+        "agency_other": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "status": {
+          "enum": ["planned", "in_progress", "completed", "incomplete", "provisional", "not_passed"]
+        },
+        "starts_on": { "$ref": "#/$defs/date" },
+        "ends_on": { "$ref": "#/$defs/date" },
+        "instructor_name": { "type": "string", "maxLength": 255 },
+        "instructor_number": { "type": "string", "maxLength": 64 },
+        "training_center": { "type": "string", "maxLength": 255 },
+        "notes": { "$ref": "#/$defs/notes" },
+        "created_at": { "$ref": "#/$defs/date_time" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["uuid", "name", "agency"],
+      "additionalProperties": false,
+      "if": {
+        "properties": { "agency": { "const": "other" } },
+        "required": ["agency"]
+      },
+      "then": {
+        "required": ["agency_other"]
+      },
+      "else": {
+        "not": { "required": ["agency_other"] }
+      }
+    },
+    "dive_site": {
+      "type": "object",
+      "properties": {
+        "uuid": { "$ref": "#/$defs/uuid" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "location": { "type": "string", "maxLength": 255 },
+        "position": { "$ref": "#/$defs/position" },
+        "notes": { "$ref": "#/$defs/notes" },
+        "created_at": { "$ref": "#/$defs/date_time" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["uuid", "name"],
+      "additionalProperties": false
+    },
+    "species": {
+      "type": "object",
+      "properties": {
+        "uuid": { "$ref": "#/$defs/uuid" },
+        "aphia_id": { "type": "integer", "exclusiveMinimum": 0 },
+        "scientific_name": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "common_name": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "rank": { "type": "string", "maxLength": 64 },
+        "wikidata_qid": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "created_at": { "$ref": "#/$defs/date_time" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["uuid"],
+      "additionalProperties": false,
+      "anyOf": [
+        { "required": ["aphia_id"] },
+        { "required": ["scientific_name"] },
+        { "required": ["common_name"] },
+        { "required": ["wikidata_qid"] }
+      ]
+    },
+    "gear_item": {
+      "type": "object",
+      "properties": {
+        "uuid": { "$ref": "#/$defs/uuid" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "brand": { "type": "string", "maxLength": 255 },
+        "type": {
+          "enum": [
+            "mask", "snorkel", "fins", "wetsuit", "drysuit", "vest", "hood",
+            "gloves", "boots", "bcd", "regulator", "computer", "cylinder",
+            "light", "smb", "mirror", "whistle", "reel", "knife", "line_cutter",
+            "shears", "compass", "camera", "other"
+          ]
+        },
+        "notes": { "$ref": "#/$defs/notes" },
+        "rented": { "type": "boolean" },
+        "archived": { "type": "boolean" },
+        "archived_at": { "$ref": "#/$defs/date_time" },
+        "dive_count": { "type": "integer", "minimum": 0 },
+        "created_at": { "$ref": "#/$defs/date_time" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["uuid", "name"],
+      "additionalProperties": false
+    },
+    "gear_set": {
+      "type": "object",
+      "properties": {
+        "uuid": { "$ref": "#/$defs/uuid" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "weight": { "type": "number", "minimum": 0 },
+        "gear_uuids": { "$ref": "#/$defs/uuid_list" },
+        "created_at": { "$ref": "#/$defs/date_time" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["uuid", "name"],
+      "additionalProperties": false
+    },
+    "service_type": {
+      "enum": ["service", "visual_inspection", "hydrostatic_test", "battery", "oxygen_clean", "other"]
+    },
+    "gear_service_schedule": {
+      "type": "object",
+      "properties": {
+        "uuid": { "$ref": "#/$defs/uuid" },
+        "gear_uuid": { "$ref": "#/$defs/uuid" },
+        "type": { "$ref": "#/$defs/service_type" },
+        "label": { "type": "string", "maxLength": 120 },
+        "starts_on": { "$ref": "#/$defs/date" },
+        "interval_months": { "type": "integer", "exclusiveMinimum": 0 },
+        "interval_dives": { "type": "integer", "exclusiveMinimum": 0 },
+        "dive_count_at_start": { "type": "integer", "minimum": 0 },
+        "active": { "type": "boolean" },
+        "last_service_on": { "$ref": "#/$defs/date" },
+        "next_due_on": { "$ref": "#/$defs/date" },
+        "next_due_at_dive_count": { "type": "integer", "minimum": 0 },
+        "created_at": { "$ref": "#/$defs/date_time" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["uuid", "gear_uuid", "type", "starts_on"],
+      "additionalProperties": false,
+      "anyOf": [
+        { "required": ["interval_months"] },
+        { "required": ["interval_dives"] }
+      ]
+    },
+    "gear_service_record": {
+      "type": "object",
+      "properties": {
+        "uuid": { "$ref": "#/$defs/uuid" },
+        "gear_uuid": { "$ref": "#/$defs/uuid" },
+        "gear_service_schedule_uuid": { "$ref": "#/$defs/uuid" },
+        "type": { "$ref": "#/$defs/service_type" },
+        "serviced_on": { "$ref": "#/$defs/date" },
+        "dive_count_at_service": { "type": "integer", "minimum": 0 },
+        "label": { "type": "string", "maxLength": 120 },
+        "performed_by": { "type": "string", "maxLength": 255 },
+        "notes": { "$ref": "#/$defs/notes" },
+        "created_at": { "$ref": "#/$defs/date_time" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["uuid", "gear_uuid", "type", "serviced_on"],
+      "additionalProperties": false
+    },
+    "certification": {
+      "type": "object",
+      "properties": {
+        "uuid": { "$ref": "#/$defs/uuid" },
+        "agency": {
+          "enum": [
+            "padi", "ssi", "naui", "sdi", "tdi", "cmas", "raid", "bsac",
+            "gue", "iantd", "psai", "dan", "efr", "andi", "snsi", "acuc",
+            "pss", "ida", "other"
+          ]
+        },
+        "agency_other": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "certification_number": { "type": "string", "maxLength": 64 },
+        "certified_on": { "$ref": "#/$defs/date" },
+        "expires_on": { "$ref": "#/$defs/date" },
+        "instructor_name": { "type": "string", "maxLength": 255 },
+        "instructor_number": { "type": "string", "maxLength": 64 },
+        "training_center": { "type": "string", "maxLength": 255 },
+        "course_uuid": { "$ref": "#/$defs/uuid" },
+        "notes": { "$ref": "#/$defs/notes" },
+        "front_file": { "$ref": "#/$defs/stored_file" },
+        "back_file": { "$ref": "#/$defs/stored_file" },
+        "created_at": { "$ref": "#/$defs/date_time" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["uuid", "agency", "name"],
+      "additionalProperties": false,
+      "if": {
+        "properties": { "agency": { "const": "other" } },
+        "required": ["agency"]
+      },
+      "then": {
+        "required": ["agency_other"]
+      },
+      "else": {
+        "not": { "required": ["agency_other"] }
+      }
+    }
+  }
+}

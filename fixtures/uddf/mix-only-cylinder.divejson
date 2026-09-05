@@ -1,0 +1,67 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-05T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.1.0"
+  },
+  "diver": {
+    "uuid": "d8b9bbd3-c66e-52c1-b8e8-d908f921af7e",
+    "name": "Alex Trim"
+  },
+  "dives": [
+    {
+      "uuid": "6ba5d47c-aeac-5754-ac67-c28c73e7981e",
+      "dive_number": 1,
+      "started_at": "2026-05-02T09:30:00+01:00",
+      "duration": 2760,
+      "notes": "A rental cylinder whose size nobody wrote down. The gas, both pressures and a real drop between them are recorded, so the size is the only input a gas-consumption figure lacks.",
+      "max_depth": 28.4,
+      "avg_depth": 16.2,
+      "site_uuids": [
+        "b46b2efb-112c-5fc3-8566-50aee4c46ce8"
+      ],
+      "cylinders": [
+        {
+          "start_pressure": 200.0,
+          "end_pressure": 80.0,
+          "oxygen": 32.0,
+          "helium": 0.0
+        }
+      ]
+    },
+    {
+      "uuid": "abef6704-789a-5048-b078-ba21af60f74b",
+      "dive_number": 2,
+      "started_at": "2026-05-02T14:05:00+01:00",
+      "duration": 3180,
+      "notes": "No tankdata at all, which is what APD DiveSight exports for every dive. The dive arrives with no cylinder rather than with an invented one.",
+      "max_depth": 18.1,
+      "avg_depth": 11.4,
+      "site_uuids": [
+        "b46b2efb-112c-5fc3-8566-50aee4c46ce8"
+      ]
+    }
+  ],
+  "sites": [
+    {
+      "uuid": "b46b2efb-112c-5fc3-8566-50aee4c46ce8",
+      "name": "Condesito Wreck",
+      "location": "Las Galletas, Tenerife",
+      "position": {
+        "latitude": 28.001389,
+        "longitude": -16.653611
+      }
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "uddf",
+      "uddf_version": "3.2.2",
+      "source_generator": {
+        "name": "DiveJSON fixtures"
+      }
+    }
+  }
+}
