@@ -444,7 +444,10 @@ class _Converter:
         `<tankvolume>` read as litres is a recorded number at a scale this reader resolved
         rather than a value it computed, and reports itself as `resolved` for that reason.
         The list is kept rather than dropped because it is the shared policy every adapter
-        inherits, and the next reader will have something to put in it.
+        inherits. The Subsurface reader that followed this one puts nothing in it either —
+        its measurements state their units, so it has no scale to settle and nothing to
+        compute — and a reader that takes a maximum depth off the samples of a file that
+        recorded none is the one that will.
         """
         provenance: dict[str, Any] = {"converted_from": FORMAT}
         version = _attr(self.root, "version")

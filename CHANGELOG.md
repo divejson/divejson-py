@@ -7,6 +7,28 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Subsurface `.ssrf` is the second format this package reads.** Its save file rather than
+  its UDDF export, so it holds everything Subsurface knows: `divejson convert
+  my-logbook.ssrf`, `sniff` answers `"ssrf"`, and `fixtures/ssrf/` carries the pairs any
+  port is measured against. Every measurement in the format states its unit — `'45.91 m'`,
+  `'66:50 min'`, `'12.0 l'`, `'200.0 bar'`, `'22.4 C'`, `'32.0%'` — so one table maps each
+  spelling to the number in front of it and **a unit the table does not carry is dropped and
+  named** rather than converted by a factor no file has checked. That is also why this
+  reader settles no scale and emits no `resolved` finding: the two kinds its report can
+  carry are `absent` and `dropped`.
+
+  Reading one Subsurface logbook through both of its export paths gives the same profiles,
+  sample for sample, and four members that differ — the five-star visibility its UDDF
+  exporter turns into metres, the air blend that exporter invents for a cylinder recording
+  no gas, the `0` kg of lead it writes for a logbook holding no weights, and a water
+  temperature the export drops. `docs/ssrf-mapping.md` records each, along with what is
+  deliberately not mapped and why.
+
+  **A `.ssrf` dive carries no id**, so its identity is its position in the file and every
+  conversion says so. An archive of per-dive files is the case that makes ordinary: the
+  positional stand-in is prefixed by the archive member, so two files' first dives do not
+  collide.
+
 - **One entry point for every source format.** `divejson.convert(source)` recognises what a
   file is from its own bytes and reads it through the adapter registered for it;
   `divejson.sniff(head)` answers the same question on a bounded head — `SNIFF_BYTES` of

@@ -68,9 +68,14 @@ one format is read as one logbook — which is what a watch that writes one file
 produces — and an archive that mixes formats, or holds something no reader claims, is
 refused rather than partly imported.
 
-The mapping rules, the three places UDDF is genuinely ambiguous, and what is deliberately
-left unmapped are in
-[`docs/uddf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/uddf-mapping.md).
+Each format has a mapping document of its own: the rules every converter follows whatever
+it is reading are in
+[`docs/converting.md`](https://github.com/divejson/divejson-py/blob/main/docs/converting.md),
+and what is one format's — its element map, its writers' habits, its ambiguities, and what
+is deliberately left unmapped — is in
+[`docs/uddf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/uddf-mapping.md)
+and
+[`docs/ssrf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/ssrf-mapping.md).
 
 From Python, the same two steps an application takes:
 
@@ -109,6 +114,7 @@ the corpus has no pairs for from a warning into an error.
 | --- | --- | --- | --- |
 | DiveJSON | — | validates | 1.0 |
 | UDDF | `uddf` | reads into DiveJSON | 3.0 – 3.2.3 |
+| Subsurface | `ssrf` | reads into DiveJSON | save format 3 |
 
 The **id** is the whole coupling between this package and everything around it: it is what
 `sniff` returns, what `--from` takes, and what a conformance corpus names a directory of
@@ -118,6 +124,13 @@ a format — it has no reader, no identity namespace and no pair directory.
 The UDDF reader matches element names rather than the declared version, so older
 documents using the same names are read too: the corpus it is checked against carries
 2.2.0, 3.2.0, 3.2.1 and 3.2.2, under three different root shapes.
+
+Subsurface can export both, and the two are not equivalent: `.ssrf` is its **save file**
+and holds everything it knows, while its UDDF export fills gaps in ways that survive into a
+converted document. Reading the same logbook both ways gives the same profiles, sample for
+sample, and four members that differ — each of them the exporter's doing.
+[`docs/ssrf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/ssrf-mapping.md)
+lists them.
 
 ## Releasing
 

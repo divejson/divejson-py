@@ -314,10 +314,11 @@ def test_an_inferred_path_is_re_indexed_for_its_place_in_the_merged_document(mon
     """A path that still named its own file's dive 0 would label somebody else's dive.
 
     No reader in this build infers anything — UDDF's two ambiguities report as `resolved`,
-    the kind for a scale decided rather than a value computed — so the adapter under test is
-    a stand-in for one that does: a reader taking a maximum depth off the samples of a file
-    that recorded none. It sets both halves the coupling requires, the note and the listed
-    member, because a reader that set only one would be the bug rather than the fixture.
+    the kind for a scale decided rather than a value computed, and the Subsurface reader
+    settles no scale at all — so the adapter under test is a stand-in for one that does: a
+    reader taking a maximum depth off the samples of a file that recorded none. It sets both
+    halves the coupling requires, the note and the listed member, because a reader that set
+    only one would be the bug rather than the fixture.
     """
 
     real = adapter_for("uddf")
