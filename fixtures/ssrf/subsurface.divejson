@@ -1,0 +1,131 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-05T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.2.0"
+  },
+  "dives": [
+    {
+      "uuid": "99ca578d-a074-52d2-9216-e98057a33dcb",
+      "dive_number": 45,
+      "started_at": "2026-04-17T11:49:23",
+      "duration": 4010,
+      "notes": "House-reef checkout dive - profile, temperature and tank pressure pulled straight from the export.",
+      "cns_end": 11.0,
+      "otu_end": 31.0,
+      "site_uuids": [
+        "7d933baf-e3e9-5ae1-91b7-c225045cd347"
+      ],
+      "cylinders": [
+        {
+          "volume": 12.0,
+          "start_pressure": 200.0,
+          "end_pressure": 80.0
+        }
+      ],
+      "max_depth": 45.91,
+      "avg_depth": 20.841,
+      "bottom_temperature": 22.4,
+      "profile": {
+        "duration": 4300,
+        "depth": {
+          "times": [
+            0,
+            10,
+            20,
+            30,
+            40,
+            80,
+            170,
+            4300
+          ],
+          "values": [
+            145,
+            183,
+            222,
+            257,
+            260,
+            332,
+            911,
+            0
+          ]
+        },
+        "temperature": {
+          "times": [
+            30,
+            80
+          ],
+          "values": [
+            244,
+            240
+          ]
+        }
+      }
+    },
+    {
+      "uuid": "a27d7fb1-89c9-52aa-9531-4d33de232b2e",
+      "dive_number": 38,
+      "started_at": "2026-04-19T08:12:00",
+      "duration": 2880,
+      "notes": "Subsurface builds a depth profile from max depth and duration for a dive that has none; these six samples are that fabrication, carried through as recorded rather than trimmed away.",
+      "cns_end": 14.0,
+      "otu_end": 37.0,
+      "site_uuids": [
+        "e46b0021-5ed5-55e5-9a60-d6d656acfa76"
+      ],
+      "cylinders": [
+        {
+          "volume": 12.0,
+          "start_pressure": 210.0,
+          "end_pressure": 60.0,
+          "oxygen": 32.0
+        }
+      ],
+      "max_depth": 29.6,
+      "avg_depth": 17.2,
+      "bottom_temperature": 24.0,
+      "profile": {
+        "duration": 2880,
+        "depth": {
+          "times": [
+            0,
+            197,
+            1176,
+            1308,
+            2815,
+            2880
+          ],
+          "values": [
+            0,
+            2960,
+            2960,
+            977,
+            977,
+            0
+          ]
+        }
+      }
+    }
+  ],
+  "sites": [
+    {
+      "uuid": "7d933baf-e3e9-5ae1-91b7-c225045cd347",
+      "name": "Small Brother"
+    },
+    {
+      "uuid": "e46b0021-5ed5-55e5-9a60-d6d656acfa76",
+      "name": "SS Thistlegorm"
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "ssrf",
+      "ssrf_version": "3",
+      "source_generator": {
+        "name": "subsurface"
+      }
+    }
+  }
+}

@@ -164,7 +164,7 @@ def test_from_names_the_reader_and_gets_that_readers_refusal(tmp_path, capsys) -
 
 def test_from_refuses_a_format_this_build_does_not_read() -> None:
     """`zip` included: an archive is a container the sniffer knows, not a reader to ask for."""
-    for named in ("ssrf", "zip"):
+    for named in ("unregistered", "zip"):
         with pytest.raises(SystemExit):
             main(["convert", "unused.uddf", "--from", named])
 

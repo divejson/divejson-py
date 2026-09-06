@@ -62,8 +62,8 @@ def _anonymous(count: int) -> bytes:
 
 
 def test_the_registered_formats_are_what_this_build_reads() -> None:
-    assert read_formats() == ("uddf",)
-    assert known_formats() == {"uddf"}
+    assert read_formats() == ("uddf", "ssrf")
+    assert known_formats() == {"uddf", "ssrf"}
 
 
 def test_zip_is_a_container_and_not_a_registered_format() -> None:
@@ -124,8 +124,8 @@ def test_a_source_nothing_claims_names_what_this_build_does_read() -> None:
 
 
 def test_a_format_this_build_does_not_read_is_refused_by_name() -> None:
-    with pytest.raises(UnsupportedSourceError, match="'ssrf'"):
-        convert(SUBSURFACE, format="ssrf")
+    with pytest.raises(UnsupportedSourceError, match="'unregistered'"):
+        convert(SUBSURFACE, format="unregistered")
 
 
 # -- an archive as one logbook --------------------------------------------------------

@@ -1,0 +1,42 @@
+<divelog program='subsurface' version='3'>
+<settings>
+</settings>
+<divesites>
+<site uuid=' ff47210' name='Small Brother'>
+</site>
+<site uuid='2bbb3390' name='SS Thistlegorm'>
+</site>
+</divesites>
+<dives>
+<dive number='45' visibility='5' sac='6.471 l/min' otu='31' cns='11%' divesiteid=' ff47210' date='2026-04-17' time='11:49:23' duration='66:50 min'>
+  <notes>House-reef checkout dive - profile, temperature and tank pressure pulled straight from the export.</notes>
+  <cylinder size='12.0 l' start='200.0 bar' end='80.0 bar' />
+  <divecomputer model='Open Diving'>
+  <depth max='45.91 m' mean='20.841 m' />
+  <temperature water='22.4 C' />
+  <sample time='0:00 min' depth='1.45 m' />
+  <sample time='0:10 min' depth='1.83 m' />
+  <sample time='0:20 min' depth='2.22 m' />
+  <sample time='0:30 min' depth='2.57 m' temp='24.4 C' />
+  <sample time='0:40 min' depth='2.6 m' />
+  <sample time='1:20 min' depth='3.32 m' temp='24.0 C' />
+  <sample time='2:50 min' depth='9.11 m' />
+  <sample time='71:40 min' depth='0.0 m' />
+  </divecomputer>
+</dive>
+<dive number='38' visibility='5' sac='12.996 l/min' otu='37' cns='14%' divesiteid='2bbb3390' date='2026-04-19' time='08:12:00' duration='48:00 min'>
+  <notes>Subsurface builds a depth profile from max depth and duration for a dive that has none; these six samples are that fabrication, carried through as recorded rather than trimmed away.</notes>
+  <cylinder size='12.0 l' o2='32.0%' start='210.0 bar' end='60.0 bar' />
+  <divecomputer model='Open Diving' last-manual-time='48:00 min'>
+  <depth max='29.6 m' mean='17.2 m' />
+  <temperature water='24.0 C' />
+  <sample time='0:00 min' depth='0.0 m' />
+  <sample time='3:17 min' depth='29.6 m' />
+  <sample time='19:36 min' depth='29.6 m' />
+  <sample time='21:48 min' depth='9.768 m' />
+  <sample time='46:55 min' depth='9.768 m' />
+  <sample time='48:00 min' depth='0.0 m' />
+  </divecomputer>
+</dive>
+</dives>
+</divelog>

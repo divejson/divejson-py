@@ -1,0 +1,39 @@
+<divelog program='subsurface' version='3'>
+<divesites>
+<site uuid='0a1b2c3d' name='Blue Hole'>
+</site>
+<site uuid='4e5f6a7b'>
+</site>
+</divesites>
+<dives>
+<dive number='1' divesiteid='4e5f6a7b' date='2026-05-01' time='09:15:00' duration='41:20 min'>
+  <cylinder size='11.1 l' o2='21.0%' start='0.0 bar' end='0.0 bar' />
+  <divecomputer>
+  <depth max='150.6 ft' mean='0.0 m' />
+  <sample time='0:00 min' depth='0.0 m' />
+  <sample time='0:30 min' depth='6.2 m' temp='19.5 C' />
+  <sample depth='7.0 m' />
+  <sample time='0:30 min' depth='6.4 m' />
+  </divecomputer>
+</dive>
+<dive number='2' time='08:00:00' divesiteid='0a1b2c3d'>
+  <notes>No date at all, so there is no start time and no dive.</notes>
+</dive>
+<dive number='3' divesiteid='0a1b2c3d' date='2026-05-02' time='10:00'>
+  <divecomputer model='Suunto Ocean'>
+  <depth max='18.4 m' mean='22.0 m' />
+  <temperature water='21.0 C' />
+  </divecomputer>
+  <divecomputer model='Garmin Descent'>
+  <depth max='18.4 m' />
+  </divecomputer>
+</dive>
+<dive number='4' divesiteid='deadbeef' date='2026-05-03' time='08:40:00'>
+  <cylinder size='7.0 l' start='4000.0 bar' end='60.0 bar' o2='71.0%' he='40.0%' />
+  <divecomputer>
+  <sample time='0:00 min' depth='0.0 m' />
+  <sample time='2:00 min' depth='9.0 m' temp='67.1 F' />
+  </divecomputer>
+</dive>
+</dives>
+</divelog>

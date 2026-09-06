@@ -1,0 +1,80 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-05T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.2.0"
+  },
+  "dives": [
+    {
+      "uuid": "99ca578d-a074-52d2-9216-e98057a33dcb",
+      "dive_number": 42,
+      "started_at": "2026-07-07T10:05:00",
+      "duration": 3660,
+      "notes": "Relaxed bay dive. Three green turtles, one very curious.",
+      "site_uuids": [
+        "aabd2eda-49ce-5301-9eec-e959ab0c527f"
+      ],
+      "cylinders": [
+        {
+          "volume": 12.0,
+          "start_pressure": 200.0,
+          "end_pressure": 90.0
+        }
+      ],
+      "max_depth": 12.4,
+      "avg_depth": 8.3,
+      "bottom_temperature": 21.0,
+      "profile": {
+        "duration": 3660,
+        "depth": {
+          "times": [
+            0,
+            1895,
+            3660
+          ],
+          "values": [
+            0,
+            1240,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "uuid": "a27d7fb1-89c9-52aa-9531-4d33de232b2e",
+      "dive_number": 43,
+      "started_at": "2026-07-09T11:20:00",
+      "duration": 2640,
+      "site_uuids": [
+        "aabd2eda-49ce-5301-9eec-e959ab0c527f"
+      ],
+      "max_depth": 21.2,
+      "avg_depth": 13.8
+    },
+    {
+      "uuid": "d51dfcdf-e98d-5027-9652-7a5a8a4b5224",
+      "dive_number": 44,
+      "started_at": "2026-07-11T09:45:00",
+      "duration": 3480,
+      "max_depth": 14.9,
+      "avg_depth": 9.1
+    }
+  ],
+  "sites": [
+    {
+      "uuid": "aabd2eda-49ce-5301-9eec-e959ab0c527f",
+      "name": "El Puertito"
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "ssrf",
+      "ssrf_version": "3",
+      "source_generator": {
+        "name": "subsurface"
+      }
+    }
+  }
+}

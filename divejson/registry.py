@@ -48,6 +48,7 @@ from .converter import (
     UnsupportedSourceError,
     header,
 )
+from .ssrf import SSRF
 from .uddf import UDDF
 from .validate import validate_document
 
@@ -107,8 +108,10 @@ class Adapter(Protocol):
 
 
 # Every reader this build carries, in the order `sniff` asks them. A list rather than a
-# dict so the order is a property of the file rather than of insertion history.
-ADAPTERS: tuple[Adapter, ...] = (UDDF,)
+# dict so the order is a property of the file rather than of insertion history. The order
+# is free: each adapter claims a root element nothing else claims, so no two of them can
+# answer for one file and `sniff` reaches the same verdict whichever it asks first.
+ADAPTERS: tuple[Adapter, ...] = (UDDF, SSRF)
 
 # The formats this implementation can *write*. Empty: it reads other formats into DiveJSON
 # and writes none of them back out, so a `write/<format>/` directory in a corpus is one

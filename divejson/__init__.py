@@ -39,6 +39,7 @@ from .converter import (  # noqa: E402
     UnsupportedSourceError,
 )
 from .registry import SNIFF_BYTES, convert, read_formats, sniff  # noqa: E402
+from .ssrf import SSRF_ID_NAMESPACE, MalformedSsrfError, SsrfError  # noqa: E402
 from .uddf import UDDF_ID_NAMESPACE, MalformedUddfError, UddfError  # noqa: E402
 from .validate import (  # noqa: E402
     DuplicateMemberError,
@@ -53,6 +54,7 @@ __all__ = [
     "SNIFF_BYTES",
     "SPEC_VERSION",
     "PRODUCER_KEY",
+    "SSRF_ID_NAMESPACE",
     "UDDF_ID_NAMESPACE",
     "Conversion",
     "ConverterError",
@@ -60,12 +62,14 @@ __all__ = [
     "DuplicateMemberError",
     "Issue",
     "MalformedArchiveError",
+    "MalformedSsrfError",
     "MalformedUddfError",
     "NonConformingOutputError",
     "Note",
     "NoteGroup",
     "NoteKind",
     "SourceTooLargeError",
+    "SsrfError",
     "UddfError",
     "UnsupportedSourceError",
     "__version__",
