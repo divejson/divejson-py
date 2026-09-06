@@ -130,7 +130,7 @@ documents using the same names are read too: the corpus it is checked against ca
 Subsurface can export both, and the two are not equivalent: `.ssrf` is its **save file**
 and holds everything it knows, while its UDDF export fills gaps in ways that survive into a
 converted document. Reading the same logbook both ways gives the same profiles, sample for
-sample, and six members that differ — each of them the exporter's doing.
+sample, and eight members that differ — each of them the exporter's doing.
 [`docs/ssrf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/ssrf-mapping.md)
 lists them.
 
