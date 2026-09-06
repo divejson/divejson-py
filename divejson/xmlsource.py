@@ -17,6 +17,13 @@ rather than a check performed after the damage.
 **A tag is matched on its lowercased local name.** UDDF alone appears under four root
 shapes — two namespaces, no namespace at all, and an uppercase `<UDDF>` for 2.x — and
 stripping `{uri}` and lowercasing at lookup time collapses all of them into one code path.
+
+**The accessors below the parser are how that matching reaches an adapter**, and they are
+here rather than in one because both of the leniencies they carry are every XML format's.
+An attribute is whitespace-stripped on the way out — Subsurface writes the site id
+`" ff47210"` in *both* the formats it exports, and a reference to it carries the space too,
+so stripping has to happen on both sides or the lookup stops resolving. An empty element is
+absent rather than an empty value, which is how a writer with no coordinates says so.
 """
 
 from __future__ import annotations
@@ -26,7 +33,16 @@ import xml.etree.ElementTree as ET
 
 from .converter import ConverterError, DoctypeRefusedError
 
-__all__ = ["DoctypeRefusingTarget", "local_name", "parse_xml", "root_name"]
+__all__ = [
+    "DoctypeRefusingTarget",
+    "attribute",
+    "child",
+    "children",
+    "local_name",
+    "parse_xml",
+    "root_name",
+    "text",
+]
 
 _NAME = re.compile(r"[^\s/>]+")
 
@@ -54,6 +70,51 @@ def local_name(element: ET.Element) -> str:
         return ""
     _, _, local = tag.rpartition("}")
     return local.lower()
+
+
+def attribute(element: ET.Element | None, name: str) -> str | None:
+    """An attribute by lowercased local name, whitespace stripped.
+
+    Matched the same way a tag is, because a UDDF 2.x file spells its attributes `ID` and
+    `REF`. Stripped because Subsurface writes one site id as `" ff47210"`, with the leading
+    space, in both the formats it exports — and the references pointing at it carry the
+    space too, so stripping has to happen on both sides or the reference stops resolving.
+    """
+    if element is None:
+        return None
+    for key, value in element.attrib.items():
+        _, _, local = key.rpartition("}")
+        if local.lower() == name:
+            return value.strip() or None
+    return None
+
+
+def children(element: ET.Element | None, name: str) -> list[ET.Element]:
+    """Every child with this local name, in document order."""
+    if element is None:
+        return []
+    return [child_element for child_element in element if local_name(child_element) == name]
+
+
+def child(element: ET.Element | None, name: str) -> ET.Element | None:
+    """The first child with this local name, or nothing."""
+    if element is None:
+        return None
+    for child_element in element:
+        if local_name(child_element) == name:
+            return child_element
+    return None
+
+
+def text(element: ET.Element | None) -> str | None:
+    """An element's text, stripped. An empty element is absent, not an empty value.
+
+    Subsurface writes `<latitude/>` for a site it has no coordinates for, so this is the
+    single most load-bearing leniency an XML reader has.
+    """
+    if element is None or element.text is None:
+        return None
+    return element.text.strip() or None
 
 
 def parse_xml(data: bytes, *, root: str, malformed: type[ConverterError]) -> ET.Element:

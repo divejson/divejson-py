@@ -74,6 +74,8 @@ __all__ = [
     "CENTIMETRES_PER_METRE",
     "INFERRED",
     "MAX_MAGNITUDE",
+    "MAX_NAME",
+    "MAX_NOTES",
     "PRODUCER_KEY",
     "TENTHS_PER_UNIT",
     "Claimed",
@@ -421,6 +423,13 @@ def integer_of(value: Decimal | None) -> int | None:
 
 
 # -- text ----------------------------------------------------------------------------
+
+# The two length caps every adapter meets, whatever it is reading: §6's `notes` on any
+# record, and the 255 that every REQUIRED name in §6 shares — a site's, a trip's, a gear
+# item's, a diver's. A format whose own members reach further caps them here too, and the
+# caps only that format meets stay with it.
+MAX_NOTES = 10_000
+MAX_NAME = 255
 
 
 def capped(value: str, limit: int, *, note: Reporter, where: str, member: str) -> str:

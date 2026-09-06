@@ -66,6 +66,8 @@ from typing import Any
 
 from .converter import (
     CENTIMETRES_PER_METRE,
+    MAX_NAME,
+    MAX_NOTES,
     PRODUCER_KEY,
     TENTHS_PER_UNIT,
     Conversion,
@@ -86,7 +88,16 @@ from .converter import (
 )
 from .series import Channel, SampleAxis
 from .validate import validate_document
+
+# Aliased on import rather than renamed at every call site. These four moved into
+# `xmlsource.py` when a second XML format arrived — taking a child by lowercased local
+# name and stripping an attribute are every XML reader's, not UDDF's — and the alias keeps
+# a hundred-odd mechanical renames out of a diff that is about the other format.
+from .xmlsource import attribute as _attr
+from .xmlsource import child as _kid
+from .xmlsource import children as _kids
 from .xmlsource import local_name, parse_xml, root_name
+from .xmlsource import text as _text
 
 # The format id this adapter registers under, which is also the name of the directory a
 # conformance corpus keeps its pairs in.
@@ -108,8 +119,8 @@ LITRES_PER_CUBIC_METRE = Decimal(1000)
 # specifies — see `_volume_litres`.
 LITRES_THRESHOLD = Decimal(1)
 
-MAX_NOTES = 10_000
-MAX_NAME = 255
+# `MAX_NOTES` and `MAX_NAME` are `converter.py`'s: every adapter meets those two. The two
+# below are UDDF's own, being the only reader that fills the members they cap.
 MAX_LOCATION = 255
 MAX_DISPLAY_NAME = 512
 MIN_PO2_LIMIT = Decimal("0.4")
@@ -221,52 +232,10 @@ class UddfAdapter:
 UDDF = UddfAdapter()
 
 
-def _attr(element: ET.Element | None, name: str) -> str | None:
-    """An attribute by lowercased local name, whitespace stripped.
-
-    Subsurface writes one site id as `" ff47210"`, with the leading space, and the
-    `<link ref>`s pointing at it carry the space too — so stripping has to happen on both
-    sides, or the reference stops resolving.
-    """
-    if element is None:
-        return None
-    for key, value in element.attrib.items():
-        _, _, local = key.rpartition("}")
-        if local.lower() == name:
-            return value.strip() or None
-    return None
-
-
-def _kids(element: ET.Element | None, name: str) -> list[ET.Element]:
-    if element is None:
-        return []
-    return [child for child in element if local_name(child) == name]
-
-
-def _kid(element: ET.Element | None, name: str) -> ET.Element | None:
-    if element is None:
-        return None
-    for child in element:
-        if local_name(child) == name:
-            return child
-    return None
-
-
 def _dig(element: ET.Element | None, *names: str) -> ET.Element | None:
     for name in names:
         element = _kid(element, name)
     return element
-
-
-def _text(element: ET.Element | None) -> str | None:
-    """An element's text, stripped. An empty element is absent, not an empty value.
-
-    Subsurface writes `<latitude/>` for a site it has no coordinates for, so this is the
-    single most load-bearing leniency in the parser.
-    """
-    if element is None or element.text is None:
-        return None
-    return element.text.strip() or None
 
 
 def _text_of(parent: ET.Element | None, *names: str) -> str | None:
