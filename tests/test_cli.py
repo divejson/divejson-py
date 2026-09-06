@@ -15,6 +15,7 @@ from helpers import FIXTURES
 
 from divejson.cli import main
 from divejson.conform import compared
+from divejson.converter import NOTE_KINDS
 
 
 @pytest.fixture()
@@ -45,12 +46,17 @@ def test_the_report_names_what_the_source_did_not_carry(source, capsys) -> None:
 
 
 def test_every_report_line_says_which_kind_of_news_it_is(source, capsys) -> None:
-    """`absent` and `dropped` are different news, and an undifferentiated list gets skimmed."""
+    """`absent` and `dropped` are different news, and an undifferentiated list gets skimmed.
+
+    Read off `NOTE_KINDS` rather than spelled out, so a kind added there does not need
+    remembering here — a list restated away from its definition is a second place for it
+    to go stale.
+    """
     main(["convert", str(source)])
     lines = [line for line in capsys.readouterr().out.splitlines() if line.startswith("  ")]
     assert lines
     for line in lines:
-        assert line[2:].split(" ", 1)[0] in ("absent", "inferred", "dropped"), line
+        assert line[2:].split(" ", 1)[0] in NOTE_KINDS, line
 
 
 def test_a_zip_of_logbooks_converts_as_one(tmp_path, capsys) -> None:

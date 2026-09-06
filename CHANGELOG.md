@@ -28,13 +28,16 @@ this file is about the package, whose version moves independently.
   and `max_member_size` bound the walk for a caller that needs them, and a member is
   measured before it is opened.
 
-- **A note carries a kind** — `absent` for what the source never recorded, `dropped` for
-  what it recorded and this format cannot hold, `inferred` for what the converter decided.
-  `Conversion.grouped()` groups on the kind as well as the message and returns
+- **A note carries a kind** — `absent` for what the source never recorded, `inferred` for a
+  value the converter computed from readings it did, `resolved` for a recorded number whose
+  scale the source left ambiguous, `dropped` for what it recorded and this format cannot
+  hold. `Conversion.grouped()` groups on the kind as well as the message and returns
   `NoteGroup(kind, message, wheres)`, and `divejson convert` prints the kind beside each
-  line. A converter that computes a value the source never recorded lists the member under
-  `extensions.divejson.inferred`; the list is written only when it is non-empty, so nothing
-  a UDDF conversion produces has changed.
+  line. A converter that computes a value lists the member under
+  `extensions.divejson.inferred` as well, and those two always travel together; a
+  resolution lists nothing, because the number is the source's own. UDDF's `<tankvolume>`
+  and `<o2>` scale readings are the `resolved` case, so the list stays absent and nothing a
+  UDDF conversion produces has changed.
 
 - **One error base.** Everything a converter raises is a `ConverterError`:
   `UnsupportedSourceError`, `SourceTooLargeError`, `MalformedArchiveError`,

@@ -22,6 +22,7 @@ import pytest
 from helpers import EXPORTED_AT, FIXTURES
 
 from divejson import compared, convert
+from divejson.converter import INFERRED, PRODUCER_KEY
 from divejson.validate import validate_document
 
 # A glob that silently matches nothing is how a suite stops testing anything, and the
@@ -46,6 +47,39 @@ def test_expected_document_is_conforming(uddf) -> None:
     """Checked here as well as in CI, so a hand-edited expectation fails at the same desk."""
     expected = json.loads(uddf.with_suffix(".divejson").read_text(encoding="utf-8"))
     assert validate_document(expected) == []
+
+
+@pytest.mark.parametrize("uddf", UDDF_FIXTURES, ids=lambda path: path.stem)
+def test_an_inferred_note_and_a_listed_member_arrive_together(uddf) -> None:
+    """The report's `inferred` kind and `extensions.divejson.inferred` are one decision.
+
+    §5.4 asks a writer to label a derived value, so a converter that computed one owes both
+    halves: the note that tells the diver, and the member path that tells a downstream
+    reader. Either without the other is a document that says two different things about
+    itself.
+
+    Both halves are empty for every UDDF file here, and that is the assertion doing the
+    work rather than a coincidence being recorded — this reader computes nothing, and the
+    two scale resolutions it *does* make report as `resolved`. Putting one of them back on
+    `inferred` fails here, on the side that would leave a note with no listed member.
+    """
+    conversion = convert(uddf.read_bytes(), exported_at=EXPORTED_AT)
+    listed = conversion.document.get("extensions", {}).get(PRODUCER_KEY, {}).get(INFERRED, [])
+    noted = [note.where for note in conversion.notes if note.kind == "inferred"]
+    assert bool(noted) == bool(listed), f"inferred notes {noted}, listed members {listed}"
+
+
+def test_the_legacy_writers_scales_are_resolved_and_change_nothing_in_its_document() -> None:
+    """The one file in the corpus that makes this reader choose a scale, twice.
+
+    Its `<tankvolume>` is written in litres and its `<o2>` in whole percent, so both
+    magnitude tests fire. The expected document beside it is unaffected: a resolution
+    labels nothing, which is why the pair did not have to be regenerated when the kind
+    arrived.
+    """
+    conversion = convert((FIXTURES / "uddf" / "legacy-writer.uddf").read_bytes(), exported_at=EXPORTED_AT)
+    assert sum(note.kind == "resolved" for note in conversion.notes) == 2
+    assert INFERRED not in conversion.document.get("extensions", {}).get(PRODUCER_KEY, {})
 
 
 def test_every_expected_document_has_an_input() -> None:

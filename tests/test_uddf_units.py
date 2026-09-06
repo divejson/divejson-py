@@ -120,9 +120,16 @@ def test_tank_volume_at_or_above_one_is_already_litres(written: str) -> None:
     assert cylinder(f"<tankvolume>{written}</tankvolume>")["volume"] == float(written)
 
 
-def test_reinterpreting_a_tank_volume_is_reported() -> None:
+def test_reinterpreting_a_tank_volume_is_reported_as_resolved() -> None:
+    """`resolved`, not `inferred`: 12 is the source's own number, at the scale it must mean.
+
+    The kind is what carries that distinction to a diver, and it is also what says the
+    document owes no `extensions.divejson.inferred` entry for the cylinder — nothing was
+    derived, so there is no derivation to label.
+    """
     conversion = convert(one_dive(f"{STARTED_AT}<tankdata><tankvolume>12</tankvolume></tankdata>"))
-    assert any("read as 12 litres" in note.message for note in conversion.notes)
+    resolved = [note for note in conversion.notes if "read as 12 litres" in note.message]
+    assert [note.kind for note in resolved] == ["resolved"]
 
 
 @pytest.mark.parametrize(
@@ -140,10 +147,16 @@ def test_gas_fractions_become_percentages(written: str, percent: float) -> None:
     assert cylinder('<link ref="m"/>', mix=header)["oxygen"] == percent
 
 
-def test_reinterpreting_a_gas_fraction_is_reported() -> None:
+def test_reinterpreting_a_gas_fraction_is_reported_as_resolved() -> None:
+    """The other scale resolution, and it carries the same kind as the volume one.
+
+    The two are one decision, so a change that moved only one of them off `resolved` would
+    leave the report saying two different things about the same reasoning.
+    """
     header = '<gasdefinitions><mix id="m"><name>Gas</name><o2>34</o2></mix></gasdefinitions>'
     conversion = convert(one_dive(f'{STARTED_AT}<tankdata><link ref="m"/></tankdata>', header=header))
-    assert any("read as 34 percent" in note.message for note in conversion.notes)
+    resolved = [note for note in conversion.notes if "read as 34 percent" in note.message]
+    assert [note.kind for note in resolved] == ["resolved"]
 
 
 def test_depths_and_temperatures_match_the_reference_export() -> None:

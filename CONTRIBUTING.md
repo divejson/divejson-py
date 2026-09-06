@@ -80,9 +80,14 @@ this arrangement exists to prevent:
 
 An adapter lands with its pairs under `fixtures/<format>/` and its mapping document under
 `docs/`, both of which the specification adopts afterwards — the second order above. It
-also lands with its report's kinds documented: `absent`, `dropped` and `inferred` are what
-a diver reads, and a converter that computes a member's value lists that member under
-`extensions.divejson.inferred` as well.
+also lands with its report's kinds documented: `absent`, `inferred`, `resolved` and
+`dropped` are what a diver reads. The two in the middle are not interchangeable and an
+adapter does not get to blur them — `inferred` is a value the converter **computed** from
+readings the source did keep, and it obliges the document to list that member under
+`extensions.divejson.inferred`; `resolved` is a number the source recorded whose scale or
+units were ambiguous, where the converter decided only how to read it and lists nothing.
+Reaching for `inferred` on a unit reading is the mistake, and it produces a document whose
+report and whose derived-value list disagree.
 
 ## Regenerating an expected document
 

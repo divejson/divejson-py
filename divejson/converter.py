@@ -13,15 +13,22 @@ Four things are worth reading before an adapter is written against them.
 catches one class and gets a message it can show a diver. The per-format subclasses exist
 for a caller that cares which reader refused; nothing in this package needs them.
 
-**A note has a kind, and it is not the same thing as an inferred value.** `kind` says what
-the report is telling the diver — `absent` for what the source never recorded, `dropped`
-for what was recorded and could not be carried, `inferred` for what this converter decided
-rather than read. `extensions.divejson.inferred` is narrower: it lists the members whose
-**value** was computed from other readings, which is what §5.4 asks a writer to label as
-derived. A `<tankvolume>` read as litres rather than cubic metres is an `inferred` note and
-not a listed member — the number is the source's own and only its scale was resolved,
-which is a unit conversion like Kelvin to Celsius. A maximum depth taken from the depth
-samples of a file that recorded none is both.
+**A note has a kind, and exactly one of the four means the value was computed.** `kind`
+says what the report is telling the diver — `absent` for what the source never recorded,
+`inferred` for a value this converter computed from readings the source *did* record,
+`resolved` for a recorded number whose scale or units the source left ambiguous and this
+converter had to decide, `dropped` for what was recorded and could not be carried.
+
+`inferred` and `resolved` are the pair worth separating, because a diver reading one
+report line has to know whether the number in the document is the converter's arithmetic
+or the source's own. That is also what keeps `extensions.divejson.inferred` exact: it
+lists the members whose **value** was computed, which is what §5.4 asks a writer to label
+as derived, so every member an `inferred` note is about is on that list and every member
+on that list has an `inferred` note. A maximum depth taken from the depth samples of a
+file that recorded none is `inferred`, and the document lists it. A `<tankvolume>` read as
+litres rather than cubic metres is `resolved` and lists nothing — the number is the
+source's own and only its scale was decided, which is a unit conversion like Kelvin to
+Celsius rather than a derivation.
 
 **Identity is shared across an archive's members, and position is not.** A `Scope` carries
 the member name a conversion sits under and the UUIDs the whole upload has already handed
@@ -131,11 +138,12 @@ class NonConformingOutputError(ConverterError):
         super().__init__("; ".join(str(issue) for issue in issues))
 
 
-NoteKind = Literal["absent", "inferred", "dropped"]
+NoteKind = Literal["absent", "inferred", "resolved", "dropped"]
 
-# In the order a report reads best: what was never there, what this converter decided,
-# what was there and could not be carried.
-NOTE_KINDS: tuple[NoteKind, ...] = ("absent", "inferred", "dropped")
+# In the order a report reads best, which is also how much of the value the source itself
+# supplied: nothing at all, the readings it was computed from, the number with its scale
+# left open, and the whole thing, uncarriable.
+NOTE_KINDS: tuple[NoteKind, ...] = ("absent", "inferred", "resolved", "dropped")
 
 
 @dataclass(frozen=True, slots=True)

@@ -45,9 +45,13 @@ and named in the report. The two *unit* ambiguities are the deliberate exception
 not the same case: `<tankvolume>`'s cubic-metres-or-litres and `<o2>`'s
 fraction-or-percent are values that **were** recorded, whose scale alone is in doubt, so a
 magnitude test there interprets data rather than inventing it. Both fire loudly into the
-report, as notes of kind `inferred` — this converter decided them — and neither is listed
-under `extensions.divejson.inferred`, because the number is still the source's own and
-only its scale was resolved.
+report, as notes of kind `resolved` — the kind that exists for exactly this, a number the
+source supplied and the converter only had to read at the scale it must have meant. They
+are deliberately not `inferred`, which is reserved for a value computed from other
+readings and carries the obligation to list its member under
+`extensions.divejson.inferred`; a resolution lists nothing, because there is no derivation
+for a reader to be told about. So this reader infers nothing and that list is absent from
+every document it produces, while its report still says out loud where it chose a scale.
 """
 
 from __future__ import annotations
@@ -607,8 +611,10 @@ class _Converter:
 
         The provenance block is also where a converter labels what it derived, so the
         inferred list lands here (spec §5.4) — empty for every UDDF conversion, since a
-        `<tankvolume>` read as litres is a recorded number at a resolved scale rather than
-        a value computed from other readings.
+        `<tankvolume>` read as litres is a recorded number at a scale this reader resolved
+        rather than a value it computed, and reports itself as `resolved` for that reason.
+        The list is kept rather than dropped because it is the shared policy every adapter
+        inherits, and the next reader will have something to put in it.
         """
         provenance: dict[str, Any] = {"converted_from": FORMAT}
         version = _attr(self.root, "version")
@@ -887,7 +893,7 @@ class _Converter:
                         where,
                         f"<{tag}> is {raw}, above the 1.0 the documentation describes; read as {percent} percent "
                         "rather than as a fraction",
-                        "inferred",
+                        "resolved",
                     )
                 if not 0 <= percent <= 100:
                     self.note(where, f"<{tag}> reads as {percent} percent, outside the 0 to 100 a fraction can be; dropped", "dropped")
@@ -1127,7 +1133,7 @@ class _Converter:
                         tank_where,
                         f"<tankvolume> is {raw_volume}, too large to be the cubic metres UDDF specifies; read as "
                         f"{litres} litres, which is how some builds of Subsurface write it",
-                        "inferred",
+                        "resolved",
                     )
                 if recorded(litres, record="cylinder", member="volume"):
                     cylinder["volume"] = float(litres)

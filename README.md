@@ -48,12 +48,19 @@ old application never kept. Every line says which kind of news it is:
 | kind | what it means |
 | --- | --- |
 | `absent` | the source never recorded this |
+| `inferred` | the converter computed it from other readings the source did keep |
+| `resolved` | the source recorded the number and left its scale ambiguous; the converter decided how to read it |
 | `dropped` | the source recorded it and this format cannot hold it |
-| `inferred` | the converter decided it — a value computed from other readings, or a number whose scale the source left ambiguous |
 
-A member whose *value* was computed rather than read is also listed under
-`extensions.divejson.inferred` in the document itself, so a reader can tell a derivation
-from a reading (spec §5.4).
+The last two are worth telling apart, because they answer different questions about the
+number in front of you: an `inferred` one is the converter's arithmetic, a `resolved` one
+is the source's own figure at the scale it must have meant — a `<tankvolume>` of `12` in a
+field UDDF specifies in cubic metres is twelve litres, not a twelve-thousand-litre
+cylinder.
+
+An `inferred` member is also listed under `extensions.divejson.inferred` in the document
+itself, so a reader can tell a derivation from a reading (spec §5.4). A `resolved` one is
+not: nothing was derived, so there is nothing to label.
 
 **The format is recognised from the file's own bytes**, not from its extension, and
 `--from <format>` says what a file is when the bytes do not. A **zip** whose files are all

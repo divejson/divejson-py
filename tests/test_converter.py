@@ -39,8 +39,14 @@ def test_a_note_cannot_be_made_without_a_kind() -> None:
         Note("dive/0", "something")  # type: ignore[call-arg]
 
 
-def test_the_kinds_are_the_three_the_report_distinguishes() -> None:
-    assert NOTE_KINDS == ("absent", "inferred", "dropped")
+def test_the_kinds_are_the_four_the_report_distinguishes() -> None:
+    """Pinned, because the set is a contract a report renderer and a port both read.
+
+    `inferred` and `resolved` are the pair that has to stay apart: one is a value this
+    converter computed, the other a value the source recorded at a scale the converter
+    decided, and only the first is a derivation §5.4 asks a writer to label.
+    """
+    assert NOTE_KINDS == ("absent", "inferred", "resolved", "dropped")
 
 
 def test_notes_group_by_kind_as_well_as_message() -> None:

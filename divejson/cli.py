@@ -11,7 +11,7 @@ from pathlib import Path
 from . import __version__
 from .conform import Result
 from .conform import run as run_conform
-from .converter import ConverterError, NonConformingOutputError, NoteGroup
+from .converter import NOTE_KINDS, ConverterError, NonConformingOutputError, NoteGroup
 from .registry import convert, known_formats, read_formats
 from .validate import DuplicateMemberError, parse_document, validate_document
 
@@ -19,6 +19,10 @@ from .validate import DuplicateMemberError, parse_document, validate_document
 # habit of a whole file - eight dives with no UTC offset - is one finding, and the point
 # of the line is the finding rather than the roll call.
 _WHERES_SHOWN = 3
+
+# The column the kind is printed in, taken from the kinds themselves so that adding one
+# cannot leave the report ragged.
+_KIND_WIDTH = max(len(kind) for kind in NOTE_KINDS)
 
 # The collections a converted document can carry, with how to count them.
 _COUNTED = (("dives", "dive", "dives"), ("trips", "trip", "trips"), ("sites", "site", "sites"), ("gear", "gear item", "gear items"))
@@ -242,13 +246,19 @@ def _convert_command(
 
 
 def _kind(group: NoteGroup) -> str:
-    """A report line's kind, padded so the three of them line up down the left.
+    """A report line's kind, padded so the four of them line up down the left.
 
     Worth the column: `absent` and `dropped` are different news — one is what the diver's
     old application never kept, the other is what it kept and this format cannot hold — and
-    a report that reads as one undifferentiated list of complaints gets skimmed.
+    a report that reads as one undifferentiated list of complaints gets skimmed. `inferred`
+    and `resolved` are the other pair, and the difference between them is whose number is
+    in the document: this converter's arithmetic, or the source's own at a scale the
+    converter picked.
+
+    The width is the longest kind rather than a number chosen by eye, so a fifth kind lines
+    the column up by arriving rather than by anyone remembering to widen it.
     """
-    return f"{group.kind:<8}"
+    return f"{group.kind:<{_KIND_WIDTH}}"
 
 
 def _conform_command(corpus: Path, *, strict: bool, only: list[str], skip: list[str]) -> int:
