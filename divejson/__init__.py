@@ -38,6 +38,7 @@ from .converter import (  # noqa: E402
     SourceTooLargeError,
     UnsupportedSourceError,
 )
+from .fit import FIT_ID_NAMESPACE, FitError, MalformedFitError  # noqa: E402
 from .registry import SNIFF_BYTES, convert, read_formats, sniff  # noqa: E402
 from .ssrf import SSRF_ID_NAMESPACE, MalformedSsrfError, SsrfError  # noqa: E402
 from .uddf import UDDF_ID_NAMESPACE, MalformedUddfError, UddfError  # noqa: E402
@@ -54,14 +55,17 @@ __all__ = [
     "SNIFF_BYTES",
     "SPEC_VERSION",
     "PRODUCER_KEY",
+    "FIT_ID_NAMESPACE",
     "SSRF_ID_NAMESPACE",
     "UDDF_ID_NAMESPACE",
     "Conversion",
     "ConverterError",
     "DoctypeRefusedError",
     "DuplicateMemberError",
+    "FitError",
     "Issue",
     "MalformedArchiveError",
+    "MalformedFitError",
     "MalformedSsrfError",
     "MalformedUddfError",
     "NonConformingOutputError",

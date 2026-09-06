@@ -27,7 +27,10 @@ UNREAD = "unregistered"
 # One pair per registered format, since `--strict` is what most of these run under and a
 # format with no pairs is a shape error there. Derived from the registry rather than
 # listed, so registering a reader without a corpus directory fails here and not in CI.
-PAIRS = {"uddf": "mix-only-cylinder", "ssrf": "refusals"}
+# The smallest pair each format has, since every test below copies the whole set: the
+# Suunto Ocean's 4,295 records make a 165 KB expectation, and the D5's 200 make a 15 KB one
+# that exercises the same reader.
+PAIRS = {"uddf": "mix-only-cylinder", "ssrf": "refusals", "fit": "suunto-d5"}
 
 
 def _corpus(tmp_path: Path) -> Path:
@@ -301,7 +304,12 @@ def test_the_registered_formats_are_the_ones_with_pair_directories() -> None:
 
     Derived rather than listed, so a reader registered without a pair directory beside it
     fails here — which is the same gap `--strict` catches, one desk earlier.
+
+    The list of ids the build registers is asserted once, in `test_registry.py`, and
+    deliberately not repeated here: this test opened with a hand-written copy of it, which
+    said `uddf` when `ssrf` landed and `uddf, ssrf` when `fit` did, and each time reported
+    the stale copy rather than anything about pair directories.
     """
-    assert known_formats() == {"uddf", "ssrf"}
+    assert known_formats()
     for fmt in known_formats():
         assert (FIXTURES / fmt).is_dir(), fmt

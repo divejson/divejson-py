@@ -73,9 +73,10 @@ it is reading are in
 [`docs/converting.md`](https://github.com/divejson/divejson-py/blob/main/docs/converting.md),
 and what is one format's — its element map, its writers' habits, its ambiguities, and what
 is deliberately left unmapped — is in
-[`docs/uddf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/uddf-mapping.md)
+[`docs/uddf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/uddf-mapping.md),
+[`docs/ssrf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/ssrf-mapping.md)
 and
-[`docs/ssrf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/ssrf-mapping.md).
+[`docs/fit-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/fit-mapping.md).
 
 From Python, the same two steps an application takes:
 
@@ -115,6 +116,7 @@ the corpus has no pairs for from a warning into an error.
 | DiveJSON | — | validates | 1.0 |
 | UDDF | `uddf` | reads into DiveJSON | 3.0 – 3.2.3 |
 | Subsurface | `ssrf` | reads into DiveJSON | save format 3 |
+| FIT | `fit` | reads into DiveJSON | protocol 2.0 |
 
 The **id** is the whole coupling between this package and everything around it: it is what
 `sniff` returns, what `--from` takes, and what a conformance corpus names a directory of
@@ -128,9 +130,25 @@ documents using the same names are read too: the corpus it is checked against ca
 Subsurface can export both, and the two are not equivalent: `.ssrf` is its **save file**
 and holds everything it knows, while its UDDF export fills gaps in ways that survive into a
 converted document. Reading the same logbook both ways gives the same profiles, sample for
-sample, and four members that differ — each of them the exporter's doing.
+sample, and eight members that differ — each of them the exporter's doing.
 [`docs/ssrf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/ssrf-mapping.md)
 lists them.
+
+FIT is the binary one, and the only format here that is genuinely shared: a Garmin Descent
+and a Suunto Ocean write the same message numbers with the same units, because the units
+come from the global FIT profile rather than from the vendor. `fitdecode` is a **core**
+dependency and not an extra, so `pip install divejson` reads FIT with nothing else asked
+for — a format left out of the core is one every consumer has to learn to ask for and every
+conformance runner can quietly skip.
+
+Two things a FIT reader has to get right, and both are in
+[`docs/fit-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/fit-mapping.md).
+Its magic sits at **offset 8**, not at the start, so a zip's own first bytes can never
+decide the format of the files inside it — each member is sniffed on its own head. And a
+vendor may declare a **developer field under a profile field's name**: every Suunto session
+in this project's hand carries a `float32` `max_depth` of 45.90999984741211 beside the
+native `uint32`'s exact 45.91, and a reader that takes the last match by name produces a
+document that validates perfectly and is wrong by a rounding error.
 
 ## Releasing
 
@@ -144,9 +162,16 @@ publishes, and a release is the only thing another repository can pin.
 
 ## Notices
 
-`fitdecode` (MIT) is a dependency of this package. The FIT Protocol and FIT file format
-are proprietary to Garmin; this project is not affiliated with or endorsed by Garmin, and
-carries no part of the FIT SDK.
+`fitdecode` (MIT) is a dependency of this package, and is what decodes a FIT file here: its
+own copy of the global FIT profile is where every field number, base type and scale factor
+this package applies comes from. The message and field numbers written out in
+[`docs/fit-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/fit-mapping.md)
+were read off that profile and off real files, and **not** from Garmin's `Profile.xlsx`,
+which nobody on this project downloads.
+
+The FIT Protocol and FIT file format are proprietary to Garmin. This project is not
+affiliated with or endorsed by Garmin, carries no part of the FIT SDK, and does not use
+`garmin-fit-sdk`.
 
 ## License
 
