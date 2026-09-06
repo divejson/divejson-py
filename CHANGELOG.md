@@ -25,7 +25,7 @@ this file is about the package, whose version moves independently.
   deliberately not mapped and why.
 
   **A `.ssrf` dive carries no id**, so its identity is its position in the file and every
-  conversion says so. An archive of per-dive files is the case that makes ordinary: the
+  conversion says so. That makes the archive case ordinary rather than exotic: the
   positional stand-in is prefixed by the archive member, so two files' first dives do not
   collide.
 
