@@ -52,11 +52,11 @@ old application never kept. Every line says which kind of news it is:
 | `resolved` | the source recorded the number and left its scale ambiguous; the converter decided how to read it |
 | `dropped` | the source recorded it and this format cannot hold it |
 
-The last two are worth telling apart, because they answer different questions about the
-number in front of you: an `inferred` one is the converter's arithmetic, a `resolved` one
-is the source's own figure at the scale it must have meant — a `<tankvolume>` of `12` in a
-field UDDF specifies in cubic metres is twelve litres, not a twelve-thousand-litre
-cylinder.
+`inferred` and `resolved` are worth telling apart, because they answer different questions
+about the number in front of you: an `inferred` one is the converter's arithmetic, a
+`resolved` one is the source's own figure at the scale it must have meant — a
+`<tankvolume>` of `12` in a field UDDF specifies in cubic metres is twelve litres, not a
+twelve-thousand-litre cylinder.
 
 An `inferred` member is also listed under `extensions.divejson.inferred` in the document
 itself, so a reader can tell a derivation from a reading (spec §5.4). A `resolved` one is
