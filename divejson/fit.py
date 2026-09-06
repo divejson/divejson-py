@@ -100,11 +100,13 @@ MAGIC = b".FIT"
 MAGIC_OFFSET = 8
 MAGIC_END = MAGIC_OFFSET + len(MAGIC)
 
-# How many messages one file may hold before it stops describing a dive. Decoding is
-# linear in messages and is the whole cost of reading a FIT, so a file of bare `record`s —
-# which is how a device really encodes a long log, about ten bytes each — is where an
-# unbounded read hurts. The fullest file in this project's hand is 4,295 messages for a
-# 72-minute dive, so this is about 23 times that, or roughly 28 hours of continuous
+# How many frames one file may hold before it stops describing a dive. Decoding is linear
+# in frames and is the whole cost of reading a FIT, so a file of bare `record`s — which is
+# how a device really encodes a long log, about ten bytes each — is where an unbounded read
+# hurts. Frames rather than data messages because that is what the decoder hands back and
+# what each one costs: the fullest file in this project's hand decodes to 4,339 of them for
+# a 72-minute dive — 4,295 `record`s among 4,311 data messages, plus 26 definitions, the
+# header and the CRC — so this is about 23 times that, or roughly 28 hours of continuous
 # logging.
 #
 # A cap this adapter sets rather than one the caller does, unlike the archive's
@@ -260,7 +262,7 @@ def _native_raw(frame: fitdecode.FitDataMessage | None, name: str) -> Any | None
     return field_data.raw_value if field_data is not None else None
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, eq=False)
 class _Point:
     """Every reading one instant of the dive carried, whichever message brought it.
 
@@ -270,6 +272,12 @@ class _Point:
     instant here so that the §6.5 axis is built once, and so that a `record` and a
     `tank_update` at one second are one sample rather than two, the later of which the
     axis would drop.
+
+    `eq=False` so a point stays hashable and compares by identity. A dataclass that
+    generates `__eq__` sets `__hash__` to `None`, and these are used as dictionary keys —
+    an event finds its second by looking its own instant's point up in the axis. Identity
+    is also the comparison that means anything here: two instants that happened to record
+    the same depth are still two samples.
     """
 
     depth: Decimal | None = None
@@ -441,6 +449,10 @@ def _collect_tank_update(scan: _Scan, frame: fitdecode.FitDataMessage) -> None:
 
     `pressure` is already bar — the profile scales it — and `sensor` is the pod's ANT id,
     read raw because the profile renders 65535 in that slot as a word rather than a number.
+
+    Two readings from one pod at one instant are the same collision `_set` reports for a
+    `record` channel, and are reported the same way: the times on a pressure channel are
+    strictly increasing too, so the first is kept and the second named.
     """
     point = _point(scan, frame)
     if point is None:
@@ -449,7 +461,10 @@ def _collect_tank_update(scan: _Scan, frame: fitdecode.FitDataMessage) -> None:
     sensor = _native_raw(frame, "sensor")
     if bar is None or not isinstance(sensor, int) or isinstance(sensor, bool):
         return
-    point.pressures.setdefault(sensor, bar)
+    if sensor in point.pressures:
+        scan.collisions.append("cylinder pressure")
+        return
+    point.pressures[sensor] = bar
 
 
 def _number(value: Any) -> Decimal | None:
@@ -489,10 +504,11 @@ class _Converter:
         self.notes: list[Note] = []
         self.identities = Identities(FIT_ID_NAMESPACE, scope, self.note)
         self.inferred: list[str] = []
-        # The instant the profile's second zero is, and the second each instant landed on.
-        # Both are set by `axis`, which is what decides them; an event resolves its own
-        # place through the second, so that a marker and a sample at one instant agree.
-        self.seconds: dict[datetime, int] = {}
+        # The `dive_gas` entries this dive actually carried, in the order the cylinders are
+        # written in. Read once, by `read_dive`, because two things need the same list and
+        # the report may only be written once: the cylinders are built from it and a gas
+        # switch resolves the `message_index` it names against it.
+        self.gases: list[fitdecode.FitDataMessage] = []
 
     # -- reporting ---------------------------------------------------------------
 
@@ -571,6 +587,7 @@ class _Converter:
         dive: dict[str, Any] = {"uuid": claimed, "started_at": started_at}
         summary = self.summary()
         samples = self.axis(where)
+        self.gases = self.carried_gases(where)
 
         # In §6.2's own member order, so a converted dive reads down the schema.
         self.read_duration(session, summary, dive, where)
@@ -910,14 +927,7 @@ class _Converter:
         tank telemetry, so `tank_summary` and `tank_update` are exercised only by
         encoder-built messages — see `docs/fit-mapping.md`.
         """
-        gases = self.carried()
-        if self.disabled:
-            self.note(
-                where,
-                f"the device's gas list holds {self.disabled} gases it records as disabled, which are "
-                "configured on the computer and were not carried on this dive; dropped",
-                "dropped",
-            )
+        gases = self.gases
         tanks = self.tank_pressures()
 
         if not gases:
@@ -938,7 +948,7 @@ class _Converter:
         cylinders = [self.cylinder(gas, pressures, where) for gas, pressures in zip(gases, paired)]
         return cylinders, [sensor for sensor, _ in tanks]
 
-    def breathed(self, where: str) -> list[fitdecode.FitDataMessage]:
+    def carried_gases(self, where: str) -> list[fitdecode.FitDataMessage]:
         """The `dive_gas` entries for cylinders that were on the dive, in device order.
 
         A device stores its whole configured gas list, so a `disabled` entry is a gas the
@@ -950,6 +960,10 @@ class _Converter:
         appended, rather than being keyed by position: keying a position into the same
         table as a real `message_index` makes a gas at position 0 collide with a gas
         declaring index 0, and one of the two vanishes.
+
+        Called **once**, by `read_dive`, and the answer kept on `self.gases`: the cylinders
+        and the gas-switch events both resolve against this list, and a second call would
+        write the disabled-gas line into the report twice.
         """
         indexed: dict[int, fitdecode.FitDataMessage] = {}
         unindexed: list[fitdecode.FitDataMessage] = []
@@ -1148,9 +1162,7 @@ class _Converter:
         start = _native(self.scan.session, "start_time")
         origin = start if isinstance(start, datetime) else min(self.scan.points)
         for at, point in self.scan.points.items():
-            second = rounded(Decimal(str((at - origin).total_seconds())))
-            self.seconds[at] = second
-            axis.offer(second, point)
+            axis.offer(rounded(Decimal(str((at - origin).total_seconds()))), point)
         return axis
 
     def read_profile(
@@ -1223,14 +1235,14 @@ class _Converter:
             return []
         positions = {
             index & MESSAGE_INDEX_MASK: number
-            for number, index in enumerate(
-                (_native_raw(gas, "message_index") for gas in self.breathed_quietly())
-            )
+            for number, index in enumerate(_native_raw(gas, "message_index") for gas in self.gases)
             if isinstance(index, int) and not isinstance(index, bool)
         }
+        # The axis is what decided which instants have a place and what second each landed
+        # on, so an event asks it rather than recomputing from the session's start time:
+        # a sample the axis dropped for sharing a second with an earlier one is an instant
+        # the profile does not reach, and an event there has nowhere to go either.
         seconds = {point: second for second, point in samples.ordered()}
-        by_instant = {id(point): point for point in self.scan.points.values()}
-        del by_instant
 
         events: list[dict[str, Any]] = []
         for frame in self.scan.events:
@@ -1267,20 +1279,6 @@ class _Converter:
                 event["label"] = str(data)
             events.append(event)
         return events
-
-    def breathed_quietly(self) -> list[fitdecode.FitDataMessage]:
-        """`breathed`, without repeating its report — the events resolve against the same list."""
-        indexed: dict[int, fitdecode.FitDataMessage] = {}
-        unindexed: list[fitdecode.FitDataMessage] = []
-        for gas in self.scan.gases:
-            if _native(gas, "status") in UNCARRIED_GAS_STATUSES:
-                continue
-            index = _native_raw(gas, "message_index")
-            if isinstance(index, int) and not isinstance(index, bool):
-                indexed.setdefault(index & MESSAGE_INDEX_MASK, gas)
-            else:
-                unindexed.append(gas)
-        return [indexed[index] for index in sorted(indexed)] + unindexed
 
 
 def _first(*values: Decimal | None) -> Decimal | None:
