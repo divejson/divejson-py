@@ -13,6 +13,7 @@ Two members are excluded from the comparison, and only two — `exported_at` and
 from __future__ import annotations
 
 import json
+import re
 
 import pytest
 from helpers import EXPORTED_AT, FIXTURES
@@ -102,18 +103,90 @@ def test_the_two_readings_of_one_subsurface_logbook_agree_where_they_can() -> No
 
 
 def test_where_the_two_readings_differ_it_is_the_exporters_doing() -> None:
-    """Four differences, none of them a disagreement about the mapping.
+    """Six differences, none of them a disagreement about the mapping.
 
     Subsurface's UDDF export writes the five-star visibility as `15` metres, invents an
     `mix(21/0)` air blend for a cylinder its own save file records no gas for, writes
-    `<leadquantity>0</leadquantity>` for a logbook holding no weights, and carries no
-    `<lowesttemperature>` for the water temperature the save file does keep. The `.ssrf`
+    `<he>0.00</he>` on every mix where no `<cylinder>` carries an `@he`, writes
+    `<leadquantity>0</leadquantity>` for a logbook holding no weights, carries no
+    `<lowesttemperature>` for the water temperature the save file does keep, and fills a
+    site's `<geography><location>` with a copy of that site's own `<name>`. The `.ssrf`
     reading is the closer one to what the diver logged in every case, which is the argument
     for reading the save file rather than the export.
+
+    **Walked over the whole document rather than over `dives`.** The count here was four
+    until 2026-09-06, because two of the six are invisible from a dive: `sites[].location`
+    is not on a dive at all, and `helium` fires even on the dives whose `oxygen` agrees, so
+    a check that stopped at the gas that differed never reached it. The set is derived from
+    a member-by-member walk and the six are then named, so a seventh appearing fails here
+    rather than going unnoticed for another reader.
+
+    The walk covers the first dive and both sites, which is every record the two reductions
+    kept the same. The **second** dive is out because the two fixtures reduce it
+    differently on purpose — six of the fabricated samples here against three there, which
+    each file's own `notes` then describes — and that is a property of the reduction rather
+    than of either exporter. The six are the same six on the unreduced exports those two
+    files were cut from.
     """
-    ssrf = convert((FIXTURES / "ssrf" / "subsurface.ssrf").read_bytes()).document["dives"][0]
-    uddf = convert((FIXTURES / "uddf" / "subsurface.uddf").read_bytes()).document["dives"][0]
-    assert "visibility" not in ssrf and uddf["visibility"] == 15.0
-    assert "oxygen" not in ssrf["cylinders"][0] and uddf["cylinders"][0]["oxygen"] == 21.0
-    assert "weight" not in ssrf and uddf["weight"] == 0.0
-    assert ssrf["bottom_temperature"] == 22.4 and "bottom_temperature" not in uddf
+    ssrf = convert((FIXTURES / "ssrf" / "subsurface.ssrf").read_bytes()).document
+    uddf = convert((FIXTURES / "uddf" / "subsurface.uddf").read_bytes()).document
+    differing = _differing_members(_first_dive_only(ssrf), _first_dive_only(uddf))
+    assert differing == {
+        "dives[]/visibility",
+        "dives[]/cylinders[]/oxygen",
+        "dives[]/cylinders[]/helium",
+        "dives[]/weight",
+        "dives[]/bottom_temperature",
+        "sites[]/location",
+    }
+
+    first_ssrf, first_uddf = ssrf["dives"][0], uddf["dives"][0]
+    assert "visibility" not in first_ssrf and first_uddf["visibility"] == 15.0
+    assert "oxygen" not in first_ssrf["cylinders"][0] and first_uddf["cylinders"][0]["oxygen"] == 21.0
+    assert "helium" not in first_ssrf["cylinders"][0] and first_uddf["cylinders"][0]["helium"] == 0.0
+    assert "weight" not in first_ssrf and first_uddf["weight"] == 0.0
+    assert first_ssrf["bottom_temperature"] == 22.4 and "bottom_temperature" not in first_uddf
+    assert "location" not in ssrf["sites"][0] and uddf["sites"][0]["location"] == uddf["sites"][0]["name"]
+
+
+# What neither reader is claiming anything about, and so what the walk below skips. The
+# UUIDs are each format's own frozen namespace and always differ; `cns_end` and `otu_end`
+# are recorded to different precisions by the two exports, which `docs/ssrf-mapping.md`
+# treats separately from a member one side does not carry at all.
+_NOT_COMPARED = {"uuid", "site_uuids", "extensions", "cns_end", "otu_end", "exported_at", "generator"}
+
+
+def _first_dive_only(document: dict) -> dict:
+    return {**document, "dives": document["dives"][:1]}
+
+
+def _differing_members(left: dict, right: dict) -> set[str]:
+    """Every member path the two documents disagree on, with list indices collapsed.
+
+    Collapsed, because "the eighth dive's helium differs" and "the first dive's helium
+    differs" are one fact about the exporter and eight assertions would be one fact stated
+    eight times. A member one side omits entirely counts as a difference, which is the
+    whole shape of five of the six.
+    """
+
+    def leaves(node: object, path: str, out: dict[str, object]) -> None:
+        if isinstance(node, dict):
+            for name, value in node.items():
+                if name not in _NOT_COMPARED:
+                    leaves(value, f"{path}/{name}" if path else name, out)
+        elif isinstance(node, list):
+            for index, value in enumerate(node):
+                leaves(value, f"{path}/{index}", out)
+        else:
+            out[path] = node
+
+    here: dict[str, object] = {}
+    there: dict[str, object] = {}
+    leaves(left, "", here)
+    leaves(right, "", there)
+    missing = object()
+    return {
+        re.sub(r"/\d+", "[]", path)
+        for path in set(here) | set(there)
+        if here.get(path, missing) != there.get(path, missing)
+    }
