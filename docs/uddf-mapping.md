@@ -1,16 +1,15 @@
 # Reading UDDF into DiveJSON
 
 **Non-normative.** The specification is [`spec/divejson.md`](../spec/divejson.md); nothing
-here changes what a conforming document is. This document records what `divejson convert`
-decided and why, so that the rules survive being reimplemented: the portable part of a
-converter is its rules, not its code, and a port in another language starts here rather
-than from `divejson/uddf.py`.
+here changes what a conforming document is.
+
+**The rules that hold for every source format are in
+[`converting.md`](converting.md)** — leniency, identity, units and arithmetic, what a
+report is, what a converter refuses to guess. This document carries only what is UDDF's:
+its element map, the dialects it has to read, its own identity namespace, its ambiguities,
+and what it deliberately leaves unmapped.
 
 It is also where a future reader learns why a `0.012` and a `12` are the same cylinder.
-
-Every claim about a real writer below was checked against a file that writer produced.
-Where a rule rests on a file this repository does not carry — a personal export, a sample
-from a public issue tracker — that is said in place rather than implied.
 
 ## Why a converter at all
 
@@ -20,8 +19,8 @@ contradicts its schema in at least one load-bearing place. What actually ships i
 of dialects: two real third-party exports checked while this converter was written both
 fail the 3.2.2 XSD, and they fail structurally rather than at the margins.
 
-So the first rule is the one everything else follows from: **schema validity is never a
-precondition**. The single most valuable file a converter is ever handed does not validate.
+That is the file that taught `converting.md`'s first rule, and this is the format it was
+written against.
 
 ## Parsing
 
@@ -31,7 +30,7 @@ UDDF appears under at least four root shapes:
 
 | shape | seen from |
 | --- | --- |
-| namespace `http://www.streit.cc/uddf/3.2/` | Subsurface, and this format's reference implementation |
+| namespace `http://www.streit.cc/uddf/3.2/` | Subsurface, and this format's reference writer |
 | namespace `http://www.streit.cc/uddf/3.1/` | older 3.1 writers |
 | no namespace at all | divelogs.de, APD DiveSight |
 | uppercase `<UDDF>` | 2.x writers |
@@ -54,54 +53,29 @@ gate on validation anyway, the honest reading is to be order-insensitive: take c
 name and let the order be whatever it is.
 
 Waypoints are the one exception, and even there position is not what orders them: they are
-sorted by their own recorded `<divetime>`, because §6.5 requires strictly increasing sample
-times and nothing guarantees a writer emitted them in order.
+sorted by their own recorded `<divetime>`, under `converting.md`'s sample-ordering rule.
 
-### Leniency, itemized
+### What UDDF's leniencies look like
 
-- **Whitespace is stripped from ids and refs.** Subsurface writes one site id as
-  `" ff47210"`, with the leading space, and the `<link ref>`s pointing at it carry the
-  space too — so stripping has to happen on both sides or the reference stops resolving.
-- **An empty element is absent, not zero.** `<latitude/>` is Subsurface saying it has no
-  coordinates. This is the single most load-bearing leniency in the parser.
-- **An id that is not an `NCName` is read anyway.** `mix(21/0)` carries parentheses,
-  `2bbb3390` begins with a digit; both are what Subsurface writes, and both are refused by
-  the XSD.
-- **A number that is not finite, or is too large to carry, is absent.** `NaN` and
-  `Infinity` are accepted by decimal parsers and are not readings. Neither is `1e999`: the
-  bound is not physical — this format sets none on a depth or a temperature, and inventing
-  one here would be a converter deciding how deep a dive can be — but a *representability*
-  one. JSON numbers are doubles in every reader this format expects to meet, so a value
-  past that range stops being a number on the way out: a serializer writes an overflowed
-  float as a bare `Infinity` token no JSON parser accepts, a double-based parser reads an
-  integer that large back as infinity, and a schema validator objects to neither. Reject
-  it at the point the text is read, before any scale is applied to it, and the members
-  derived from it are covered too.
-- **Text is compared after stripping.** A `<name>` of pure whitespace is no name.
+The rules are in `converting.md`; these are the elements that produced each of them.
+
+- **Whitespace in ids and refs.** Subsurface writes one site id as `" ff47210"`, with the
+  leading space, and the `<link ref>`s pointing at it carry the space too — so stripping
+  has to happen on both sides or the reference stops resolving.
+- **`<latitude/>`.** An empty element is Subsurface saying it has no coordinates.
+- **Ids the XSD refuses.** `mix(21/0)` carries parentheses and `2bbb3390` begins with a
+  digit, so neither is an `NCName`; both are what Subsurface writes and both are read.
+- **`<name>`.** A `<name>` of pure whitespace is no name.
 
 ### A `<!DOCTYPE>` is refused outright
 
-UDDF has no legitimate use for a document type declaration, and spec §9 requires readers
-not to dereference anything found in a document. The standard library's XML parser blocks
-external entities on its own, but it caps entity *amplification* only in recent libexpat —
-a several-hundredfold blowup still parses on older ones, and that is a property of the
-library version rather than a guarantee the language makes. Refusing the declaration is the
-guarantee, it costs nothing real, and it avoids taking on a second runtime dependency in a
-package that has exactly one.
-
-The refusal fires from the parser's doctype hook, which runs before a single entity
-reference in the content has been expanded.
+UDDF has no legitimate use for a document type declaration. The refusal and its reasoning
+are `converting.md`'s, and this reader shares the parse target that carries it.
 
 ## Units
 
-UDDF is SI throughout and DiveJSON is not, and this is the highest-risk part of a
-converter: a wrong factor produces a document that validates perfectly and describes a dive
-nobody took. Nothing downstream catches it — a validator accepts any integer as a profile
-sample, and a count of samples is not a value.
-
-**The channel conversions carry a scale the scalar ones do not.** That is the trap. The
-most-executed conversion in the whole converter is depth samples ×100, and a list of the
-scalar conversions alone does not contain it.
+The factors. The arithmetic they run on, and why a wrong one is the most expensive mistake
+in a converter, are in `converting.md`.
 
 | DiveJSON member | DiveJSON unit | UDDF element | UDDF unit | factor |
 | --- | --- | --- | --- | --- |
@@ -119,43 +93,18 @@ scalar conversions alone does not contain it.
 | `weight` | kilograms | `<leadquantity>` | kilograms | — |
 | `visibility`, `altitude` | metres | `<visibility>`, `<altitude>` | metres | — |
 
-Arithmetic runs on decimal values parsed from the source text, not on floating point:
-`2.6 × 100` is exactly `260` that way, where the float route arrives at
-`260.00000000000003` and has to be rounded back out. Rounding to an integer is
-half-away-from-zero — a reading of 2.5 seconds is 3, not the 2 that banker's rounding
-gives.
-
 ## Identity
 
-UDDF ids are XML Names. DiveJSON requires a UUID on every record, and §5.3 asks that
-identifiers be stable across exports of the same data, which a fresh random UUID per run
-breaks. So:
+The rules are `converting.md`'s. UDDF's namespace, fixed forever, is
+`1b85a949-d5f7-5d67-9d04-dcc78342f907`, itself
+`uuid5(NAMESPACE_URL, "https://divejson.org/ns/uddf")`.
 
-1. **If the source id already contains a UUID, reuse it.** `xs:ID` is an `NCName` and
-   cannot begin with a digit, which a hex UUID regularly does, so a writer holding real
-   UUIDs prefixes them — this format's reference implementation writes
-   `dive-019fec36-b9ec-71c6-a03e-64f59b8b92b1`. A short alphabetic prefix followed by a
-   canonical UUID is stripped. This is what lets a logbook that went out through UDDF come
-   back recognisable.
-2. **Otherwise, UUIDv5 over a fixed namespace and `"{kind}:{source id}"`.** The namespace
-   is `1b85a949-d5f7-5d67-9d04-dcc78342f907`, itself
-   `uuid5(NAMESPACE_URL, "https://divejson.org/ns/uddf")`. It is fixed forever: changing it
-   would renumber every document any released converter has produced.
-3. **The record kind is in the hash, and that is not decoration.** A source id is not
-   unique within a file — every `<dive>` in a Subsurface export reuses its enclosing
-   `<repetitiongroup>`'s id — so hashing the bare id would hand a dive and its group one
-   UUID.
-4. **A record with no id gets its position in the file**, reported as such: its identity is
-   stable for an unchanged file and moves if the file's order changes.
-5. **Two records of the same kind sharing an id is a source defect.** The second is dropped
-   and reported, because two records cannot share one identity.
-
-Two properties worth stating rather than discovering. Derived identities are a function of
-the source id alone, so two files from *different* divers that both use the id `owner`
-produce the same diver UUID — §5.3 is explicit that UUIDs are not portable identities for
-shared realities, so this is within the rules, but it means converted logbooks are not
-safe to merge on UUID. And a source id that changes between exports changes the identity
-with it; nothing can recover from a writer that does not keep its own ids stable.
+The two UDDF facts those rules answer to: `xs:ID` is an `NCName` and cannot begin with a
+digit, which a hex UUID regularly does, so a writer holding real UUIDs prefixes them — this
+format's reference writer writes `dive-019fec36-b9ec-71c6-a03e-64f59b8b92b1`, and
+the prefix is stripped back off. And a source id is not unique within a file: every
+`<dive>` in a Subsurface export reuses its enclosing `<repetitiongroup>`'s id, which is why
+the record kind is part of the hash.
 
 ## The element map
 
@@ -168,11 +117,8 @@ mapped* below.
 | --- | --- |
 | `/uddf/@version` | `extensions.divejson.uddf_version` |
 | `/uddf/generator/name`, `/version` | `extensions.divejson.source_generator` |
-| — | `generator` — **the converter**, not the source; §4 defines it as what produced *this* document |
+| — | `generator` — **the converter**, not the source |
 | — | `exported_at` — the moment of conversion, always offset-aware |
-
-The provenance block rides under the `divejson` producer key (§5.5) because the source's
-own identity is worth keeping and the core vocabulary has nowhere for it.
 
 ### Diver — `/uddf/diver/owner`
 
@@ -183,19 +129,10 @@ own identity is worth keeping and the core vocabulary has nowhere for it.
 | `@id` | `diver.uuid` |
 
 **`@id` is never read as a name or a handle.** It is an XML id, and Subsurface's is the
-literal string `owner`. An owner with nothing else recorded produces no `diver` member at
-all: §6.1 says a converter whose source records nothing about an owner omits it entirely,
-because minting identity for one would be §5.4's fabrication applied to people.
+literal string `owner`.
 
-**`email` is the one member whose type constrains the text a source may put in it**, and
-the only source string that is checked rather than merely capped. Every other one reaches a
-free-text member where the only limit is a length. So a `<contact><email>` holding `n/a`, a
-dash or a person's name is read as no email recorded and reported — a member the format
-cannot hold is a member the source did not fill in. A converter that passed it through
-would emit a document that fails its own validation, and since that is treated as the
-converter's bug rather than the file's, one unusable header field would discard an entire
-logbook. Any mapping added later that lands a source string on a constrained member owes
-the same guard.
+`<contact><email>` is UDDF's instance of `converting.md`'s constrained-member guard: one
+holding `n/a`, a dash or a person's name is read as no email recorded, and reported.
 
 ### Dive sites — `/uddf/divesite/site`
 
@@ -206,15 +143,12 @@ the same guard.
 | `geography/latitude` + `longitude` | `sites[].position` |
 | `notes/para` | `sites[].notes`, paragraphs joined with blank lines |
 
-A **nameless site is dropped along with every reference to it**, because §6.10 requires a
-name and §5.3 forbids a dangling reference. divelogs.de produces this: a site it holds only
-a locality for exports as `<name/>` with a `<location>`. Promoting the locality into the
-name would be inventing one, so the dive arrives without a site instead.
+divelogs.de produces the nameless site: one it holds only a locality for exports as
+`<name/>` with a `<location>`. Promoting the locality into the name would be inventing one,
+so the dive arrives without a site instead — and every reference to that site goes with it.
 
-**An exact `0.000000` / `0.000000` pair is not a position.** Every site in a divelogs.de
-export carries it, and Null Island is a place: a reader that trusts it pins a Red Sea wreck
-into the Atlantic. Half a pair is not a position either — §6's Position object makes both
-members REQUIRED, which is §5.4 enforced by shape.
+Every site in a divelogs.de export also carries an exact `0.000000` / `0.000000` pair,
+which is the file that taught `converting.md`'s rule that such a pair is not a position.
 
 ### Trips — `/uddf/divetrip/trip`
 
@@ -229,9 +163,8 @@ members REQUIRED, which is §5.4 enforced by shape.
 | `trippart/notes/para` | `trips[].notes` |
 | dive's `informationbeforedive/tripmembership/@ref` | `dives[].trip_uuid` |
 
-`tripType` records no dates of its own, so a trip's span is the span of its parts. A trip
-with no dates at all is dropped: §6.8 makes `starts_on` REQUIRED and there is nothing to
-put there.
+`tripType` records no dates of its own, so a trip's span is the span of its parts — and a
+trip whose parts carry none has nothing to put in `starts_on`.
 
 UDDF also allows the opposite direction — `trippart/relateddives/link` pointing from the
 trip at its dives. It is not read, because no writer in the corpus emits it.
@@ -277,26 +210,24 @@ carries nothing this format records.
 | `informationafterdive/visibility` | `visibility` |
 | `informationafterdive/notes/para` | `notes` |
 
-**The offset on `<datetime>` is preserved exactly as recorded and never supplied.** That is
-§5.2's whole point, and converting to UTC — or assuming an offset where the source recorded
-none — is the failure every tested UDDF consumer produced. A dive with no `<datetime>` at
-all is dropped, since §6.2 makes `started_at` REQUIRED.
+`<datetime>` is the source of the UTC offset `converting.md` requires be carried through
+untouched; a dive with no `<datetime>` at all is dropped, since §6.2 makes `started_at`
+REQUIRED.
 
 Two truncations are forgiven, both real writer output rather than hypotheticals:
 `2002-06-18T` and a bare `2002-06-18` are read as midnight on that date and reported.
 Subsurface emits the first for a midnight dive, its stylesheet building the string with an
 unguarded concatenation. Dropping the dive over it would lose a dive to a writer's typo.
 
-Zero is read two different ways, and the difference is the rule rather than an
-inconsistency. A `<greatestdepth>` or `<averagedepth>` of `0` is **not recorded**: UDDF
-makes `<greatestdepth>` mandatory where DiveJSON leaves `max_depth` optional, so a writer
-with nothing to say has to put a zero there. A `<leadquantity>` of `0` **is recorded**:
-§6.2 makes `weight: 0` a diver's "no lead", distinct from absence. Which way a zero reads
-follows the format's own constraint on the member — `> 0` means the zero was a placeholder,
-`≥ 0` means it was an answer. *Known trap:* Subsurface writes `<leadquantity>0</leadquantity>`
-for a logbook it holds no weights for, so a converted Subsurface file says "no lead" where
-the diver's original log said 6 kg. That is a loss on Subsurface's side, and reading it any
-other way would discard a genuine "no lead" from every other writer.
+Zero is read two different ways here, which is `converting.md`'s zero rule meeting two
+members with different constraints. A `<greatestdepth>` or `<averagedepth>` of `0` is **not
+recorded**: UDDF makes `<greatestdepth>` mandatory where DiveJSON leaves `max_depth`
+optional, so a writer with nothing to say has to put a zero there. A `<leadquantity>` of `0`
+**is recorded**, since §6.2 makes `weight: 0` a diver's "no lead". *Known trap:* Subsurface
+writes `<leadquantity>0</leadquantity>` for a logbook it holds no weights for, so a
+converted Subsurface file says "no lead" where the diver's original log said 6 kg. That is a
+loss on Subsurface's side, and reading it any other way would discard a genuine "no lead"
+from every other writer.
 
 A `<link>` under `informationbeforedive` addresses a site here; the schema also lets it
 address a buddy or a shop, so one that resolves to something else is dropped with a note,
@@ -316,25 +247,17 @@ and one that resolves to nothing at all is reported as a source defect.
 `<gasdefinitions>` is not a collection of its own: DiveJSON carries the blend on the
 cylinder that held it, so a mix nothing links to travels nowhere.
 
-**A `<tankdata>` with a gas link and no `<tankvolume>` is a cylinder with its vessel
-members absent**, which §6.3 names in as many words. It is not a defect and it is not
-skipped.
-
-**A `<tankpressurebegin>` of `0` is a device's absent-marker.** §6.3 says outright that
-writers must not emit one, so it is read as not recorded rather than as an empty cylinder.
-
-A dive's cylinders are numbered from 0 in document order — and **only** when the profile
-needs the numbering, to tie a pressure channel or a gas switch to its cylinder. §6.3 calls
-`gas_number` "a label, not an array index", and UDDF records no numbering at all, so the
-converter does not assert one where nothing depends on it.
+`converting.md`'s vessel-less cylinder is UDDF's `<tankdata>` with a gas link and no
+`<tankvolume>`; the absent start pressure it describes is `<tankpressurebegin>` of `0`. And
+UDDF records no cylinder numbering at all, which is why the converter has none to carry and
+numbers only where a pressure channel or a gas switch needs it.
 
 ### Profile — `dive/samples/waypoint`
 
 UDDF puts every reading taken at one instant inside one `<waypoint>`; DiveJSON splits them
-into channels sampled on their own axes. **The waypoints set the time axis, and each channel
-takes only the waypoints that actually carried a reading for it.** No channel is padded to
-another's length. This is why a converted Subsurface dive keeps 431 depth samples beside 29
-temperatures rather than inventing 402 readings.
+into channels sampled on their own axes, and `converting.md`'s no-padding rule is why a
+converted Subsurface dive keeps 431 depth samples beside 29 temperatures rather than
+inventing 402 readings.
 
 | UDDF | DiveJSON |
 | --- | --- |
@@ -345,15 +268,10 @@ temperatures rather than inventing 402 readings.
 | `setmarker` | an event |
 | `switchmix` (`@ref` → a mix → a cylinder) | a `gas_switch` event |
 
-- A waypoint with **no `<divetime>`** has no place on the axis and is dropped, reported.
-  `<divetime>` is optional in the schema and is the only thing that can place a reading.
-- Waypoints whose readings are all unusable produce **no profile at all**, rather than one
-  carrying a bare `duration: 0`. A zero-length sampled record is a claim the source did not
-  make. This is reported, unlike a dive that simply has no `<samples>`: the source did
-  record a profile, and this is the converter unable to carry it — the same class as a
-  dropped waypoint rather than an absence.
-- `<divetime>` is `xs:float` while §6.5's `times` are strictly increasing integers, so two
-  waypoints that round to the same second keep the first and report the second.
+- `<divetime>` is optional in the schema and is the only thing that can place a reading, so
+  a waypoint without one is the timeless sample `converting.md` drops and reports.
+- `<divetime>` is `xs:float` while §6.5's `times` are integers, which is what makes the
+  same-second collision rule fire on real files.
 - A `<setmarker>` whose text is exactly `deep_stop`, `safety_stop` or `bookmark` becomes
   that event type; anything else becomes an `"other"` event labelled with the text.
   `<setmarker>` is a bare string with no type beside it, so this is the only thing a round
@@ -365,10 +283,13 @@ temperatures rather than inventing 402 readings.
   a linked double measured at one pressure — is taken as the dive's cylinder when there is
   exactly one, and dropped when there is a choice to get wrong.
 
-## The three ambiguities
+## Three places UDDF does not hand over the answer
 
-None of these has a clean answer. Each is handled explicitly and reported when its
-heuristic fires, because a silent guess is the failure this converter exists to avoid.
+The last two are `converting.md`'s ambiguities: a value the source did record, whose scale
+the file cannot settle, so a heuristic reads it at the scale it must have meant and reports
+a finding of kind `resolved` when it fires. The first is the opposite shape and no ambiguity
+at all — a required DiveJSON member with no UDDF source — and §6.4 settles it outright, so
+it guesses nothing and reports nothing.
 
 ### `profile.duration` has no UDDF source
 
@@ -380,7 +301,9 @@ sample span in both real exports on record, 4010 against 4300 and 4001 against 4
 **Take the largest sample time across every channel. Never trim samples to make
 `<diveduration>` fit** — that would delete recorded readings to satisfy a number, which is
 exactly §5.4's violation. DiveJSON's own reference writer produces the same shape, a
-`profile.duration` of 4301 over a logged `duration` of 4001.
+`profile.duration` of 4301 over a logged `duration` of 4001. §6.4 defines the member as the
+span of the samples themselves, so reading it off them is structural rather than derived,
+and it carries no finding of any kind.
 
 ### `<tankvolume>`: cubic metres or litres
 
@@ -392,12 +315,8 @@ because whichever build produced the fixture only demonstrates one of them.
 
 **Heuristic: below 1, cubic metres; at 1 or above, already litres.** A cubic metre of water
 capacity is a thousand-litre cylinder, and a litre-valued `0.012` would be twelve
-millilitres. Bubbletrail's UDDF importer uses the same threshold. Reported when the second
-branch fires.
-
-Dropping the member instead would lose every cylinder's size on those Subsurface builds,
-which is why this is not the "refuse rather than guess" case: the value **was** recorded and
-only its scale is in doubt, so the magnitude test interprets data rather than inventing it.
+millilitres. Bubbletrail's UDDF importer uses the same threshold. Reported as `resolved`
+when the second branch fires.
 
 ### `<o2>` and `<he>`: fraction or percent
 
@@ -406,43 +325,10 @@ contradicts itself, and writers took both readings: pre-2017 Subsurface wrote `<
 where current writers write `0.34`. Both are schema-valid.
 
 **Heuristic: at or below 1, the documented fraction; above 1, already a percentage.** `1.0`
-is pure oxygen rather than a 1 % mix, because a 1 % mix is not a breathing gas. Reported
-when the second branch fires.
-
-## Refuse rather than guess, and say which
-
-Every case where the source **did not record** a member resolves to omitting it and
-reporting that, never to a plausible default. §5.4 is the rule; the report is how a diver
-learns what their file did not carry. In particular:
-
-- No implied air for a cylinder with no gas — §6.3 says absent oxygen means not recorded,
-  not 21.
-- No `(0, 0)` for a missing position, and no half a position.
-- No synthesized samples, and no offset supplied where the source recorded none.
-- No name invented for a record whose format-required name is missing; the record and the
-  references to it go instead.
-
-The two unit ambiguities above are deliberately *not* this case, for the reason given
-there.
-
-## The report
-
-Every conversion returns a list of findings alongside the document. Each names a location
-in the **source** file — `dive/0`, `dive/0/tankdata/1`, `site/3`, `$` — because that is
-where a diver looking for a missing value has to go. Indices are zero-based and count
-elements of that kind in document order.
-
-The command line groups findings by message, since one habit of a whole file produces one
-finding per record and a thousand-dive logbook would otherwise bury the interesting ones.
-
-**The converter validates its own output before it is written.** A converter that can emit
-a non-conforming document is a bug factory, and every way a source can be wrong is supposed
-to resolve to an omission and a note — so reaching a validation failure is a bug in the
-converter rather than a property of the file, and it is reported as one.
+is pure oxygen rather than a 1 % mix, because a 1 % mix is not a breathing gas. Reported as
+`resolved` when the second branch fires.
 
 ## Deliberately not mapped
-
-Listed rather than left silent, because a port needs to know these were considered.
 
 | UDDF | why not |
 | --- | --- |
