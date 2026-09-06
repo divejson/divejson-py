@@ -251,13 +251,19 @@ project's hand does; a device that sampled faster on descent would weight it tow
 descent, which is why this is the last resort and why it is labelled as computed. It is
 quantized to two places, which is what a device's own `avg_depth` carries.
 
-A mean deeper than the maximum cannot be — which a device's own `avg_depth` and a maximum
-computed from the samples can produce between them — and the mean is dropped rather than
-either being adjusted to fit (spec §6.2). **The `inferred` findings are raised after that
-check rather than as the values are found**, so a dropped mean is reported as dropped and
-nothing says the document carries a value computed from the samples when it carries no
-value at all. Raising them first and unlisting the loser afterwards leaves the report and
-the list disagreeing, which is the one thing this pairing may never do.
+A mean deeper than the maximum cannot be, and the mean is dropped rather than either being
+adjusted to fit (spec §6.2). **The `inferred` findings are raised after that check rather
+than as the values are found**, so a dropped mean is reported as dropped and nothing says
+the document carries a value computed from the samples when it carries no value at all.
+
+The case that makes the ordering matter is a **recorded `max_depth` against a mean computed
+from the samples** — a device that summarised its depths and got the maximum wrong, or one
+whose `session` carries a maximum and no mean. There the dropped member is the derived one,
+so raising its finding first and unlisting it afterwards leaves an `inferred` line in the
+report with nothing on the list to match, which is the one thing this pairing may never do.
+The other way round — a device's own mean against a maximum computed from the samples — the
+dropped member is the device's own reading, which was never `inferred`, and the ordering
+changes nothing.
 
 ### The local time zone — `activity` (34)
 

@@ -756,10 +756,10 @@ class _Converter:
         **The `inferred` findings are raised last, after the two depths have been checked
         against each other**, because a computed mean deeper than a recorded maximum is
         dropped and a note saying where a dropped value came from is a note about a value
-        the document does not carry. Raising them as the values were found and then
-        unlisting the survivor left the report and
-        `extensions.divejson.inferred` disagreeing — an `inferred` line with no member on
-        the list, which is the one thing `converter.py` says can never happen.
+        the document does not carry. Raising them as the values were found and unlisting
+        the dropped mean afterwards left the report and `extensions.divejson.inferred`
+        disagreeing — an `inferred` line with no member on the list, which is the one thing
+        `converter.py` says can never happen.
         """
         depths = [point.depth for _, point in samples.ordered() if point.depth is not None]
         computed = {
