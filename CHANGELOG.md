@@ -42,12 +42,12 @@ this file is about the package, whose version moves independently.
   carry are `absent` and `dropped`.
 
   Reading one Subsurface logbook through both of its export paths gives the same profiles,
-  sample for sample, and six members that differ — the five-star visibility its UDDF
+  sample for sample, and eight members that differ — the five-star visibility its UDDF
   exporter turns into metres, the air blend and the `0.00` helium that exporter writes for
   a cylinder recording no gas, the `0` kg of lead it writes for a logbook holding no
-  weights, a water temperature the export drops, and the site `location` it fills with a
-  copy of the site's own name. `docs/ssrf-mapping.md` records each, along with what is
-  deliberately not mapped and why.
+  weights, the water temperature and the end-of-dive CNS and OTU the export drops, and the
+  site `location` it fills with a copy of the site's own name. `docs/ssrf-mapping.md`
+  records each, along with what is deliberately not mapped and why.
 
   **A `.ssrf` dive carries no id**, so its identity is its position in the file and every
   conversion says so. That makes the archive case ordinary rather than exotic: the

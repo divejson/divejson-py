@@ -269,17 +269,19 @@ one, so nothing about it could be checked against output Subsurface actually pro
 
 Both readers in this repository have been run over one Subsurface logbook exported both
 ways — eight dives and five sites, converted whole and compared member by member, ignoring
-only the four things neither reader is claiming anything about: `uuid`, `site_uuids`,
-`extensions`, and the `cns_end`/`otu_end` the two exports record to different precisions.
-The depth and temperature channels come out **equal, sample for sample**, through two
-entirely different unit paths — metres and Celsius in attributes here, metres and Kelvin in
-elements there.
+only the three things neither reader is claiming anything about: `uuid`, `site_uuids` and
+`extensions`. The depth and temperature channels come out **equal, sample for sample**,
+through two entirely different unit paths — metres and Celsius in attributes here, metres
+and Kelvin in elements there.
 
-**Compare the whole document, not `dives`.** This count was arrived at three times by
-walking the dives alone, and was three times too low: a difference that lives on a site is
-invisible from there, and so is one on a member every dive happens to share. Six members
-differ, and every one is the UDDF exporter's doing. Everything else in both documents is
-equal.
+**Compare the whole document, not `dives`, and set nothing aside without checking it.**
+This count was arrived at three times by walking the dives alone, and was three times too
+low: a difference that lives on a site is invisible from there, and so is one on a member
+every dive happens to share. A fourth attempt then excluded `cns_end` and `otu_end` as a
+pair the two exports record to different precisions, which they are not — the UDDF export
+carries no CNS or OTU at all, so they differ exactly the way `bottom_temperature` does and
+belong in the list for the same reason. Eight members differ, and every one is the UDDF
+exporter's doing. Everything else in both documents is equal.
 
 - **`visibility`** — `15` metres there, absent here, on all eight dives. The star rating,
   converted by the exporter and refused by this reader.
@@ -297,13 +299,24 @@ equal.
   `<leadquantity>0</leadquantity>` for a logbook it holds no weights for, which §6.2 makes a
   recorded "no lead"; `uddf-mapping.md` records that as a known trap. The save file writes
   no `<weightsystem>` at all, which is the honest absence.
-- **`bottom_temperature`** — `22.4` here, absent there, on all eight dives. The UDDF export
-  carries no `<lowesttemperature>` for the water temperature the save file keeps.
+- **`bottom_temperature`** — a temperature here (`22.4` on the first dive; each dive has its
+  own), absent there, on all eight dives. The UDDF export carries no `<lowesttemperature>`
+  for the water temperature the save file keeps.
+- **`cns_end`** — a CNS figure here (`11` on the first dive), absent there, on the seven
+  dives whose `<dive>` carries an `@cns`. The UDDF export writes no CNS anywhere in the
+  document — not on a dive, not on a waypoint — for the figure the save file keeps. The
+  eighth dive carries neither `@cns` nor `@otu`, and there the two readings agree.
+- **`otu_end`** — an OTU figure here (`31` on the first dive), absent there, on the same
+  seven dives, and absent from the UDDF export for the same reason. Where a UDDF document
+  does carry these two they are per-waypoint series rather than the dive's end scalar, and
+  `uddf-mapping.md` records this reader declining to derive a scalar from them; that policy
+  never comes into play here, because there is nothing in the export to derive from.
 - **`sites[].location`** — the site's own name there, absent here, on all five sites. The
   exporter writes a `<geography><location>` holding exactly what `<name>` holds, and the
   UDDF reader carries it because §6.10's `location` is a real member and a reader cannot
   know that a writer filled it by copying. The save file's `<site>` has one name and no
-  second field to copy it into. This is the other difference `dives` cannot see.
+  second field to copy it into. This is the one difference `dives` cannot see: the other
+  seven all live on a dive.
 
 The record UUIDs differ too, and always will: each format has its own frozen identity
 namespace, so the same site converted through both paths is two records. `converting.md`
