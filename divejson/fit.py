@@ -944,8 +944,13 @@ class _Converter:
             )
             tanks = []
 
+        # `strict`, because the two lists are equal in length by construction — the
+        # mismatched case was dropped above — and a zip that silently truncated would lose a
+        # cylinder rather than fail.
         paired = [pressures for _, pressures in tanks] or [(None, None)] * len(gases)
-        cylinders = [self.cylinder(gas, pressures, where) for gas, pressures in zip(gases, paired)]
+        cylinders = [
+            self.cylinder(gas, pressures, where) for gas, pressures in zip(gases, paired, strict=True)
+        ]
         return cylinders, [sensor for sensor, _ in tanks]
 
     def carried_gases(self, where: str) -> list[fitdecode.FitDataMessage]:

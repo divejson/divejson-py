@@ -34,7 +34,7 @@ from typing import Any
 from fitdecode.profile import BASE_TYPES, MESSAGE_TYPES
 from fitdecode.types import FieldType
 
-__all__ = ["DevField", "FLOAT32", "Message", "STARTED_AT", "dive_file", "fit_file", "message", "record_stream"]
+__all__ = ["FLOAT32", "STARTED_AT", "DevField", "Message", "dive_file", "fit_file", "message", "record_stream"]
 
 # FIT timestamps count seconds from this instant, not the Unix epoch.
 FIT_EPOCH = datetime(1989, 12, 31, tzinfo=timezone.utc)

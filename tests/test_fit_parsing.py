@@ -571,7 +571,12 @@ def test_a_switch_to_a_gas_this_file_does_not_describe_is_still_a_switch() -> No
 
 
 def test_a_user_marker_is_a_bookmark() -> None:
-    data = dive_file(_at(0, depth=30.0), _at(60, depth=6.0), _event(60, "user_marker"), session={"total_elapsed_time": 60.0})
+    data = dive_file(
+        _at(0, depth=30.0),
+        _at(60, depth=6.0),
+        _event(60, "user_marker"),
+        session={"total_elapsed_time": 60.0},
+    )
     assert _dive(data)["profile"]["events"] == [{"time": 60, "type": "bookmark"}]
 
 

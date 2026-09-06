@@ -166,7 +166,7 @@ def test_a_ceiling_of_zero_is_not_a_ceiling() -> None:
 def test_a_semicircle_is_180_over_two_to_the_31() -> None:
     """The profile declares no scale for `position_lat`, so the raw count is what arrives."""
     assert DEGREES_PER_SEMICIRCLE == Decimal(180) / Decimal(2**31)
-    assert (Decimal(2**31) * DEGREES_PER_SEMICIRCLE) == Decimal(180)
+    assert Decimal(2**31) * DEGREES_PER_SEMICIRCLE == Decimal(180)
 
 
 def test_a_recorded_fix_converts_to_degrees_at_six_places() -> None:
