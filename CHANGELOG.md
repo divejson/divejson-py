@@ -7,6 +7,30 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **FIT is the third format this package reads, and the first binary one.** `divejson
+  convert my-dive.fit`, `sniff` answers `"fit"`, a zip of them converts as one logbook, and
+  `fixtures/fit/` carries the pairs any port is measured against. `fitdecode` is a **core**
+  dependency rather than an extra, so `pip install divejson` reads FIT with nothing else
+  asked for.
+
+  **Its magic is at offset 8**, not at the start of the file, which is why a zip's own first
+  bytes can never decide the format of the files inside it — the archive walk sniffs each
+  member on its own head, and an application should do the same.
+
+  **A developer field may carry a profile field's name, and the native one wins.** Every
+  Suunto session in this project's hand writes a `float32` `max_depth` of 45.90999984741211
+  beside the native `uint32`'s exact 45.91; a reader taking the last match by name produces
+  a document that validates perfectly and is wrong by a rounding error. Where the developer
+  field is the *only* one, the value reads as not recorded and falls through — to Garmin's
+  `dive_summary`, and then to the depth samples, where it becomes the first `inferred`
+  finding any reader in this package raises and the first entry in a document's
+  `extensions.divejson.inferred`.
+
+  `dive_summary`, `tank_summary`, `tank_update` and most of `dive_gas` are Garmin's, no
+  Garmin file exists in this project yet, and they are tested over encoder-built messages
+  only. `docs/fit-mapping.md` marks every one of those rows **untested** and records what
+  is deliberately unmapped and why.
+
 - **Subsurface `.ssrf` is the second format this package reads.** Its save file rather than
   its UDDF export, so it holds everything Subsurface knows: `divejson convert
   my-logbook.ssrf`, `sniff` answers `"ssrf"`, and `fixtures/ssrf/` carries the pairs any
