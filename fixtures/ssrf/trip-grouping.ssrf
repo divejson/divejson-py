@@ -1,0 +1,33 @@
+<divelog program='subsurface' version='3'>
+<settings>
+</settings>
+<divesites>
+<site uuid='bc7c9098' name='El Puertito'>
+</site>
+</divesites>
+<dives>
+<trip date='2026-07-07' time='08:00:00' location='Tenerife'>
+<dive number='42' sac='10.881 l/min' divesiteid='bc7c9098' date='2026-07-07' time='10:05:00' duration='61:00 min'>
+  <notes>Relaxed bay dive. Three green turtles, one very curious.</notes>
+  <cylinder size='12.0 l' start='200.0 bar' end='90.0 bar' />
+  <divecomputer last-manual-time='61:00 min'>
+  <depth max='12.4 m' mean='8.3 m' />
+  <temperature water='21.0 C' />
+  <sample time='0:00 min' depth='0.0 m' />
+  <sample time='31:35 min' depth='12.4 m' />
+  <sample time='61:00 min' depth='0.0 m' />
+  </divecomputer>
+</dive>
+<dive number='43' divesiteid='bc7c9098' date='2026-07-09' time='11:20:00' duration='44:00 min'>
+  <divecomputer last-manual-time='44:00 min'>
+  <depth max='21.2 m' mean='13.8 m' />
+  </divecomputer>
+</dive>
+</trip>
+<dive number='44' date='2026-07-11' time='09:45:00' duration='58:00 min'>
+  <divecomputer last-manual-time='58:00 min'>
+  <depth max='14.9 m' mean='9.1 m' />
+  </divecomputer>
+</dive>
+</dives>
+</divelog>

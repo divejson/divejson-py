@@ -33,14 +33,12 @@ records no timestamp". The rule is shared; the words a diver reads are the forma
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
-from .converter import NoteKind
+from .converter import Reporter
 
 __all__ = ["Channel", "SampleAxis"]
-
-Reporter = Callable[[str, str, NoteKind], None]
 
 
 class Channel:

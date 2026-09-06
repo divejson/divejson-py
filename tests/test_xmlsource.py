@@ -1,19 +1,23 @@
-"""The parse target every XML adapter shares, and the sniff that never parses.
+"""The parse target every XML adapter shares, its accessors, and the sniff that never parses.
 
-Two claims worth separating. `parse_xml` refuses a `<!DOCTYPE>` and raises something that
+Three claims worth separating. `parse_xml` refuses a `<!DOCTYPE>` and raises something that
 is not any one format's error, so an adapter added later inherits spec §9 rather than
 remembering it. `root_name` answers what a bounded head of bytes opens with, and does it
 without building a tree — a sniffer that raised on a hostile file would turn "what is
-this?" into an error before anything had decided to read it.
+this?" into an error before anything had decided to read it. And the accessors carry the
+two leniencies every XML reader needs, which is why they are checked here rather than
+through whichever adapter happens to exercise them.
 """
 
 from __future__ import annotations
+
+import xml.etree.ElementTree as ET
 
 import pytest
 
 from divejson import ConverterError, DoctypeRefusedError, UddfError
 from divejson.uddf import MalformedUddfError
-from divejson.xmlsource import parse_xml, root_name
+from divejson.xmlsource import attribute, child, children, parse_xml, root_name, text
 
 # -- the parse target -----------------------------------------------------------------
 
@@ -35,6 +39,50 @@ def test_a_doctype_refusal_is_not_any_one_formats_error() -> None:
         parse_xml(b'<!DOCTYPE uddf><uddf/>', root="uddf", malformed=MalformedUddfError)
     assert isinstance(raised.value, ConverterError)
     assert not isinstance(raised.value, UddfError)
+
+
+# -- the accessors --------------------------------------------------------------------
+
+
+def test_an_attribute_is_matched_by_local_name_and_stripped() -> None:
+    """Both halves are load-bearing, and each was learned from a real file.
+
+    UDDF 2.x spells its attributes `ID` and `REF`, and a namespaced one arrives as
+    `{uri}id`. Subsurface writes the site id `" ff47210"` with a leading space in both the
+    formats it exports, and the references to it carry the space too — stripping on one
+    side only is worse than not stripping at all.
+    """
+    element = ET.fromstring("<site ID=' ff47210' xmlns:x='urn:x' x:name='Small Brother' blank='  '/>")
+    assert attribute(element, "id") == "ff47210"
+    assert attribute(element, "name") == "Small Brother"
+    assert attribute(element, "blank") is None
+    assert attribute(element, "missing") is None
+    assert attribute(None, "id") is None
+
+
+def test_children_are_taken_by_lowercased_local_name() -> None:
+    element = ET.fromstring("<dive><SAMPLE n='1'/><sample n='2'/><notes/></dive>")
+    assert [attribute(found, "n") for found in children(element, "sample")] == ["1", "2"]
+    assert attribute(child(element, "sample"), "n") == "1"
+    assert child(element, "absent") is None
+    assert children(None, "sample") == []
+    assert child(None, "sample") is None
+
+
+def test_an_empty_element_is_absent_rather_than_an_empty_value() -> None:
+    """`<latitude/>` is Subsurface saying it has no coordinates for a site."""
+    element = ET.fromstring("<geography><latitude/><longitude>  </longitude><location>Dahab</location></geography>")
+    assert text(child(element, "latitude")) is None
+    assert text(child(element, "longitude")) is None
+    assert text(child(element, "location")) == "Dahab"
+    assert text(None) is None
+
+
+def test_a_comment_is_not_a_child_with_a_name() -> None:
+    """`local_name` answers `""` for a comment, so nothing ever matches one."""
+    element = ET.fromstring("<dive><!-- exported by something --><notes>a</notes></dive>")
+    assert text(child(element, "notes")) == "a"
+    assert children(element, "") == []
 
 
 # -- the sniff ------------------------------------------------------------------------

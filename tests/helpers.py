@@ -55,3 +55,34 @@ def one_dive(
         version=version,
         namespace=namespace,
     )
+
+
+# -- Subsurface `.ssrf` ---------------------------------------------------------------
+
+# The `@date`/`@time` pair every `.ssrf` dive needs, being the same instant the UDDF helper
+# above uses — without the offset, which the format records nowhere.
+SSRF_STARTED_AT = "date='2026-04-17' time='11:49:23'"
+
+
+def ssrf(body: str, *, program: str = "subsurface", version: str = "3") -> bytes:
+    """One Subsurface logbook around `body`, as the bytes `convert` takes."""
+    declared = "".join(
+        f" {name}='{value}'" for name, value in (("program", program), ("version", version)) if value
+    )
+    return f"<?xml version='1.0' encoding='utf-8'?>\n<divelog{declared}>{body}</divelog>".encode()
+
+
+def one_ssrf_dive(attributes: str = "", body: str = "", *, sites: str = "") -> bytes:
+    """A logbook whose only dive carries `attributes` and `body`, after `sites`.
+
+    `attributes` is appended to the start time rather than replacing it: `started_at` is
+    REQUIRED (spec §6.2), so a dive without one is dropped rather than converted — which
+    would make every other assertion in a test vacuous.
+    """
+    divesites = f"<divesites>{sites}</divesites>" if sites else ""
+    return ssrf(f"{divesites}<dives><dive {SSRF_STARTED_AT} {attributes}>{body}</dive></dives>")
+
+
+def one_ssrf_computer(body: str, *, attributes: str = "") -> bytes:
+    """A logbook whose only dive carries one `<divecomputer>` holding `body`."""
+    return one_ssrf_dive(attributes, f"<divecomputer>{body}</divecomputer>")

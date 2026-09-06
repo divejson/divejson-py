@@ -62,8 +62,8 @@ def _anonymous(count: int) -> bytes:
 
 
 def test_the_registered_formats_are_what_this_build_reads() -> None:
-    assert read_formats() == ("uddf",)
-    assert known_formats() == {"uddf"}
+    assert read_formats() == ("uddf", "ssrf")
+    assert known_formats() == {"uddf", "ssrf"}
 
 
 def test_zip_is_a_container_and_not_a_registered_format() -> None:
@@ -124,8 +124,8 @@ def test_a_source_nothing_claims_names_what_this_build_does_read() -> None:
 
 
 def test_a_format_this_build_does_not_read_is_refused_by_name() -> None:
-    with pytest.raises(UnsupportedSourceError, match="'ssrf'"):
-        convert(SUBSURFACE, format="ssrf")
+    with pytest.raises(UnsupportedSourceError, match="'unregistered'"):
+        convert(SUBSURFACE, format="unregistered")
 
 
 # -- an archive as one logbook --------------------------------------------------------
@@ -314,10 +314,11 @@ def test_an_inferred_path_is_re_indexed_for_its_place_in_the_merged_document(mon
     """A path that still named its own file's dive 0 would label somebody else's dive.
 
     No reader in this build infers anything — UDDF's two ambiguities report as `resolved`,
-    the kind for a scale decided rather than a value computed — so the adapter under test is
-    a stand-in for one that does: a reader taking a maximum depth off the samples of a file
-    that recorded none. It sets both halves the coupling requires, the note and the listed
-    member, because a reader that set only one would be the bug rather than the fixture.
+    the kind for a scale decided rather than a value computed, and the Subsurface reader
+    settles no scale at all — so the adapter under test is a stand-in for one that does: a
+    reader taking a maximum depth off the samples of a file that recorded none. It sets both
+    halves the coupling requires, the note and the listed member, because a reader that set
+    only one would be the bug rather than the fixture.
     """
 
     real = adapter_for("uddf")

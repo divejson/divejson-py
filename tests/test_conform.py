@@ -17,7 +17,17 @@ from helpers import FIXTURES
 
 from divejson.cli import main
 from divejson.conform import DIFF_LINES, IGNORED, compared, run
-from divejson.registry import known_formats
+from divejson.registry import known_formats, read_formats
+
+# The stand-in for a format nothing here registers. It used to be `ssrf`, which stopped
+# standing in for anything the day the Subsurface reader landed and took several tests with
+# it — so this one is a name no adapter will ever claim, rather than the next format along.
+UNREAD = "unregistered"
+
+# One pair per registered format, since `--strict` is what most of these run under and a
+# format with no pairs is a shape error there. Derived from the registry rather than
+# listed, so registering a reader without a corpus directory fails here and not in CI.
+PAIRS = {"uddf": "mix-only-cylinder", "ssrf": "refusals"}
 
 
 def _corpus(tmp_path: Path) -> Path:
@@ -25,11 +35,13 @@ def _corpus(tmp_path: Path) -> Path:
     corpus = tmp_path / "corpus"
     (corpus / "valid").mkdir(parents=True)
     (corpus / "invalid").mkdir()
-    (corpus / "uddf").mkdir()
     shutil.copy(FIXTURES / "valid" / "minimal.divejson", corpus / "valid")
     shutil.copy(FIXTURES / "invalid" / "missing-format.divejson", corpus / "invalid")
-    for name in ("mix-only-cylinder.uddf", "mix-only-cylinder.divejson"):
-        shutil.copy(FIXTURES / "uddf" / name, corpus / "uddf")
+    for fmt in read_formats():
+        (corpus / fmt).mkdir()
+        stem = PAIRS[fmt]
+        for name in (f"{stem}.{fmt}", f"{stem}.divejson"):
+            shutil.copy(FIXTURES / fmt / name, corpus / fmt)
     return corpus
 
 
@@ -72,13 +84,13 @@ def test_a_pair_for_a_format_this_implementation_does_not_read(tmp_path, capsys)
     be reporting the opposite.
     """
     corpus = _corpus(tmp_path)
-    (corpus / "ssrf").mkdir()
-    (corpus / "ssrf" / "logbook.ssrf").write_text("<divelog/>", encoding="utf-8")
-    _write(corpus / "ssrf" / "logbook.divejson", {"format": "divejson", "version": "1.0"})
+    (corpus / UNREAD).mkdir()
+    (corpus / UNREAD / f"logbook.{UNREAD}").write_text("<divelog/>", encoding="utf-8")
+    _write(corpus / UNREAD / "logbook.divejson", {"format": "divejson", "version": "1.0"})
 
     assert main(["conform", str(corpus)]) == 2
     out = capsys.readouterr().out
-    assert "ssrf" in out
+    assert UNREAD in out
     assert "does not read" in out
 
 
@@ -96,17 +108,18 @@ def test_a_zip_directory_is_not_a_format_either(tmp_path, capsys) -> None:
     assert main(["conform", str(corpus)]) == 2
     out = capsys.readouterr().out
     assert "zip: is a format this implementation does not read" in out
-    assert "it reads uddf" in out
+    for fmt in read_formats():
+        assert fmt in out
 
 
 def test_a_format_this_implementation_does_not_read_cannot_be_skipped(tmp_path, capsys) -> None:
     """`--skip` is not a way to make an unanswerable corpus pass."""
     corpus = _corpus(tmp_path)
-    (corpus / "ssrf").mkdir()
-    (corpus / "ssrf" / "logbook.ssrf").write_text("<divelog/>", encoding="utf-8")
+    (corpus / UNREAD).mkdir()
+    (corpus / UNREAD / f"logbook.{UNREAD}").write_text("<divelog/>", encoding="utf-8")
 
-    assert main(["conform", str(corpus), "--skip", "ssrf"]) == 2
-    assert "no such format: ssrf" in capsys.readouterr().out
+    assert main(["conform", str(corpus), "--skip", UNREAD]) == 2
+    assert f"no such format: {UNREAD}" in capsys.readouterr().out
 
 
 def test_a_pair_directory_with_no_inputs_is_a_shape_error(tmp_path, capsys) -> None:
@@ -269,9 +282,9 @@ def test_the_result_counts_what_it_checked(tmp_path) -> None:
     assert {group.name: group.checked for group in result.groups} == {
         "valid": 1,
         "invalid": 1,
-        "uddf": 1,
+        **dict.fromkeys(read_formats(), 1),
     }
-    assert result.checked == 3
+    assert result.checked == 2 + len(read_formats())
 
 
 def test_compared_drops_exactly_the_two_members_a_run_owns() -> None:
@@ -284,6 +297,11 @@ def test_compared_drops_exactly_the_two_members_a_run_owns() -> None:
 
 
 def test_the_registered_formats_are_the_ones_with_pair_directories() -> None:
-    """A corpus directory is named for a format id, and that is the whole coupling."""
-    assert known_formats() == {"uddf"}
-    assert (FIXTURES / "uddf").is_dir()
+    """A corpus directory is named for a format id, and that is the whole coupling.
+
+    Derived rather than listed, so a reader registered without a pair directory beside it
+    fails here — which is the same gap `--strict` catches, one desk earlier.
+    """
+    assert known_formats() == {"uddf", "ssrf"}
+    for fmt in known_formats():
+        assert (FIXTURES / fmt).is_dir(), fmt

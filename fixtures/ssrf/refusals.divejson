@@ -1,0 +1,94 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-05T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.2.0"
+  },
+  "dives": [
+    {
+      "uuid": "99ca578d-a074-52d2-9216-e98057a33dcb",
+      "dive_number": 1,
+      "started_at": "2026-05-01T09:15:00",
+      "duration": 2480,
+      "cylinders": [
+        {
+          "volume": 11.1,
+          "end_pressure": 0.0,
+          "oxygen": 21.0
+        }
+      ],
+      "profile": {
+        "duration": 30,
+        "depth": {
+          "times": [
+            0,
+            30
+          ],
+          "values": [
+            0,
+            620
+          ]
+        },
+        "temperature": {
+          "times": [
+            30
+          ],
+          "values": [
+            195
+          ]
+        }
+      }
+    },
+    {
+      "uuid": "d51dfcdf-e98d-5027-9652-7a5a8a4b5224",
+      "dive_number": 3,
+      "started_at": "2026-05-02T10:00:00",
+      "site_uuids": [
+        "5508e90d-683a-5d1f-8d82-b3214e43d495"
+      ],
+      "max_depth": 18.4,
+      "bottom_temperature": 21.0
+    },
+    {
+      "uuid": "6f6041b4-d396-5a30-8e03-db3e210e8c0c",
+      "dive_number": 4,
+      "started_at": "2026-05-03T08:40:00",
+      "cylinders": [
+        {
+          "volume": 7.0,
+          "end_pressure": 60.0
+        }
+      ],
+      "profile": {
+        "duration": 120,
+        "depth": {
+          "times": [
+            0,
+            120
+          ],
+          "values": [
+            0,
+            900
+          ]
+        }
+      }
+    }
+  ],
+  "sites": [
+    {
+      "uuid": "5508e90d-683a-5d1f-8d82-b3214e43d495",
+      "name": "Blue Hole"
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "ssrf",
+      "ssrf_version": "3",
+      "source_generator": {
+        "name": "subsurface"
+      }
+    }
+  }
+}
