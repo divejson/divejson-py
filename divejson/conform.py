@@ -14,7 +14,10 @@ both:
 A pair directory is named for a **format id** — what an implementation registers an
 adapter under — and that is the whole coupling between a corpus and an implementation. A
 corpus carrying pairs for a format this implementation does not register is one this
-implementation cannot answer for, and saying so is worth more than passing.
+implementation cannot answer for, and saying so is worth more than passing. `zip` is not
+one of those ids: an archive is a container the sniffer recognises and no adapter reads, so
+a `zip/` directory is a format this implementation does not register, like any other name
+nothing answers to.
 
 Three exit statuses, and the distinction between the last two is the point:
 
@@ -33,24 +36,22 @@ from __future__ import annotations
 
 import difflib
 import json
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
 from typing import Any
 
-from .uddf import UddfError, convert_uddf
+from .converter import ConverterError
+from .registry import WRITTEN, convert, read_formats
 from .validate import DuplicateMemberError, parse_document, validate_document
 
 __all__ = [
     "IGNORED",
-    "READERS",
-    "WRITTEN",
     "Finding",
     "Group",
     "Result",
     "compared",
-    "known_formats",
     "run",
 ]
 
@@ -74,30 +75,16 @@ def compared(document: dict[str, Any]) -> dict[str, Any]:
     return {member: value for member, value in document.items() if member not in IGNORED}
 
 
-def _read_uddf(data: bytes) -> dict[str, Any]:
-    # `exported_at` is left to default, which is the clock: it is one of the two members
-    # `compared` drops, so nothing this runner decides can see it.
-    return convert_uddf(data).document
+def _converted(fmt: str, data: bytes) -> dict[str, Any]:
+    """One pair's input through the registered reader for the directory's own format.
 
-
-# What this implementation reads, by the format id a corpus directory is named for.
-READERS: dict[str, Callable[[bytes], dict[str, Any]]] = {"uddf": _read_uddf}
-
-# What a reader raises for a source it cannot read. An input the reader refuses is a
-# failing case rather than a crash, so that one broken pair does not hide the others.
-_READ_ERRORS: tuple[type[Exception], ...] = (UddfError,)
-
-# The formats this implementation can *write*. Empty: it reads other formats into
-# DiveJSON and writes none of them back out, so a `write/<format>/` directory is one this
-# implementation does not register — status 2 rather than a silent pass. What a writer
-# pair compares, canonical XML with `<generator>` ignored, belongs beside the writer that
-# produces one.
-WRITTEN: frozenset[str] = frozenset()
-
-
-def known_formats() -> frozenset[str]:
-    """Every format id this implementation registers, read or written."""
-    return frozenset(READERS) | WRITTEN
+    Named rather than sniffed: a corpus directory *is* the claim about what its inputs are,
+    and a pair whose input a sniffer would not recognise is still a case this
+    implementation owes an answer for. `exported_at` is left to default, which is the
+    clock: it is one of the two members `compared` drops, so nothing this runner decides
+    can see it.
+    """
+    return convert(data, format=fmt).document
 
 
 @dataclass(frozen=True, slots=True)
@@ -267,7 +254,7 @@ class _Walk:
 
     def _reader_directory(self, directory: Path) -> None:
         fmt = directory.name
-        if fmt not in READERS:
+        if fmt not in read_formats():
             # Asked before `--only`/`--skip` are applied, deliberately. A corpus carrying
             # pairs this implementation cannot run is a fact about the corpus, and no
             # filter may turn it into silence — `--skip <that format>` is refused by the
@@ -327,8 +314,8 @@ class _Walk:
             return _Outcome.FAILED
 
         try:
-            produced = READERS[fmt](source.read_bytes())
-        except _READ_ERRORS as error:
+            produced = _converted(fmt, source.read_bytes())
+        except ConverterError as error:
             self._failures.append(Finding(where, f"could not be converted — {error}"))
             return _Outcome.FAILED
         except OSError as error:
@@ -389,7 +376,7 @@ class _Walk:
     # Formats with no directory at all.
 
     def _formats_with_no_pairs(self) -> None:
-        for fmt in sorted(READERS):
+        for fmt in sorted(read_formats()):
             if self._selected(fmt) and not (self._corpus / fmt).is_dir():
                 self._missing(
                     fmt,
@@ -423,7 +410,7 @@ class _Walk:
         return path.relative_to(self._corpus).as_posix()
 
     def _reads(self) -> str:
-        return f"it reads {', '.join(sorted(READERS))}"
+        return f"it reads {', '.join(sorted(read_formats()))}"
 
     def _writes(self) -> str:
         return f"it writes {', '.join(sorted(WRITTEN))}" if WRITTEN else "it writes nothing"

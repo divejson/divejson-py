@@ -8,12 +8,14 @@ did not carry, so "it printed something" is not the assertion.
 from __future__ import annotations
 
 import json
+import zipfile
 
 import pytest
 from helpers import FIXTURES
 
 from divejson.cli import main
 from divejson.conform import compared
+from divejson.converter import NOTE_KINDS
 
 
 @pytest.fixture()
@@ -41,6 +43,33 @@ def test_the_report_names_what_the_source_did_not_carry(source, capsys) -> None:
     out = capsys.readouterr().out
     assert "no UTC offset" in out
     assert "dive/0, dive/1" in out  # one finding, both its locations
+
+
+def test_every_report_line_says_which_kind_of_news_it_is(source, capsys) -> None:
+    """`absent` and `dropped` are different news, and an undifferentiated list gets skimmed.
+
+    Read off `NOTE_KINDS` rather than spelled out, so a kind added there does not need
+    remembering here — a list restated away from its definition is a second place for it
+    to go stale.
+    """
+    main(["convert", str(source)])
+    lines = [line for line in capsys.readouterr().out.splitlines() if line.startswith("  ")]
+    assert lines
+    for line in lines:
+        assert line[2:].split(" ", 1)[0] in NOTE_KINDS, line
+
+
+def test_a_zip_of_logbooks_converts_as_one(tmp_path, capsys) -> None:
+    """The shape a watch's account export arrives in: one file per dive, in an archive."""
+    archive = tmp_path / "export.zip"
+    with zipfile.ZipFile(archive, "w") as written:
+        for name in ("subsurface.uddf", "divelogs.uddf"):
+            written.writestr(name, (FIXTURES / "uddf" / name).read_bytes())
+
+    assert main(["convert", str(archive)]) == 0
+    document = json.loads((tmp_path / "export.divejson").read_text(encoding="utf-8"))
+    assert len(document["dives"]) == 4
+    assert "4 dives" in capsys.readouterr().out
 
 
 def test_output_names_another_destination(source, tmp_path, capsys) -> None:
@@ -114,12 +143,30 @@ def test_an_input_named_divejson_would_overwrite_itself(tmp_path, capsys) -> Non
     assert "overwrite the input" in capsys.readouterr().out
 
 
-def test_a_file_that_is_not_uddf_fails_without_writing_anything(tmp_path, capsys) -> None:
+def test_a_file_no_reader_claims_fails_without_writing_anything(tmp_path, capsys) -> None:
+    """The extension is not consulted: what the bytes are is what decides."""
     path = tmp_path / "notes.uddf"
     path.write_text("this is not XML at all", encoding="utf-8")
     assert main(["convert", str(path)]) == 1
     assert not path.with_suffix(".divejson").exists()
+    out = capsys.readouterr().out
+    assert "nothing here reads these bytes" in out
+    assert "uddf (.uddf)" in out
+
+
+def test_from_names_the_reader_and_gets_that_readers_refusal(tmp_path, capsys) -> None:
+    """Saying what a file is gets the reader's own message rather than the sniffer's."""
+    path = tmp_path / "notes.uddf"
+    path.write_text("this is not XML at all", encoding="utf-8")
+    assert main(["convert", str(path), "--from", "uddf"]) == 1
     assert "not well-formed" in capsys.readouterr().out
+
+
+def test_from_refuses_a_format_this_build_does_not_read() -> None:
+    """`zip` included: an archive is a container the sniffer knows, not a reader to ask for."""
+    for named in ("ssrf", "zip"):
+        with pytest.raises(SystemExit):
+            main(["convert", "unused.uddf", "--from", named])
 
 
 def test_a_missing_file_fails(tmp_path, capsys) -> None:

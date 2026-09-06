@@ -3,9 +3,14 @@
 The format itself — the normative specification, the JSON Schema and the conformance
 corpus — lives at <https://github.com/divejson/divejson>. This package implements it:
 ``validate`` — the schema pass plus the requirements the spec lists as beyond-schema —
-``uddf``, which reads UDDF logbooks into conforming documents, and ``conform``, the
-conformance runner every implementation of the format provides. All three are importable
-functions; ``cli`` is a thin wrapper over them.
+``registry``, which decides what a source is and converts it through the adapter that
+reads it, and ``conform``, the conformance runner every implementation of the format
+provides. All three are importable functions; ``cli`` is a thin wrapper over them.
+
+An application reads a source in two calls. ``sniff(head)`` takes a bounded head of bytes
+— ``SNIFF_BYTES`` of them — and answers a format id, ``"zip"``, or ``None`` for bytes
+nothing here claims; ``convert(source)`` takes the whole thing and returns a
+``Conversion``: the document, and the notes that are the other half of the output.
 
 The schema, the fixtures and the mapping documents are **vendored** here, from the
 specification commit named in the repository's ``SPEC_REF``, so that an installed package
@@ -20,18 +25,21 @@ SPEC_VERSION = "1.0"
 # `SPEC_VERSION` from this module as it imports, so the names it needs have to exist by
 # the time the import runs.
 from .conform import compared  # noqa: E402
-from .uddf import (  # noqa: E402
+from .converter import (  # noqa: E402
     PRODUCER_KEY,
-    UDDF_ID_NAMESPACE,
     Conversion,
+    ConverterError,
     DoctypeRefusedError,
-    MalformedUddfError,
+    MalformedArchiveError,
     NonConformingOutputError,
     Note,
-    UddfError,
-    convert_uddf,
-    convert_uddf_file,
+    NoteGroup,
+    NoteKind,
+    SourceTooLargeError,
+    UnsupportedSourceError,
 )
+from .registry import SNIFF_BYTES, convert, read_formats, sniff  # noqa: E402
+from .uddf import UDDF_ID_NAMESPACE, MalformedUddfError, UddfError  # noqa: E402
 from .validate import (  # noqa: E402
     DuplicateMemberError,
     Issue,
@@ -42,23 +50,31 @@ from .validate import (  # noqa: E402
 )
 
 __all__ = [
+    "SNIFF_BYTES",
     "SPEC_VERSION",
     "PRODUCER_KEY",
     "UDDF_ID_NAMESPACE",
     "Conversion",
+    "ConverterError",
     "DoctypeRefusedError",
     "DuplicateMemberError",
     "Issue",
+    "MalformedArchiveError",
     "MalformedUddfError",
     "NonConformingOutputError",
     "Note",
+    "NoteGroup",
+    "NoteKind",
+    "SourceTooLargeError",
     "UddfError",
+    "UnsupportedSourceError",
     "__version__",
     "compared",
-    "convert_uddf",
-    "convert_uddf_file",
+    "convert",
     "load_document",
     "load_schema",
     "parse_document",
+    "read_formats",
+    "sniff",
     "validate_document",
 ]

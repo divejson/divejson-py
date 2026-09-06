@@ -9,7 +9,7 @@ who decides and whose `CONTRIBUTING.md` says how a change to the format lands.
 
 | path | what |
 | --- | --- |
-| `divejson/` | the package: the validator, the UDDF reader, the conformance runner, the CLI |
+| `divejson/` | the package: the validator, the format registry and its readers, the conformance runner, the CLI |
 | `tests/` | its tests |
 | `schema/`, `fixtures/`, `docs/` | **vendored** from the specification repository at the commit `SPEC_REF` names |
 | `SPEC_REF` | that commit, on one line — a tag once the format has one |
@@ -52,6 +52,42 @@ install this package run; it also builds the sdist, builds the wheel from *that*
 checks that an installed copy resolves the schema it carries with no checkout anywhere
 near it. That last one is the failure this arrangement is most exposed to: the package
 and the corpus sit in one tree here and in different worlds everywhere else.
+
+## Adding a reader
+
+A source format is an **adapter**: an object with a `format` id, the `suffixes` a file of
+it usually carries, a frozen identity `namespace`, a `sniff(head)` and a `convert(data, *,
+exported_at, scope)`. Register it in `divejson/registry.py` and nothing else in the package
+has to be told — the CLI's `--from`, the sniffer, the archive walk and the conformance
+runner all read the registry.
+
+The rules below are already decided, and re-deciding any of them in an adapter is the mistake
+this arrangement exists to prevent:
+
+- **The namespace is `uuid5(NAMESPACE_URL, "https://divejson.org/ns/<format>")`**, frozen
+  forever and recorded in that format's own mapping document. Changing one renumbers every
+  document the reader has ever produced.
+- **Parse XML through `xmlsource.parse_xml`**, which refuses a `<!DOCTYPE>` before expat
+  expands anything (spec §9).
+- **Build a profile through `series.SampleAxis`**, which owns the ordering, the sample with
+  no time, the two samples on one second, and the dive whose samples carry nothing this
+  format can hold. `noun` and `time_member` keep the report speaking the source's language.
+- **Ask `converter.recorded` which way a zero reads.** The member's own schema constraint
+  decides, and the answer differs between members that look alike.
+- **Validate the document before returning it, unless `scope.validates_alone` is false.**
+  A member of an archive is an intermediate — its dive may refer to a site another member
+  carries, so its references close only after the merge, which the registry validates.
+
+An adapter lands with its pairs under `fixtures/<format>/` and its mapping document under
+`docs/`, both of which the specification adopts afterwards — the second order above. It
+also lands with its report's kinds documented: `absent`, `inferred`, `resolved` and
+`dropped` are what a diver reads. The two in the middle are not interchangeable and an
+adapter does not get to blur them — `inferred` is a value the converter **computed** from
+readings the source did keep, and it obliges the document to list that member under
+`extensions.divejson.inferred`; `resolved` is a number the source recorded whose scale or
+units were ambiguous, where the converter decided only how to read it and lists nothing.
+Reaching for `inferred` on a unit reading is the mistake, and it produces a document whose
+report and whose derived-value list disagree.
 
 ## Regenerating an expected document
 

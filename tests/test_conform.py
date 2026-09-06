@@ -16,7 +16,8 @@ from pathlib import Path
 from helpers import FIXTURES
 
 from divejson.cli import main
-from divejson.conform import DIFF_LINES, IGNORED, compared, known_formats, run
+from divejson.conform import DIFF_LINES, IGNORED, compared, run
+from divejson.registry import known_formats
 
 
 def _corpus(tmp_path: Path) -> Path:
@@ -79,6 +80,23 @@ def test_a_pair_for_a_format_this_implementation_does_not_read(tmp_path, capsys)
     out = capsys.readouterr().out
     assert "ssrf" in out
     assert "does not read" in out
+
+
+def test_a_zip_directory_is_not_a_format_either(tmp_path, capsys) -> None:
+    """`sniff` answers `zip`, and that is a container rather than a format id.
+
+    Nothing registers it, so a corpus that kept archives in a `zip/` directory would be
+    claiming this implementation reads a format it does not — the same status 2 as any
+    other name nothing answers to.
+    """
+    corpus = _corpus(tmp_path)
+    (corpus / "zip").mkdir()
+    (corpus / "zip" / "logbook.zip").write_bytes(b"PK\x03\x04")
+
+    assert main(["conform", str(corpus)]) == 2
+    out = capsys.readouterr().out
+    assert "zip: is a format this implementation does not read" in out
+    assert "it reads uddf" in out
 
 
 def test_a_format_this_implementation_does_not_read_cannot_be_skipped(tmp_path, capsys) -> None:
