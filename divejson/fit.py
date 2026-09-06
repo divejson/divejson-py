@@ -168,9 +168,10 @@ UNCARRIED_GAS_STATUSES = frozenset({"disabled"})
 WATER_TYPES = {"fresh": "fresh", "salt": "salt", "en13319": "en13319"}
 
 # `event.event` values that describe the dive, and the §6.5 event type each becomes. A
-# table rather than a cast: this is Garmin's vocabulary and the thirty-odd members it does
-# not list — `timer`, `battery_low`, every cycling and running alert the shared enum
-# carries — have to come out as nothing rather than be forced into a type of this format's.
+# table rather than a cast: this is Garmin's vocabulary, and the other 43 members of its
+# 46-member enum — `timer`, `battery`, `off_course`, every cycling and running alert the
+# shared enum carries — have to come out as nothing rather than be forced into a type of
+# this format's.
 #
 # `timer` is the deliberate omission. It is the only `event` any file in hand writes, and
 # its start/stop pair says where the dive begins and ends, which §6.4's `started_at` and
@@ -751,6 +752,14 @@ class _Converter:
         samples are the third source and the only one that is *this converter's
         arithmetic*, so a depth taken from them is `inferred` and the document lists it
         under `extensions.divejson.inferred` (spec §5.4).
+
+        **The `inferred` findings are raised last, after the two depths have been checked
+        against each other**, because a computed mean deeper than a recorded maximum is
+        dropped and a note saying where a dropped value came from is a note about a value
+        the document does not carry. Raising them as the values were found and then
+        unlisting the survivor left the report and
+        `extensions.divejson.inferred` disagreeing — an `inferred` line with no member on
+        the list, which is the one thing `converter.py` says can never happen.
         """
         depths = [point.depth for _, point in samples.ordered() if point.depth is not None]
         computed = {
@@ -763,6 +772,7 @@ class _Converter:
         }
 
         found: dict[str, Decimal] = {}
+        derived: list[str] = []
         for member, source in (("max_depth", "max_depth"), ("avg_depth", "avg_depth")):
             native = _first(_number(_native(session, source)), _number(_native(summary, source)))
             if native is not None and recorded(native, record="dive", member=member):
@@ -780,13 +790,7 @@ class _Converter:
                 self.absent(member, f"{source} on its session or on a dive summary", where)
                 continue
             found[member] = value
-            self.note(
-                where,
-                f"the file records no {source} on its session or on a dive summary, so the dive's {member} "
-                "is computed from its own depth samples (spec §5.4)",
-                "inferred",
-            )
-            self.inferred.append(f"dives/0/{member}")
+            derived.append(member)
 
         if "max_depth" in found and "avg_depth" in found and found["avg_depth"] > found["max_depth"]:
             self.note(
@@ -796,18 +800,20 @@ class _Converter:
                 "adjusted to fit (spec §6.2)",
                 "dropped",
             )
-            self.forget("avg_depth", found)
+            found.pop("avg_depth")
 
         for member in ("max_depth", "avg_depth"):
-            if member in found:
-                dive[member] = float(found[member])
-
-    def forget(self, member: str, found: dict[str, Decimal]) -> None:
-        """Drop a member after it was found, and unlist it if it had been computed."""
-        found.pop(member, None)
-        path = f"dives/0/{member}"
-        if path in self.inferred:
-            self.inferred.remove(path)
+            if member not in found:
+                continue
+            dive[member] = float(found[member])
+            if member in derived:
+                self.note(
+                    where,
+                    f"the file records no {member} on its session or on a dive summary, so the dive's "
+                    f"{member} is computed from its own depth samples (spec §5.4)",
+                    "inferred",
+                )
+                self.inferred.append(f"dives/0/{member}")
 
     def read_oxygen(
         self,
@@ -1008,11 +1014,18 @@ class _Converter:
         cannot be joined to anything and stands as its own cylinder — unless it carries no
         pressures either, in which case it describes nothing at all.
         """
+        # In **recorded-time** order, not the order the file listed them in. `series.py`'s
+        # first rule is that no writer guarantees it emitted its samples in order, and this
+        # pod's own pressure channel is built off the axis, which sorts — so taking the ends
+        # off the file order would put one pair of readings on the cylinder and a different
+        # pair at the ends of its channel, in one document. Where the two invert it is worse
+        # than untidy: the `end > start` guard below drops a real end pressure and keeps a
+        # later reading as the start.
+        in_order = [point for _, point in sorted(self.scan.points.items())]
+
         telemetry: dict[int, tuple[Decimal | None, Decimal | None]] = {}
-        for sensor in dict.fromkeys(key for point in self.scan.points.values() for key in point.pressures):
-            readings = [
-                point.pressures[sensor] for point in self.scan.points.values() if sensor in point.pressures
-            ]
+        for sensor in dict.fromkeys(key for point in in_order for key in point.pressures):
+            readings = [point.pressures[sensor] for point in in_order if sensor in point.pressures]
             telemetry[sensor] = (readings[0], readings[-1])
 
         summaries: dict[int, tuple[Decimal | None, Decimal | None]] = {}

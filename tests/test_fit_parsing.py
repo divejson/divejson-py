@@ -297,6 +297,51 @@ def test_a_file_with_neither_summary_nor_session_depth_infers_from_its_samples_a
     assert len(noted) == 2
 
 
+def test_a_computed_mean_deeper_than_the_recorded_maximum_is_dropped_and_says_nothing_else() -> None:
+    """The one route to a mean deeper than a maximum: one recorded and one computed.
+
+    §6.2 forbids it, so the mean goes — and the report must then say only that. An
+    `inferred` line about a value the document does not carry would leave the report and
+    `extensions.divejson.inferred` disagreeing, which is the pairing `converter.py` says can
+    never come apart: every `inferred` note's member is on that list, and every member on
+    that list has a note.
+    """
+    data = dive_file(
+        _at(0, depth=30.0),
+        _at(30, depth=40.0),
+        _at(60, depth=35.0),
+        session={"max_depth": 20.0, "avg_depth": None, "total_elapsed_time": 60.0},
+    )
+    conversion = _run(data)
+    dive = conversion.document["dives"][0]
+    assert dive["max_depth"] == 20.0
+    assert "avg_depth" not in dive
+    assert any("is deeper than the greatest depth" in text for text in _messages(conversion, "dropped"))
+    assert _messages(conversion, "inferred") == []
+    assert "inferred" not in conversion.document["extensions"]["divejson"]
+
+
+def test_the_inferred_report_and_the_derived_list_name_the_same_members() -> None:
+    """Both halves, on a file that infers one member and drops the other.
+
+    The aggregate `bool(noted) == bool(listed)` check the fixtures run would pass on a
+    document that inferred two and listed one, so this pins the correspondence itself on the
+    case where the two could come apart.
+    """
+    data = dive_file(
+        _at(0, depth=30.0),
+        _at(30, depth=40.0),
+        _at(60, depth=35.0),
+        session={"max_depth": None, "avg_depth": 10.0, "total_elapsed_time": 60.0},
+    )
+    conversion = _run(data)
+    assert conversion.document["dives"][0]["max_depth"] == 40.0
+    assert conversion.document["dives"][0]["avg_depth"] == 10.0
+    assert conversion.document["extensions"]["divejson"]["inferred"] == ["dives/0/max_depth"]
+    assert len(_messages(conversion, "inferred")) == 1
+    assert "max_depth is computed from its own depth samples" in _messages(conversion, "inferred")[0]
+
+
 def test_a_second_session_is_reported_and_not_converted() -> None:
     """A file describes one dive here, and a diver is told when it described more."""
     data = fit_file(
@@ -456,6 +501,31 @@ def test_a_transmitters_pressures_become_a_profile_channel_numbered_by_its_cylin
     dive = _dive(data)
     assert dive["cylinders"][0]["gas_number"] == 0
     assert dive["profile"]["pressures"] == [{"times": [0, 60], "values": [2100, 640], "gas_number": 0}]
+
+
+def test_a_pods_ends_are_its_earliest_and_latest_readings_not_the_files_first_and_last() -> None:
+    """No writer guarantees it emitted its samples in order, which is why the axis sorts.
+
+    A pod's channel comes off that axis, so ends read out of file order would put one pair
+    of readings on the cylinder and a different pair at the ends of its own channel in the
+    same document — and here they invert, so the `end > start` guard would drop the real
+    end pressure and keep the later reading as the start.
+    """
+    data = dive_file(
+        _gas(0, 21),
+        # Emitted last-first: 64 bar at +60 s arrives before 210 bar at +0 s.
+        message("tank_update", timestamp=STARTED_AT + timedelta(seconds=60), sensor=7, pressure=64.0),
+        message("tank_update", timestamp=STARTED_AT, sensor=7, pressure=210.0),
+        _at(0, depth=5.0),
+        _at(60, depth=12.0),
+        session={"total_elapsed_time": 60.0},
+    )
+    conversion = _run(data)
+    dive = conversion.document["dives"][0]
+    assert dive["cylinders"][0]["start_pressure"] == 210.0
+    assert dive["cylinders"][0]["end_pressure"] == 64.0
+    assert dive["profile"]["pressures"][0]["values"] == [2100, 640]
+    assert _messages(conversion, "dropped") == []
 
 
 def test_pressures_are_dropped_where_the_counts_do_not_match_exactly() -> None:

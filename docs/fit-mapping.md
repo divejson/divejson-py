@@ -251,8 +251,13 @@ project's hand does; a device that sampled faster on descent would weight it tow
 descent, which is why this is the last resort and why it is labelled as computed. It is
 quantized to two places, which is what a device's own `avg_depth` carries.
 
-A mean deeper than the maximum cannot be, and the mean is dropped rather than either being
-adjusted to fit (spec §6.2) — and unlisted again if it had been computed.
+A mean deeper than the maximum cannot be — which a device's own `avg_depth` and a maximum
+computed from the samples can produce between them — and the mean is dropped rather than
+either being adjusted to fit (spec §6.2). **The `inferred` findings are raised after that
+check rather than as the values are found**, so a dropped mean is reported as dropped and
+nothing says the document carries a value computed from the samples when it carries no
+value at all. Raising them first and unlisting the loser afterwards leaves the report and
+the list disagreeing, which is the one thing this pairing may never do.
 
 ### The local time zone — `activity` (34)
 
@@ -326,6 +331,12 @@ empty falls through to the ends of that pod's telemetry, since a transmitter str
 throughout the dive whether or not a summary is also written. The realistic case is the
 partial one: a pod that drops out near the end writes a summary with a start pressure and no
 end, and the last real reading is the one a gas calculation turns on.
+
+"The ends" means the **earliest and latest recorded**, not the first and last the file
+listed. No writer guarantees it emitted its samples in order — which is why the §6.5 axis
+sorts — and this pod's own pressure channel comes off that axis, so reading the ends out of
+file order would put one pair of readings on the cylinder and a different pair at the ends
+of its channel in the same document.
 
 **Nothing in a FIT file links a gas to a pod.** Telemetry is keyed by the transmitter's ANT
 id and a `dive_gas` by its `message_index`, and no message maps one onto the other. Position
