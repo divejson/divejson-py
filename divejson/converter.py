@@ -2,12 +2,20 @@
 
 Every adapter this package registers reads a different syntax and produces the same two
 things: a DiveJSON document, and a report of what the source did not carry. The rules
-governing the second — and the errors, the identities and the schema-driven readings
-behind the first — are the portable part, so they live here and are inherited rather than
-restated once per format. `docs/converting.md` in the specification repository is the
-prose companion, and this module is not allowed to disagree with it.
+governing the second — and the errors, the identities, the number and geometry readings
+and the schema-driven ones behind the first — are the portable part, so they live here and
+are inherited rather than restated once per format. `docs/converting.md` in the
+specification repository is the prose companion, and this module is not allowed to
+disagree with it.
 
-Four things are worth reading before an adapter is written against them.
+The sections below the policy classes carry the rest of what an adapter inherits rather
+than rewrites: `decimal_of` and its representability bound, `rounded`'s half-away-from-zero
+convention and the two §6.5 channel scales; `capped`; `Identities`; and `position`. An
+adapter that reimplements one of these gets it subtly different, which is the failure this
+module exists to prevent — the bound and the Null Island rule were each written once for
+one format and are true of every format.
+
+These are worth reading before an adapter is written against them.
 
 **One error base.** Everything a converter can raise is a `ConverterError`, so a caller
 catches one class and gets a message it can show a diver. The per-format subclasses exist
@@ -49,9 +57,13 @@ between those two is a diver's "no lead" turning into "unknown".
 
 from __future__ import annotations
 
+import re
+import sys
+import uuid as uuid_pkg
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from functools import cache
 from typing import Any, Literal
 
@@ -59,23 +71,33 @@ from . import SPEC_VERSION, __version__
 from .validate import Issue, load_schema
 
 __all__ = [
+    "CENTIMETRES_PER_METRE",
     "INFERRED",
+    "MAX_MAGNITUDE",
     "PRODUCER_KEY",
+    "TENTHS_PER_UNIT",
     "Claimed",
     "Conversion",
     "ConverterError",
     "DoctypeRefusedError",
+    "Identities",
     "MalformedArchiveError",
     "NonConformingOutputError",
     "Note",
     "NoteGroup",
     "NoteKind",
+    "Reporter",
     "Scope",
     "SourceTooLargeError",
     "UnsupportedSourceError",
+    "capped",
+    "decimal_of",
     "header",
+    "integer_of",
+    "position",
     "record_inferred",
     "recorded",
+    "rounded",
     "zero_is_an_answer",
 ]
 
@@ -144,6 +166,10 @@ NoteKind = Literal["absent", "inferred", "resolved", "dropped"]
 # supplied: nothing at all, the readings it was computed from, the number with its scale
 # left open, and the whole thing, uncarriable.
 NOTE_KINDS: tuple[NoteKind, ...] = ("absent", "inferred", "resolved", "dropped")
+
+# How the helpers below add a line to the report they were called from. An adapter's own
+# `note` method, which knows the archive member the path belongs under.
+Reporter = Callable[[str, str, NoteKind], None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -320,3 +346,215 @@ def recorded(value: Decimal | int | None, *, record: str, member: str) -> bool:
         return True
     floor, exclusive = bound
     return value > floor if exclusive else value >= floor
+
+
+# -- numbers -------------------------------------------------------------------------
+
+# The two §6.5 channel scales, here rather than in any one adapter because every format's
+# samples land on them: depth in centimetres, temperature in tenths of a degree, pressure
+# in tenths of a bar. `docs/converting.md` *Units and arithmetic* names these as the trap —
+# "the channel conversions carry a scale the scalar ones do not" — and a table of an
+# adapter's scalar factors does not contain them.
+CENTIMETRES_PER_METRE = Decimal(100)
+TENTHS_PER_UNIT = Decimal(10)
+
+# The largest magnitude a source number may have. Not a physical bound — this format sets
+# none on a depth or a temperature, and inventing one here would be a converter deciding
+# how deep a dive can be. It is a *representability* bound, and `docs/converting.md`
+# *Reading the source* states it: JSON numbers are doubles in every reader this format
+# expects to meet, so a value past that range stops being a number on the way out.
+# `json.dumps` writes an overflowed float as the bare token `Infinity`, which no RFC 8259
+# parser accepts, and a reader on a double-based parser turns an integer that large back
+# into infinity — in both directions the document silently stops being readable, and
+# validation catches neither, `jsonschema` being happy to call infinity a number greater
+# than zero.
+#
+# Divided by 1000, the largest factor any adapter applies to a number it has read — UDDF's
+# cubic metres to litres, and above any channel scale — so that checking the value as the
+# text is read also covers every value derived from it.
+MAX_MAGNITUDE = Decimal(sys.float_info.max) / 1000
+
+
+def decimal_of(text: str | None) -> Decimal | None:
+    """A number from source text, or `None` for anything that is not a usable one.
+
+    `Decimal` rather than `float` throughout: the input is decimal text and every scale an
+    adapter applies is a decimal factor, so `Decimal("2.6") * 100` is exactly `260` where
+    the float route arrives at 260.00000000000003 and has to be rounded back out. `Decimal`
+    also accepts `"NaN"` and `"Infinity"` without complaint, which is what the finiteness
+    check is for.
+
+    **The magnitude bound is the other half of that check and is not optional.** `Decimal`
+    parses `1e999` and `1e999999999` happily and calls both finite, and neither survives
+    the trip out: the first becomes a float infinity, which a converter would write into a
+    document as a bare `Infinity` token no JSON parser accepts and its own validation would
+    not object to; the second overflows `Decimal`'s arithmetic on the next multiplication,
+    raising something that is not a `ConverterError` and so abandoning a whole batch
+    mid-migration rather than failing the one file. Text that cannot be carried as a number
+    is treated as text that is not a number, which is what it is.
+    """
+    if text is None:
+        return None
+    try:
+        value = Decimal(text)
+    except InvalidOperation:
+        return None
+    # `copy_abs`, not `abs`: the builtin is a context operation and raises `Overflow` on
+    # exactly the values this line exists to reject, so the guard would be the thing that
+    # crashed. `copy_abs` and the comparison below both leave the context alone.
+    if not value.is_finite() or value.copy_abs() > MAX_MAGNITUDE:
+        return None
+    return value
+
+
+def rounded(value: Decimal) -> int:
+    """The nearest integer, halves away from zero.
+
+    Python's own `round` is half-to-even, which is the right default for statistics and the
+    wrong one for a reading: 2.5 seconds of elapsed time is 3, not 2.
+    """
+    return int(value.to_integral_value(rounding=ROUND_HALF_UP))
+
+
+def integer_of(value: Decimal | None) -> int | None:
+    return None if value is None else rounded(value)
+
+
+# -- text ----------------------------------------------------------------------------
+
+
+def capped(value: str, limit: int, *, note: Reporter, where: str, member: str) -> str:
+    """A source string cut to the length the format allows, reporting what was cut."""
+    if len(value) <= limit:
+        return value
+    note(
+        where,
+        f"{member} is {len(value)} characters; the format caps it at {limit} and the rest is dropped",
+        "dropped",
+    )
+    return value[:limit]
+
+
+# -- identity ------------------------------------------------------------------------
+
+_UUID_TEXT = re.compile(r"\A[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\Z")
+
+
+def _is_uuid(text: str) -> bool:
+    return bool(_UUID_TEXT.match(text))
+
+
+def _embedded_uuid(source_id: str) -> str | None:
+    """The UUID a source id already carries, if it carries one.
+
+    A writer holding real UUIDs often has to prefix them, because its own id type forbids a
+    leading digit and a hex UUID regularly has one — UDDF's reference implementation writes
+    `dive-019fec36-…`. Stripping a short alphabetic prefix recovers it, which is what lets a
+    logbook that went out through another format come back recognisable.
+    """
+    head, dash, tail = source_id.partition("-")
+    if dash and head.isalpha() and len(head) <= 12 and _is_uuid(tail):
+        return tail.lower()
+    return source_id.lower() if _is_uuid(source_id) else None
+
+
+class Identities:
+    """The stable UUIDs one conversion hands out, under one format's namespace.
+
+    `docs/converting.md` *Identity* is the prose: reuse an embedded UUID, else UUIDv5 over
+    the format's own frozen namespace and `"{kind}:{source id}"`, with the record kind in
+    the hash because a source id is not unique within a file — a dive and its enclosing
+    group commonly share one, and hashing the bare id would hand them one UUID.
+
+    Held by the adapter's converter rather than free-standing, because it is stateful in two
+    ways that matter: it knows the `Scope`, so a record with no id of its own is identified
+    within its archive member, and it shares the claimed-UUID table with the archive's other
+    members, so a record two files both define is written once.
+    """
+
+    __slots__ = ("_namespace", "_scope", "_note")
+
+    def __init__(self, namespace: uuid_pkg.UUID, scope: Scope, note: Reporter) -> None:
+        self._namespace = namespace
+        self._scope = scope
+        self._note = note
+
+    def for_record(self, kind: str, source_id: str | None, where: str, index: int) -> tuple[str | None, bool]:
+        """A record's stable UUID, and whether **this** file is the one that carries it.
+
+        Three outcomes, and the middle one is the whole of what an archive needs.
+
+        The identity is nobody's yet: `(uuid, True)`, and the record is written here.
+
+        The identity belongs to a record in **another member of the same archive**:
+        `(uuid, False)`. That is one record defined twice, which is the ordinary shape of a
+        per-dive export — each file repeats the site it was at and the gear it was dived
+        with — so its row is written once and this file's references resolve to it. Not a
+        note: nothing was lost, and a note per repeat would be one line for every file in
+        the archive saying that the archive is shaped the way archives are.
+
+        The identity belongs to another record in **this same file**: `(None, False)`,
+        reported. Two records in one file cannot share one identity (spec §5.3), and there
+        is no other record to resolve to.
+        """
+        claimed = self._scope.claimed
+        if source_id is None:
+            self._note(
+                where,
+                f"the source gives this {kind} no id, so its identity is derived from its position in the "
+                "file and will move if the file's order changes (spec §5.3)",
+                "absent",
+            )
+            # Prefixed by the archive member this file is, so that two members whose
+            # records carry no ids do not derive one identity from one position.
+            source_id = self._scope.positional(index)
+
+        derived = str(uuid_pkg.uuid5(self._namespace, f"{kind}:{source_id}"))
+        for candidate in dict.fromkeys((_embedded_uuid(source_id) or derived, derived)):
+            holder = claimed.get(candidate)
+            if holder is None:
+                claimed[candidate] = (self._scope.member, self._scope.where(where))
+                return candidate, True
+            if holder[0] != self._scope.member:
+                return candidate, False
+
+        self._note(
+            where,
+            f"a second {kind} carries the id {source_id!r}, already used by {claimed[derived][1]}; the "
+            "record is dropped, because two records cannot share one identity (spec §5.3)",
+            "dropped",
+        )
+        return None, False
+
+
+# -- geometry ------------------------------------------------------------------------
+
+
+def position(
+    latitude: Decimal | None, longitude: Decimal | None, *, note: Reporter, where: str
+) -> dict[str, float] | None:
+    """A §6 Position from a recorded coordinate pair, or `None` where there is not one.
+
+    Three sources of nothing, and the second is the interesting one. Half a pair is not a
+    position — §6's Position makes both members REQUIRED, which is §5.4 enforced by shape.
+    An exact `0.000000` pair is a writer saying "unknown" in the one spelling that looks
+    like an answer: divelogs.de puts it on every site in its export, and a reader that
+    trusts Null Island pins a Red Sea wreck into the Atlantic. And a pair outside WGS 84's
+    own range is not a place at all.
+    """
+    if latitude is None or longitude is None:
+        if latitude is not None or longitude is not None:
+            note(where, "only one half of a coordinate pair was recorded, and a position needs both; dropped (spec §6)", "dropped")
+        return None
+    if latitude == 0 and longitude == 0:
+        note(
+            where,
+            "the coordinates are exactly 0.000000 / 0.000000, which writers emit to mean 'unknown'; read as "
+            "no position rather than as Null Island",
+            "absent",
+        )
+        return None
+    if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
+        note(where, f"the coordinates {latitude} / {longitude} are outside the WGS 84 range; dropped", "dropped")
+        return None
+    return {"latitude": float(latitude), "longitude": float(longitude)}

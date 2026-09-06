@@ -10,9 +10,9 @@ the rule it would be breaking.
 it deliberately does not, and the reasoning behind each heuristic. It is written for a
 port in another language as much as for a reader of this file, so the *rules* live there
 and only their implementation lives here. What is true of every source format rather than
-of UDDF — the note kinds, the identity scope, the way a zero reads, the sample axis, the
-`<!DOCTYPE>` refusal — lives in `converter.py`, `series.py` and `xmlsource.py`, and this
-module inherits it.
+of UDDF — the note kinds, identity, the way a zero reads, the number bound, the coordinate
+pair, the sample axis, the `<!DOCTYPE>` refusal — lives in `converter.py`, `series.py` and
+`xmlsource.py`, and this module inherits it. What is below is UDDF's alone.
 
 Four decisions shape everything below.
 
@@ -57,25 +57,32 @@ every document it produces, while its report still says out loud where it chose 
 from __future__ import annotations
 
 import re
-import sys
 import uuid as uuid_pkg
 import xml.etree.ElementTree as ET
 from collections.abc import Iterator
 from datetime import datetime
-from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Any
 
 from .converter import (
+    CENTIMETRES_PER_METRE,
     PRODUCER_KEY,
+    TENTHS_PER_UNIT,
     Conversion,
     ConverterError,
+    Identities,
     NonConformingOutputError,
     Note,
     NoteKind,
     Scope,
+    capped,
+    decimal_of,
     header,
+    integer_of,
+    position,
     record_inferred,
     recorded,
+    rounded,
 )
 from .series import Channel, SampleAxis
 from .validate import validate_document
@@ -96,26 +103,10 @@ UDDF_ID_NAMESPACE = uuid_pkg.UUID("1b85a949-d5f7-5d67-9d04-dcc78342f907")
 KELVIN_OFFSET = Decimal("273.15")
 PASCAL_PER_BAR = Decimal(100_000)
 LITRES_PER_CUBIC_METRE = Decimal(1000)
-CENTIMETRES_PER_METRE = Decimal(100)
-TENTHS_PER_UNIT = Decimal(10)
 
 # At or above which a `<tankvolume>` is read as litres rather than the cubic metres UDDF
 # specifies — see `_volume_litres`.
 LITRES_THRESHOLD = Decimal(1)
-
-# The largest magnitude a source number may have. Not a physical bound — the format sets
-# none on a depth or a temperature, and inventing one here would be this module deciding
-# how deep a dive can be. It is a *representability* bound: JSON numbers are doubles in
-# every reader this format expects to meet, and a value past that range stops being a
-# number on the way out. `json.dumps` writes an overflowed float as the bare token
-# `Infinity`, which no RFC 8259 parser accepts, and a reader on a double-based parser turns
-# an integer that large back into infinity — in both directions the document silently stops
-# being readable, and this converter's own validation does not catch it, because
-# `jsonschema` is happy to call infinity a number greater than zero.
-#
-# Divided by the largest factor any conversion below applies (litres, ×1000), so that
-# checking the value on the way in also covers every value derived from it.
-MAX_MAGNITUDE = Decimal(sys.float_info.max) / 1000
 
 MAX_NOTES = 10_000
 MAX_NAME = 255
@@ -128,8 +119,6 @@ MAX_SURFACE_PRESSURE = Decimal("1.2")
 MAX_CYLINDER_PRESSURE = Decimal(350)
 MIN_ALTITUDE = -450
 MAX_ALTITUDE = 6500
-
-_UUID_TEXT = re.compile(r"\A[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\Z")
 
 # Deliberately looser than any address grammar, and it is not trying to be one. `email` is
 # the only member in this format whose *type* constrains the text a source can put in it,
@@ -284,70 +273,6 @@ def _text_of(parent: ET.Element | None, *names: str) -> str | None:
     return _text(_dig(parent, *names))
 
 
-def _decimal(text: str | None) -> Decimal | None:
-    """A number from element text, or `None` for anything that is not a usable one.
-
-    `Decimal` rather than `float` throughout: the input is decimal text and every scale
-    below is a decimal factor, so `Decimal("2.6") * 100` is exactly `260` where the float
-    route arrives at 260.00000000000003 and has to be rounded back out. `Decimal` also
-    accepts `"NaN"` and `"Infinity"` without complaint, which is what the finiteness check
-    is for.
-
-    **The magnitude bound is the other half of that check and is not optional.** `Decimal`
-    parses `1e999` and `1e999999999` happily and calls both finite, and neither survives
-    the trip out: the first becomes a float infinity, which this converter would write into
-    a document as a bare `Infinity` token no JSON parser accepts and its own validation
-    would not object to; the second overflows `Decimal`'s arithmetic on the next
-    multiplication, raising something that is not one of this module's errors and so
-    abandoning a whole batch mid-migration rather than failing the one file. Text that
-    cannot be carried as a number is treated as text that is not a number, which is what
-    it is.
-    """
-    if text is None:
-        return None
-    try:
-        value = Decimal(text)
-    except InvalidOperation:
-        return None
-    # `copy_abs`, not `abs`: the builtin is a context operation and raises `Overflow` on
-    # exactly the values this line exists to reject, so the guard would be the thing that
-    # crashed. `copy_abs` and the comparison below both leave the context alone.
-    if not value.is_finite() or value.copy_abs() > MAX_MAGNITUDE:
-        return None
-    return value
-
-
-def _rounded(value: Decimal) -> int:
-    """The nearest integer, halves away from zero.
-
-    Python's own `round` is half-to-even, which is the right default for statistics and
-    the wrong one for a reading: 2.5 seconds of elapsed time is 3, not 2.
-    """
-    return int(value.to_integral_value(rounding=ROUND_HALF_UP))
-
-
-def _integer(value: Decimal | None) -> int | None:
-    return None if value is None else _rounded(value)
-
-
-def _is_uuid(text: str) -> bool:
-    return bool(_UUID_TEXT.match(text))
-
-
-def _embedded_uuid(source_id: str) -> str | None:
-    """The UUID a source id already carries, if it carries one.
-
-    `xs:ID` is an `NCName` and cannot begin with a digit, which a hex UUID regularly does,
-    so a writer holding real UUIDs prefixes them — this format's reference implementation
-    writes `dive-019fec36-…`. Stripping a short alphabetic prefix recovers it, which is
-    what lets a logbook survive a round trip through UDDF with its identities intact.
-    """
-    head, dash, tail = source_id.partition("-")
-    if dash and head.isalpha() and len(head) <= 12 and _is_uuid(tail):
-        return tail.lower()
-    return source_id.lower() if _is_uuid(source_id) else None
-
-
 def _volume_litres(raw: Decimal) -> tuple[Decimal, bool]:
     """A `<tankvolume>` as litres, and whether it had to be reinterpreted.
 
@@ -437,11 +362,11 @@ class _Converter:
         self.exported_at = exported_at
         self.scope = scope
         self.notes: list[Note] = []
-        # Shared with the rest of the archive this file came from, if it came from one, so
-        # that a record two members both define is written once and referred to by both —
-        # see `uuid_for`, which is where that is decided and where the *other* case, two
-        # records in one file naming one id, is still refused.
-        self.claimed = scope.claimed
+        # The claimed-UUID table inside is shared with the rest of the archive this file
+        # came from, if it came from one, so that a record two members both define is
+        # written once and referred to by both — while the *other* case, two records in one
+        # file naming one id, is still refused.
+        self.identities = Identities(UDDF_ID_NAMESPACE, scope, self.note)
         self.inferred: list[str] = []
         self.source_ids: set[str] = set()
         self.site_uuids: dict[str, str] = {}
@@ -458,62 +383,13 @@ class _Converter:
     # -- identity ----------------------------------------------------------------
 
     def uuid_for(self, kind: str, source_id: str | None, where: str, index: int) -> tuple[str | None, bool]:
-        """A record's stable UUID, and whether **this** file is the one that carries it.
-
-        Three outcomes, and the middle one is the whole of what an archive needs.
-
-        The identity is nobody's yet: `(uuid, True)`, and the record is written here.
-
-        The identity belongs to a record in **another member of the same archive**:
-        `(uuid, False)`. That is one record defined twice, which is the ordinary shape of a
-        per-dive export — each file repeats the site it was at and the gear it was dived
-        with — so its row is written once and this file's references resolve to it. Not a
-        note: nothing was lost, and a note per repeat would be one line for every file in
-        the archive saying that the archive is shaped the way archives are.
-
-        The identity belongs to another record in **this same file**: `(None, False)`,
-        reported. Two records in one file cannot share one identity (spec §5.3), and there
-        is no other record to resolve to.
-        """
-        if source_id is None:
-            self.note(
-                where,
-                f"the source gives this {kind} no id, so its identity is derived from its position in the "
-                "file and will move if the file's order changes (spec §5.3)",
-                "absent",
-            )
-            # Prefixed by the archive member this file is, so that two members whose
-            # records carry no ids do not derive one identity from one position.
-            source_id = self.scope.positional(index)
-
-        derived = str(uuid_pkg.uuid5(UDDF_ID_NAMESPACE, f"{kind}:{source_id}"))
-        for candidate in dict.fromkeys((_embedded_uuid(source_id) or derived, derived)):
-            holder = self.claimed.get(candidate)
-            if holder is None:
-                self.claimed[candidate] = (self.scope.member, self.scope.where(where))
-                return candidate, True
-            if holder[0] != self.scope.member:
-                return candidate, False
-
-        self.note(
-            where,
-            f"a second {kind} carries the id {source_id!r}, already used by {self.claimed[derived][1]}; the "
-            "record is dropped, because two records cannot share one identity (spec §5.3)",
-            "dropped",
-        )
-        return None, False
+        """A record's stable UUID, and whether this file is the one that carries it."""
+        return self.identities.for_record(kind, source_id, where, index)
 
     # -- text --------------------------------------------------------------------
 
     def capped(self, value: str, limit: int, where: str, member: str) -> str:
-        if len(value) <= limit:
-            return value
-        self.note(
-            where,
-            f"{member} is {len(value)} characters; the format caps it at {limit} and the rest is dropped",
-            "dropped",
-        )
-        return value[:limit]
+        return capped(value, limit, note=self.note, where=where, member=member)
 
     def email(self, value: str | None, where: str) -> str | None:
         """`<contact><email>` when it is an address, and nothing when it is not.
@@ -543,32 +419,17 @@ class _Converter:
     # -- geometry ----------------------------------------------------------------
 
     def position(self, geography: ET.Element | None, where: str) -> dict[str, float] | None:
-        """A Position from `<geography>`, or `None` where there is not an honest one.
+        """A Position from `<geography>`, reading an empty element as no coordinate.
 
-        Two sources of nothing, and the second is the interesting one. An empty
-        `<latitude/>` is Subsurface saying it has no coordinates. An exact `0.000000` pair
-        is divelogs.de saying the same thing in the one spelling that looks like an answer:
-        every site in its export carries it, and a reader that trusts Null Island pins a
-        Red Sea wreck into the Atlantic.
+        Subsurface writes `<latitude/>` for a site it has no coordinates for; everything
+        past that — half a pair, the exact-zero pair, the WGS 84 range — is the shared rule.
         """
-        latitude = _decimal(_text_of(geography, "latitude"))
-        longitude = _decimal(_text_of(geography, "longitude"))
-        if latitude is None or longitude is None:
-            if latitude is not None or longitude is not None:
-                self.note(where, "only one half of a coordinate pair was recorded, and a position needs both; dropped (spec §6)", "dropped")
-            return None
-        if latitude == 0 and longitude == 0:
-            self.note(
-                where,
-                "the coordinates are exactly 0.000000 / 0.000000, which writers emit to mean 'unknown'; read as "
-                "no position rather than as Null Island",
-                "absent",
-            )
-            return None
-        if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
-            self.note(where, f"the coordinates {latitude} / {longitude} are outside the WGS 84 range; dropped", "dropped")
-            return None
-        return {"latitude": float(latitude), "longitude": float(longitude)}
+        return position(
+            decimal_of(_text_of(geography, "latitude")),
+            decimal_of(_text_of(geography, "longitude")),
+            note=self.note,
+            where=where,
+        )
 
     # -- the run -----------------------------------------------------------------
 
@@ -884,7 +745,7 @@ class _Converter:
             where = f"mix/{index}"
             mix: dict[str, Any] = {}
             for member, tag in (("oxygen", "o2"), ("helium", "he")):
-                raw = _decimal(_text_of(element, tag))
+                raw = decimal_of(_text_of(element, tag))
                 if raw is None:
                     continue
                 percent, reinterpreted = _gas_percent(raw)
@@ -904,7 +765,7 @@ class _Converter:
                 mix.pop("oxygen", None)
                 mix.pop("helium", None)
 
-            po2_limit = _decimal(_text_of(element, "maximumpo2"))
+            po2_limit = decimal_of(_text_of(element, "maximumpo2"))
             if po2_limit is not None:
                 if MIN_PO2_LIMIT <= po2_limit <= MAX_PO2_LIMIT:
                     mix["po2_limit"] = float(po2_limit)
@@ -946,12 +807,12 @@ class _Converter:
             return None
 
         dive: dict[str, Any] = {"uuid": claimed}
-        number = _integer(_decimal(_text_of(before, "divenumber")))
+        number = integer_of(decimal_of(_text_of(before, "divenumber")))
         if number is not None:
             dive["dive_number"] = number
         dive["started_at"] = started_at
 
-        duration = _integer(_decimal(_text_of(after, "diveduration")))
+        duration = integer_of(decimal_of(_text_of(after, "diveduration")))
         if duration is not None:
             if recorded(duration, record="dive", member="duration"):
                 dive["duration"] = duration
@@ -962,8 +823,8 @@ class _Converter:
         if notes:
             dive["notes"] = notes
 
-        max_depth = self.positive(_decimal(_text_of(after, "greatestdepth")), where, "<greatestdepth>", "max_depth")
-        avg_depth = self.positive(_decimal(_text_of(after, "averagedepth")), where, "<averagedepth>", "avg_depth")
+        max_depth = self.positive(decimal_of(_text_of(after, "greatestdepth")), where, "<greatestdepth>", "max_depth")
+        avg_depth = self.positive(decimal_of(_text_of(after, "averagedepth")), where, "<averagedepth>", "avg_depth")
         if max_depth is not None and avg_depth is not None and avg_depth > max_depth:
             self.note(
                 where,
@@ -977,11 +838,11 @@ class _Converter:
         if avg_depth is not None:
             dive["avg_depth"] = float(avg_depth)
 
-        lowest = _decimal(_text_of(after, "lowesttemperature"))
+        lowest = decimal_of(_text_of(after, "lowesttemperature"))
         if lowest is not None:
             dive["bottom_temperature"] = float(lowest - KELVIN_OFFSET)
 
-        visibility = _decimal(_text_of(after, "visibility"))
+        visibility = decimal_of(_text_of(after, "visibility"))
         if visibility is not None:
             if recorded(visibility, record="dive", member="visibility"):
                 dive["visibility"] = float(visibility)
@@ -989,7 +850,7 @@ class _Converter:
                 self.note(where, f"<visibility> is {visibility} m; dropped", "dropped")
 
         used = _kid(before, "equipmentused")
-        weight = _decimal(_text_of(used, "leadquantity"))
+        weight = decimal_of(_text_of(used, "leadquantity"))
         if weight is not None:
             # A zero is kept here and read as absence for `max_depth`, and neither is this
             # module's choice: `weight`'s floor in the schema is inclusive and
@@ -1000,14 +861,14 @@ class _Converter:
             else:
                 self.note(where, f"<leadquantity> is {weight} kg; dropped", "dropped")
 
-        altitude = _integer(_decimal(_text_of(before, "altitude")))
+        altitude = integer_of(decimal_of(_text_of(before, "altitude")))
         if altitude is not None:
             if MIN_ALTITUDE <= altitude <= MAX_ALTITUDE:
                 dive["altitude"] = altitude
             else:
                 self.note(where, f"<altitude> is {altitude} m, outside the -450 to 6500 the format allows; dropped", "dropped")
 
-        surface_pressure = _decimal(_text_of(before, "surfacepressure"))
+        surface_pressure = decimal_of(_text_of(before, "surfacepressure"))
         if surface_pressure is not None:
             bar = surface_pressure / PASCAL_PER_BAR
             if MIN_SURFACE_PRESSURE <= bar <= MAX_SURFACE_PRESSURE:
@@ -1118,7 +979,7 @@ class _Converter:
             tank_where = f"{where}/tankdata/{index}"
             cylinder: dict[str, Any] = {}
 
-            raw_volume = _decimal(_text_of(tank, "tankvolume"))
+            raw_volume = decimal_of(_text_of(tank, "tankvolume"))
             if raw_volume is None:
                 self.note(
                     tank_where,
@@ -1183,7 +1044,7 @@ class _Converter:
         return cylinders, mix_refs
 
     def pressure_bar(self, text: str | None, where: str, member: str) -> Decimal | None:
-        value = _decimal(text)
+        value = decimal_of(text)
         if value is None:
             return None
         bar = value / PASCAL_PER_BAR
@@ -1216,7 +1077,7 @@ class _Converter:
 
         axis = SampleAxis(self.note, where, noun="waypoint", time_member="<divetime>")
         for waypoint in _kids(samples, "waypoint"):
-            axis.offer(_integer(_decimal(_text_of(waypoint, "divetime"))), waypoint)
+            axis.offer(integer_of(decimal_of(_text_of(waypoint, "divetime"))), waypoint)
 
         cylinders_of_mix: dict[str, list[int]] = {}
         for index, ref in enumerate(mix_refs):
@@ -1230,13 +1091,13 @@ class _Converter:
         needs_gas_numbers = False
 
         for second, waypoint in axis.ordered():
-            metres = _decimal(_text_of(waypoint, "depth"))
+            metres = decimal_of(_text_of(waypoint, "depth"))
             if metres is not None:
-                depth.record(second, _rounded(metres * CENTIMETRES_PER_METRE))
+                depth.record(second, rounded(metres * CENTIMETRES_PER_METRE))
 
-            kelvin = _decimal(_text_of(waypoint, "temperature"))
+            kelvin = decimal_of(_text_of(waypoint, "temperature"))
             if kelvin is not None:
-                temperature.record(second, _rounded((kelvin - KELVIN_OFFSET) * TENTHS_PER_UNIT))
+                temperature.record(second, rounded((kelvin - KELVIN_OFFSET) * TENTHS_PER_UNIT))
 
             for cylinder_index, tenths in self.waypoint_pressures(waypoint, where, second, cylinders_of_mix, len(mix_refs)):
                 channel = pressures.setdefault(cylinder_index, Channel())
@@ -1296,7 +1157,7 @@ class _Converter:
         """
         seen: dict[str, int] = {}
         for element in _kids(waypoint, "tankpressure"):
-            pascal = _decimal(_text(element))
+            pascal = decimal_of(_text(element))
             if pascal is None:
                 continue
             ref = _attr(element, "ref")
@@ -1323,4 +1184,4 @@ class _Converter:
                     )
                     continue
                 index = candidates[position]
-            yield index, _rounded(pascal / PASCAL_PER_BAR * TENTHS_PER_UNIT)
+            yield index, rounded(pascal / PASCAL_PER_BAR * TENTHS_PER_UNIT)
