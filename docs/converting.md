@@ -150,6 +150,12 @@ document. `exported_at` is the moment of conversion, always offset-aware.
 - **The recorded UTC offset is preserved exactly and never supplied.** That is §5.2's whole
   point, and converting to UTC — or assuming an offset where the source recorded none — is
   the failure every tested consumer of the incumbent format produced.
+- **A recorded sub-second fraction is preserved too, and only its spelling is normalised.**
+  §5.2 makes the fraction OPTIONAL rather than forbidden, so a source that wrote one wrote
+  a reading, and truncating it is not something any of the report's four kinds could
+  honestly describe. What a converter does normalise is spelling alone: an offset written
+  `+0200` without its colon and a lowercase `z` come out as `+02:00` and `Z`, which changes
+  no instant.
 - **Which way a zero reads follows the format's own constraint on the member**: `> 0` means
   the zero was a placeholder for a value the source had to write and did not have, `≥ 0`
   means it was an answer. A `max_depth` of zero is not recorded; a `weight` of zero is a
@@ -166,6 +172,14 @@ document. `exported_at` is the moment of conversion, always offset-aware.
   calls `gas_number` "a label, not an array index", so a converter does not assert a
   numbering where nothing depends on it — and a source's own gas number is a label too, not
   an index into `cylinders[]`.
+- **Evidence of a tank is evidence of a tank.** Where a source carries pressure telemetry
+  for a cylinder it lists nowhere — a transmitter reporting under an id the gas list never
+  names — the readings still become a cylinder, carrying its pressures and nothing else.
+  What a converter may not do is the reverse and build the *list* from the telemetry: a
+  two-tank dive whose second bottle never transmitted then arrives as one cylinder carrying
+  both pressures, which is exactly the shape a gas-consumption figure is derived from, so a
+  stage bottle's pressure drop would be attributed to the whole dive. A cylinder is listed
+  because the source recorded it was on the dive; its pressures are a separate question.
 
 ## Profiles
 
@@ -181,8 +195,36 @@ readings beside 29 temperatures keeps both, rather than gaining 402 invented one
   record a profile, and this is the converter unable to carry it — the same class as a
   dropped sample rather than an absence.
 - Source sample times are commonly fractional while §6.5's `times` are strictly increasing
-  integers, so **two samples that round to the same second keep the first and report the
-  second**.
+  integers, so **two readings of one channel that round to the same second keep the first
+  and report the second**. The collision is **per channel, not per source record**: §6.5
+  gives every channel its own `times`, so readings of *different* channels landing on one
+  second are collected into one sample rather than competing for it. Sources that append
+  each sensor's stream as its own record — a depth here, a temperature there, almost never
+  two at once — are common, and offering those records to the axis one at a time makes the
+  axis choose between two readings that were never in competition, losing real ones by it.
+- **A ceiling of zero is not a ceiling.** Zero says the diver may surface — the absence of
+  an obligation rather than an obligation at 0 m — and §6.5 says the same thing structurally:
+  a gap in a ceiling's `times` means no deco obligation, not a dropout. Reading a recorded
+  zero as a reading draws a flat line along the surface across every no-deco dive in a
+  logbook. This is the one reading whose zero the member's own constraint cannot settle —
+  §6.5's Series puts no floor on a value — so the rule is stated here rather than derived
+  the way the zeroes above it are.
+
+## Where a fix belongs
+
+**No fix is taken underwater.** A satellite receiver does not reach a wrist through
+seawater, so every position in a dive log was recorded at the surface, and the only
+question worth asking of one is which surface interval it belongs to.
+
+**The deepest sample is the split**: the last fix at or before it is the entry position and
+the first after it is the exit. The fix that says where a diver got in is the one taken just
+before they descended, not the one from when the boat left the jetty.
+
+The deepest sample is the pivot in preference to an in-water *window*, which would need a
+depth threshold a converter has nowhere to get and would therefore invent. With no depth
+channel there is no pivot and so no answer, and nothing is written. A source whose fixes all
+land after the diver surfaced yields an exit and no entry, which is the honest half of what
+it recorded rather than a failure to find the other one.
 
 ## A container is one logbook, not a format
 

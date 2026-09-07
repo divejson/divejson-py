@@ -14,7 +14,7 @@ rule rests on something none of those exercises, it says so in place.
 ## Why this format, and what makes it different
 
 This is the file the Suunto app hands a diver who asks for their data, so it is what a
-Suunto owner arrives with. It is also the only format in this package written by an
+Suunto owner arrives with. It is also the only format in this corpus written by an
 *application* about a device rather than by the device itself, which shows: the same reading
 appears in different units in different generations of it, the header is a superset of every
 activity type the watch records, and the newest generation moved gas out of the header
@@ -74,16 +74,15 @@ failing, which is the same code path the two real shapes take when their gas is 
 
 ### A start time is parsed by pattern, not by the standard library
 
-`datetime.fromisoformat` on the Python floor this package supports accepts a two- or
-six-digit sub-second fraction and rejects `.6`, which the same vendor's other export writes.
-That is a property of one interpreter version rather than of the data, so the timestamp is
-matched against a lenient ISO 8601 pattern and the calendar is checked afterwards.
+A standard library's ISO 8601 parser is not reliably lenient enough for this: Python's
+`datetime.fromisoformat` before 3.11 accepts a three- or six-digit sub-second fraction and
+rejects `.6`, which the same vendor's other export writes. That is a property of one
+parser's version rather than of the data, so the timestamp is matched against a lenient
+ISO 8601 pattern and the calendar is checked afterwards.
 
-**The recorded fraction is preserved.** §5.2 makes it OPTIONAL rather than forbidden, the
-source recorded it, and nothing in this format asks for it to be dropped — so
-`2026-04-17T11:49:23.510+02:00` converts to exactly that. The offset is preserved and never
-supplied; the *spelling* is normalised, so a `+0200` with no colon and a lowercase `z` come
-out as `+02:00` and `Z`.
+This is the format that made `converting.md` state the fraction rule: nothing here asks for
+a recorded fraction to be dropped, so `2026-04-17T11:49:23.510+02:00` converts to exactly
+that, offset and all.
 
 ## Units
 
@@ -115,7 +114,7 @@ report the oxygen tolerance units as 1 789 of them.
 **Nothing recorded is rounded.** A transmitter reports in steps far finer than a gauge a
 diver reads, so 21 162 500 Pa is `211.625` bar and not `211.62` — the digits are the
 source's, and rounding them here would write a convention into a conformance corpus that
-this library applies nowhere else. The one quantized value is the radian-to-degree
+this corpus applies nowhere else. The one quantized value is the radian-to-degree
 conversion, which is this converter's own arithmetic on an irrational factor and is cut at
 six places, about 11 cm. `DiveRouteOrigin` is already degrees and is carried untouched.
 
@@ -226,8 +225,8 @@ carries no pressures at all, which is the honest answer.
 
 Switch order is chronological, so the back gas comes first and a deco gas follows — the
 order a logbook lists them in. A slot that transmitted without a recorded switch is appended
-after those: evidence of a tank is evidence of a tank, whichever way round it arrived. At
-most 16 cylinders are read from one dive, since nothing else bounds how many distinct gas
+after those, by `converting.md`'s evidence-of-a-tank rule — whichever way round it arrived.
+At most 16 cylinders are read from one dive, since nothing else bounds how many distinct gas
 numbers a file may claim.
 
 **Only the pressures are real, and nothing else is invented to fill the gap.** This shape
@@ -311,16 +310,13 @@ switch that happened, and saying so is honest where guessing a position would no
 | `DiveEvents` / `Events` | | §6.5 events, below |
 | `Latitude` / `Longitude`, `DiveRouteOrigin` | | `entry_position` and `exit_position` |
 
-**Entries that land on one second are merged rather than one of them being dropped.** This
-exporter appends its sensor streams as separate entries: on the dive `suunto-ocean.json` is
-reduced from, 7 477 entries carry a depth, a temperature, a satellite fix or a battery
-reading, almost never two of those at once, and they collide on the whole seconds §6.5
-requires. Offering them one at a time leaves the axis choosing between a depth and a
-temperature recorded at the same instant, and it keeps 345 of that dive's 431 depths.
-Merging keeps all 431 — the count the same dive's FIT reading gives — because §6.5's
-channels each carry their own times and two *different* channels were never in competition.
-One channel twice on a second is still a collision, and is reported per channel rather than
-per entry.
+**This exporter is what made `converting.md`'s collision rule per channel.** It appends its
+sensor streams as separate entries: on the dive `suunto-ocean.json` is reduced from, 7 477
+entries carry a depth, a temperature, a satellite fix or a battery reading, almost never two
+of those at once, and they collide on the whole seconds §6.5 requires. Offering them to the
+axis one at a time leaves it choosing between a depth and a temperature recorded at the same
+instant, and keeps 345 of that dive's 431 depths; merging them keeps all 431 — the count the
+same dive's FIT reading gives.
 
 **Samples are ordered by their own recorded time.** The union of an Ocean export's sample
 timestamps is not monotonic: adjacent entries go backwards by up to a second — 1.05 s is
@@ -328,11 +324,10 @@ the worst step across these 35 files — because the separate sensor streams are
 of order. The last entry in the file is not the
 last reading of the dive.
 
-**A ceiling of zero is not a ceiling.** This export writes `"Ceiling": 0` on every no-deco
-sample where the same vendor's desktop export writes `xsi:nil` — 10 992 of the 12 643
-ceiling readings across these 35 files. The ceiling is the depth a diver may not ascend
-above, and zero says they may surface; reading it as a reading would draw a flat line along
-the surface across every no-deco dive in a logbook.
+**A zero ceiling is `converting.md`'s rule, and this is the export that showed it.** It
+writes `"Ceiling": 0` on every no-deco sample where the same vendor's desktop export writes
+`xsi:nil` — 10 992 of the 12 643 ceiling readings across these 35 files, every one of which
+would have drawn a flat line along the surface.
 
 **`DeviceInternalAbsPressure` is not a tank pressure.** It sits in the same sample object as
 `Cylinders` and reads about 96 400 Pa at the surface: it is the computer's own ambient
@@ -371,12 +366,10 @@ confirmation after; marking all three would put three ticks on one stop. `Deco W
 `Gas Switch`, `NoFly Time`, `Dive Time`, `Safety Stop Broken`, `Deco` and `Gas Available`
 have no §6.5 type and are dropped rather than forced into the nearest one.
 
-### Positions, and where a fix belongs
+### Positions
 
-The rule is the one every reader in this package applies: no fix is taken underwater, so the
-only question worth asking of one is which surface interval it belongs to, and the deepest
-sample is the split. What is at or before it is on the way in, what is after it is on the
-way out, and the last before and the first after are the two kept.
+Which surface interval a fix belongs to is `converting.md`'s question, and the deepest
+sample is its split. What is this format's is below.
 
 **This export writes its coordinates in two units, in one file.** A sample's own
 `Latitude`/`Longitude` are radians; the `DiveRouteOrigin` on the first sample is degrees.
@@ -493,18 +486,7 @@ Read as a list of what was considered, not of what was missed.
 
 ## The pairs
 
-`fixtures/suunto_json/` holds the conformance pairs for this reader — an input, and the
-document a correct reader produces from it. The specification adopts them after a release,
-and `fixtures/README.md` gains its rows then.
-
-**Every input is hand-built, reduced from a real export**, which is `fixtures/README.md`'s
-rule for a text format. The readings in them are real and unaltered, so the answers are the
-answers the whole files give; what is dropped is the thousands of samples between them.
-
-| file | modelled on | what it covers |
-| --- | --- | --- |
-| `suunto-ocean.json` | Suunto Ocean, 2026 | The known answer, and the shape with no gas block: two cylinders from two gas switches where only one slot ever transmitted, `start_pressure` 211.625 and `end_pressure` 127.15625 against a pressure channel that ends on 127.26562 after the dive had ended, a `.510` sub-second fraction preserved on `started_at`, three entries merging onto second 0, a zero ceiling beside a real one, an entry position in degrees off `DiveRouteOrigin` and an exit in radians off a satellite fix — the same exit `fixtures/fit/suunto-ocean.divejson` carries for this dive. |
-| `purged-regulator.json` | Suunto Ocean, 2026 | The `DiveTime` bound where it is worth two thirds of a tank: an `end_pressure` of 53.34375 bar beside a pressure channel that ends on 0.14 bar, six minutes after the diver got out. |
-| `suunto-d5.json` | Suunto D5, 2025 | The header's own gas block, in SI: two gases at 21 % and 49 % from cubic metres, Pascal and 0-1 fractions, the second carried and never transmitted from; telemetry on slot 1 resolving to cylinder 0; a switch to gas 2 resolving to cylinder 1; and the oxygen clock, `CNS` as a fraction beside `OTU` as itself. |
-| `header-only.json` | Suunto D5, 2021 | The shape with no gas anywhere: a header and no samples at all, so no cylinders and no profile, and neither reported — the source recorded none rather than this reader failing to carry them. Constructed; see *The three header shapes*. |
-| `not-a-dive.json` | Suunto Ocean, 2026 | An activity that is not a dive, skipped and reported, producing a document with no dives. Constructed: every real export in hand is a dive, which is exactly why this rule needs a pair. |
+[`fixtures/suunto_json/`](../fixtures/suunto_json) holds the conformance pairs for this format — an
+input, and the document a correct reader produces from it. What each one covers, and how it
+was built, is one row per pair in [`fixtures/README.md`](../fixtures/README.md#suunto_json); the
+rules those expectations follow are this document and [`converting.md`](converting.md).
