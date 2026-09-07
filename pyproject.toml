@@ -16,8 +16,14 @@ dynamic = ["version"]
 
 # An extra rather than a PEP 735 dependency group, so that `pip install -e ".[dev]"` works
 # on every pip the declared Python floor can have. `--group` needs pip 25.1.
+#
+# `xmlschema` is here and not in `dependencies` because nothing the package *does* needs
+# it: the UDDF reader treats schema validity as never a precondition, and the writer's
+# output is checked against `tests/fixtures/uddf_3.2.2.xsd` by the suite rather than at
+# run time. A diver installing `divejson` should not pay for a validator only the tests
+# use.
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "xmlschema>=3.0.0"]
 
 [project.scripts]
 divejson = "divejson.cli:main"

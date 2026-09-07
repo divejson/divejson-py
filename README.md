@@ -210,6 +210,14 @@ The FIT Protocol and FIT file format are proprietary to Garmin. This project is 
 affiliated with or endorsed by Garmin, carries no part of the FIT SDK, and does not use
 `garmin-fit-sdk`.
 
+`tests/fixtures/uddf_3.2.2.xsd` is the official UDDF schema, copyright © 2005–2018 Kai
+Schröder and Steffen Reith and vendored verbatim under the GNU Free Documentation License
+the UDDF documentation is published under, which permits verbatim redistribution. It is a
+test fixture — the UDDF writer's output is validated against it — and is not part of the
+wheel; the sdist carries it, which is why it is named here.
+[`tests/fixtures/README.md`](https://github.com/divejson/divejson-py/blob/main/tests/fixtures/README.md)
+records where it came from and when.
+
 ## License
 
 MIT — see [`LICENSE`](https://github.com/divejson/divejson-py/blob/main/LICENSE). The
