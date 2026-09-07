@@ -4,13 +4,16 @@ The format itself — the normative specification, the JSON Schema and the confo
 corpus — lives at <https://github.com/divejson/divejson>. This package implements it:
 ``validate`` — the schema pass plus the requirements the spec lists as beyond-schema —
 ``registry``, which decides what a source is and converts it through the adapter that
-reads it, and ``conform``, the conformance runner every implementation of the format
-provides. All three are importable functions; ``cli`` is a thin wrapper over them.
+reads it, ``uddf_write``, which writes a document back out as UDDF, and ``conform``, the
+conformance runner every implementation of the format provides. All of them are importable
+functions; ``cli`` is a thin wrapper over them.
 
 An application reads a source in two calls. ``sniff(head)`` takes a bounded head of bytes
 — ``SNIFF_BYTES`` of them — and answers a format id, ``"zip"``, or ``None`` for bytes
 nothing here claims; ``convert(source)`` takes the whole thing and returns a
 ``Conversion``: the document, and the notes that are the other half of the output.
+``write_uddf(document)`` is the way back out, and returns the mirror of that — a
+``Written``: the bytes, and the notes saying what UDDF could not hold.
 
 The schema, the fixtures and the mapping documents are **vendored** here, from the
 specification commit named in the repository's ``SPEC_REF``, so that an installed package
@@ -37,9 +40,17 @@ from .converter import (  # noqa: E402
     NoteKind,
     SourceTooLargeError,
     UnsupportedSourceError,
+    Written,
 )
 from .fit import FIT_ID_NAMESPACE, FitError, MalformedFitError  # noqa: E402
-from .registry import SNIFF_BYTES, convert, read_formats, sniff  # noqa: E402
+from .registry import (  # noqa: E402
+    SNIFF_BYTES,
+    WRITTEN,
+    convert,
+    read_formats,
+    sniff,
+    write_formats,
+)
 from .ssrf import SSRF_ID_NAMESPACE, MalformedSsrfError, SsrfError  # noqa: E402
 from .suunto_json import (  # noqa: E402
     SUUNTO_JSON_ID_NAMESPACE,
@@ -47,6 +58,7 @@ from .suunto_json import (  # noqa: E402
     SuuntoJsonError,
 )
 from .uddf import UDDF_ID_NAMESPACE, MalformedUddfError, UddfError  # noqa: E402
+from .uddf_write import write_uddf  # noqa: E402
 from .validate import (  # noqa: E402
     DuplicateMemberError,
     Issue,
@@ -59,6 +71,7 @@ from .validate import (  # noqa: E402
 __all__ = [
     "SNIFF_BYTES",
     "SPEC_VERSION",
+    "WRITTEN",
     "PRODUCER_KEY",
     "FIT_ID_NAMESPACE",
     "SSRF_ID_NAMESPACE",
@@ -84,6 +97,7 @@ __all__ = [
     "SuuntoJsonError",
     "UddfError",
     "UnsupportedSourceError",
+    "Written",
     "__version__",
     "compared",
     "convert",
@@ -93,4 +107,6 @@ __all__ = [
     "read_formats",
     "sniff",
     "validate_document",
+    "write_formats",
+    "write_uddf",
 ]

@@ -7,6 +7,35 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **UDDF is the first format this package writes, as well as reads.** `divejson convert
+  --to uddf my-logbook.divejson` writes the UDDF beside it, `write_uddf(document)` is the
+  same thing from Python, and the report is half the output going out as much as coming in:
+  every member UDDF has no room for is named, with a path into the document rather than into
+  a file. `registry.WRITTEN` carries `uddf`, and `divejson conform` gains the writer-pair
+  comparison it could not run while nothing was registered — a `write/<format>/` pair is a
+  document and the file writing it must produce, compared as canonical XML with
+  `<generator>` ignored.
+
+  **It is checked through the reader.** Reading a written file back returns the document it
+  was written from, on every member `docs/uddf-mapping.md`'s element map carries, and
+  `fixtures/write/uddf/` holds the pairs a port is measured against. Every generated document
+  is also validated against the UDDF 3.2.2 XSD, now vendored at
+  `tests/fixtures/uddf_3.2.2.xsd`, which is the only check that can see element order — and
+  five of the types written here are an `xs:sequence`.
+
+  **Nothing is invented to satisfy a required element.** UDDF makes `<greatestdepth>`,
+  `<diveduration>` and `<tankpressurebegin>` mandatory where §6 does not, and each takes the
+  zero this format's own reader takes back as "not recorded". `<geography>` makes a place
+  name mandatory and has no such spelling, so a site with coordinates and no `location`
+  loses the coordinates rather than having its name copied into them.
+  `docs/uddf-writing.md` is the prose companion, and it names the four places this writer
+  and the format's reference writer deliberately disagree.
+
+- Corrects the stale reason behind the Suunto reader's cylinder extremes: the merged sample
+  axis reproduces `211.625`, and what loses it is an unmerged one-entry-per-second axis
+  (`211.26562`) or the axis's pressure channel in tenths (`211.6`). The rule the docstrings
+  guard is unchanged.
+
 ## 0.3.0
 
 - **The Suunto app's JSON is the fourth format this package reads.** `divejson convert
