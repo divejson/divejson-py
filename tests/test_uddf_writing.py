@@ -455,6 +455,24 @@ def test_gear_with_no_uddf_element_of_its_own_says_so(schema) -> None:
     assert "does not name 'shears'" in messages(source, "gear/0")[0]
 
 
+def test_a_gear_finding_names_the_piece_it_is_about(schema) -> None:
+    """The paths are the document's order and the elements are the schema's, and the two
+    are different numbers — so a finding raised while writing a piece has to take its path
+    from the piece rather than from wherever the pass that grouped them ended up.
+
+    The boots are `gear/0` in the document and the *last* element written, `<variouspieces>`
+    coming after them in `equipmentType`'s sequence; only the boots carry the empty note.
+    """
+    source = document(
+        gear=[
+            {"uuid": GEAR_UUID, "name": "Rock boots", "type": "boots", "notes": ""},
+            {"uuid": "0198a6f0-9999-7008-8000-000000000008", "name": "SMB", "type": "smb"},
+        ]
+    )
+    written(source, schema)
+    assert [where for _, where, message in notes(source) if "the note is empty" in message] == ["gear/0"]
+
+
 def test_a_logbook_with_gear_and_no_diver_keeps_the_gear(schema) -> None:
     """`<equipment>` lives inside `<owner>`, so an absent diver would take the kit with it."""
     source = document(gear=[{"uuid": GEAR_UUID, "name": "Wrist computer", "type": "computer"}])

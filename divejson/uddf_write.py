@@ -531,7 +531,11 @@ class _Writer:
                     # document invalid.
                     manufacturer = _sub(piece, "manufacturer", id=_uddf_id("mfr", uuid) if uuid else f"mfr-{index}")
                     _sub(manufacturer, "name", str(item["brand"]))
-                self.notes_of(piece, where, item)
+                # Recomputed rather than carried down from the pass above: this loop walks
+                # the pieces in the schema's order, not the document's, so the two indices
+                # are different numbers and a path taken from the wrong loop names whichever
+                # piece the first one happened to end on.
+                self.notes_of(piece, f"gear/{index}", item)
                 if tag == "suit" and item.get("type") in _SUIT_TYPE:
                     # After `<notes>`: `suitType` extends `equipmentPieceType` and its own
                     # sequence follows the base type's whole one.

@@ -209,7 +209,12 @@ def test_writing_twice_produces_one_file(source) -> None:
 
 @pytest.mark.parametrize("source", WRITE_FIXTURES, ids=lambda path: path.stem)
 def test_reading_the_written_file_back_returns_the_document(source) -> None:
-    """Design decision 6's self round trip: out through the writer, in through the reader."""
+    """Out through the writer, in through the reader, and back to the document it started as.
+
+    The check the writer's fidelity claim actually rests on: a comparison against another
+    implementation's bytes would make this one a mirror of that one, where this asks whether
+    the *logbook* survived the trip.
+    """
     document = _document(source)
     read_back = convert(write_uddf(document).data, format="uddf").document
     assert set(_differences(_compared(document), _compared(read_back))) == LOST[source.stem]
@@ -242,9 +247,9 @@ def test_the_report_names_everything_that_changed(source) -> None:
 
 # The same logbook written twice: `fixtures/uddf/opendiving.uddf` is what DiveJSON's
 # reference writer produced for it, and `fixtures/write/uddf/opendiving.uddf` is what this
-# one produces from the document that file reads as. Design decision 6's third check is
-# **agreement after reading** — the two files are not compared, their conversions are,
-# because the writers are allowed to differ and the logbook is not.
+# one produces from the document that file reads as. What has to agree is **the logbook after
+# reading** and not the two files: the writers are allowed to differ — each of those places is
+# marked in `docs/uddf-writing.md` — and the dive nobody took is what neither may invent.
 REFERENCE = FIXTURES / "uddf" / "opendiving.uddf"
 OURS = FIXTURES / "write" / "uddf" / "opendiving.uddf"
 

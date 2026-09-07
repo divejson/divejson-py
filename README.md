@@ -105,8 +105,8 @@ kinds, computing nothing and settling no scale.
 UDDF is the only format this package writes today. **Nothing is invented to fill a required
 element**: where UDDF has its own spelling for "not recorded" — a `<greatestdepth>` of `0`,
 which is mandatory where §6's `max_depth` is not — that is what goes in, and where it has
-none, the value is dropped and reported rather than substituted for. The rules, and the four
-places this writer and the format's reference writer deliberately disagree, are in
+none, the value is dropped and reported rather than substituted for. The rules, and every
+place this writer and the format's reference writer deliberately disagree, are in
 [`docs/uddf-writing.md`](https://github.com/divejson/divejson-py/blob/main/docs/uddf-writing.md).
 
 From Python:

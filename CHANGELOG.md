@@ -28,8 +28,8 @@ this file is about the package, whose version moves independently.
   zero this format's own reader takes back as "not recorded". `<geography>` makes a place
   name mandatory and has no such spelling, so a site with coordinates and no `location`
   loses the coordinates rather than having its name copied into them.
-  `docs/uddf-writing.md` is the prose companion, and it names the four places this writer
-  and the format's reference writer deliberately disagree.
+  `docs/uddf-writing.md` is the prose companion, and it marks every place this writer and
+  the format's reference writer deliberately disagree.
 
 - Corrects the stale reason behind the Suunto reader's cylinder extremes: the merged sample
   axis reproduces `211.625`, and what loses it is an unmerged one-entry-per-second axis

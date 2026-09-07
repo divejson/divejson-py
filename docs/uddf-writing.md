@@ -17,10 +17,11 @@ pointed the other way.
 
 DiveJSON's own **reference writer** is the application the format came out of, and it stays
 the reference: this is a second writer serving applications that are not that one, not a
-replacement for it. The two agree on everything a logbook actually holds and differ in four
-places, each of them a case where an application exporting its own data and a converter
-producing an interchange file want opposite things. Those four are marked **Differs from
-the reference writer** below.
+replacement for it. The two agree on everything a logbook actually holds, and differ wherever
+an application exporting its own data and a converter producing an interchange file want
+opposite things. Each of those is marked **Differs from the reference writer** below, which
+is the list — a count of them stated up here would only be a second place for it to be
+wrong.
 
 ## What a correct writer is checked against
 
@@ -266,7 +267,7 @@ waypoint carries only what was measured at that second — a temperature taken b
 depth samples becomes its own waypoint, with a `<divetime>` and a `<temperature>` and no
 depth.
 
-**Differs from the reference writer**, and this is the largest of the four. It snaps every
+**Differs from the reference writer**, and this is the largest of them. It snaps every
 other channel onto the depth axis and *drops* a reading that cannot reach a waypoint within
 half the depth channel's typical interval, because two importers mishandle a depth-less
 waypoint in opposite and equally fatal ways: Subsurface silently discards it (a 706-sample

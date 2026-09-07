@@ -365,6 +365,29 @@ def test_a_writer_pair_whose_document_does_not_conform_fails(tmp_path, capsys) -
     assert "does not itself conform" in capsys.readouterr().out
 
 
+def test_a_non_conforming_document_is_never_handed_to_the_writer(tmp_path, capsys) -> None:
+    """One failure, and the rest of the corpus still runs.
+
+    A writer places a document into another format's shape and reads every REQUIRED member
+    unguarded, so writing one the validator has just rejected raises out of the runner and
+    takes every remaining case with it — a traceback in place of the failure that was
+    already recorded, and no answer at all about the cases that never ran. `uuid` is the
+    case that shows it: §6.2 requires it and `write_uddf` subscripts it.
+    """
+    corpus = _corpus(tmp_path)
+    source = corpus / "write" / "uddf" / f"{WRITER_PAIRS['uddf']}.divejson"
+    document = json.loads(source.read_text(encoding="utf-8"))
+    del document["dives"][0]["uuid"]
+    _write(source, document)
+
+    assert main(["conform", str(corpus)]) == 1
+    out = capsys.readouterr().out
+    assert "does not itself conform" in out
+    # The groups after `write/uddf` in the walk still reported, which is what says the run
+    # finished rather than fell over on the way.
+    assert "uddf: 1 reader pair checked" in out
+
+
 def test_the_result_counts_what_it_checked(tmp_path) -> None:
     result = run(_corpus(tmp_path), strict=True)
     assert result.status == 0

@@ -423,10 +423,17 @@ class _Walk:
             self._failures.append(Finding(where, "is not a JSON object, so it is not a document"))
             return _Outcome.FAILED
 
-        outcome = _Outcome.PASSED
         # The input is checked the way a reader pair's *expectation* is: a corpus whose
         # writer pair starts from a document that does not itself conform proves nothing
         # about the writer, whatever the two files then agree on.
+        #
+        # And the case stops here rather than carrying on to write it, which is the one
+        # place this differs from the reader pair. A writer is handed a document to place
+        # into another format's shape and is not the thing that decides whether it was a
+        # document — every required member is read unguarded — so writing one the validator
+        # has just rejected raises out of the runner and takes every remaining case in the
+        # corpus with it, in place of the failure that was already recorded. The command
+        # line refuses the same way, before writing anything.
         issues = validate_document(document)
         if issues:
             self._failures.append(
@@ -437,8 +444,9 @@ class _Walk:
                     tuple(str(issue) for issue in issues),
                 )
             )
-            outcome = _Outcome.FAILED
+            return _Outcome.FAILED
 
+        outcome = _Outcome.PASSED
         try:
             produced = writer.write(document).data
             comparable = writer.compared(produced)
