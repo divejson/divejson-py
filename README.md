@@ -165,13 +165,37 @@ with the figures each of them changes.
 
 ## Releasing
 
-A release is a tag. Move `__version__` in `divejson/__init__.py` — the build reads the
-version from there, so it is the only place it lives — head the changelog's new entries
-with it, land that, and push `v<version>`.
-`.github/workflows/release.yml` then builds the sdist and, from it, the wheel; checks
-that the tag names the version it built and that the wheel actually runs the corpus; and
-publishes to PyPI by trusted publishing, with no API token anywhere. Nothing else
-publishes, and a release is the only thing another repository can pin.
+A release is a `v*` tag on `main`, and
+[`.github/workflows/release-bump.yml`](https://github.com/divejson/divejson-py/blob/main/.github/workflows/release-bump.yml)
+is what puts one there — run it from the Actions tab. It works out the version from the
+conventional-commit subjects since the last tag, which are the titles of the pull requests
+in the window; **below 1.0 a breaking `!` moves the minor**, because 0.x has no major to
+spend and a minor is what 0.x already warns about. It writes that version into
+`__version__`, turns the changelog's `## Unreleased` heading into it with a fresh empty
+one above, lands the pair on `main` through a pull request it squash-merges itself, and
+tags the commit that lands. A `version` input overrides the computed answer; `dry_run`
+reports the version and the diff and pushes nothing.
+
+It refuses rather than guesses, and each refusal is a release that would otherwise be
+wrong in a way nobody notices until PyPI has it: an empty `## Unreleased` section, a
+`__version__` that disagrees with the newest tag, a version that is not ahead of the
+current one, and a tag that already exists. The arithmetic and both rewrites are
+[`.github/scripts/release_bump.py`](https://github.com/divejson/divejson-py/blob/main/.github/scripts/release_bump.py),
+which has tests and which applies the same two edits when run in a checkout, so `git diff`
+is the whole preview. The workflow's own header says what GitHub App it holds a token
+from, and why none of this can be done with `GITHUB_TOKEN` or with `git push`.
+
+The tag is what publishes. `.github/workflows/release.yml` then builds the sdist and, from
+it, the wheel; checks that the tag names the version it built and that the wheel actually
+runs the corpus; and publishes to PyPI by trusted publishing, with no API token anywhere.
+Nothing else publishes, and a release is the only thing another repository can pin.
+
+By hand it is the same edits: move `__version__` in `divejson/__init__.py` — the build
+reads the version from there, so it is the only place it lives — head the changelog's new
+entries with it, land that through a pull request, and push `v<version>`. That recipe has
+one step nothing reminds you of, which is why the workflow exists: the version does not
+move on its own, and a tag naming a version nobody built fails `release.yml` rather than
+publishing.
 
 ## Notices
 

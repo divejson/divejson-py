@@ -1,0 +1,281 @@
+name: Release bump
+
+# Cuts a release: works out the version, writes it into the two files that carry it, lands
+# that on `main` through a pull request, and tags the commit that lands — which is the
+# event `release.yml` publishes from. `.github/scripts/release_bump.py` is the half with
+# the decisions in it, and it has tests; this file is the half that has to touch GitHub,
+# and every awkward thing below is one of these four.
+#
+# **A GitHub App token, never `GITHUB_TOKEN`.** GitHub starts no workflow run from an
+# event created with the default token — `workflow_dispatch`, `repository_dispatch` and
+# three `pull_request` activity types are the documented exceptions, and a tag push is not
+# among them. A tag pushed with `GITHUB_TOKEN` would publish nothing and say nothing was
+# wrong: no error, no run, no release, just a tag sitting there.
+#
+# **The bump commit is made through the API.** `main`'s ruleset requires signatures, and a
+# runner's `git commit` is signed by nobody. GraphQL's `createCommitOnBranch` is used
+# rather than `git` because a commit it creates is signed by GitHub itself — documented
+# behaviour of that mutation, and the only way a runner gets a commit onto this branch.
+#
+# **Through a pull request, and this app is not a bypass actor.** The ruleset's
+# `bypass_actors` is empty on purpose, and GitHub's bypass is ruleset-wide rather than
+# per-rule: an "always allow" entry for this app would also let it push unsigned commits,
+# force-push `main` and delete it — so a leaked private key could rewrite the history of a
+# package that publishes to PyPI by trusted publishing, and destroy the evidence of its own
+# use. The pull request costs nothing instead, because `main` requires zero approving
+# reviews: this workflow opens one and squash-merges it in the same run, with no rule
+# relaxed and no human in the loop. Squash is also the only merge method `main` allows.
+#
+# **The tag goes on the squash commit.** Squash-merging writes a *new* commit on `main`;
+# the branch's own commit never lands there, and a tag on it would name a release nothing
+# on `main` can be traced to.
+#
+# ## What this needs from outside the repository
+#
+# A GitHub App owned by the `divejson` organisation and installed on this repository
+# alone, with two repository permissions and nothing else: **Contents: read and write**
+# (the branch, the commit, the tag) and **Pull requests: read and write** (opening it,
+# merging it). No organisation permissions, no account permissions, no webhook. Then, on
+# this repository:
+#
+#   RELEASE_BOT_CLIENT_ID    a repository **variable** — the app's Client ID
+#   RELEASE_BOT_PRIVATE_KEY  a repository **secret**   — the app's private key, whole .pem
+#
+# The Client ID is a variable rather than a secret on purpose. It is not a secret, and
+# secrets are masked in every log line, which would turn each failure here into `***`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. 0.3.0. Computed from the commit subjects when blank."
+        required: false
+        type: string
+      dry_run:
+        description: "Report the version and the diff, and push nothing."
+        required: false
+        default: false
+        type: boolean
+
+# Two dispatches would otherwise both read the same `main`, compute the same version, and
+# race to create the same branch. Queued rather than cancelled: a run cancelled between
+# the merge and the tag leaves a bump on `main` that nothing published.
+concurrency:
+  group: release-bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Bump the version, land it, tag it
+    runs-on: ubuntu-latest
+
+    # Every write goes through the app's token, so the default one needs nothing at all.
+    permissions: {}
+
+    steps:
+      - name: A release is cut with the workflow that is on `main`
+        if: ${{ !inputs.dry_run && github.ref != 'refs/heads/main' }}
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          echo "::error::dispatched from $REF, and the tree released is always main's — so this would be a branch's machinery against a tree it has not merged into. Dispatch from main, or use dry_run to try a branch's copy."
+          exit 1
+
+      - name: The release app's credentials are configured
+        env:
+          CLIENT_ID: ${{ vars.RELEASE_BOT_CLIENT_ID }}
+          PRIVATE_KEY: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+        run: |
+          missing=""
+          [ -n "$CLIENT_ID" ] || missing="$missing RELEASE_BOT_CLIENT_ID (repository variable)"
+          [ -n "$PRIVATE_KEY" ] || missing="$missing RELEASE_BOT_PRIVATE_KEY (repository secret)"
+          if [ -n "$missing" ]; then
+            echo "::error::not configured:$missing — the header of this workflow says what the app is and what it needs"
+            exit 1
+          fi
+
+      - name: Mint a token for the release app
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+
+      - name: Check `main` out, with the history a version is computed from
+        uses: actions/checkout@v4
+        with:
+          # Always `main`, whatever branch the dispatch names: the tree a release is cut
+          # from is not a dispatcher's choice, and a dry run from a branch is then that
+          # branch's machinery measured against the tree it would really release.
+          ref: main
+          # The whole history and every tag. The window is the subjects since the last
+          # `v*` tag, and a shallow clone has neither end of it.
+          fetch-depth: 0
+          token: ${{ steps.app.outputs.token }}
+          # Nothing here pushes with git — the commit and the tag both go through the API
+          # — so the token has no reason to be left in `.git/config`.
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Work out the version, and write it into the two files that carry it
+        id: bump
+        env:
+          # Through the environment rather than interpolated into the script: a
+          # `${{ inputs.version }}` written inside `run:` is substituted before bash parses
+          # the line, so a dispatcher could put `$(...)` in the box and have it run.
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -eo pipefail
+          {
+            echo '```'
+            python3 .github/scripts/release_bump.py --version "$VERSION"
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: What the release changes
+        run: |
+          set -eo pipefail
+          {
+            echo '```diff'
+            git diff
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Stop here — this was a dry run
+        if: ${{ inputs.dry_run }}
+        run: |
+          echo "::notice::dry run — nothing was committed, merged or tagged"
+
+      - name: Open the pull request that carries the bump
+        if: ${{ !inputs.dry_run }}
+        id: pr
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          set -eo pipefail
+          base="$(git rev-parse HEAD)"
+          branch="release/v$VERSION"
+          title="chore(release): v$VERSION"
+
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$branch" >/dev/null 2>&1; then
+            echo "::error::$branch already exists, so an earlier run stopped part-way. Merge or delete its pull request, then dispatch again."
+            exit 1
+          fi
+
+          # The branch first, at `main`'s head: `createCommitOnBranch` appends to a branch,
+          # it does not create one.
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f "ref=refs/heads/$branch" -f "sha=$base" >/dev/null
+
+          # `expectedHeadOid` is the optimistic lock — on the branch just created, so it
+          # cannot fail here, but it is the mutation's own guard against appending to a
+          # branch that moved and it is not optional.
+          query='mutation($input: CreateCommitOnBranchInput!) {
+            createCommitOnBranch(input: $input) { commit { oid } }
+          }'
+          commit="$(jq -n \
+            --arg query "$query" \
+            --arg repo "$GITHUB_REPOSITORY" \
+            --arg branch "$branch" \
+            --arg oid "$base" \
+            --arg headline "$title" \
+            --arg init "$(base64 -w0 divejson/__init__.py)" \
+            --arg changelog "$(base64 -w0 CHANGELOG.md)" \
+            '{query: $query, variables: {input: {
+                branch: {repositoryNameWithOwner: $repo, branchName: $branch},
+                expectedHeadOid: $oid,
+                message: {headline: $headline},
+                fileChanges: {additions: [
+                  {path: "divejson/__init__.py", contents: $init},
+                  {path: "CHANGELOG.md", contents: $changelog}
+                ]}
+              }}}' \
+            | gh api graphql --input - --jq '.data.createCommitOnBranch.commit.oid')"
+          echo "the bump is $commit on $branch"
+
+          # `printf` rather than a heredoc: a heredoc body has to start at column 1,
+          # which is outside this block scalar.
+          body="$(printf '%s\n' \
+            "\`__version__\` and the changelog's \`## Unreleased\` heading both move to $VERSION." \
+            "" \
+            "Opened by \`.github/workflows/release-bump.yml\`, which squash-merges this and tags the commit that lands — and the tag is what \`release.yml\` builds and publishes from.")"
+          url="$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" \
+            --title "$title" --body "$body")"
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "number=${url##*/}" >> "$GITHUB_OUTPUT"
+          echo "$url"
+
+      - name: Squash-merge it, and tag the commit that lands
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          VERSION: ${{ steps.bump.outputs.version }}
+          NUMBER: ${{ steps.pr.outputs.number }}
+          BASE: ${{ steps.pr.outputs.base }}
+        run: |
+          set -eo pipefail
+
+          # Mergeability is computed asynchronously, so a merge attempted the instant the
+          # pull request opens is refused for being UNKNOWN rather than for anything real.
+          state=UNKNOWN
+          for _ in $(seq 30); do
+            state="$(gh pr view "$NUMBER" --repo "$GITHUB_REPOSITORY" --json mergeStateStatus --jq .mergeStateStatus)"
+            [ "$state" = UNKNOWN ] || break
+            sleep 4
+          done
+          case "$state" in
+            # UNSTABLE is the ordinary answer here: the pull request's own CI is still
+            # running, and nothing on `main` is a required check. What that CI would say,
+            # `release.yml` asks again and harder once the tag exists — it rebuilds the
+            # sdist, builds the wheel from it, and runs the whole corpus through the wheel
+            # before a byte reaches PyPI — so waiting would buy a slower release and no
+            # more certainty, on a commit that moves a version string and a heading.
+            CLEAN|UNSTABLE|HAS_HOOKS) ;;
+            *)
+              echo "::error::the pull request is $state and cannot be merged. BLOCKED means a rule on main wants something this app cannot give — read the ruleset before relaxing anything here."
+              exit 1
+              ;;
+          esac
+
+          # The version was computed from `main` at $BASE. If `main` has moved since, the
+          # squash commit would carry work this run never read, under a version that does
+          # not describe it.
+          main_head="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)"
+          if [ "$main_head" != "$BASE" ]; then
+            echo "::error::main moved from $BASE to $main_head while this ran, so the release would carry changes the version was never computed from. Nothing was merged; the pull request is open."
+            exit 1
+          fi
+
+          # No --subject: the repository's squash subject source is PR_TITLE, so the title
+          # checked by `pr-title.yml` is the subject that lands on `main`.
+          gh pr merge "$NUMBER" --repo "$GITHUB_REPOSITORY" --squash
+
+          # The squash commit, not the branch's. GitHub names it a moment after the merge.
+          merged=""
+          for _ in $(seq 30); do
+            merged="$(gh pr view "$NUMBER" --repo "$GITHUB_REPOSITORY" --json mergeCommit --jq '.mergeCommit.oid // empty')"
+            [ -z "$merged" ] || break
+            sleep 2
+          done
+          if [ -z "$merged" ]; then
+            echo "::error::merged, but GitHub has not named the squash commit. Tag v$VERSION on main's head by hand."
+            exit 1
+          fi
+
+          # Annotated, like every tag this repository already carries, which takes two
+          # calls: the object, then the ref that points at it. Creating the ref is the
+          # push, and it is the app's token that makes it — which is the whole reason the
+          # app exists, since `release.yml` would never run off `GITHUB_TOKEN`'s.
+          object="$(gh api "repos/$GITHUB_REPOSITORY/git/tags" \
+            -f "tag=v$VERSION" -f "message=divejson $VERSION" \
+            -f "object=$merged" -f "type=commit" --jq .sha)"
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f "ref=refs/tags/v$VERSION" -f "sha=$object" >/dev/null
+
+          echo "::notice::v$VERSION tagged at $merged"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Merged as \`$merged\` and tagged \`v$VERSION\`; \`release.yml\` publishes from here." >> "$GITHUB_STEP_SUMMARY"
