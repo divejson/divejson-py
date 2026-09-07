@@ -4,8 +4,10 @@ Sources disagree about almost everything here and DiveJSON does not. UDDF puts e
 reading taken at one instant inside one `<waypoint>`; Subsurface's `.ssrf` writes a
 `<sample>` with the attributes it has; FIT writes a `record` message per second with
 invalid-value sentinels for the channels a device did not carry; the Suunto app's JSON
-writes an array of objects with their own timestamps. What §6.5 wants out of all four is
-the same: channels sampled on their own axes, with strictly increasing integer times.
+writes an array of objects with their own timestamps; Suunto's DM5 XML writes a
+`<Dive.Sample>` carrying every channel, `i:nil` where the sensor had nothing. What §6.5
+wants out of all five is the same: channels sampled on their own axes, with strictly
+increasing integer times.
 
 The rules that survive that translation are the ones in here, and no adapter re-derives
 them:
