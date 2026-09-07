@@ -191,8 +191,10 @@ def test_one_channel_twice_on_a_second_keeps_the_first_and_is_reported_once() ->
     )
     assert conversion.document["dives"][0]["profile"]["depth"]["values"] == [100, 2000]
     assert _messages(conversion, "dropped") == [
-        "2 depth readings land on a second the dive already has one at; the later reading is dropped, "
-        "because the format's sample times are strictly increasing (spec §6.5)"
+        (
+            "2 depth readings land on a second the dive already has one at; the later reading is "
+            "dropped, because the format's sample times are strictly increasing (spec §6.5)"
+        )
     ]
 
 
