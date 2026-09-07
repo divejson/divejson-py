@@ -872,6 +872,14 @@ class _Converter:
         `<DiveMixture>` elements rather than on the samples and which are therefore still
         there to lose.
 
+        The reason is left off the line deliberately. The two paths are opposite readings of
+        the file — one recorded no samples at all, the other recorded samples this converter
+        could not use — and `series.py` keeps them apart on purpose ("there the source said
+        nothing, here it said something this converter could not carry"). Naming either
+        reason here would misdescribe half the files that reach it, and the file's *own* half
+        of the story is already in the report: the dropped-sample path reported each sample
+        as it went, and the no-samples path had nothing to report.
+
         One line carrying a count rather than one line per switch, and no times in it: the
         report groups on the message, so a value in the text would turn one habit of an
         archive into a separate line per dive.
@@ -881,7 +889,7 @@ class _Converter:
                 where,
                 f"the export records {len(events)} gas "
                 f"{'change' if len(events) == 1 else 'changes'} and the dive has no profile for a marker "
-                "to sit on, its samples carrying nothing this format can hold; dropped (spec §6.4)",
+                "to sit on; dropped (spec §6.4)",
                 "dropped",
             )
         return None

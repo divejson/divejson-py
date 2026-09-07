@@ -264,6 +264,17 @@ was breathed on that gas throughout, and §6.5 gives an event time a floor of ze
 needs no rebasing even though most of these exports number their samples from 1. A time
 before zero is dropped and reported.
 
+**A switch with no profile to sit on is dropped and reported too**, which is a loss only
+this format can have: every other source in this corpus keeps its events *in* the sample
+stream, so "no samples, no events" is a tautology there. Here the times are on the mixtures
+and outlive a dive whose `<DiveSamples>` is empty or whose samples were every one of them
+dropped. §6.4 has nowhere to hang a marker without a profile, so the report carries a count
+of what was lost — a count and no reason, because the two ways to arrive here are opposite
+readings of the file and the file's own half of the story is already in the report: the
+dropped-sample path reported each sample as it went, and the no-samples path had nothing to
+report. A dive whose samples carry a time and no reading is the one shape that keeps its
+markers: something was on the axis, so the profile is emitted for the events alone.
+
 ### Numbering — a `gas_number` is a label, and is written only where it is used
 
 `converting.md` numbers a converted dive's cylinders from 0 in document order, and §6.3 calls
@@ -363,9 +374,9 @@ is `converting.md`'s refuse-rather-than-guess rule, not its ambiguity rule.
   `<DiveNumberInSerie>`; `<Visibility>`, `<Weather>` and `<Weight>`; an average depth deeper
   than the maximum; a surface pressure or ppO₂ limit outside what §6 allows; a mix whose
   halves sum above 100 %; an end pressure above its start; a cylinder pressure past 350 bar;
-  cylinders past the cap; a gas change before the dive began; a sample with no `<Time>`; two
-  samples on one second; samples that carry a time and no reading this format can hold; tank
-  readings two cylinders both claim.
+  cylinders past the cap; a gas change before the dive began, or one left with no profile to
+  sit on; a sample with no `<Time>`; two samples on one second; samples that carry a time and
+  no reading this format can hold; tank readings two cylinders both claim.
 - **`inferred`** — never. This export summarises its own dive, so there is nothing for this
   reader to compute, and `extensions.divejson.inferred` is never written.
 - **`resolved`** — never, as above.
