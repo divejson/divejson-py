@@ -9,8 +9,8 @@ who decides and whose `CONTRIBUTING.md` says how a change to the format lands.
 
 | path | what |
 | --- | --- |
-| `divejson/` | the package: the validator, the format registry and its readers, the conformance runner, the CLI |
-| `tests/` | its tests |
+| `divejson/` | the package: the validator, the format registry with its readers and writers, the conformance runner, the CLI |
+| `tests/` | its tests, and in `tests/fixtures/` the one thing they need that the corpus is not: the UDDF schema the writer's output is validated against |
 | `schema/`, `fixtures/`, `docs/` | **vendored** from the specification repository at the commit `SPEC_REF` names |
 | `SPEC_REF` | that commit, on one line — a tag once the format has one |
 
@@ -89,6 +89,44 @@ units were ambiguous, where the converter decided only how to read it and lists 
 Reaching for `inferred` on a unit reading is the mistake, and it produces a document whose
 report and whose derived-value list disagree.
 
+## Adding a writer
+
+Writing a format back out is a **separate registration under the same id**. A writer is an
+object with a `format`, the `suffix` a written file takes, a `write(document)` that returns
+a `Written` — the bytes and the report — and a `compared(data)` saying how two files of that
+format are compared when one of them was produced just now. Register it in
+`divejson/registry.py` and the CLI's `--to`, `WRITTEN` and the conformance runner all follow;
+nothing else in the package learns the name.
+
+`compared` is the part that cannot be left to a runner. Every writer stamps something that
+moves without the mapping moving — for an XML format it is the generator element, carrying
+this package's version — and a corpus that failed on every release is one nobody keeps
+green. It is a method rather than a rule in `conform.py` because a port checking its own
+writer against the same corpus needs the same answer.
+
+The rules below are already decided:
+
+- **Never invent a value to satisfy a required element.** Where the target format has its
+  own spelling for "not recorded", write that and report it; where it has none, drop the
+  value and report that. Copying a neighbouring member in — a record's name into a mandatory
+  place name — hands a round trip back something the diver never wrote.
+- **Report from the record, not from a list.** Ask each record which of its members were not
+  placed, so that a member the format gains reports itself instead of being dropped silently
+  by a writer nobody updated.
+- **`inferred` and `resolved` are a reader's kinds.** A writer computes nothing and settles
+  no scale, so its report carries `absent` — a required element the document had nothing
+  for — and `dropped`, and nothing else. A note's `where` is a path into the **document**.
+- **Be a function of the input.** No clock, no environment: two writes of one document are
+  one file, which is what makes a writer pair in a corpus stable and a `compared` comparison
+  meaningful.
+
+A writer lands with its pairs under `fixtures/write/<format>/` — a document, and the file
+writing it must produce — and a `docs/<format>-writing.md` beside the format's mapping
+document, both adopted by the specification afterwards like a reader's. It also lands with
+whatever check the corpus cannot hold: for UDDF that is validation against the vendored XSD
+in `tests/fixtures/`, which is the only thing that can see element order, and the self round
+trip, which is reading a written pair back and finding the document it was written from.
+
 ## Regenerating an expected document
 
 Each input under a pair directory is paired with the document it must produce, so a
@@ -100,6 +138,16 @@ answer:
 divejson convert fixtures/<format>/<name>.<ext> --force \
   --exported-at "$(grep -m1 exported_at fixtures/<format>/<name>.divejson | cut -d'"' -f4)"
 ```
+
+A **writer** pair is regenerated the other way round and needs neither flag's reasoning: the
+input is the `.divejson` and the output is a function of it, so
+
+```bash
+divejson convert --to <format> --force fixtures/write/<format>/<name>.divejson
+```
+
+reproduces the expected file exactly unless the mapping moved. Read that diff before
+committing it too.
 
 Both flags matter. Without `--force` the command refuses to replace a file that exists,
 which is the right default everywhere except here. And `exported_at` is one of the two

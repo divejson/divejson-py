@@ -12,7 +12,7 @@ from . import __version__
 from .conform import Result
 from .conform import run as run_conform
 from .converter import NOTE_KINDS, ConverterError, NonConformingOutputError, NoteGroup
-from .registry import convert, known_formats, read_formats
+from .registry import convert, known_formats, read_formats, write_formats, writer_for
 from .validate import DuplicateMemberError, parse_document, validate_document
 
 # How many source locations one grouped finding names before it stops listing them. A
@@ -48,23 +48,31 @@ def main(argv: list[str] | None = None) -> int:
 
     convert_parser = commands.add_parser(
         "convert",
-        help="convert dive logs into DiveJSON",
+        help="convert dive logs into DiveJSON, and DiveJSON back out",
         description=(
             "Reads each dive log and writes a DiveJSON document beside it, named after "
             "the input with a .divejson extension. The source format is recognised from "
             "the file's own bytes; a zip of files in one format is read as one logbook. "
             "Nothing the source did not record is "
             "filled in, and everything it did not carry is reported: those lines are the "
-            "other half of the output, not a diagnostic. Exits non-zero if any file "
-            "could not be converted."
+            "other half of the output, not a diagnostic. "
+            "--to runs the other way, writing each DiveJSON document out in one of the "
+            "formats this build writes, and reporting what that format cannot hold. "
+            "Exits non-zero if any file could not be converted."
         ),
     )
-    convert_parser.add_argument("files", nargs="+", type=Path, help="dive logs, or zips of them")
+    convert_parser.add_argument("files", nargs="+", type=Path, help="dive logs, zips of them, or DiveJSON documents")
     convert_parser.add_argument(
         "--from",
         dest="source_format",
         choices=sorted(read_formats()),
         help="read every input as this format instead of recognising it from the bytes",
+    )
+    convert_parser.add_argument(
+        "--to",
+        dest="target_format",
+        choices=sorted(write_formats()),
+        help="write each DiveJSON document out in this format instead of reading one in",
     )
     convert_parser.add_argument(
         "-o",
@@ -115,6 +123,14 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     if args.command == "convert":
+        if args.target_format:
+            if args.source_format:
+                print("--from reads a source into DiveJSON and --to writes one out; they are opposite directions")
+                return 1
+            if args.exported_at:
+                print("--exported-at is a member of a document being produced, and --to writes an existing one out")
+                return 1
+            return _write_command(args.files, args.output, force=args.force, target_format=args.target_format)
         return _convert_command(
             args.files,
             args.output,
@@ -241,6 +257,82 @@ def _convert_command(
 
         print(f"{path}: {_counted(conversion.document)} → {destination}")
         for group in conversion.grouped():
+            print(f"  {_kind(group)} {_listed(group.wheres)}: {group.message}")
+    return 1 if failed else 0
+
+
+def _write_command(
+    files: list[Path],
+    output: Path | None,
+    *,
+    force: bool,
+    target_format: str,
+) -> int:
+    """Write each DiveJSON document out in `target_format`, reporting what it cannot hold.
+
+    **Each document is validated first, and a document that does not conform is refused.**
+    A writer is given a document to place into another format's shape and is not the thing
+    that decides whether it was a document at all — so a member out of range would be
+    written out as it stands and the file would carry it, which is a worse answer than
+    saying which member and stopping. `divejson validate` is the same check, and this is
+    it inline so that nobody has to remember to run it.
+
+    Everything else is `convert`'s, deliberately: the destination is beside the input with
+    the format's own extension, an existing file is refused rather than replaced, and the
+    report is the other half of the output.
+    """
+    if output is not None and len(files) > 1:
+        print(f"--output names one file, but {len(files)} were given")
+        return 1
+
+    writer = writer_for(target_format)
+    failed = False
+    for path in files:
+        destination = output if output is not None else path.with_suffix(writer.suffix)
+        if destination == path:
+            print(f"{path}: the output would overwrite the input; pass --output to name another file")
+            failed = True
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+            document = parse_document(text)
+        except (OSError, UnicodeDecodeError) as error:
+            print(f"{path}: unreadable — {error}")
+            failed = True
+            continue
+        except DuplicateMemberError as error:
+            print(f"{path}: 1 error")
+            print(f"  $: {error}")
+            failed = True
+            continue
+        except json.JSONDecodeError as error:
+            print(f"{path}: 1 error")
+            print(f"  $: not valid JSON — {error}")
+            failed = True
+            continue
+
+        issues = validate_document(document, raw=text)
+        if issues:
+            print(f"{path}: does not conform, so there is nothing to write — {len(issues)} error{'s' if len(issues) != 1 else ''}")
+            for issue in issues:
+                print(f"  {issue}")
+            failed = True
+            continue
+
+        written = writer.write(document)
+        if destination.exists() and not force:
+            print(f"{path}: {destination} already exists — pass --force to replace it, or --output to write elsewhere")
+            failed = True
+            continue
+        try:
+            destination.write_bytes(written.data)
+        except OSError as error:
+            print(f"{path}: could not write {destination} — {error}")
+            failed = True
+            continue
+
+        print(f"{path}: {_counted(document)} → {destination}")
+        for group in written.grouped():
             print(f"  {_kind(group)} {_listed(group.wheres)}: {group.message}")
     return 1 if failed else 0
 

@@ -1,9 +1,9 @@
 # divejson
 
 Python tools for [DiveJSON](https://divejson.org), an open interchange format for scuba
-dive logs: the validator, the converters that read other dive-log formats into DiveJSON,
-and `divejson conform`, the conformance runner an implementation of the format is checked
-with.
+dive logs: the validator, the converters that read other dive-log formats into DiveJSON and
+write UDDF back out of it, and `divejson conform`, the conformance runner an implementation
+of the format is checked with.
 
 The format itself — the normative specification, the JSON Schema and the conformance
 corpus — lives in [divejson/divejson](https://github.com/divejson/divejson). This is an
@@ -90,15 +90,44 @@ conversion.document           # the DiveJSON document
 conversion.grouped()          # NoteGroup(kind, message, wheres), one per finding
 ```
 
+## Write a logbook back out
+
+```bash
+divejson convert --to uddf my-logbook.divejson
+```
+
+writes `my-logbook.uddf` beside the document and reports, line by line, what UDDF could not
+hold — a training course, a deco ceiling, a cylinder's role. Same command, same report, the
+other direction: `absent` is a required element the document had nothing for and `dropped`
+is a member the format has nowhere to put, and a writer produces neither of the other two
+kinds, computing nothing and settling no scale.
+
+UDDF is the only format this package writes today. **Nothing is invented to fill a required
+element**: where UDDF has its own spelling for "not recorded" — a `<greatestdepth>` of `0`,
+which is mandatory where §6's `max_depth` is not — that is what goes in, and where it has
+none, the value is dropped and reported rather than substituted for. The rules, and every
+place this writer and the format's reference writer deliberately disagree, are in
+[`docs/uddf-writing.md`](https://github.com/divejson/divejson-py/blob/main/docs/uddf-writing.md).
+
+From Python:
+
+```python
+written = divejson.write_uddf(document)
+written.data                  # the UDDF, as bytes
+written.grouped()             # NoteGroup(kind, message, wheres), one per finding
+```
+
 ## Run a conformance corpus
 
 ```bash
 divejson conform fixtures --strict
 ```
 
-Walks a corpus — `valid/` documents that must validate, `invalid/` ones that must not,
-and one directory of reader pairs per source format, named for the format — and says what
-this implementation makes of it. The exit status distinguishes two ways of not passing:
+Walks a corpus — `valid/` documents that must validate, `invalid/` ones that must not, one
+directory of reader pairs per source format, named for the format, and `write/<format>/` of
+writer pairs, which are the same thing with the halves swapped: a document, and the file
+writing it must produce. It says what this implementation makes of the lot, and the exit
+status distinguishes two ways of not passing:
 
 | status | meaning |
 | --- | --- |
@@ -107,23 +136,30 @@ this implementation makes of it. The exit status distinguishes two ways of not p
 | 2 | the corpus's **shape** is wrong: an empty directory, a pair missing one of its halves, or pairs for a format this implementation does not register — cases that never ran, which is not the same answer as cases that failed |
 
 `--only <format>` and `--skip <format>` narrow the run to a format's pairs, and neither
-reaches `valid/` or `invalid/`. `--strict` turns a format this implementation reads and
+reaches `valid/` or `invalid/`. `--strict` turns a format this implementation registers and
 the corpus has no pairs for from a warning into an error.
 
-## What it reads
+Two writes of one document differ in the version the writer stamps in `<generator>` and in
+nothing else, so a writer pair is compared with that element left out — otherwise every
+release would break every corpus that carries one.
+
+## What it reads and writes
 
 | format | id | what this package does | versions |
 | --- | --- | --- | --- |
 | DiveJSON | — | validates | 1.0 |
-| UDDF | `uddf` | reads into DiveJSON | 3.0 – 3.2.3 |
+| UDDF | `uddf` | reads into DiveJSON, **and writes** | reads 3.0 – 3.2.3, writes 3.2.2 |
 | Subsurface | `ssrf` | reads into DiveJSON | save format 3 |
 | FIT | `fit` | reads into DiveJSON | protocol 2.0 |
 | Suunto app JSON | `suunto_json` | reads into DiveJSON | D5-era and 2026 Suunto Ocean exports |
 
 The **id** is the whole coupling between this package and everything around it: it is what
-`sniff` returns, what `--from` takes, and what a conformance corpus names a directory of
-pairs after. A zip of files in one format sniffs as `zip`, which is a container rather than
-a format — it has no reader, no identity namespace and no pair directory.
+`sniff` returns, what `--from` and `--to` take, and what a conformance corpus names a
+directory of pairs after. Reading a format and writing it are separate registrations under
+one id, which is why a corpus's `write/ssrf/` directory is one this build cannot answer for
+however fluently it answers for `ssrf/` two directories away. A zip of files in one format
+sniffs as `zip`, which is a container rather than a format — it has no reader, no identity
+namespace and no pair directory.
 
 The UDDF reader matches element names rather than the declared version, so older
 documents using the same names are read too: the corpus it is checked against carries
@@ -209,6 +245,14 @@ which nobody on this project downloads.
 The FIT Protocol and FIT file format are proprietary to Garmin. This project is not
 affiliated with or endorsed by Garmin, carries no part of the FIT SDK, and does not use
 `garmin-fit-sdk`.
+
+`tests/fixtures/uddf_3.2.2.xsd` is the official UDDF schema, copyright © 2005–2018 Kai
+Schröder and Steffen Reith and vendored verbatim under the GNU Free Documentation License
+the UDDF documentation is published under, which permits verbatim redistribution. It is a
+test fixture — the UDDF writer's output is validated against it — and is not part of the
+wheel; the sdist carries it, which is why it is named here.
+[`tests/fixtures/README.md`](https://github.com/divejson/divejson-py/blob/main/tests/fixtures/README.md)
+records where it came from and when.
 
 ## License
 

@@ -151,7 +151,11 @@ _DATE_TIME = re.compile(
 # source was silent: `<variouspieces>` is UDDF's own catch-all, and a scooter, a
 # rebreather, a weight belt, a compressor and a watch are equipment this format does not
 # yet name. Read the mapping off the rows rather than off any count of them.
-_GEAR_TYPE: dict[str, str] = {
+#
+# Public because the writer derives its own fidelity claim from it: a gear type survives a
+# round trip through UDDF exactly when reading the element it was written as returns that
+# type, and a second table stating which those are would be a second thing to get wrong.
+GEAR_TYPE: dict[str, str] = {
     "boots": "boots",
     "buoyancycontroldevice": "bcd",
     "camera": "camera",
@@ -175,7 +179,7 @@ _GEAR_TYPE: dict[str, str] = {
 }
 
 # The `<suittype>` values that mean a dry suit. Everything else it can hold — "wet-suit",
-# "shorty", "half-suit", "two-piece" and the rest — leaves `type` at `_GEAR_TYPE`'s
+# "shorty", "half-suit", "two-piece" and the rest — leaves `type` at `GEAR_TYPE`'s
 # `wetsuit`, which is what every one of them is.
 _DRYSUIT_TYPES = {"dry-suit", "drysuit", "hot-water-suit"}
 
@@ -659,7 +663,7 @@ class _Converter:
         equipment = _dig(self.root, "diver", "owner", "equipment")
         # `is not None`, never a truth test: an `Element` with no children is falsy today
         # and `ElementTree` warns that it will not be.
-        pieces = [child for child in equipment if local_name(child) in _GEAR_TYPE] if equipment is not None else []
+        pieces = [child for child in equipment if local_name(child) in GEAR_TYPE] if equipment is not None else []
         gear: list[dict[str, Any]] = []
         for index, element in enumerate(pieces):
             kind = local_name(element)
@@ -689,7 +693,7 @@ class _Converter:
             brand = _text_of(element, "manufacturer", "name")
             if brand:
                 item["brand"] = self.capped(brand, MAX_NAME, where, "the brand")
-            gear_type = _GEAR_TYPE[kind]
+            gear_type = GEAR_TYPE[kind]
             if kind == "suit" and (_text_of(element, "suittype") or "").lower() in _DRYSUIT_TYPES:
                 gear_type = "drysuit"
             item["type"] = gear_type

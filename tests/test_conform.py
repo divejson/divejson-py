@@ -17,7 +17,7 @@ from helpers import FIXTURES
 
 from divejson.cli import main
 from divejson.conform import DIFF_LINES, IGNORED, compared, run
-from divejson.registry import adapter_for, known_formats, read_formats
+from divejson.registry import adapter_for, known_formats, read_formats, write_formats, writer_for
 
 # The stand-in for a format nothing here registers. It used to be `ssrf`, which stopped
 # standing in for anything the day the Subsurface reader landed and took several tests with
@@ -37,6 +37,10 @@ PAIRS = {
     "suunto_json": "header-only",
 }
 
+# The same, for the formats this implementation *writes*: `--strict` wants a `write/<id>/`
+# directory for each of those too, and for the same reason.
+WRITER_PAIRS = {"uddf": "opendiving"}
+
 
 def _corpus(tmp_path: Path) -> Path:
     """One of everything, so that a mutation is the only thing a test changes."""
@@ -53,6 +57,12 @@ def _corpus(tmp_path: Path) -> Path:
         # format carries, and for `suunto_json` those are not the same string.
         for name in (f"{stem}{adapter_for(fmt).suffixes[0]}", f"{stem}.divejson"):
             shutil.copy(FIXTURES / fmt / name, corpus / fmt)
+    for fmt in write_formats():
+        directory = corpus / "write" / fmt
+        directory.mkdir(parents=True)
+        stem = WRITER_PAIRS[fmt]
+        for name in (f"{stem}.divejson", f"{stem}{writer_for(fmt).suffix}"):
+            shutil.copy(FIXTURES / "write" / fmt / name, directory)
     return corpus
 
 
@@ -268,23 +278,115 @@ def test_only_and_skip_choose_which_pairs_run(tmp_path, capsys) -> None:
 def test_a_write_directory_is_for_a_format_this_implementation_does_not_write(
     tmp_path, capsys
 ) -> None:
+    """Reading a format and writing it are separate registrations under one id.
+
+    `ssrf` is the case that matters, and it is not a hypothetical: this implementation
+    reads Subsurface's save format and cannot write it, so a corpus that carries writer
+    pairs for it is one this build cannot answer for — however fluently it answers for the
+    same format's reader pairs two directories away.
+    """
     corpus = _corpus(tmp_path)
-    (corpus / "write" / "uddf").mkdir(parents=True)
+    (corpus / "write" / "ssrf").mkdir(parents=True)
     shutil.copy(
-        corpus / "uddf" / "mix-only-cylinder.divejson", corpus / "write" / "uddf" / "one.divejson"
+        corpus / "uddf" / "mix-only-cylinder.divejson", corpus / "write" / "ssrf" / "one.divejson"
     )
 
     assert main(["conform", str(corpus)]) == 2
     out = capsys.readouterr().out
-    assert "write/uddf" in out and "does not write" in out
+    assert "write/ssrf" in out and "does not write" in out
 
 
 def test_an_empty_write_directory_is_a_shape_error(tmp_path, capsys) -> None:
     corpus = _corpus(tmp_path)
+    shutil.rmtree(corpus / "write")
     (corpus / "write").mkdir()
 
     assert main(["conform", str(corpus)]) == 2
     assert "write: holds no writer-pair directories" in capsys.readouterr().out
+
+
+def test_a_writer_pair_whose_expected_file_is_missing_is_a_shape_error(tmp_path, capsys) -> None:
+    corpus = _corpus(tmp_path)
+    (corpus / "write" / "uddf" / f"{WRITER_PAIRS['uddf']}.uddf").unlink()
+
+    assert main(["conform", str(corpus)]) == 2
+    assert "beside it to be checked against" in capsys.readouterr().out
+
+
+def test_an_expected_file_with_no_document_beside_it_is_a_shape_error(tmp_path, capsys) -> None:
+    """The reader pair's orphan rule, inverted with the pair: here the document is input."""
+    corpus = _corpus(tmp_path)
+    shutil.copy(
+        corpus / "write" / "uddf" / f"{WRITER_PAIRS['uddf']}.uddf", corpus / "write" / "uddf" / "stray.uddf"
+    )
+
+    assert main(["conform", str(corpus)]) == 2
+    assert "is an expected file with no document beside it" in capsys.readouterr().out
+
+
+def test_a_write_directory_with_no_documents_is_a_shape_error(tmp_path, capsys) -> None:
+    corpus = _corpus(tmp_path)
+    (corpus / "write" / "uddf" / f"{WRITER_PAIRS['uddf']}.divejson").unlink()
+
+    assert main(["conform", str(corpus)]) == 2
+    assert "holds no documents to write" in capsys.readouterr().out
+
+
+def test_a_mismatched_writer_pair_fails_and_prints_a_diff(tmp_path, capsys) -> None:
+    """Status 1 rather than 2: the case ran, and the writer's answer was not the corpus's."""
+    corpus = _corpus(tmp_path)
+    expected = corpus / "write" / "uddf" / f"{WRITER_PAIRS['uddf']}.uddf"
+    expected.write_bytes(expected.read_bytes().replace(b"<greatestdepth>29.6", b"<greatestdepth>28.5"))
+
+    assert main(["conform", str(corpus)]) == 1
+    out = capsys.readouterr().out
+    assert "differs from" in out
+    assert "greatestdepth" in out
+
+
+def test_a_writer_pair_ignores_the_generator_element(tmp_path) -> None:
+    """A release moves the version stamped there, and no corpus can be re-cut for that."""
+    corpus = _corpus(tmp_path)
+    expected = corpus / "write" / "uddf" / f"{WRITER_PAIRS['uddf']}.uddf"
+    expected.write_bytes(expected.read_bytes().replace(b"<version>", b"<version>9.9.9-", 1))
+
+    assert main(["conform", str(corpus), "--strict"]) == 0
+
+
+def test_a_writer_pair_whose_document_does_not_conform_fails(tmp_path, capsys) -> None:
+    """A pair that starts from a document the format rejects proves nothing about a writer."""
+    corpus = _corpus(tmp_path)
+    source = corpus / "write" / "uddf" / f"{WRITER_PAIRS['uddf']}.divejson"
+    document = json.loads(source.read_text(encoding="utf-8"))
+    document["dives"][0]["max_depth"] = -1
+    _write(source, document)
+
+    assert main(["conform", str(corpus)]) == 1
+    assert "does not itself conform" in capsys.readouterr().out
+
+
+def test_a_non_conforming_document_is_never_handed_to_the_writer(tmp_path, capsys) -> None:
+    """One failure, and the rest of the corpus still runs.
+
+    A writer places a document into another format's shape and reads every REQUIRED member
+    unguarded, so writing one the validator has just rejected raises out of the runner and
+    takes every remaining case with it — a traceback in place of the failure that was
+    already recorded, and no answer at all about the cases that never ran. `uuid` is the
+    case that shows it: §6.2 requires it and `write_uddf` subscripts it.
+    """
+    corpus = _corpus(tmp_path)
+    source = corpus / "write" / "uddf" / f"{WRITER_PAIRS['uddf']}.divejson"
+    document = json.loads(source.read_text(encoding="utf-8"))
+    del document["dives"][0]["uuid"]
+    _write(source, document)
+
+    assert main(["conform", str(corpus)]) == 1
+    out = capsys.readouterr().out
+    assert "does not itself conform" in out
+    # Nothing is printed until the whole walk returns a `Result`, so any output at all is
+    # what says the run finished rather than fell over on the way — this asserts on a group
+    # from earlier in the walk, `write/uddf` being the last of them.
+    assert "uddf: 1 reader pair checked" in out
 
 
 def test_the_result_counts_what_it_checked(tmp_path) -> None:
@@ -294,8 +396,9 @@ def test_the_result_counts_what_it_checked(tmp_path) -> None:
         "valid": 1,
         "invalid": 1,
         **dict.fromkeys(read_formats(), 1),
+        **{f"write/{fmt}": 1 for fmt in write_formats()},
     }
-    assert result.checked == 2 + len(read_formats())
+    assert result.checked == 2 + len(read_formats()) + len(write_formats())
 
 
 def test_compared_drops_exactly_the_two_members_a_run_owns() -> None:

@@ -43,7 +43,7 @@ from pathlib import Path
 from typing import Any
 
 from .converter import ConverterError
-from .registry import WRITTEN, convert, read_formats
+from .registry import WRITTEN, Writer, convert, read_formats, writer_for
 from .validate import DuplicateMemberError, parse_document, validate_document
 
 __all__ = [
@@ -348,14 +348,7 @@ class _Walk:
     # Writer pairs: `write/<format>/`.
 
     def _writer_directories(self, directory: Path) -> None:
-        """`write/` holds one directory of writer pairs per format an implementation writes.
-
-        With `WRITTEN` empty, every one of them is a directory this implementation cannot
-        answer for, and the walk stops at that. Comparing a writer pair is the writer's
-        own question — canonical XML with `<generator>` ignored, for a writer that emits
-        XML — and it arrives with the writer rather than being decided for one nobody has
-        seen yet.
-        """
+        """`write/` holds one directory of writer pairs per format an implementation writes."""
         children = sorted(
             path
             for path in directory.iterdir()
@@ -372,6 +365,109 @@ class _Walk:
                         f"is a format this implementation does not write ({self._writes()})",
                     )
                 )
+            elif self._selected(child.name):
+                self._writer_directory(child)
+
+    def _writer_directory(self, directory: Path) -> None:
+        """One format's writer pairs: a document, and the file writing it must produce.
+
+        The reader pair inverted, and the inversion is the whole of it — the `.divejson` is
+        the **input** here and the file beside it the expectation, where in a `<format>/`
+        directory it is the other way round. So the pairing runs off the documents rather
+        than off everything that is not one, and a file with no document beside it is the
+        orphan.
+
+        **How two files are compared is the writer's own answer, not this runner's.** A
+        writer registers `compared`, and for an XML format that is canonical XML with
+        `<generator>` dropped: two runs of one writer differ in the version it stamps there
+        and in nothing else, and a corpus that failed on a release would be a corpus nobody
+        could keep green.
+        """
+        fmt = directory.name
+        writer = writer_for(fmt)
+        contents = sorted(
+            path for path in directory.iterdir() if path.is_file() and not path.name.startswith(".")
+        )
+        inputs = [path for path in contents if path.suffix == ".divejson"]
+        if not inputs:
+            self._shape.append(Finding(f"write/{fmt}", "holds no documents to write"))
+            return
+
+        expected = {path for path in contents if path.suffix != ".divejson"}
+        outcomes = []
+        claimed = set()
+        for source in inputs:
+            produced = source.with_suffix(writer.suffix)
+            claimed.add(produced)
+            outcomes.append(self._writer_pair(writer, source, produced))
+        for orphan in sorted(expected - claimed):
+            self._shape.append(
+                Finding(self._where(orphan), "is an expected file with no document beside it to write")
+            )
+        self._record(f"write/{fmt}", "writer pair", outcomes)
+
+    def _writer_pair(self, writer: Writer, source: Path, expected_path: Path) -> _Outcome:
+        where = self._where(source)
+        if not expected_path.is_file():
+            self._shape.append(
+                Finding(where, f"has no {expected_path.name} beside it to be checked against")
+            )
+            return _Outcome.UNCHECKED
+
+        try:
+            document = parse_document(source.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, DuplicateMemberError, json.JSONDecodeError) as error:
+            self._failures.append(Finding(where, f"is not readable as JSON — {error}"))
+            return _Outcome.FAILED
+        if not isinstance(document, dict):
+            self._failures.append(Finding(where, "is not a JSON object, so it is not a document"))
+            return _Outcome.FAILED
+
+        # The input is checked the way a reader pair's *expectation* is: a corpus whose
+        # writer pair starts from a document that does not itself conform proves nothing
+        # about the writer, whatever the two files then agree on.
+        #
+        # And the case stops here rather than carrying on to write it, which is the one
+        # place this differs from the reader pair. A writer is handed a document to place
+        # into another format's shape and is not the thing that decides whether it was a
+        # document — every required member is read unguarded — so writing one the validator
+        # has just rejected raises out of the runner and takes every remaining case in the
+        # corpus with it, in place of the failure that was already recorded. The command
+        # line refuses the same way, before writing anything.
+        issues = validate_document(document)
+        if issues:
+            self._failures.append(
+                Finding(
+                    where,
+                    f"is given to a writer and does not itself conform, "
+                    f"in {len(issues)} way{'s' if len(issues) != 1 else ''}",
+                    tuple(str(issue) for issue in issues),
+                )
+            )
+            return _Outcome.FAILED
+
+        outcome = _Outcome.PASSED
+        try:
+            produced = writer.write(document).data
+            comparable = writer.compared(produced)
+            against = writer.compared(expected_path.read_bytes())
+        except ConverterError as error:
+            self._failures.append(Finding(where, f"could not be written — {error}"))
+            return _Outcome.FAILED
+        except OSError as error:
+            self._failures.append(Finding(self._where(expected_path), f"is unreadable — {error}"))
+            return _Outcome.FAILED
+
+        if comparable != against:
+            self._failures.append(
+                Finding(
+                    where,
+                    f"is written as a document that differs from {expected_path.name}",
+                    _text_diff(against, comparable),
+                )
+            )
+            outcome = _Outcome.FAILED
+        return outcome
 
     # Formats with no directory at all.
 
@@ -417,15 +513,26 @@ class _Walk:
 
 
 def _diff(expected: dict[str, Any], produced: dict[str, Any]) -> tuple[str, ...]:
+    return _lines(_rendered(expected), _rendered(produced))
+
+
+def _text_diff(expected: str, produced: str) -> tuple[str, ...]:
+    """A writer pair's mismatch, over the comparable form of each file.
+
+    Split on `>` rather than on newlines: the comparable form is canonical XML, which
+    carries no indentation at all, so a whole document would otherwise be one line and the
+    diff would say only that it differs.
+    """
+    return _lines(_by_element(expected), _by_element(produced))
+
+
+def _by_element(canonical: str) -> list[str]:
+    return [f"{part}>" for part in canonical.split(">")[:-1]]
+
+
+def _lines(expected: list[str], produced: list[str]) -> tuple[str, ...]:
     lines = list(
-        difflib.unified_diff(
-            _rendered(expected),
-            _rendered(produced),
-            fromfile="expected",
-            tofile="produced",
-            lineterm="",
-            n=2,
-        )
+        difflib.unified_diff(expected, produced, fromfile="expected", tofile="produced", lineterm="", n=2)
     )
     if len(lines) > DIFF_LINES:
         return (*lines[:DIFF_LINES], f"... and {len(lines) - DIFF_LINES} more lines of difference")
