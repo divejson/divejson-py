@@ -1,0 +1,76 @@
+{
+  "DeviceLog": {
+    "Header": {
+      "ActivityType": 51,
+      "DateTime": "2025-06-03T12:15:30.310+02:00",
+      "Depth": { "Avg": 17.79, "Max": 46.29 },
+      "Device": {
+        "Info": { "BSL": "3.0.2143", "HW": "68.6.0", "SW": "3.0.2143" },
+        "Name": "Suunto D5"
+      },
+      "Diving": {
+        "Algorithm": "Suunto Fused RGBM 2",
+        "DiveMode": "Mixed",
+        "EndTissue": { "CNS": 0.153, "OTU": 45.12766647338867 },
+        "Gases": [
+          {
+            "EndPressure": 12243750,
+            "Helium": 0,
+            "Oxygen": 0.21,
+            "PO2": 140000,
+            "StartPressure": 20714062,
+            "State": "Primary",
+            "TankFillPressure": 20000000,
+            "TankSize": 0.022,
+            "TransmitterID": "2411100050"
+          },
+          {
+            "Helium": 0,
+            "Oxygen": 0.49,
+            "PO2": 160000,
+            "State": "Primary",
+            "TankFillPressure": 20000000,
+            "TankSize": 0.011
+          }
+        ],
+        "StartTissue": { "CNS": 0.072, "OTU": 23.09649658203125 },
+        "SurfacePressure": 104900
+      },
+      "Duration": 4683
+    },
+    "Samples": [
+      {
+        "Cylinders": [{ "GasNumber": 1, "Pressure": 20714000 }],
+        "Depth": 1.1,
+        "Events": [
+          { "GasSwitch": { "GasNumber": 1 } },
+          { "State": { "Active": true, "Type": "Wet Outside" } }
+        ],
+        "Temperature": 293.75,
+        "TimeISO8601": "2025-06-03T12:15:30.310+02:00"
+      },
+      {
+        "Ceiling": 3,
+        "Cylinders": [{ "GasNumber": 1, "Pressure": 15000000 }],
+        "Depth": 46.29,
+        "Temperature": 291.35,
+        "TimeISO8601": "2025-06-03T12:48:50.310+02:00"
+      },
+      {
+        "Ceiling": 0,
+        "Depth": 21.0,
+        "Events": [
+          { "GasSwitch": { "GasNumber": 2 } },
+          { "Warning": { "Active": true, "Type": "Ascent Speed" } }
+        ],
+        "TimeISO8601": "2025-06-03T13:22:10.310+02:00"
+      },
+      {
+        "Cylinders": [{ "GasNumber": 1, "Pressure": 11775000 }],
+        "Depth": 5.0,
+        "Events": [{ "Notify": { "Active": true, "Type": "Safety Stop" } }],
+        "TimeISO8601": "2025-06-03T13:33:33.310+02:00"
+      }
+    ]
+  }
+}

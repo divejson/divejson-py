@@ -1,0 +1,111 @@
+{
+  "DeviceLog": {
+    "Header": {
+      "ActivityType": 51,
+      "DateTime": "2026-04-17T11:49:23.510+02:00",
+      "Depth": { "Max": 45.91 },
+      "DepthAverage": 20.87,
+      "Device": {
+        "Info": { "HW": "Seal_RevA3", "SW": "2.40.56" },
+        "Name": "Suunto Ocean",
+        "SerialNumber": "000000000000"
+      },
+      "DiveTime": 4001.4,
+      "Duration": 4302.208,
+      "Notes": "",
+      "Temperature": { "Max": 295.5, "Min": 298.2 }
+    },
+    "Samples": [
+      {
+        "DiveRouteOrigin": {
+          "Altitude": 6,
+          "Latitude": 28.567251205444336,
+          "Longitude": 34.53325653076172
+        },
+        "DiveRouteQuality": 0,
+        "TimeISO8601": "2026-04-17T11:49:23.510+02:00"
+      },
+      {
+        "DiveEvents": [
+          { "GasSwitch": { "GasNumber": 0 } },
+          { "State": { "Active": true, "Type": "Below Surface" } }
+        ],
+        "TimeISO8601": "2026-04-17T11:49:23.530+02:00"
+      },
+      {
+        "Ceiling": 0,
+        "Cylinders": [
+          { "GasNumber": 0, "GasTime": 6120, "Pressure": 21162500, "Ventilation": 0.000151 },
+          { "GasNumber": 1, "GasTime": 0, "Pressure": null, "Ventilation": 0 },
+          { "GasNumber": 2, "GasTime": 0, "Pressure": null, "Ventilation": 0 },
+          { "GasNumber": 3, "GasTime": 0, "Pressure": null, "Ventilation": 0 },
+          { "GasNumber": 4, "GasTime": 0, "Pressure": null, "Ventilation": 0 }
+        ],
+        "Depth": 1.45,
+        "DeviceInternalAbsPressure": 96417,
+        "TimeISO8601": "2026-04-17T11:49:23.670+02:00"
+      },
+      {
+        "AbsPressure": 101325,
+        "Temperature": 295.5,
+        "TimeISO8601": "2026-04-17T11:50:23.510+02:00"
+      },
+      {
+        "Ceiling": 3,
+        "Cylinders": [
+          { "GasNumber": 0, "GasTime": 3768, "Pressure": 18385938, "Ventilation": 0.000152 },
+          { "GasNumber": 1, "GasTime": 0, "Pressure": null, "Ventilation": 0 },
+          { "GasNumber": 2, "GasTime": 0, "Pressure": null, "Ventilation": 0 },
+          { "GasNumber": 3, "GasTime": 0, "Pressure": null, "Ventilation": 0 },
+          { "GasNumber": 4, "GasTime": 0, "Pressure": null, "Ventilation": 0 }
+        ],
+        "Depth": 44.64,
+        "TimeISO8601": "2026-04-17T12:09:23.510+02:00"
+      },
+      {
+        "Events": [{ "Alarm": { "Active": true, "Type": "Ceiling Broken" } }],
+        "TimeISO8601": "2026-04-17T12:09:53.510+02:00"
+      },
+      {
+        "DiveEvents": [{ "GasSwitch": { "GasNumber": 1 } }],
+        "TimeISO8601": "2026-04-17T12:23:58.700+02:00"
+      },
+      {
+        "DiveEvents": [{ "Notify": { "Active": true, "Type": "Safety Stop" } }],
+        "TimeISO8601": "2026-04-17T12:53:23.510+02:00"
+      },
+      {
+        "DiveEvents": [{ "Notify": { "Active": false, "Type": "Safety Stop" } }],
+        "TimeISO8601": "2026-04-17T12:56:03.510+02:00"
+      },
+      {
+        "Ceiling": 0,
+        "Cylinders": [
+          { "GasNumber": 0, "GasTime": 8940, "Pressure": 12715625, "Ventilation": 0.000039 },
+          { "GasNumber": 1, "GasTime": 0, "Pressure": null, "Ventilation": 0 },
+          { "GasNumber": 2, "GasTime": 0, "Pressure": null, "Ventilation": 0 },
+          { "GasNumber": 3, "GasTime": 0, "Pressure": null, "Ventilation": 0 },
+          { "GasNumber": 4, "GasTime": 0, "Pressure": null, "Ventilation": 0 }
+        ],
+        "Depth": 1.32,
+        "TimeISO8601": "2026-04-17T12:56:03.530+02:00"
+      },
+      {
+        "GPSAltitude": -3.4,
+        "Latitude": 0.49859222167449974,
+        "Longitude": 0.6027186224443467,
+        "TimeISO8601": "2026-04-17T12:59:00.000+02:00"
+      },
+      {
+        "Cylinders": [
+          { "GasNumber": 0, "GasTime": 0, "Pressure": 12726562, "Ventilation": 0 },
+          { "GasNumber": 1, "GasTime": 0, "Pressure": null, "Ventilation": 0 },
+          { "GasNumber": 2, "GasTime": 0, "Pressure": null, "Ventilation": 0 },
+          { "GasNumber": 3, "GasTime": 0, "Pressure": null, "Ventilation": 0 },
+          { "GasNumber": 4, "GasTime": 0, "Pressure": null, "Ventilation": 0 }
+        ],
+        "TimeISO8601": "2026-04-17T13:01:03.500+02:00"
+      }
+    ]
+  }
+}

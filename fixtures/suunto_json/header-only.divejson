@@ -1,0 +1,27 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-05T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.2.0"
+  },
+  "dives": [
+    {
+      "uuid": "29e7c994-34d6-5135-940d-1ec2b3a7e42d",
+      "started_at": "2021-04-06T11:16:42.600+02:00",
+      "duration": 2001,
+      "max_depth": 32.41,
+      "avg_depth": 17.73
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "suunto_json",
+      "source_generator": {
+        "name": "Suunto D5",
+        "version": "2.5.1947"
+      }
+    }
+  }
+}

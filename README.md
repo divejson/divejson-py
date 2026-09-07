@@ -74,9 +74,10 @@ it is reading are in
 and what is one format's — its element map, its writers' habits, its ambiguities, and what
 is deliberately left unmapped — is in
 [`docs/uddf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/uddf-mapping.md),
-[`docs/ssrf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/ssrf-mapping.md)
+[`docs/ssrf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/ssrf-mapping.md),
+[`docs/fit-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/fit-mapping.md)
 and
-[`docs/fit-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/fit-mapping.md).
+[`docs/suunto-json-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/suunto-json-mapping.md).
 
 From Python, the same two steps an application takes:
 
@@ -117,6 +118,7 @@ the corpus has no pairs for from a warning into an error.
 | UDDF | `uddf` | reads into DiveJSON | 3.0 – 3.2.3 |
 | Subsurface | `ssrf` | reads into DiveJSON | save format 3 |
 | FIT | `fit` | reads into DiveJSON | protocol 2.0 |
+| Suunto app JSON | `suunto_json` | reads into DiveJSON | D5-era and 2026 Suunto Ocean exports |
 
 The **id** is the whole coupling between this package and everything around it: it is what
 `sniff` returns, what `--from` takes, and what a conformance corpus names a directory of
@@ -149,6 +151,17 @@ vendor may declare a **developer field under a profile field's name**: every Suu
 in this project's hand carries a `float32` `max_depth` of 45.90999984741211 beside the
 native `uint32`'s exact 45.91, and a reader that takes the last match by name produces a
 document that validates perfectly and is wrong by a rounding error.
+
+The Suunto app's JSON is what a Suunto owner arrives with, and it is the one format here
+written by an *application* about a device rather than by the device itself. Its units are
+SI throughout — Pascal, cubic metres, Kelvin, a 0-1 gas fraction — where §6 holds none of
+them; its newest generation moved a dive's cylinders out of the header and into the sample
+stream, where they have to be rebuilt from the diver's **gas switches** rather than from
+which tanks transmitted; and its transmitter keeps reporting after the diver has surfaced,
+so the last reading in the file is a purged regulator and not the dive's end pressure. All
+three are in
+[`docs/suunto-json-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/suunto-json-mapping.md),
+with the figures each of them changes.
 
 ## Releasing
 

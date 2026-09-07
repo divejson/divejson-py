@@ -1,6 +1,6 @@
-"""Building UDDF documents to convert.
+"""Building source documents to convert, one section per format.
 
-The corpus in `fixtures/uddf/` covers whole files as real writers produce them. These build
+The corpora in `fixtures/` cover whole files as real writers produce them. These build
 the smallest document that exhibits one behaviour, so that a test about a unit conversion
 reads as a unit conversion rather than as a diff of two logbooks.
 
@@ -10,7 +10,8 @@ directory on `sys.path` for the test modules either way.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -86,3 +87,39 @@ def one_ssrf_dive(attributes: str = "", body: str = "", *, sites: str = "") -> b
 def one_ssrf_computer(body: str, *, attributes: str = "") -> bytes:
     """A logbook whose only dive carries one `<divecomputer>` holding `body`."""
     return one_ssrf_dive(attributes, f"<divecomputer>{body}</divecomputer>")
+
+
+# -- Suunto app JSON ------------------------------------------------------------------
+
+# The instant every helper below starts its dive at, being the same one the UDDF and
+# `.ssrf` helpers use — this exporter records an offset where those two record none, and a
+# sub-second fraction where neither does.
+SUUNTO_STARTED_AT = "2026-04-17T11:49:23.510+02:00"
+
+
+def suunto_json(header: dict, samples: list[dict] | None = None) -> bytes:
+    """One `DeviceLog` around `header` and `samples`, as the bytes `convert` takes.
+
+    `DateTime` and `ActivityType` are filled in unless the caller states them: `started_at`
+    is REQUIRED (spec §6.2) and an activity that is not a dive is skipped, so a helper that
+    left either out would make every other assertion in a test vacuous.
+    """
+    return json.dumps(
+        {
+            "DeviceLog": {
+                "Header": {"ActivityType": 51, "DateTime": SUUNTO_STARTED_AT, **header},
+                "Samples": samples or [],
+            }
+        }
+    ).encode()
+
+
+def suunto_sample(seconds: float, **members: object) -> dict:
+    """One `Samples[]` entry `seconds` after `SUUNTO_STARTED_AT`, carrying `members`."""
+    at = datetime.fromisoformat(SUUNTO_STARTED_AT) + timedelta(seconds=seconds)
+    return {"TimeISO8601": at.isoformat(timespec="milliseconds"), **members}
+
+
+def suunto_slots(*pressures: int | None) -> list[dict]:
+    """The `Cylinders[]` array an Ocean writes: every slot numbered, most of them empty."""
+    return [{"GasNumber": number, "Pressure": pascal} for number, pascal in enumerate(pressures)]
