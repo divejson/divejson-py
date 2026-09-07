@@ -7,6 +7,34 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **The Suunto app's JSON is the fourth format this package reads.** `divejson convert
+  my-dive.json`, `sniff` answers `"suunto_json"`, a zip of them converts as one logbook, and
+  `fixtures/suunto_json/` carries the pairs any port is measured against. A file is claimed
+  on its shape — an object whose one top-level member is `DeviceLog` — because JSON has no
+  magic number and a `.json` suffix says nothing.
+
+  **Its units are SI and §6's are not**: Pascal, cubic metres, Kelvin and a 0-1 gas fraction
+  against bar, litres, tenths of a degree Celsius and whole percent, with a 0-1 `CNS`
+  beside an `OTU` that needs no conversion at all. Nothing recorded is rounded — a
+  transmitter's 21 162 500 Pa is `211.625` bar, to every digit it reported.
+
+  **On the newest export a dive's cylinders are not in the header.** A 2026 Suunto Ocean
+  writes no `Header.Diving` block at all; the cylinders are rebuilt from
+  `Samples[].DiveEvents.GasSwitch` — the diver's own gas switches — rather than from which
+  slots transmitted, because a two-tank dive read off the telemetry comes back as one
+  cylinder carrying both pressures, which is the shape a gas-consumption figure is derived
+  from.
+
+  **A reading from after the dive ended is not the end pressure.** Bounding the cylinder's
+  first and last readings on `Header.DiveTime` moves the answer on every one of the nineteen
+  Ocean exports in hand, and on two of them it is the difference between a real end pressure
+  and 0.14 bar — the tank once the regulator was purged on the boat. The profile's own
+  pressure channel keeps the reading, because it is telemetry the device really recorded.
+
+  This reader computes nothing and settles no scale, so it raises neither an `inferred` nor
+  a `resolved` finding. `docs/suunto-json-mapping.md` carries the member map, the three
+  header shapes, and what is deliberately unmapped and why.
+
 - **FIT is the third format this package reads, and the first binary one.** `divejson
   convert my-dive.fit`, `sniff` answers `"fit"`, a zip of them converts as one logbook, and
   `fixtures/fit/` carries the pairs any port is measured against. `fitdecode` is a **core**
