@@ -70,8 +70,8 @@ def _anonymous(count: int) -> bytes:
 
 
 def test_the_registered_formats_are_what_this_build_reads() -> None:
-    assert read_formats() == ("uddf", "ssrf", "fit", "suunto_json")
-    assert known_formats() == {"uddf", "ssrf", "fit", "suunto_json"}
+    assert read_formats() == ("uddf", "ssrf", "fit", "suunto_json", "suunto_xml")
+    assert known_formats() == {"uddf", "ssrf", "fit", "suunto_json", "suunto_xml"}
 
 
 def test_reading_a_format_and_writing_it_are_separate_registrations() -> None:

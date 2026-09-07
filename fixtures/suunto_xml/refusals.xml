@@ -1,0 +1,154 @@
+<Dive xmlns="http://schemas.datacontract.org/2004/07/Suunto.Diving.Dal" xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+  <Algorithm>0</Algorithm>
+  <AltitudeMode>0</AltitudeMode>
+  <AscentMode>0</AscentMode>
+  <AscentTime>240</AscentTime>
+  <AvgDepth>25.1</AvgDepth>
+  <BatteryLevel i:nil="true" />
+  <Boat i:nil="true" />
+  <BottomTemperature>24</BottomTemperature>
+  <BottomTime>1200</BottomTime>
+  <CnsEnd>12</CnsEnd>
+  <CnsStart>0</CnsStart>
+  <CylinderVolume>12</CylinderVolume>
+  <CylinderWorkPressure>200000</CylinderWorkPressure>
+  <Deleted i:nil="true" />
+  <DeltaPressure i:nil="true" />
+  <DesaturationTime>60000</DesaturationTime>
+  <DiveMixtures>
+    <DiveMixture>
+      <DiveGasChanges>
+        <DiveGasChange>
+          <GasChangeTime>-30</GasChangeTime>
+          <PO2 i:nil="true" />
+          <SetPointType>0</SetPointType>
+        </DiveGasChange>
+      </DiveGasChanges>
+      <EndPressure>90000</EndPressure>
+      <Helium>60</Helium>
+      <Name i:nil="true" />
+      <Oxygen>50</Oxygen>
+      <PO2>3.2</PO2>
+      <Size>12</Size>
+      <StartPressure>210000</StartPressure>
+      <TransmitterId>2411100050</TransmitterId>
+      <Type>1</Type>
+    </DiveMixture>
+    <DiveMixture>
+      <DiveGasChanges>
+        <DiveGasChange>
+          <GasChangeTime>1200</GasChangeTime>
+          <PO2 i:nil="true" />
+          <SetPointType>0</SetPointType>
+        </DiveGasChange>
+      </DiveGasChanges>
+      <EndPressure>120000</EndPressure>
+      <Helium>0</Helium>
+      <Name i:nil="true" />
+      <Oxygen>50</Oxygen>
+      <PO2>1.6</PO2>
+      <Size>11</Size>
+      <StartPressure>200000</StartPressure>
+      <TransmitterId>2411100051</TransmitterId>
+      <Type>1</Type>
+    </DiveMixture>
+  </DiveMixtures>
+  <DiveNumberInSerie>1</DiveNumberInSerie>
+  <DiveSamples>
+    <Dive.Sample>
+      <AveragedTemperature>24.5</AveragedTemperature>
+      <Ceiling i:nil="true" />
+      <Depth>1.86</Depth>
+      <GasTime i:nil="true" />
+      <Heading i:nil="true" />
+      <Pressure>210000</Pressure>
+      <SacRate i:nil="true" />
+      <Temperature>24.5</Temperature>
+      <Time>1</Time>
+    </Dive.Sample>
+    <Dive.Sample>
+      <AveragedTemperature>24.5</AveragedTemperature>
+      <Ceiling i:nil="true" />
+      <Depth>2.14</Depth>
+      <GasTime i:nil="true" />
+      <Heading i:nil="true" />
+      <Pressure>209000</Pressure>
+      <SacRate i:nil="true" />
+      <Temperature>24.4</Temperature>
+      <Time>1</Time>
+    </Dive.Sample>
+    <Dive.Sample>
+      <AveragedTemperature>24.4</AveragedTemperature>
+      <Ceiling i:nil="true" />
+      <Depth>a bit deep</Depth>
+      <GasTime i:nil="true" />
+      <Heading i:nil="true" />
+      <Pressure>400000</Pressure>
+      <SacRate i:nil="true" />
+      <Temperature>24.3</Temperature>
+      <Time>11</Time>
+    </Dive.Sample>
+    <Dive.Sample>
+      <AveragedTemperature>24.3</AveragedTemperature>
+      <Ceiling i:nil="true" />
+      <Depth>20.5</Depth>
+      <GasTime i:nil="true" />
+      <Heading i:nil="true" />
+      <Pressure>150000</Pressure>
+      <SacRate i:nil="true" />
+      <Temperature>24.2</Temperature>
+      <Time i:nil="true" />
+    </Dive.Sample>
+    <Dive.Sample>
+      <AveragedTemperature>24.2</AveragedTemperature>
+      <Ceiling i:nil="true" />
+      <Depth>18.4</Depth>
+      <GasTime i:nil="true" />
+      <Heading i:nil="true" />
+      <Pressure>140000</Pressure>
+      <SacRate i:nil="true" />
+      <Temperature>24.1</Temperature>
+      <Time>21</Time>
+    </Dive.Sample>
+  </DiveSamples>
+  <DiveTags />
+  <DiveTime i:nil="true" />
+  <DivingDaysInRow>1</DivingDaysInRow>
+  <Duration>1800</Duration>
+  <EndPressure i:nil="true" />
+  <EndTemperature>24</EndTemperature>
+  <HighSwitchPoint i:nil="true" />
+  <LastDecoStopDepth>3</LastDecoStopDepth>
+  <LowSetPoint i:nil="true" />
+  <LowSwitchPoint i:nil="true" />
+  <Marks />
+  <Master i:nil="true" />
+  <MaxDepth>20.5</MaxDepth>
+  <MaxGf i:nil="true" />
+  <MinGf i:nil="true" />
+  <Mode>1</Mode>
+  <Note i:nil="true" />
+  <OlfEnd>12</OlfEnd>
+  <OtuEnd>30</OtuEnd>
+  <OtuStart>0</OtuStart>
+  <Partner i:nil="true" />
+  <PersonalMode>0</PersonalMode>
+  <PressureBlob i:nil="true" />
+  <PreviousMaxDepth>0</PreviousMaxDepth>
+  <ProfileBlob i:nil="true" />
+  <SampleInterval>10</SampleInterval>
+  <SerialNumber>192410004212</SerialNumber>
+  <SetPoint i:nil="true" />
+  <Software>3.0.2143</Software>
+  <Source>Suunto D5</Source>
+  <StartPressure i:nil="true" />
+  <StartTemperature>25</StartTemperature>
+  <StartTime>2025-03-27T12:06</StartTime>
+  <SurfacePressure>1063</SurfacePressure>
+  <SurfaceTime>3600</SurfaceTime>
+  <TemperatureBlob i:nil="true" />
+  <TimeFromReset i:nil="true" />
+  <Visibility>0</Visibility>
+  <Weather>0</Weather>
+  <Weight>0</Weight>
+</Dive>
