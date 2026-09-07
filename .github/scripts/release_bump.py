@@ -40,13 +40,19 @@ from pathlib import Path
 
 # The line hatchling reads the built version out of (`[tool.hatch.version]`), matched
 # whole so that a `__version__` mentioned in a docstring or a comment cannot be the one
-# that moves.
-VERSION_LINE = re.compile(r'^__version__ = "(?P<version>[^"]*)"$', re.MULTILINE)
+# that moves. `[^"\n]` and not `[^"]`: a class that admits a newline would match a
+# `__version__ = "0.3.0` whose closing quote is on the next line, which is the shape a
+# version string carrying a newline writes and the shape the read-back below has to catch.
+VERSION_LINE = re.compile(r'^__version__ = "(?P<version>[^"\n]*)"$', re.MULTILINE)
 
 # Three plain integers and nothing else. A pre-release or build-metadata suffix would
 # make `bump` ambiguous and `release.yml`'s `dist/divejson-$version.tar.gz` check depend
 # on how the build normalises it, so it is refused rather than half-supported.
-SEMVER = re.compile(r"^(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)$")
+#
+# Used with `fullmatch` rather than anchored with `$`, because Python's `$` also matches
+# *before* a trailing newline: `"0.3.0\n"` would pass an anchored `match`, be written into
+# the version line as two physical lines, and leave a package that does not import.
+SEMVER = re.compile(r"(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)")
 
 # The same shape `.github/workflows/pr-title.yml` enforces on every title that becomes a
 # subject here, with the type left open: that workflow owns the list of types, and a
@@ -65,7 +71,7 @@ class ReleaseError(Exception):
 
 
 def parse_version(text: str) -> tuple[int, int, int]:
-    match = SEMVER.match(text)
+    match = SEMVER.fullmatch(text)
     if match is None:
         raise ReleaseError(f"{text!r} is not a major.minor.patch version")
     return int(match["major"]), int(match["minor"]), int(match["patch"])
@@ -202,6 +208,42 @@ def plan(root: Path, init_text: str, requested: str | None) -> tuple[str, str, s
     return current, version, tag, subjects
 
 
+def run(root: Path, requested: str | None) -> None:
+    """Decide, rewrite, report. Every refusal leaves this by raising `ReleaseError`."""
+    init_text = (root / INIT_PATH).read_text(encoding="utf-8")
+    changelog_text = (root / CHANGELOG_PATH).read_text(encoding="utf-8")
+
+    current, version, tag, subjects = plan(root, init_text, requested)
+    # Both rewrites are computed before either is written, so a refusal from the second
+    # one does not leave the first one on disk.
+    new_init = rewrite_version(init_text, version)
+    new_changelog = rewrite_changelog(changelog_text, version)
+
+    (root / INIT_PATH).write_text(new_init, encoding="utf-8")
+    (root / CHANGELOG_PATH).write_text(new_changelog, encoding="utf-8")
+
+    # Read back rather than trust the substitution: this string is what `release.yml` will
+    # look for as `dist/divejson-$version.tar.gz`, and the tag is pushed before anything
+    # builds. `read_version` raises here if the line it wrote is no longer one line.
+    written = read_version((root / INIT_PATH).read_text(encoding="utf-8"))
+    if written != version:
+        raise ReleaseError(f"wrote {written!r}, meant {version!r}")
+
+    print(f"released so far: {current}   (tag {tag or 'none'})")
+    print(f"releasing:       {version}   ({bump_kind(subjects)})")
+    print(f"window:          {len(subjects)} commits")
+    for subject in subjects:
+        print(f"  {subject}")
+
+    # Only once everything above held: the workflow names the branch, the pull request and
+    # the tag from this, so a version here is a commitment to push it.
+    output = os.environ.get("GITHUB_OUTPUT")
+    if output:
+        with open(output, "a", encoding="utf-8") as handle:
+            handle.write(f"version={version}\n")
+            handle.write(f"previous={current}\n")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -217,45 +259,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="the checkout to work in (default: the working directory)",
     )
     args = parser.parse_args(argv)
-    root = args.root.resolve()
-
-    init_text = (root / INIT_PATH).read_text(encoding="utf-8")
-    changelog_text = (root / CHANGELOG_PATH).read_text(encoding="utf-8")
 
     try:
-        current, version, tag, subjects = plan(root, init_text, args.version or None)
-        # Both rewrites are computed before either is written, so a refusal from the
-        # second one does not leave the first one on disk.
-        new_init = rewrite_version(init_text, version)
-        new_changelog = rewrite_changelog(changelog_text, version)
+        # Stripped once, here: whitespace around a version typed into the dispatch form is
+        # a typo rather than an intention, and every check below is on the value that is
+        # actually written.
+        run(args.root.resolve(), args.version.strip() or None)
     except ReleaseError as error:
         prefix = "::error::" if os.environ.get("GITHUB_ACTIONS") else "error: "
         print(f"{prefix}{error}", file=sys.stderr)
         return 1
-
-    (root / INIT_PATH).write_text(new_init, encoding="utf-8")
-    (root / CHANGELOG_PATH).write_text(new_changelog, encoding="utf-8")
-
-    # Read back rather than trust the substitution: this string is what `release.yml`
-    # will look for as `dist/divejson-$version.tar.gz`, and the tag is pushed before
-    # anything builds.
-    written = read_version((root / INIT_PATH).read_text(encoding="utf-8"))
-    if written != version:
-        print(f"error: wrote {written!r}, meant {version!r}", file=sys.stderr)
-        return 1
-
-    print(f"released so far: {current}   (tag {tag or 'none'})")
-    print(f"releasing:       {version}   ({bump_kind(subjects)})")
-    print(f"window:          {len(subjects)} commits")
-    for subject in subjects:
-        print(f"  {subject}")
-
-    output = os.environ.get("GITHUB_OUTPUT")
-    if output:
-        with open(output, "a", encoding="utf-8") as handle:
-            handle.write(f"version={version}\n")
-            handle.write(f"previous={current}\n")
-
     return 0
 
 

@@ -104,7 +104,16 @@ def test_the_bump(current: str, subjects: list[str], expected: str) -> None:
     assert release_bump.next_version(current, subjects) == expected
 
 
-@pytest.mark.parametrize("text", ["1.0", "0.2.0a1", "v0.2.0", "0.2.0+1", "01.2.0", ""])
+@pytest.mark.parametrize(
+    "text",
+    [
+        "1.0", "0.2.0a1", "v0.2.0", "0.2.0+1", "01.2.0", "",
+        # Python's `$` also matches before a trailing newline, so an anchored `match`
+        # would accept these — and the version then lands in `__version__ = "..."` as two
+        # physical lines, leaving a package that does not import and a tag already pushed.
+        "0.2.0\n", "0.2.0 ", " 0.2.0", "0.2\n.0",
+    ],
+)
 def test_a_version_that_is_not_three_integers_is_refused(text: str) -> None:
     """A suffix would make the bump ambiguous and the tag↔sdist check scale-dependent."""
     with pytest.raises(ReleaseError):
@@ -277,21 +286,49 @@ def test_a_requested_version_whose_tag_exists_is_refused(tmp_path: Path) -> None
         release_bump.plan(root, declared(root), "0.9.0")
 
 
-def test_a_run_writes_both_files_and_says_what_it_did(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_a_run_writes_both_files_and_names_the_version_it_wrote(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
     root = build_repo(tmp_path / "repo", "0.2.0", HISTORY)
+    # The workflow reads the version back out of this file to name the branch, the pull
+    # request and the tag. Pointed at the test's own copy, because `GITHUB_OUTPUT` is set
+    # for every Actions step — so under CI an unset one would append to the real file the
+    # runner made for `pytest`.
+    output = tmp_path / "github-output"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+
     assert release_bump.main(["--root", str(root)]) == 0
     assert '__version__ = "0.3.0"' in declared(root)
     changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
     assert "## Unreleased\n\n## 0.3.0\n\n- A thing.\n" in changelog
     assert "0.3.0" in capsys.readouterr().out
+    assert output.read_text(encoding="utf-8") == "version=0.3.0\nprevious=0.2.0\n"
 
 
-def test_a_refusal_leaves_the_tree_alone(tmp_path: Path) -> None:
+def test_a_version_typed_with_whitespace_round_it_is_the_version_it_names(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The dispatch form's value arrives verbatim, and a stray newline is not a version."""
+    root = build_repo(tmp_path / "repo", "0.2.0", HISTORY)
+    monkeypatch.setenv("GITHUB_OUTPUT", str(tmp_path / "github-output"))
+
+    assert release_bump.main(["--root", str(root), "--version", " 0.4.0\n"]) == 0
+    assert declared(root) == '__version__ = "0.4.0"\n'
+    assert (tmp_path / "github-output").read_text(encoding="utf-8").startswith("version=0.4.0\n")
+
+
+def test_a_refusal_leaves_the_tree_alone_and_names_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Neither file is written until both rewrites have been computed."""
     root = build_repo(tmp_path / "repo", "0.2.0", HISTORY)
     (root / "CHANGELOG.md").write_text(
         "# Changelog\n\n## Unreleased\n\n## 0.1.0\n\n- The first.\n", encoding="utf-8"
     )
+    output = tmp_path / "github-output"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
     before = declared(root)
+
     assert release_bump.main(["--root", str(root)]) == 1
     assert declared(root) == before
+    assert not output.exists()
