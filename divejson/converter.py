@@ -21,6 +21,12 @@ These are worth reading before an adapter is written against them.
 catches one class and gets a message it can show a diver. The per-format subclasses exist
 for a caller that cares which reader refused; nothing in this package needs them.
 
+**A writer's result has the same shape as a reader's.** `Written` is `Conversion` with
+bytes where the document was, because the loss a writer has to report is the same kind of
+news as the loss a reader reports and a caller should not need two renderers for it. What
+the note kinds mean going *out* is each writer's own document to state — `converting.md`
+defines them for the way in, and this module holds only the vocabulary.
+
 **A note has a kind, and exactly one of the four means the value was computed.** `kind`
 says what the report is telling the diver — `absent` for what the source never recorded,
 `inferred` for a value this converter computed from readings the source *did* record,
@@ -60,7 +66,7 @@ from __future__ import annotations
 import re
 import sys
 import uuid as uuid_pkg
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
@@ -92,8 +98,10 @@ __all__ = [
     "Scope",
     "SourceTooLargeError",
     "UnsupportedSourceError",
+    "Written",
     "capped",
     "decimal_of",
+    "grouped",
     "header",
     "integer_of",
     "position",
@@ -205,6 +213,25 @@ class NoteGroup:
     wheres: list[str]
 
 
+def grouped(notes: Sequence[Note]) -> list[NoteGroup]:
+    """Notes as groups of `(kind, message, wheres)`, in first-seen order.
+
+    One habit produces one note per record — eight dives with no UTC offset are eight
+    notes — and a thousand-dive logbook would bury the interesting ones under them.
+    Grouping is a presentation concern, so it lives here rather than in the data.
+
+    Keyed on the kind as well as the message, because a caller renders the two differently
+    and a group carrying both would have to pick one.
+    """
+    groups: dict[tuple[NoteKind, str], NoteGroup] = {}
+    for note in notes:
+        key = (note.kind, note.message)
+        if key not in groups:
+            groups[key] = NoteGroup(note.kind, note.message, [])
+        groups[key].wheres.append(note.where)
+    return list(groups.values())
+
+
 @dataclass(frozen=True, slots=True)
 class Conversion:
     """A converted document and everything the conversion could not carry."""
@@ -213,22 +240,26 @@ class Conversion:
     notes: tuple[Note, ...]
 
     def grouped(self) -> list[NoteGroup]:
-        """Notes as groups of `(kind, message, wheres)`, in first-seen order.
+        return grouped(self.notes)
 
-        One source habit produces one note per record — eight dives with no UTC offset are
-        eight notes — and a thousand-dive logbook would bury the interesting ones under
-        them. Grouping is a presentation concern, so it lives here rather than in the data.
 
-        Keyed on the kind as well as the message, because a caller renders the two
-        differently and a group carrying both would have to pick one.
-        """
-        groups: dict[tuple[NoteKind, str], NoteGroup] = {}
-        for note in self.notes:
-            key = (note.kind, note.message)
-            if key not in groups:
-                groups[key] = NoteGroup(note.kind, note.message, [])
-            groups[key].wheres.append(note.where)
-        return list(groups.values())
+@dataclass(frozen=True, slots=True)
+class Written:
+    """A document written out in another format, and what that format could not hold.
+
+    The mirror of `Conversion`, and deliberately the same shape: a caller that renders one
+    report renders the other with the same code, and the CLI does. What differs is which
+    way the loss runs — a `Conversion`'s notes are about a source file this package read,
+    a `Written`'s are about the DiveJSON document it was handed — so a `Written` note's
+    `where` is a path into that **document**: `dives/0`, `dives/0/cylinders/1`, `$`.
+    Each writer's own document says what its kinds mean on this side.
+    """
+
+    data: bytes
+    notes: tuple[Note, ...]
+
+    def grouped(self) -> list[NoteGroup]:
+        return grouped(self.notes)
 
 
 # Every UUID an upload has handed out, against the archive member that claimed it and the

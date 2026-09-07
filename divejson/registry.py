@@ -1,10 +1,16 @@
-"""What this build reads, how it decides which reader gets a file, and the container.
+"""What this build reads and writes, how it decides which reader gets a file, and the container.
 
 A **format id** is the whole coupling between this package and everything around it. It
 names an adapter here, it names the directory a conformance corpus keeps that format's
-pairs in, it is what `divejson convert --from` takes, and it is what an application asking
-`sniff()` gets back. Adding a format is registering an adapter; nothing else in the package
-learns its name.
+pairs in, it is what `divejson convert --from` and `--to` take, and it is what an
+application asking `sniff()` gets back. Adding a format is registering an adapter, or a
+writer, or both; nothing else in the package learns its name.
+
+**Reading and writing are separate registrations under one id.** A format may be read and
+not written, which is most of them, and the two lists are asked separately: a corpus's
+`<format>/` directory is answered by `read_formats()` and its `write/<format>/` by
+`WRITTEN`, so a corpus carrying writer pairs for a format this build only reads is a
+directory it says so about rather than passes.
 
 **`sniff` answers `zip` and `zip` is not a format.** An archive is a container: it has no
 adapter, no identity namespace and no pair directory, and `conform` will call a `zip/`
@@ -46,12 +52,14 @@ from .converter import (
     Scope,
     SourceTooLargeError,
     UnsupportedSourceError,
+    Written,
     header,
 )
 from .fit import FIT
 from .ssrf import SSRF
 from .suunto_json import SUUNTO_JSON
 from .uddf import UDDF
+from .uddf_write import UDDF_WRITER
 from .validate import validate_document
 
 __all__ = [
@@ -59,11 +67,14 @@ __all__ = [
     "WRITTEN",
     "ZIP",
     "Adapter",
+    "Writer",
     "adapter_for",
     "convert",
     "known_formats",
     "read_formats",
     "sniff",
+    "write_formats",
+    "writer_for",
 ]
 
 # How many bytes of a source `sniff` is given. Enough to reach an XML root element past a
@@ -119,15 +130,61 @@ class Adapter(Protocol):
 # DiveJSON document and decides nothing here — nothing sniffs on a suffix.
 ADAPTERS: tuple[Adapter, ...] = (UDDF, SSRF, FIT, SUUNTO_JSON)
 
-# The formats this implementation can *write*. Empty: it reads other formats into DiveJSON
-# and writes none of them back out, so a `write/<format>/` directory in a corpus is one
-# this implementation does not register.
-WRITTEN: frozenset[str] = frozenset()
+
+class Writer(Protocol):
+    """What the registry needs of a format this implementation writes.
+
+    The mirror of `Adapter`, and much smaller, because the hard half of reading — deciding
+    what a file is — has no counterpart going out: a caller writing a document names the
+    format it wants. `format` is the id, shared with the reader where there is one, and
+    also the name of the `write/<format>/` directory a conformance corpus keeps this
+    format's writer pairs in; `suffix` is the extension a written file takes, and what
+    pairs an expected file with its input in that directory.
+
+    `compared` is the part a runner cannot supply for itself: how two files of this format
+    are compared when one of them was produced just now. For an XML format that is
+    canonical XML with the generator element dropped; a format whose files carry no such
+    member can return the bytes. It is here rather than in the runner because a port
+    checking its own writer against the same corpus needs the same answer, and a second
+    copy of it in a test would be a second thing to get out of step.
+    """
+
+    format: str
+    suffix: str
+
+    def write(self, document: dict[str, Any]) -> Written: ...
+
+    def compared(self, data: bytes) -> str: ...
+
+
+# Every writer this build carries. A tuple for the same reason `ADAPTERS` is one: the order
+# is a property of the file rather than of import history.
+WRITERS: tuple[Writer, ...] = (UDDF_WRITER,)
+
+# The formats this implementation can *write*, which is what tells a conformance runner
+# whether it can answer for a `write/<format>/` directory. Derived from the writers rather
+# than listed, so registering one is the whole of adding a format to it.
+WRITTEN: frozenset[str] = frozenset(writer.format for writer in WRITERS)
 
 
 def read_formats() -> tuple[str, ...]:
     """Every format id this build reads, in the order `sniff` asks them."""
     return tuple(adapter.format for adapter in ADAPTERS)
+
+
+def write_formats() -> tuple[str, ...]:
+    """Every format id this build writes, in the order the writers are registered."""
+    return tuple(writer.format for writer in WRITERS)
+
+
+def writer_for(fmt: str) -> Writer:
+    """The writer registered under `fmt`, or `UnsupportedSourceError` naming what is."""
+    for writer in WRITERS:
+        if writer.format == fmt:
+            return writer
+    raise UnsupportedSourceError(
+        f"{fmt!r} is not a format this build writes (it writes {', '.join(sorted(WRITTEN))})"
+    )
 
 
 def known_formats() -> frozenset[str]:
