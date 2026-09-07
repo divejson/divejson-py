@@ -1,0 +1,123 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-05T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.2.0"
+  },
+  "dives": [
+    {
+      "uuid": "29e7c994-34d6-5135-940d-1ec2b3a7e42d",
+      "started_at": "2025-06-03T12:15:30.310+02:00",
+      "duration": 4683,
+      "max_depth": 46.29,
+      "avg_depth": 17.79,
+      "cns_start": 7.2,
+      "otu_start": 23.09649658203125,
+      "cns_end": 15.3,
+      "otu_end": 45.12766647338867,
+      "surface_pressure": 1.049,
+      "cylinders": [
+        {
+          "volume": 22.0,
+          "start_pressure": 207.14062,
+          "end_pressure": 122.4375,
+          "oxygen": 21.0,
+          "helium": 0.0,
+          "po2_limit": 1.4,
+          "role": "bottom",
+          "gas_number": 0
+        },
+        {
+          "volume": 11.0,
+          "oxygen": 49.0,
+          "helium": 0.0,
+          "po2_limit": 1.6,
+          "role": "bottom",
+          "gas_number": 1
+        }
+      ],
+      "profile": {
+        "duration": 4683,
+        "depth": {
+          "times": [
+            0,
+            2000,
+            4000,
+            4683
+          ],
+          "values": [
+            110,
+            4629,
+            2100,
+            500
+          ]
+        },
+        "ceiling": {
+          "times": [
+            2000
+          ],
+          "values": [
+            300
+          ]
+        },
+        "temperature": {
+          "times": [
+            0,
+            2000
+          ],
+          "values": [
+            206,
+            182
+          ]
+        },
+        "pressures": [
+          {
+            "times": [
+              0,
+              2000,
+              4683
+            ],
+            "values": [
+              2071,
+              1500,
+              1178
+            ],
+            "gas_number": 0
+          }
+        ],
+        "events": [
+          {
+            "time": 0,
+            "type": "gas_switch",
+            "gas_number": 0
+          },
+          {
+            "time": 4000,
+            "type": "gas_switch",
+            "gas_number": 1
+          },
+          {
+            "time": 4000,
+            "type": "other",
+            "label": "Ascent Speed"
+          },
+          {
+            "time": 4683,
+            "type": "safety_stop"
+          }
+        ]
+      }
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "suunto_json",
+      "source_generator": {
+        "name": "Suunto D5",
+        "version": "3.0.2143"
+      }
+    }
+  }
+}

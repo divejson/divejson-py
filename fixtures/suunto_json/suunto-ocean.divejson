@@ -1,0 +1,114 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-05T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.2.0"
+  },
+  "dives": [
+    {
+      "uuid": "29e7c994-34d6-5135-940d-1ec2b3a7e42d",
+      "started_at": "2026-04-17T11:49:23.510+02:00",
+      "duration": 4001,
+      "max_depth": 45.91,
+      "avg_depth": 20.87,
+      "entry_position": {
+        "latitude": 28.567251205444336,
+        "longitude": 34.53325653076172
+      },
+      "exit_position": {
+        "latitude": 28.56723,
+        "longitude": 34.533233
+      },
+      "cylinders": [
+        {
+          "start_pressure": 211.625,
+          "end_pressure": 127.15625,
+          "gas_number": 0
+        },
+        {
+          "gas_number": 1
+        }
+      ],
+      "profile": {
+        "duration": 4300,
+        "depth": {
+          "times": [
+            0,
+            1200,
+            4000
+          ],
+          "values": [
+            145,
+            4464,
+            132
+          ]
+        },
+        "ceiling": {
+          "times": [
+            1200
+          ],
+          "values": [
+            300
+          ]
+        },
+        "temperature": {
+          "times": [
+            60
+          ],
+          "values": [
+            224
+          ]
+        },
+        "pressures": [
+          {
+            "times": [
+              0,
+              1200,
+              4000,
+              4300
+            ],
+            "values": [
+              2116,
+              1839,
+              1272,
+              1273
+            ],
+            "gas_number": 0
+          }
+        ],
+        "events": [
+          {
+            "time": 0,
+            "type": "gas_switch",
+            "gas_number": 0
+          },
+          {
+            "time": 1230,
+            "type": "other",
+            "label": "Ceiling Broken"
+          },
+          {
+            "time": 2075,
+            "type": "gas_switch",
+            "gas_number": 1
+          },
+          {
+            "time": 3840,
+            "type": "safety_stop"
+          }
+        ]
+      }
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "suunto_json",
+      "source_generator": {
+        "name": "Suunto Ocean",
+        "version": "2.40.56"
+      }
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-05T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.2.0"
+  },
+  "extensions": {
+    "divejson": {
+      "converted_from": "suunto_json",
+      "source_generator": {
+        "name": "Suunto Ocean",
+        "version": "2.40.56"
+      }
+    }
+  }
+}

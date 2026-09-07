@@ -425,9 +425,6 @@ class _Converter:
                 if version is not None:
                     generator["version"] = version
                 provenance["source_generator"] = generator
-            serial = _text(device.get("SerialNumber"))
-            if serial is not None:
-                provenance["suunto_serial_number"] = serial
         record_inferred(provenance, self.inferred)
         return provenance
 
@@ -539,12 +536,16 @@ class _Converter:
         """
         depth = self.head.get("Depth")
         depth = depth if isinstance(depth, dict) else {}
-        for member, value in (
-            ("max_depth", _number(depth.get("Max"))),
-            ("avg_depth", _first(_number(self.head.get("DepthAverage")), _number(depth.get("Avg")))),
+        for member, source, value in (
+            ("max_depth", "Depth.Max", _number(depth.get("Max"))),
+            (
+                "avg_depth",
+                "DepthAverage or Depth.Avg",
+                _first(_number(self.head.get("DepthAverage")), _number(depth.get("Avg"))),
+            ),
         ):
             if value is None:
-                self.absent(member.replace("_", " "), f"{member} for the dive", where)
+                self.absent(member.replace("_", " "), source, where)
                 continue
             if not recorded(value, record="dive", member=member):
                 self.note(

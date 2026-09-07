@@ -1,0 +1,15 @@
+{
+  "DeviceLog": {
+    "Header": {
+      "ActivityType": 51,
+      "DateTime": "2021-04-06T11:16:42.600+02:00",
+      "Depth": { "Avg": 17.73, "Max": 32.41 },
+      "Device": {
+        "Info": { "BSL": "2.5.1947", "HW": "68.6.0", "SW": "2.5.1947" },
+        "Name": "Suunto D5"
+      },
+      "Duration": 2001
+    },
+    "Samples": []
+  }
+}

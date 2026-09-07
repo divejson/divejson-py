@@ -1,0 +1,17 @@
+{
+  "DeviceLog": {
+    "Header": {
+      "ActivityType": 3,
+      "DateTime": "2026-04-18T07:02:11.000+02:00",
+      "Device": {
+        "Info": { "SW": "2.40.56" },
+        "Name": "Suunto Ocean"
+      },
+      "Distance": 10480,
+      "Duration": 3210.5
+    },
+    "Samples": [
+      { "Speed": 3.26, "TimeISO8601": "2026-04-18T07:02:12.000+02:00" }
+    ]
+  }
+}
