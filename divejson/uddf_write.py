@@ -780,8 +780,9 @@ class _Writer:
         if dive.get("surface_pressure") is not None:
             _sub(before, "surfacepressure", _num(_decimal(dive["surface_pressure"]) * PASCAL_PER_BAR))
 
-        mix_by_gas_number = self.tankdata_elements(element, dive, where)
-        self.samples_element(element, dive, where, mix_by_gas_number)
+        mix_by_gas_number, declared = self.tankdata_elements(element, dive, where)
+        numbered = self.samples_element(element, dive, where, mix_by_gas_number)
+        self.check_numbering(where, declared, numbered=numbered)
 
         # `informationafterdiveType` is an `xs:all`, so this order is a reader's convenience
         # rather than a requirement.
@@ -817,19 +818,18 @@ class _Writer:
         _optional(after, "averagedepth", dive.get("avg_depth"))
         return element
 
-    def tankdata_elements(self, element: ET.Element, dive: dict[str, Any], where: str) -> dict[int, str]:
-        """A `<tankdata>` per cylinder, and each cylinder's mix id for the profile to use.
+    def tankdata_elements(
+        self, element: ET.Element, dive: dict[str, Any], where: str
+    ) -> tuple[dict[int, str], list[int | None]]:
+        """A `<tankdata>` per cylinder, its mix id for the profile, and the numbers declared.
 
-        UDDF records no cylinder numbering at all: a reader recovers one by counting the
-        `<tankdata>` elements in file order, which is what §6.5's `gas_number` has to agree
-        with for a pressure channel or a gas switch to come back tied to the right cylinder.
-        So a document whose `gas_number`s are labels rather than positions is reported once
-        here, the numbering being the thing UDDF cannot carry.
+        UDDF records no cylinder numbering at all, so the second return value is what
+        `check_numbering` needs: the `gas_number` each cylinder carried on the way in,
+        against which what a reader recovers can be compared once the profile is written.
         """
         cylinders = dive.get("cylinders") or []
         seen: dict[_MixKey, int] = {}
         mix_by_gas_number: dict[int, str] = {}
-        labelled = False
         for index, cylinder in enumerate(cylinders):
             cylinder_where = f"{where}/cylinders/{index}"
             self.unmapped(
@@ -837,9 +837,6 @@ class _Writer:
                 cylinder,
                 frozenset({"volume", "start_pressure", "end_pressure", "oxygen", "helium", "po2_limit", "gas_number"}),
             )
-            if cylinder.get("gas_number") is not None and cylinder["gas_number"] != index:
-                labelled = True
-
             key = _mix_key(cylinder)
             occurrence = seen.get(key, 0)
             seen[key] = occurrence + 1
@@ -872,29 +869,47 @@ class _Writer:
             if cylinder.get("end_pressure") is not None:
                 _sub(tank, "tankpressureend", _num(_decimal(cylinder["end_pressure"]) * PASCAL_PER_BAR))
 
-        if labelled:
+        return mix_by_gas_number, [cylinder.get("gas_number") for cylinder in cylinders]
+
+    def check_numbering(self, where: str, declared: list[int | None], *, numbered: bool) -> None:
+        """Report the dive's cylinder numbering where UDDF will not give it back.
+
+        §6.3 calls `gas_number` a **label**, and UDDF carries no numbering at all: a reader
+        recovers one by counting `<tankdata>` elements in file order, and only where the
+        profile needs one — a pressure channel, or a gas switch naming the cylinder it
+        switched to. So the labels survive in exactly one case, which is the one this
+        converter's own reader produces: numbered from 0 by position, on a dive whose
+        profile asks for a numbering. Anything else is reported here rather than in the
+        file, there being nowhere in the file to put it.
+        """
+        recovered: list[int | None] = list(range(len(declared))) if numbered else [None] * len(declared)
+        if declared != recovered and any(number is not None for number in declared):
             self.note(
                 where,
-                "UDDF records no cylinder numbering, so a reader numbers this dive's cylinders from 0 in the "
-                "order they are written; the gas numbers the document carries are not preserved (spec §6.3)",
+                "UDDF records no cylinder numbering, so a reader recovers one by counting this dive's "
+                "<tankdata> elements, and only where its profile needs one; the gas numbers the document "
+                "carries are not preserved (spec §6.3)",
                 "dropped",
             )
-        return mix_by_gas_number
 
     # -- profile -----------------------------------------------------------------
 
     def samples_element(
         self, element: ET.Element, dive: dict[str, Any], where: str, mix_by_gas_number: dict[int, str]
-    ) -> None:
-        """`<samples>`: one waypoint per second any channel or event landed on.
+    ) -> bool:
+        """`<samples>`, and whether what was written asks a reader for a gas numbering.
 
-        The union rather than the depth channel's axis — see the module docstring — so a
-        temperature taken between two depth samples becomes its own waypoint, carrying a
-        `<divetime>` and a `<temperature>` and no depth.
+        One waypoint per second any channel or event landed on — the union rather than the
+        depth channel's axis, see the module docstring — so a temperature taken between two
+        depth samples becomes its own waypoint, carrying a `<divetime>` and a
+        `<temperature>` and no depth.
+
+        The return value is what `check_numbering` needs: a `<tankpressure ref>` or a
+        `<switchmix ref>` is the only thing that makes a reader number the cylinders at all.
         """
         profile = dive.get("profile")
         if not profile:
-            return
+            return False
         profile_where = f"{where}/profile"
         self.unmapped(
             profile_where, profile, frozenset({"duration", "depth", "temperature", "pressures", "events"})
@@ -928,7 +943,7 @@ class _Writer:
         self.events(profile.get("events") or [], profile_where, mix_by_gas_number, readings)
 
         if not readings:
-            return
+            return False
         samples = _sub(element, "samples")
         for second in sorted(readings):
             reading = readings[second]
@@ -965,6 +980,7 @@ class _Writer:
                 "UDDF records no duration for a profile; a reader takes the span (spec §6.4)",
                 "dropped",
             )
+        return any(reading["pressures"] or "switchmix" in reading for reading in readings.values())
 
     def events(
         self,
