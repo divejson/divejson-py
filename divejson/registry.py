@@ -50,6 +50,7 @@ from .converter import (
 )
 from .fit import FIT
 from .ssrf import SSRF
+from .suunto_json import SUUNTO_JSON
 from .uddf import UDDF
 from .validate import validate_document
 
@@ -113,7 +114,7 @@ class Adapter(Protocol):
 # is free: the XML readers each claim a root element nothing else claims and FIT claims a
 # binary magic no XML document can carry, so no two of them can answer for one file and
 # `sniff` reaches the same verdict whichever it asks first.
-ADAPTERS: tuple[Adapter, ...] = (UDDF, SSRF, FIT)
+ADAPTERS: tuple[Adapter, ...] = (UDDF, SSRF, FIT, SUUNTO_JSON)
 
 # The formats this implementation can *write*. Empty: it reads other formats into DiveJSON
 # and writes none of them back out, so a `write/<format>/` directory in a corpus is one

@@ -41,6 +41,11 @@ from .converter import (  # noqa: E402
 from .fit import FIT_ID_NAMESPACE, FitError, MalformedFitError  # noqa: E402
 from .registry import SNIFF_BYTES, convert, read_formats, sniff  # noqa: E402
 from .ssrf import SSRF_ID_NAMESPACE, MalformedSsrfError, SsrfError  # noqa: E402
+from .suunto_json import (  # noqa: E402
+    SUUNTO_JSON_ID_NAMESPACE,
+    MalformedSuuntoJsonError,
+    SuuntoJsonError,
+)
 from .uddf import UDDF_ID_NAMESPACE, MalformedUddfError, UddfError  # noqa: E402
 from .validate import (  # noqa: E402
     DuplicateMemberError,
@@ -57,6 +62,7 @@ __all__ = [
     "PRODUCER_KEY",
     "FIT_ID_NAMESPACE",
     "SSRF_ID_NAMESPACE",
+    "SUUNTO_JSON_ID_NAMESPACE",
     "UDDF_ID_NAMESPACE",
     "Conversion",
     "ConverterError",
@@ -67,6 +73,7 @@ __all__ = [
     "MalformedArchiveError",
     "MalformedFitError",
     "MalformedSsrfError",
+    "MalformedSuuntoJsonError",
     "MalformedUddfError",
     "NonConformingOutputError",
     "Note",
@@ -74,6 +81,7 @@ __all__ = [
     "NoteKind",
     "SourceTooLargeError",
     "SsrfError",
+    "SuuntoJsonError",
     "UddfError",
     "UnsupportedSourceError",
     "__version__",
