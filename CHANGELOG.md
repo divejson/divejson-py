@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.4.0
+
 - **Suunto's DM5 XML is the fifth format this package reads.** `divejson convert
   Dive_2021-04-06-1116.xml`, `sniff` answers `"suunto_xml"`, a zip of a whole export
   directory converts as one logbook, and `fixtures/suunto_xml/` carries the pairs any port
