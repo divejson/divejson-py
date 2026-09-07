@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="utf-8"?>
+<uddf xmlns="http://www.streit.cc/uddf/3.2/" version="3.2.2">
+  <generator>
+    <name>divejson convert</name>
+    <type>converter</type>
+    <version>0.3.0</version>
+    <datetime>2026-08-28T12:00:00Z</datetime>
+  </generator>
+  <diver>
+    <owner id="diver-0198a6f0-1111-7001-8000-000000000001">
+      <personal>
+        <firstname>Alex</firstname>
+        <lastname>Trim</lastname>
+      </personal>
+      <equipment>
+        <suit id="gear-0198a6f0-1111-7051-8000-000000000051">
+          <name>Tech drysuit</name>
+          <manufacturer id="mfr-0198a6f0-1111-7051-8000-000000000051">
+            <name>Santi</name>
+          </manufacturer>
+          <suittype>dry-suit</suittype>
+        </suit>
+        <tank id="gear-0198a6f0-1111-7050-8000-000000000050">
+          <name>Twin 12 manifold</name>
+        </tank>
+        <variouspieces id="gear-0198a6f0-1111-7052-8000-000000000052">
+          <name>EMT shears</name>
+        </variouspieces>
+      </equipment>
+    </owner>
+  </diver>
+  <divesite>
+    <site id="site-0198a6f0-1111-7040-8000-000000000040">
+      <name>Harrys Wall</name>
+      <geography>
+        <location>Milford Sound, New Zealand</location>
+        <latitude>-44.6301</latitude>
+        <longitude>167.8901</longitude>
+      </geography>
+      <notes>
+        <para>Black coral from 12 m.</para>
+      </notes>
+    </site>
+    <site id="site-0198a6f0-1111-7041-8000-000000000041">
+      <name>The Chimney</name>
+    </site>
+  </divesite>
+  <divetrip>
+    <trip id="trip-0198a6f0-1111-7030-8000-000000000030">
+      <name>Fiordland tech week</name>
+      <trippart>
+        <name>Milford Sound</name>
+        <dateoftrip startdate="2026-07-01T00:00:00" enddate="2026-07-09T00:00:00" />
+        <geography>
+          <location>Milford Sound / Piopiotahi, Southland, New Zealand</location>
+          <latitude>-44.6414</latitude>
+          <longitude>167.8974</longitude>
+        </geography>
+      </trippart>
+      <trippart>
+        <name>Chatham Rise crossing</name>
+      </trippart>
+    </trip>
+  </divetrip>
+  <gasdefinitions>
+    <mix id="mix-1">
+      <name>Trimix 18/45</name>
+      <o2>0.18</o2>
+      <he>0.45</he>
+      <maximumpo2>1.4</maximumpo2>
+    </mix>
+    <mix id="mix-2">
+      <name>Trimix 18/45</name>
+      <o2>0.18</o2>
+      <he>0.45</he>
+      <maximumpo2>1.4</maximumpo2>
+    </mix>
+    <mix id="mix-3">
+      <name>EAN32</name>
+      <o2>0.32</o2>
+    </mix>
+    <mix id="mix-4">
+      <name>EAN50</name>
+      <o2>0.5</o2>
+      <he>0</he>
+      <maximumpo2>1.6</maximumpo2>
+    </mix>
+    <mix id="mix-5">
+      <name>Oxygen</name>
+      <o2>1</o2>
+      <he>0</he>
+      <maximumpo2>1.6</maximumpo2>
+    </mix>
+  </gasdefinitions>
+  <profiledata>
+    <repetitiongroup id="rg-1">
+      <dive id="dive-0198a6f0-1111-7010-8000-000000000010">
+        <informationbeforedive>
+          <link ref="site-0198a6f0-1111-7040-8000-000000000040" />
+          <link ref="site-0198a6f0-1111-7041-8000-000000000041" />
+          <divenumber>412</divenumber>
+          <datetime>2026-07-03T09:14:00+12:45</datetime>
+          <altitude>0</altitude>
+          <equipmentused>
+            <leadquantity>0</leadquantity>
+            <link ref="gear-0198a6f0-1111-7050-8000-000000000050" />
+            <link ref="gear-0198a6f0-1111-7051-8000-000000000051" />
+          </equipmentused>
+          <tripmembership ref="trip-0198a6f0-1111-7030-8000-000000000030" />
+          <surfacepressure>101300</surfacepressure>
+        </informationbeforedive>
+        <tankdata>
+          <link ref="mix-1" />
+          <tankvolume>0.012</tankvolume>
+          <tankpressurebegin>22000000</tankpressurebegin>
+          <tankpressureend>8000000</tankpressureend>
+        </tankdata>
+        <tankdata>
+          <link ref="mix-2" />
+          <tankvolume>0.012</tankvolume>
+          <tankpressurebegin>21800000</tankpressurebegin>
+          <tankpressureend>9500000</tankpressureend>
+        </tankdata>
+        <tankdata>
+          <link ref="mix-4" />
+          <tankvolume>0.007</tankvolume>
+          <tankpressurebegin>20000000</tankpressurebegin>
+          <tankpressureend>12000000</tankpressureend>
+        </tankdata>
+        <tankdata>
+          <link ref="mix-5" />
+          <tankvolume>0.007</tankvolume>
+          <tankpressurebegin>19500000</tankpressurebegin>
+          <tankpressureend>0</tankpressureend>
+        </tankdata>
+        <samples>
+          <waypoint>
+            <depth>0</depth>
+            <divetime>0</divetime>
+            <switchmix ref="mix-1" />
+            <tankpressure ref="mix-1">22000000</tankpressure>
+            <tankpressure ref="mix-2">21800000</tankpressure>
+            <temperature>289.35</temperature>
+          </waypoint>
+          <waypoint>
+            <depth>18.3</depth>
+            <divetime>120</divetime>
+          </waypoint>
+          <waypoint>
+            <depth>61</depth>
+            <divetime>600</divetime>
+          </waypoint>
+          <waypoint>
+            <depth>62.3</depth>
+            <divetime>1500</divetime>
+            <temperature>280.55</temperature>
+          </waypoint>
+          <waypoint>
+            <depth>58</depth>
+            <divetime>2400</divetime>
+            <tankpressure ref="mix-1">14000000</tankpressure>
+            <tankpressure ref="mix-2">15000000</tankpressure>
+          </waypoint>
+          <waypoint>
+            <divetime>2980</divetime>
+            <setmarker>deep_stop</setmarker>
+          </waypoint>
+          <waypoint>
+            <depth>21</depth>
+            <divetime>3000</divetime>
+            <tankpressure ref="mix-4">20000000</tankpressure>
+          </waypoint>
+          <waypoint>
+            <divetime>3005</divetime>
+            <switchmix ref="mix-4" />
+          </waypoint>
+          <waypoint>
+            <depth>12</depth>
+            <divetime>3600</divetime>
+          </waypoint>
+          <waypoint>
+            <depth>9</depth>
+            <divetime>4200</divetime>
+            <tankpressure ref="mix-4">16000000</tankpressure>
+            <tankpressure ref="mix-5">19500000</tankpressure>
+          </waypoint>
+          <waypoint>
+            <divetime>4210</divetime>
+            <switchmix ref="mix-5" />
+          </waypoint>
+          <waypoint>
+            <depth>6</depth>
+            <divetime>4800</divetime>
+          </waypoint>
+          <waypoint>
+            <divetime>5100</divetime>
+            <setmarker>safety_stop</setmarker>
+          </waypoint>
+          <waypoint>
+            <divetime>5200</divetime>
+            <setmarker>Tissue ceiling cleared</setmarker>
+          </waypoint>
+          <waypoint>
+            <depth>3</depth>
+            <divetime>5400</divetime>
+            <tankpressure ref="mix-1">8000000</tankpressure>
+            <tankpressure ref="mix-2">9500000</tankpressure>
+            <tankpressure ref="mix-5">0</tankpressure>
+            <temperature>288.95</temperature>
+          </waypoint>
+          <waypoint>
+            <depth>0</depth>
+            <divetime>5520</divetime>
+          </waypoint>
+          <waypoint>
+            <divetime>5605</divetime>
+            <setmarker>bookmark</setmarker>
+          </waypoint>
+        </samples>
+        <informationafterdive>
+          <lowesttemperature>280.55</lowesttemperature>
+          <greatestdepth>62.3</greatestdepth>
+          <visibility>25</visibility>
+          <notes>
+            <para>Trimix wall dive; two deco gases staged on the line.</para>
+          </notes>
+          <diveduration>5520</diveduration>
+          <averagedepth>31.8</averagedepth>
+        </informationafterdive>
+      </dive>
+      <dive id="dive-0198a6f0-1111-7011-8000-000000000011">
+        <informationbeforedive>
+          <link ref="site-0198a6f0-1111-7040-8000-000000000040" />
+          <datetime>2026-07-04T10:02:00</datetime>
+        </informationbeforedive>
+        <tankdata>
+          <link ref="mix-3" />
+          <tankpressurebegin>0</tankpressurebegin>
+        </tankdata>
+        <informationafterdive>
+          <greatestdepth>0</greatestdepth>
+          <notes>
+            <para>Converted from a legacy log: no offset, no duration recorded.</para>
+          </notes>
+          <diveduration>0</diveduration>
+        </informationafterdive>
+      </dive>
+    </repetitiongroup>
+  </profiledata>
+</uddf>

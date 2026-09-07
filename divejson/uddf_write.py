@@ -221,15 +221,22 @@ def _optional(parent: ET.Element, tag: str, value: Any) -> None:
         _sub(parent, tag, _num(value))
 
 
-def _notes(parent: ET.Element, text: Any) -> None:
-    """A record's `notes` as one `<para>`.
+def _notes(parent: ET.Element, text: Any) -> bool:
+    """A record's `notes` as one `<para>`, and whether it was written.
 
     One paragraph rather than a split on blank lines, because the reader joins the paragraphs
     it finds with a blank line between them: splitting here and joining there would survive
     a round trip only for text that had no other blank line in it.
+
+    An **empty** note is not written and the caller reports it. `<para></para>` and no
+    `<notes>` at all read back identically — every XML reader here takes an empty element as
+    absent, which is what a writer with no coordinates forced on it — so an empty string is a
+    value UDDF has no spelling for rather than one this writer chose to drop.
     """
-    if text:
-        _sub(_sub(parent, "notes"), "para", str(text))
+    if not text:
+        return False
+    _sub(_sub(parent, "notes"), "para", str(text))
+    return True
 
 
 def _uddf_id(prefix: str, uuid: str) -> str:
@@ -330,6 +337,16 @@ class _Writer:
 
     def note(self, where: str, message: str, kind: NoteKind) -> None:
         self.notes.append(Note(where, message, kind))
+
+    def notes_of(self, parent: ET.Element, where: str, record: dict[str, Any]) -> None:
+        """A record's `notes`, with the empty string reported rather than written."""
+        if not _notes(parent, record.get("notes")) and record.get("notes") is not None:
+            self.note(
+                where,
+                "the note is empty, and an empty <para> reads back as no note at all; nothing is written "
+                "for it",
+                "dropped",
+            )
 
     def unmapped(self, where: str, record: dict[str, Any], carried: frozenset[str]) -> None:
         """Report every member of a record this writer did not put anywhere.
@@ -514,7 +531,7 @@ class _Writer:
                     # document invalid.
                     manufacturer = _sub(piece, "manufacturer", id=_uddf_id("mfr", uuid) if uuid else f"mfr-{index}")
                     _sub(manufacturer, "name", str(item["brand"]))
-                _notes(piece, item.get("notes"))
+                self.notes_of(piece, where, item)
                 if tag == "suit" and item.get("type") in _SUIT_TYPE:
                     # After `<notes>`: `suitType` extends `equipmentPieceType` and its own
                     # sequence follows the base type's whole one.
@@ -534,7 +551,7 @@ class _Writer:
             element = _sub(divesite, "site", id=_uddf_id("site", site["uuid"]))
             _sub(element, "name", str(site.get("name") or ""))
             self.geography(element, where, site.get("location"), site.get("position"), noun="site")
-            _notes(element, site.get("notes"))
+            self.notes_of(element, where, site)
         return divesite
 
     def geography(
@@ -617,7 +634,7 @@ class _Writer:
                         part, part_where, location.get("display_name"), location.get("position"), noun="location"
                     )
                 if part_index == 0:
-                    _notes(part, trip.get("notes"))
+                    self.notes_of(part, where, trip)
         return divetrip
 
     def date_of_trip(self, part: ET.Element, where: str, trip: dict[str, Any]) -> None:
@@ -763,8 +780,8 @@ class _Writer:
         if dive.get("surface_pressure") is not None:
             _sub(before, "surfacepressure", _num(_decimal(dive["surface_pressure"]) * PASCAL_PER_BAR))
 
-        mix_of_cylinder = self.tankdata_elements(element, dive, where)
-        self.samples_element(element, dive, where, mix_of_cylinder)
+        mix_by_gas_number = self.tankdata_elements(element, dive, where)
+        self.samples_element(element, dive, where, mix_by_gas_number)
 
         # `informationafterdiveType` is an `xs:all`, so this order is a reader's convenience
         # rather than a requirement.
@@ -784,7 +801,7 @@ class _Writer:
             )
         _sub(after, "greatestdepth", _num(depth if depth is not None else 0))
         _optional(after, "visibility", dive.get("visibility"))
-        _notes(after, dive.get("notes"))
+        self.notes_of(after, where, dive)
         duration = dive.get("duration")
         if duration is None:
             # `<diveduration>` is mandatory too, and takes the same zero for the same
@@ -811,7 +828,7 @@ class _Writer:
         """
         cylinders = dive.get("cylinders") or []
         seen: dict[_MixKey, int] = {}
-        mix_of_cylinder: dict[int, str] = {}
+        mix_by_gas_number: dict[int, str] = {}
         labelled = False
         for index, cylinder in enumerate(cylinders):
             cylinder_where = f"{where}/cylinders/{index}"
@@ -827,7 +844,12 @@ class _Writer:
             occurrence = seen.get(key, 0)
             seen[key] = occurrence + 1
             mix_id = self.mix_ids[(key, occurrence)]
-            mix_of_cylinder[index] = mix_id
+            # Keyed on the cylinder's own `gas_number` where it has one, because that is
+            # what §6.5's channels and §6.6's switches address — a label the document chose,
+            # not a position. Where it has none, the position is the number, which is the
+            # numbering `converting.md` gives a converted dive.
+            number = cylinder.get("gas_number")
+            mix_by_gas_number.setdefault(index if number is None else number, mix_id)
 
             # `tankdataType` is an `xs:sequence`: link, tankvolume, tankpressurebegin,
             # tankpressureend.
@@ -857,12 +879,12 @@ class _Writer:
                 "order they are written; the gas numbers the document carries are not preserved (spec §6.3)",
                 "dropped",
             )
-        return mix_of_cylinder
+        return mix_by_gas_number
 
     # -- profile -----------------------------------------------------------------
 
     def samples_element(
-        self, element: ET.Element, dive: dict[str, Any], where: str, mix_of_cylinder: dict[int, str]
+        self, element: ET.Element, dive: dict[str, Any], where: str, mix_by_gas_number: dict[int, str]
     ) -> None:
         """`<samples>`: one waypoint per second any channel or event landed on.
 
@@ -889,7 +911,7 @@ class _Writer:
             at(second)["temperature"] = _decimal(tenths) / TENTHS_PER_UNIT + KELVIN_OFFSET
 
         for channel in profile.get("pressures") or []:
-            mix_id = mix_of_cylinder.get(channel["gas_number"])
+            mix_id = mix_by_gas_number.get(channel["gas_number"])
             if mix_id is None:
                 # `<tankpressure ref>` is an `xs:IDREF`, and without a cylinder on this dive
                 # to have written a `<mix>` for, there is nothing valid to point it at.
@@ -903,7 +925,7 @@ class _Writer:
             for second, tenths in _series(channel):
                 at(second)["pressures"].append((mix_id, _decimal(tenths) / TENTHS_PER_UNIT * PASCAL_PER_BAR))
 
-        self.events(profile.get("events") or [], profile_where, mix_of_cylinder, readings)
+        self.events(profile.get("events") or [], profile_where, mix_by_gas_number, readings)
 
         if not readings:
             return
@@ -948,7 +970,7 @@ class _Writer:
         self,
         events: list[dict[str, Any]],
         where: str,
-        mix_of_cylinder: dict[int, str],
+        mix_by_gas_number: dict[int, str],
         readings: _Readings,
     ) -> None:
         """§6.6's events onto waypoints, one `<setmarker>` and one `<switchmix>` each.
@@ -969,7 +991,7 @@ class _Writer:
             second = event["time"]
             kind = event["type"]
             if kind == "gas_switch":
-                mix_id = mix_of_cylinder.get(event.get("gas_number"))
+                mix_id = mix_by_gas_number.get(event.get("gas_number"))
                 if mix_id is None:
                     self.note(
                         event_where,
@@ -990,6 +1012,17 @@ class _Writer:
                 continue
 
             marker = kind if kind in _MARKER_TYPES else event.get("label")
+            if kind in _MARKER_TYPES and event.get("label"):
+                # `<setmarker>` is one string, and the type has to have it: the three named
+                # types are the only thing this format's own round trip has to go on, so a
+                # labelled safety stop keeps its type and loses its label rather than
+                # arriving as an `other` that nothing recognises.
+                self.note(
+                    event_where,
+                    f"UDDF's <setmarker> carries one string, and the event is a {kind} with a label; the type "
+                    "is written and the label is dropped",
+                    "dropped",
+                )
             if not marker:
                 # `<setmarker>` is a bare string with no type beside it, so an unlabelled
                 # `other` has nothing to carry: writing the word "other" would come back as
