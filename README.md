@@ -75,9 +75,10 @@ and what is one format's — its element map, its writers' habits, its ambiguiti
 is deliberately left unmapped — is in
 [`docs/uddf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/uddf-mapping.md),
 [`docs/ssrf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/ssrf-mapping.md),
-[`docs/fit-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/fit-mapping.md)
+[`docs/fit-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/fit-mapping.md),
+[`docs/suunto-json-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/suunto-json-mapping.md)
 and
-[`docs/suunto-json-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/suunto-json-mapping.md).
+[`docs/suunto-xml-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/suunto-xml-mapping.md).
 
 From Python, the same two steps an application takes:
 
@@ -152,6 +153,7 @@ release would break every corpus that carries one.
 | Subsurface | `ssrf` | reads into DiveJSON | save format 3 |
 | FIT | `fit` | reads into DiveJSON | protocol 2.0 |
 | Suunto app JSON | `suunto_json` | reads into DiveJSON | D5-era and 2026 Suunto Ocean exports |
+| Suunto DM5 XML | `suunto_xml` | reads into DiveJSON | the desktop application's one-dive `<Dive>` exports |
 
 The **id** is the whole coupling between this package and everything around it: it is what
 `sniff` returns, what `--from` and `--to` take, and what a conformance corpus names a
@@ -198,6 +200,16 @@ so the last reading in the file is a purged regulator and not the dive's end pre
 three are in
 [`docs/suunto-json-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/suunto-json-mapping.md),
 with the figures each of them changes.
+
+The same vendor's **desktop** application exports the same dives as XML, one document per
+dive, and the two disagree about their units: CNS is whole percent there and a 0-1 fraction
+in the app's JSON, cylinder pressures are millibar against Pascal, and one pressure in the
+XML — the surface pressure — is Pascal while every other one in the same file is millibar.
+Only a dive that exists in both makes any of that visible, which is why every factor in
+[`docs/suunto-xml-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/suunto-xml-mapping.md)
+is stated beside the JSON reading of the same dive. That format also writes a **freedive**
+in the same shape as a scuba dive, and DiveJSON has no member for the kind of a dive, so a
+freedive is skipped and reported rather than arriving mislabelled by omission.
 
 ## Releasing
 

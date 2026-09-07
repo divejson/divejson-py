@@ -133,7 +133,7 @@ MAX_CYLINDER_PRESSURE = Decimal(350)
 # members hold. Both are wide enough that a reading outside one is a device that recorded
 # something other than what the element claims, which is reported rather than clamped.
 MIN_SURFACE_PRESSURE, MAX_SURFACE_PRESSURE = Decimal("0.4"), Decimal("1.2")
-MIN_PO2_LIMIT, MAX_PO2_LIMIT = Decimal("0.4"), Decimal(2)
+MIN_PO2_LIMIT, MAX_PO2_LIMIT = Decimal("0.4"), Decimal("2.0")
 
 # How many cylinders one dive may describe. The corpus never reaches two, but a
 # `<DiveMixtures>` element may hold any number and each one is a row in a diver's logbook.
@@ -315,8 +315,8 @@ class _Converter:
         else:
             self.note(
                 where,
-                f"<{name}> is {value}, which is not a {member.replace('_', ' ')} this format records; "
-                "read as not recorded",
+                f"<{name}> is {value}, which is not a value the format's `{member}` can hold; read as "
+                "not recorded",
                 "absent",
             )
 
@@ -454,14 +454,17 @@ class _Converter:
                 "dropped",
             )
             return None
-        started_at = _date_time(raw)
-        if started_at is None:
+        read = _date_time(raw)
+        if read is None:
             self.note(
                 where,
                 "<StartTime> is not a date and time this reader can carry; the dive is dropped (spec §6.2)",
                 "dropped",
             )
             return None
+        started_at, seconds = read
+        if not seconds:
+            self.note(where, "<StartTime> records no seconds; read as :00", "absent")
         self.note(
             where,
             "the source records no UTC offset on the dive's start time; the wall clock travels alone "
@@ -492,10 +495,10 @@ class _Converter:
 
         Deliberately not `<BottomTime>`, which is the time spent at depth and runs a third
         shorter — 1 028 s against 2 001 on the dive this reader is measured against — and
-        not `<DiveTime>`, which every one of the 384 exports in hand writes as `i:nil`
-        despite the app's JSON export of the same dives filling its own `DiveTime` in.
-        §6.2's `duration` is the dive's own length, and `<Duration>` is the only element
-        here that claims to be it.
+        not `<DiveTime>`, which is `i:nil` on every one of the 384 exports in hand, so
+        nothing here has ever seen a value of it. §6.2's `duration` is the dive's own
+        length, and `<Duration>` is the only element in this format that has been observed
+        holding it.
 
         **The whole seconds are what the member's own rule is asked about**, not the value
         the element states. §6.2 makes `duration` a positive integer, so a `<Duration>` of
@@ -798,6 +801,10 @@ class _Converter:
         ceiling = Channel()
         temperature = Channel()
         pressure = Channel()
+        # Counted rather than reported one at a time: a pod that reports outside §6.3's
+        # range usually does it for a run of samples, and one line per reading would be a
+        # transmitter fault written out several hundred times.
+        out_of_range = 0
         for second, sample in axis.ordered():
             metres = self.number(sample, "Depth", where)
             if metres is not None:
@@ -818,6 +825,16 @@ class _Converter:
                 bar = millibar / MILLIBAR_PER_BAR
                 if 0 <= bar <= MAX_CYLINDER_PRESSURE:
                     pressure.record(second, rounded(bar * TENTHS_PER_UNIT))
+                else:
+                    out_of_range += 1
+        if out_of_range:
+            self.note(
+                where,
+                f"{out_of_range} {'sample records' if out_of_range == 1 else 'samples record'} a tank "
+                f"pressure outside the 0 to {MAX_CYLINDER_PRESSURE} bar the format allows; "
+                f"{'that reading is' if out_of_range == 1 else 'those readings are'} dropped",
+                "dropped",
+            )
 
         pressures = self.label_pressures(pressure, cylinders, where)
         events = self.read_events(cylinders)
@@ -911,8 +928,12 @@ class _Converter:
         ]
 
 
-def _date_time(raw: str) -> str | None:
-    """`<StartTime>` text as a §5.2 date-time, or `None` for text that is not one.
+def _date_time(raw: str) -> tuple[str, bool] | None:
+    """`<StartTime>` as a §5.2 date-time and whether it stated its seconds, or `None`.
+
+    The second half of the pair is what lets the caller report the one leniency this
+    grammar carries — §5.2 requires the seconds and a stored value missing them would cost
+    the whole dive — without asking the caller to re-parse the text to find out.
 
     `datetime.fromisoformat` is deliberately not the parser. On the Python floor this
     package supports, it accepts only a two- or six-digit fraction and rejects `.6` — which
@@ -935,4 +956,5 @@ def _date_time(raw: str) -> str | None:
         )
     except ValueError:
         return None
-    return f"{parts['date']}T{parts['hour']}:{parts['minute']}:{second}{parts['fraction'] or ''}"
+    written = f"{parts['date']}T{parts['hour']}:{parts['minute']}:{second}{parts['fraction'] or ''}"
+    return written, parts["second"] is not None
