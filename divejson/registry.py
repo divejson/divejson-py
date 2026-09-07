@@ -58,6 +58,7 @@ from .converter import (
 from .fit import FIT
 from .ssrf import SSRF
 from .suunto_json import SUUNTO_JSON
+from .suunto_xml import SUUNTO_XML
 from .uddf import UDDF
 from .uddf_write import UDDF_WRITER
 from .validate import validate_document
@@ -123,12 +124,14 @@ class Adapter(Protocol):
 # Every reader this build carries, in the order `sniff` asks them. A list rather than a
 # dict so the order is a property of the file rather than of insertion history. The order
 # is free, because each reader claims a syntax the others cannot be written in: the XML
-# readers each claim a root element nothing else claims, FIT claims a binary magic no XML
-# document can carry, and the Suunto app's JSON claims an object opening on a member name
-# no XML or FIT file has anywhere. So no two of them can answer for one file and `sniff`
-# reaches the same verdict whichever it asks first. The `.json` suffix is shared with a
-# DiveJSON document and decides nothing here — nothing sniffs on a suffix.
-ADAPTERS: tuple[Adapter, ...] = (UDDF, SSRF, FIT, SUUNTO_JSON)
+# readers each claim a root element nothing else claims — and Suunto's DM5 export, whose
+# `<Dive>` is a name another XML format could reach for, claims its datacontract namespace
+# alongside it — FIT claims a binary magic no XML document can carry, and the Suunto app's
+# JSON claims an object opening on a member name no XML or FIT file has anywhere. So no two
+# of them can answer for one file and `sniff` reaches the same verdict whichever it asks
+# first. The `.json` and `.xml` suffixes are each shared by two of the formats here and
+# decide nothing — nothing sniffs on a suffix.
+ADAPTERS: tuple[Adapter, ...] = (UDDF, SSRF, FIT, SUUNTO_JSON, SUUNTO_XML)
 
 
 class Writer(Protocol):
