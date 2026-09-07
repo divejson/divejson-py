@@ -509,20 +509,28 @@ class _Converter:
         the diver gets in and ends after they are back on the boat — 4 001 s against 4 302 s
         on one file in hand. §6.2's `duration` is the dive's, so the in-water figure wins
         where the export states it, and the D5 shapes state only `Duration`.
+
+        **The whole seconds are what the member's own rule is asked about**, not the
+        fractional value the header states. §6.2 makes `duration` a positive integer, so a
+        `DiveTime` of 0.4 s is above the schema's floor and the number written from it —
+        zero — is not; checking before rounding lets that one through and fails the
+        converter's own validation. The other three readers in this package round first for
+        the same reason.
         """
-        for member, source in (("DiveTime", "DiveTime"), ("Duration", "Duration")):
-            value = _number(self.head.get(member))
+        for source in ("DiveTime", "Duration"):
+            value = _number(self.head.get(source))
             if value is None:
                 continue
-            if not recorded(value, record="dive", member="duration"):
+            seconds = rounded(value)
+            if not recorded(seconds, record="dive", member="duration"):
                 self.note(
                     where,
-                    f"the header records {source} as {value}, which is not a length of time a dive can "
-                    "have; read as not recorded",
+                    f"the header records {source} as {value} s, which the format cannot hold as a duration "
+                    "(§6.2 admits a positive whole number of seconds); read as not recorded",
                     "absent",
                 )
                 continue
-            dive["duration"] = rounded(value)
+            dive["duration"] = seconds
             return
         self.absent("duration", "DiveTime or Duration", where)
 
@@ -784,6 +792,11 @@ class _Converter:
         `Oxygen` does not appear in any of the nineteen Ocean files in hand — so every
         cylinder here carries an `absent` finding saying so, because reporting air would be
         indistinguishable from having read it.
+
+        A transmitter's readings are range-checked exactly as a gas block's are. They are
+        the same member with the same bounds, and a pod reporting outside them is a noisy
+        reading rather than a reason to lose the whole conversion — `converting.md` is
+        explicit that every way a source can be wrong resolves to an omission and a note.
         """
         pressures = self.transmitted(origin)
         switched = self.switched()
@@ -794,7 +807,8 @@ class _Converter:
         cylinders: list[dict[str, Any]] = []
         for number in numbers:
             cylinder: dict[str, Any] = {}
-            self.set_pressures(cylinder, pressures.get(number, (None, None)), where)
+            first, last = pressures.get(number, (None, None))
+            self.set_pressures(cylinder, (self.pressure(first, where), self.pressure(last, where)), where)
             self.note(
                 where,
                 "the export records no gas mixture for one of this dive's cylinders; absent means not "

@@ -211,7 +211,25 @@ def test_a_zero_duration_is_a_placeholder_rather_than_a_dive_of_no_length() -> N
     """§6.2 gives `duration` `exclusiveMinimum: 0`, and the member's own rule decides."""
     conversion = _conversion({"DiveTime": 0, "Duration": 2001})
     assert conversion.document["dives"][0]["duration"] == 2001
-    assert any("not a length of time a dive can have" in m for m in _messages(conversion, "absent"))
+    assert any("cannot hold as a duration" in m for m in _messages(conversion, "absent"))
+
+
+def test_a_duration_that_rounds_to_zero_is_read_as_not_recorded() -> None:
+    """The member's rule is asked about the whole seconds, not the fraction behind them.
+
+    0.4 s is above §6.2's floor and the integer written from it is not, so a reader that
+    checks before it rounds writes a `duration: 0` its own validation then rejects — which
+    would lose the whole conversion over a header field.
+    """
+    conversion = _conversion({"DiveTime": 0.4, "Duration": 2001})
+    assert conversion.document["dives"][0]["duration"] == 2001
+    assert any("records DiveTime as 0.4 s" in m for m in _messages(conversion, "absent"))
+
+
+def test_a_negative_duration_is_read_as_not_recorded() -> None:
+    conversion = _conversion({"DiveTime": -30})
+    assert "duration" not in conversion.document["dives"][0]
+    assert any("cannot hold as a duration" in m for m in _messages(conversion, "absent"))
 
 
 # -- cylinders, the Ocean shape -------------------------------------------------------
@@ -343,6 +361,30 @@ def test_a_pressure_past_what_the_format_allows_is_dropped() -> None:
     conversion = _conversion(_gas_block(StartPressure=40_000_000))
     assert conversion.document["dives"][0]["cylinders"] == [{"role": "bottom"}]
     assert any("outside the 0 to 350" in message for message in _messages(conversion, "dropped"))
+
+
+def test_a_transmitter_reading_past_that_range_is_dropped_too() -> None:
+    """The same check on the reconstructed path, which is where a noisy pod arrives.
+
+    A gas block is the app's own summary and a transmitter reading is telemetry, so this is
+    the path a wild value actually comes down. Left unchecked it reaches the document, and
+    the converter's own validation then rejects it — losing the dive over one sample rather
+    than dropping the reading and saying so.
+    """
+    for first, last, dropped, kept in (
+        (40_000_000, 15_000_000, "start_pressure", "end_pressure"),
+        (20_000_000, -100, "end_pressure", "start_pressure"),
+    ):
+        conversion = _conversion(
+            {},
+            [
+                suunto_sample(0, Depth=1.0, Cylinders=suunto_slots(first)),
+                suunto_sample(600, Depth=20.0, Cylinders=suunto_slots(last)),
+            ],
+        )
+        cylinder = conversion.document["dives"][0]["cylinders"][0]
+        assert dropped not in cylinder and kept in cylinder
+        assert any("outside the 0 to 350" in message for message in _messages(conversion, "dropped"))
 
 
 def test_more_cylinders_than_one_dive_may_describe_are_capped_and_reported() -> None:

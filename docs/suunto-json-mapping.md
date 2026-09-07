@@ -184,7 +184,9 @@ file in hand states both. Neither is derived: this export summarises its own div
 depths are readings.
 
 A zero reads by the member's own constraint. `duration`, `max_depth` and `avg_depth` are
-`> 0` in the schema, so a zero in any of them is a placeholder and is read as not recorded;
+`> 0` in the schema, so a zero in any of them is a placeholder and is read as not recorded —
+and for `duration` the constraint is asked of the **whole seconds**, so a `DiveTime` of 0.4 s
+is read as not recorded too rather than written as a dive of no length;
 `cns_*` and `otu_*` are `≥ 0`, so the zero a first dive of the day starts on is an answer.
 An average depth deeper than the maximum cannot be, and the average is dropped.
 
@@ -232,6 +234,10 @@ numbers a file may claim.
 records no gas fraction, no tank size and no ppO₂ limit anywhere — the string `Oxygen` does
 not appear in a single one of the nineteen Ocean files — so every cylinder here carries an
 `absent` finding saying so. Reporting air would be indistinguishable from having read it.
+
+A transmitter's readings are range-checked exactly as a gas block's are: they are the same
+member with the same 0-350 bar bounds, and a pod reporting outside them is a noisy reading
+dropped with a finding rather than a reason to lose the whole conversion.
 
 **A `null` pressure is skipped rather than ending the series.** An Ocean numbers five
 cylinder slots on every sample and writes `null` into the four nothing is paired to, and its
