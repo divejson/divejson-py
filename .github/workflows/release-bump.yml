@@ -4,7 +4,7 @@ name: Release bump
 # that on `main` through a pull request, and tags the commit that lands — which is the
 # event `release.yml` publishes from. `.github/scripts/release_bump.py` is the half with
 # the decisions in it, and it has tests; this file is the half that has to touch GitHub,
-# and every awkward thing below is one of these four.
+# and every awkward thing below is one of these five.
 #
 # **A GitHub App token, never `GITHUB_TOKEN`.** GitHub starts no workflow run from an
 # event created with the default token — `workflow_dispatch`, `repository_dispatch` and
@@ -29,6 +29,13 @@ name: Release bump
 # **The tag goes on the squash commit.** Squash-merging writes a *new* commit on `main`;
 # the branch's own commit never lands there, and a tag on it would name a release nothing
 # on `main` can be traced to.
+#
+# **Everything after the merge is retried.** The merge and the tag are one release that
+# GitHub cannot be asked to do in one call, so between them the repository is a version
+# bumped on `main` that nothing published — and a step running under `bash -e` ends on the
+# first API call that answers `502`. That happened on 0.4.0: the merge landed, the tag call
+# did not, `release.yml` never ran, and only a human with push access could finish it. So
+# the calls after the merge retry, and ask what is already there before creating anything.
 #
 # ## What this needs from outside the repository
 #
@@ -255,26 +262,119 @@ jobs:
           gh pr merge "$NUMBER" --repo "$GITHUB_REPOSITORY" --squash
 
           # The squash commit, not the branch's. GitHub names it a moment after the merge.
+          # A call that fails is one lost attempt rather than the end of the step: the merge
+          # above has already happened, so from here on a bad gateway must cost a few
+          # seconds and not the release.
           merged=""
           for _ in $(seq 30); do
-            merged="$(gh pr view "$NUMBER" --repo "$GITHUB_REPOSITORY" --json mergeCommit --jq '.mergeCommit.oid // empty')"
+            merged="$(gh pr view "$NUMBER" --repo "$GITHUB_REPOSITORY" --json mergeCommit --jq '.mergeCommit.oid // empty')" || merged=""
             [ -z "$merged" ] || break
             sleep 2
           done
           if [ -z "$merged" ]; then
-            echo "::error::merged, but GitHub has not named the squash commit. Tag v$VERSION on main's head by hand."
+            echo "::error::merged, but GitHub has not named the squash commit, so this run does not know which commit to tag. The bump is on main and nothing is published. Finish it by hand once the merge commit is visible: git fetch origin && git tag -a v$VERSION -m \"divejson $VERSION\" origin/main && git push origin v$VERSION"
             exit 1
           fi
 
           # Annotated, like every tag this repository already carries, which takes two
           # calls: the object, then the ref that points at it. Creating the ref is the
           # push, and it is the app's token that makes it — which is the whole reason the
-          # app exists, since `release.yml` would never run off `GITHUB_TOKEN`'s.
-          object="$(gh api "repos/$GITHUB_REPOSITORY/git/tags" \
-            -f "tag=v$VERSION" -f "message=divejson $VERSION" \
-            -f "object=$merged" -f "type=commit" --jq .sha)"
-          gh api "repos/$GITHUB_REPOSITORY/git/refs" \
-            -f "ref=refs/tags/v$VERSION" -f "sha=$object" >/dev/null
+          # app exists, since `release.yml` would never run off `GITHUB_TOKEN`'s. Both are
+          # retried, and both look at what is already tagged before creating anything —
+          # this pair is where 0.4.0 was lost.
+
+          # `gh api` exits 1 for a bad gateway exactly as it does for a refusal, and the
+          # two are not worth telling apart here: every call retried below is either safe
+          # to repeat or guarded by the check above it, so retrying a permanent failure
+          # costs half a minute and then reports the same error.
+          retry() {
+            local attempt out
+            for attempt in $(seq 6); do
+              [ "$attempt" = 1 ] || sleep 5
+              if out="$("$@")"; then
+                printf '%s\n' "$out"
+                return 0
+              fi
+              # To stderr, because this function's stdout is the call's answer.
+              echo "attempt $attempt of 6 failed: $*" >&2
+            done
+            return 1
+          }
+
+          # The commit `v$VERSION` names, empty when there is no such tag — which is what
+          # lets an attempt after a lost answer tell "GitHub never saw it" from "GitHub did
+          # it and the answer did not come back", two things that are one exit status.
+          # `matching-refs` rather than `git/ref/tags/...` because it answers 200 with an
+          # empty list for a tag that is absent, where a 404 would be indistinguishable
+          # from the failure this is all here to survive; it matches by prefix, so the
+          # exact ref is selected out of what comes back. The version is `release_bump.py`
+          # SEMVER's, digits and dots, so it cannot end the string it is written into.
+          exact=".[] | select(.ref == \"refs/tags/v$VERSION\") | .object.sha + \" \" + .object.type"
+          tagged_commit() {
+            local found sha type
+            found="$(retry gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/v$VERSION" --jq "$exact")" || return 1
+            [ -n "$found" ] || return 0
+            sha="${found%% *}"
+            type="${found##* }"
+            # A tag ref points at the annotated tag object, so which commit it names is a
+            # second call. `commit` is answered too, for a lightweight tag someone made.
+            if [ "$type" = tag ]; then
+              retry gh api "repos/$GITHUB_REPOSITORY/git/tags/$sha" --jq .object.sha
+            else
+              printf '%s\n' "$sha"
+            fi
+          }
+
+          # The poll above has its own message because it fails with nothing tagged and no
+          # sha to tag. This one is read by someone whose `main` already carries the bump,
+          # and the only useful thing it can say is the command that finishes the release.
+          tagging_failed() {
+            echo "::error::merged as $merged, but v$VERSION could not be tagged. The bump is on main and nothing is published — release.yml publishes from the tag, so it never started. Finish it by hand: git fetch origin && git tag -a v$VERSION -m \"divejson $VERSION\" $merged && git push origin v$VERSION"
+            exit 1
+          }
+
+          existing="$(tagged_commit)" || tagging_failed
+          if [ -n "$existing" ] && [ "$existing" != "$merged" ]; then
+            echo "::error::v$VERSION already exists and names $existing, but this run merged $merged. Nothing was retagged: a tag on the wrong commit is not a transient failure, and PyPI takes a version once. Work out which commit the release is before moving anything."
+            exit 1
+          fi
+
+          if [ -n "$existing" ]; then
+            echo "::notice::v$VERSION already names $merged — an earlier attempt got that far"
+          else
+            # Repeating this one is harmless: two tag objects for one tag differ only in
+            # their tagger date, and the one no ref points at is unreachable.
+            object="$(retry gh api "repos/$GITHUB_REPOSITORY/git/tags" \
+              -f "tag=v$VERSION" -f "message=divejson $VERSION" \
+              -f "object=$merged" -f "type=commit" --jq .sha)" || tagging_failed
+
+            # The ref is the one call that must not be repeated blindly — it is the push,
+            # and a second one is refused with 422 "Reference already exists" whether or
+            # not the first landed. So a failed attempt asks the ref what happened instead
+            # of reading the error, and a ref naming some other commit stops the run rather
+            # than being mistaken for a success.
+            created=""
+            for attempt in $(seq 6); do
+              [ "$attempt" = 1 ] || sleep 5
+              if gh api "repos/$GITHUB_REPOSITORY/git/refs" \
+                   -f "ref=refs/tags/v$VERSION" -f "sha=$object" >/dev/null; then
+                created=yes
+                break
+              fi
+              landed="$(tagged_commit)" || landed=""
+              if [ "$landed" = "$merged" ]; then
+                echo "refs/tags/v$VERSION is there: the attempt that reported a failure had landed"
+                created=yes
+                break
+              fi
+              if [ -n "$landed" ]; then
+                echo "::error::refs/tags/v$VERSION appeared naming $landed while this run was tagging $merged. Nothing was changed."
+                exit 1
+              fi
+              echo "creating refs/tags/v$VERSION failed on attempt $attempt of 6, and the ref is not there" >&2
+            done
+            [ -n "$created" ] || tagging_failed
+          fi
 
           echo "::notice::v$VERSION tagged at $merged"
           echo "" >> "$GITHUB_STEP_SUMMARY"
