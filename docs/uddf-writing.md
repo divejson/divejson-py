@@ -25,8 +25,8 @@ the reference writer** below.
 ## What a correct writer is checked against
 
 Two things, and neither is a byte comparison against another implementation. A writer built
-to match a 738-line module byte for byte is a mirror of it, and the first divergence between
-the two is a bug in whichever was read last.
+to match another implementation byte for byte is a mirror of it, and the first divergence
+between the two is a bug in whichever was read last.
 
 **The writer pairs.** `fixtures/write/uddf/` holds a DiveJSON document and the UDDF a
 correct writer produces from it — the reader pair's shape with its halves swapped. They are

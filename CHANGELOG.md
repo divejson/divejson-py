@@ -21,7 +21,7 @@ this file is about the package, whose version moves independently.
   `fixtures/write/uddf/` holds the pairs a port is measured against. Every generated document
   is also validated against the UDDF 3.2.2 XSD, now vendored at
   `tests/fixtures/uddf_3.2.2.xsd`, which is the only check that can see element order — and
-  five of the types written here are an `xs:sequence`.
+  most of the types written here are an `xs:sequence`.
 
   **Nothing is invented to satisfy a required element.** UDDF makes `<greatestdepth>`,
   `<diveduration>` and `<tankpressurebegin>` mandatory where §6 does not, and each takes the

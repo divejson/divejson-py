@@ -8,8 +8,8 @@ written for a port in another language as much as for a reader of this file.
 
 **This is checked through the reader, not against a second implementation.** DiveJSON's
 reference writer is the application this format came out of; a second one built to match it
-byte for byte would be a mirror of a 738-line module, and the first divergence between them
-would be a bug in whichever was read last. So the bar here is two things a corpus can hold:
+byte for byte would be a mirror of a module in another repository, and the first divergence
+between them would be a bug in whichever was read last. So the bar here is two things a corpus can hold:
 a written pair in `fixtures/write/uddf/`, compared as canonical XML with `<generator>`
 ignored, and the **self round trip** — reading a written file back through `uddf.py` returns
 the document it was written from, on every member `docs/uddf-mapping.md`'s element map
@@ -1007,7 +1007,11 @@ class _Writer:
             second = event["time"]
             kind = event["type"]
             if kind == "gas_switch":
-                mix_id = mix_by_gas_number.get(event.get("gas_number"))
+                # A switch the document recorded without saying what to, and one naming a
+                # cylinder this dive has none of, are the same answer here: `<switchmix>`
+                # has an `xs:IDREF` and nothing to put in it.
+                number = event.get("gas_number")
+                mix_id = None if number is None else mix_by_gas_number.get(number)
                 if mix_id is None:
                     self.note(
                         event_where,
