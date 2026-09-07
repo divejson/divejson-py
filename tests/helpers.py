@@ -123,3 +123,57 @@ def suunto_sample(seconds: float, **members: object) -> dict:
 def suunto_slots(*pressures: int | None) -> list[dict]:
     """The `Cylinders[]` array an Ocean writes: every slot numbered, most of them empty."""
     return [{"GasNumber": number, "Pressure": pascal} for number, pascal in enumerate(pressures)]
+
+
+# -- Suunto DM5 XML -------------------------------------------------------------------
+
+SUUNTO_XML_NAMESPACE = "http://schemas.datacontract.org/2004/07/Suunto.Diving.Dal"
+XSI_NAMESPACE = "http://www.w3.org/2001/XMLSchema-instance"
+
+# The instant every helper below starts its dive at. The same wall clock the three helpers
+# above use, with the sub-second fraction this exporter writes on 380 of the 384 files in
+# hand and **no offset**, which is the one thing a DM5 export records nowhere.
+SUUNTO_XML_STARTED_AT = "2026-04-17T11:49:23.6"
+
+
+def suunto_xml(
+    body: str = "",
+    *,
+    started_at: str | None = SUUNTO_XML_STARTED_AT,
+    namespace: str | None = SUUNTO_XML_NAMESPACE,
+) -> bytes:
+    """One `<Dive>` around `body`, as the bytes `convert` takes.
+
+    `<StartTime>` is filled in unless the caller states otherwise: `started_at` is REQUIRED
+    (spec §6.2), so a dive without one is dropped rather than converted — which would make
+    every other assertion in a test vacuous.
+    """
+    declared = f' xmlns="{namespace}"' if namespace else ""
+    start = "" if started_at is None else f"<StartTime>{started_at}</StartTime>"
+    return (
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        f'<Dive{declared} xmlns:i="{XSI_NAMESPACE}">{start}{body}</Dive>'
+    ).encode()
+
+
+def suunto_mixtures(*mixtures: str) -> str:
+    """A `<DiveMixtures>` block, one `<DiveMixture>` per argument."""
+    return "<DiveMixtures>" + "".join(f"<DiveMixture>{body}</DiveMixture>" for body in mixtures) + "</DiveMixtures>"
+
+
+def suunto_xml_samples(*samples: str) -> str:
+    """A `<DiveSamples>` block, one `<Dive.Sample>` per argument."""
+    return "<DiveSamples>" + "".join(f"<Dive.Sample>{body}</Dive.Sample>" for body in samples) + "</DiveSamples>"
+
+
+def suunto_xml_sample(second: int, **members: object) -> str:
+    """One `<Dive.Sample>` at `second`, carrying `members` as child elements.
+
+    A member given `None` is written as `i:nil="true"`, which is this serializer's spelling
+    of a reading the sensor did not take.
+    """
+    written = "".join(
+        f"<{name} i:nil=\"true\" />" if value is None else f"<{name}>{value}</{name}>"
+        for name, value in members.items()
+    )
+    return f"<Time>{second}</Time>{written}"

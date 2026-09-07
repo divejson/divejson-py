@@ -75,9 +75,10 @@ and what is one format's — its element map, its writers' habits, its ambiguiti
 is deliberately left unmapped — is in
 [`docs/uddf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/uddf-mapping.md),
 [`docs/ssrf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/ssrf-mapping.md),
-[`docs/fit-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/fit-mapping.md)
+[`docs/fit-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/fit-mapping.md),
+[`docs/suunto-json-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/suunto-json-mapping.md)
 and
-[`docs/suunto-json-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/suunto-json-mapping.md).
+[`docs/suunto-xml-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/suunto-xml-mapping.md).
 
 From Python, the same two steps an application takes:
 
@@ -152,6 +153,7 @@ release would break every corpus that carries one.
 | Subsurface | `ssrf` | reads into DiveJSON | save format 3 |
 | FIT | `fit` | reads into DiveJSON | protocol 2.0 |
 | Suunto app JSON | `suunto_json` | reads into DiveJSON | D5-era and 2026 Suunto Ocean exports |
+| Suunto DM5 XML | `suunto_xml` | reads into DiveJSON | the desktop application's one-dive `<Dive>` exports |
 
 The **id** is the whole coupling between this package and everything around it: it is what
 `sniff` returns, what `--from` and `--to` take, and what a conformance corpus names a
@@ -188,8 +190,9 @@ in this project's hand carries a `float32` `max_depth` of 45.90999984741211 besi
 native `uint32`'s exact 45.91, and a reader that takes the last match by name produces a
 document that validates perfectly and is wrong by a rounding error.
 
-The Suunto app's JSON is what a Suunto owner arrives with, and it is the one format here
-written by an *application* about a device rather than by the device itself. Its units are
+The Suunto app's JSON is what a Suunto owner arrives with, and it is one of the two formats
+here written by an *application* about a device rather than by the device itself — the DM5
+XML in the paragraph below is the other, from the same vendor's desktop side. Its units are
 SI throughout — Pascal, cubic metres, Kelvin, a 0-1 gas fraction — where §6 holds none of
 them; its newest generation moved a dive's cylinders out of the header and into the sample
 stream, where they have to be rebuilt from the diver's **gas switches** rather than from
@@ -198,6 +201,16 @@ so the last reading in the file is a purged regulator and not the dive's end pre
 three are in
 [`docs/suunto-json-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/suunto-json-mapping.md),
 with the figures each of them changes.
+
+The same vendor's **desktop** application exports the same dives as XML, one document per
+dive, and the two disagree about their units: CNS is whole percent there and a 0-1 fraction
+in the app's JSON, cylinder pressures are millibar against Pascal, and one pressure in the
+XML — the surface pressure — is Pascal while every other one in the same file is millibar.
+Only a dive that exists in both makes any of that visible, which is why every factor in
+[`docs/suunto-xml-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/suunto-xml-mapping.md)
+is stated beside the JSON reading of the same dive. That format also writes a **freedive**
+in the same shape as a scuba dive, and DiveJSON has no member for the kind of a dive, so a
+freedive is skipped and reported rather than arriving mislabelled by omission.
 
 ## Releasing
 

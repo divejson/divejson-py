@@ -35,6 +35,7 @@ PAIRS = {
     "ssrf": "refusals",
     "fit": "suunto-d5",
     "suunto_json": "header-only",
+    "suunto_xml": "freedive",
 }
 
 # The same, for the formats this implementation *writes*: `--strict` wants a `write/<id>/`

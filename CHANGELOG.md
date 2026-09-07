@@ -7,6 +7,38 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Suunto's DM5 XML is the fifth format this package reads.** `divejson convert
+  Dive_2021-04-06-1116.xml`, `sniff` answers `"suunto_xml"`, a zip of a whole export
+  directory converts as one logbook, and `fixtures/suunto_xml/` carries the pairs any port
+  is measured against. A file is claimed on its root element **and** its datacontract
+  namespace, where the other XML readers here need only the root: `<uddf>` and `<divelog>`
+  are each one format's, and `<dive>` is a name any dive-log format might reach for.
+
+  **The same vendor's two exports disagree about three units**, and only a dive that exists
+  in both makes it visible. CNS is whole percent here and a 0-1 fraction in the app's JSON;
+  cylinder pressures are millibar against Pascal; and `<SurfacePressure>` is the one
+  pressure in *this* file that is not millibar but Pascal — read at the cylinder scale a
+  barometer at sea level reports a hundred metres of seawater. Every factor in
+  `docs/suunto-xml-mapping.md` is stated beside the JSON reading of the same dive.
+
+  **A `<Mode>3</Mode>` document is a freedive, and is skipped and reported.** DiveJSON has
+  no member for the kind of a dive, so a converted freedive would arrive indistinguishable
+  from a scuba dive with no gas and no algorithm — mislabelled by omission, in a logbook it
+  shares with real scuba dives. It is the answer the app-JSON reader already gives an
+  activity that is not a dive.
+
+  **A cylinder with no transmitter writes both its pressures as `0`**, and the pair is the
+  format's absent-marker rather than a tank breathed to nothing. §6.3 settles the start
+  outright; the end follows it here, because this format never writes one of the two as
+  zero on its own. And the sample stream's single unlabelled `<Pressure>` is tied to a
+  cylinder by `<TransmitterId>` rather than by counting from the first, which is the same
+  answer only until a transmitted deco bottle sits behind an untransmitted back gas.
+
+- The vendored `schema/`, `fixtures/` and `docs/` move to `SPEC_REF` `22690a7`, picking up
+  the mapping documents the specification adopted and the general rules it moved into
+  `docs/converting.md`: where a fix belongs, the per-channel sample collision, and the
+  preserved sub-second fraction.
+
 - **UDDF is the first format this package writes, as well as reads.** `divejson convert
   --to uddf my-logbook.divejson` writes the UDDF beside it, `write_uddf(document)` is the
   same thing from Python, and the report is half the output going out as much as coming in:

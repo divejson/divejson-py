@@ -57,6 +57,11 @@ from .suunto_json import (  # noqa: E402
     MalformedSuuntoJsonError,
     SuuntoJsonError,
 )
+from .suunto_xml import (  # noqa: E402
+    SUUNTO_XML_ID_NAMESPACE,
+    MalformedSuuntoXmlError,
+    SuuntoXmlError,
+)
 from .uddf import UDDF_ID_NAMESPACE, MalformedUddfError, UddfError  # noqa: E402
 from .uddf_write import write_uddf  # noqa: E402
 from .validate import (  # noqa: E402
@@ -76,6 +81,7 @@ __all__ = [
     "FIT_ID_NAMESPACE",
     "SSRF_ID_NAMESPACE",
     "SUUNTO_JSON_ID_NAMESPACE",
+    "SUUNTO_XML_ID_NAMESPACE",
     "UDDF_ID_NAMESPACE",
     "Conversion",
     "ConverterError",
@@ -87,6 +93,7 @@ __all__ = [
     "MalformedFitError",
     "MalformedSsrfError",
     "MalformedSuuntoJsonError",
+    "MalformedSuuntoXmlError",
     "MalformedUddfError",
     "NonConformingOutputError",
     "Note",
@@ -95,6 +102,7 @@ __all__ = [
     "SourceTooLargeError",
     "SsrfError",
     "SuuntoJsonError",
+    "SuuntoXmlError",
     "UddfError",
     "UnsupportedSourceError",
     "Written",

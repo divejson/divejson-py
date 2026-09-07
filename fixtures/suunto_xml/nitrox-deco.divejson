@@ -1,0 +1,145 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-07T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.3.0"
+  },
+  "dives": [
+    {
+      "uuid": "c4b3ed00-9b9e-5374-9280-13b157ad8761",
+      "started_at": "2025-03-10T09:55:48.83",
+      "duration": 3423,
+      "max_depth": 31.95,
+      "avg_depth": 16.6,
+      "bottom_temperature": 25.0,
+      "cns_start": 0.0,
+      "cns_end": 20.0,
+      "otu_start": 0.0,
+      "otu_end": 43.0,
+      "surface_pressure": 1.063,
+      "cylinders": [
+        {
+          "volume": 22.0,
+          "start_pressure": 211.391,
+          "end_pressure": 144.625,
+          "oxygen": 21.0,
+          "helium": 0.0,
+          "po2_limit": 1.4,
+          "gas_number": 0
+        },
+        {
+          "volume": 11.0,
+          "oxygen": 52.0,
+          "helium": 0.0,
+          "po2_limit": 1.6,
+          "gas_number": 1
+        }
+      ],
+      "profile": {
+        "duration": 3485,
+        "depth": {
+          "times": [
+            1,
+            11,
+            241,
+            1112,
+            1122,
+            1583,
+            1593,
+            3485
+          ],
+          "values": [
+            141,
+            399,
+            3186,
+            2988,
+            2991,
+            2104,
+            2068,
+            0
+          ]
+        },
+        "ceiling": {
+          "times": [
+            1112,
+            1122,
+            1583,
+            1593
+          ],
+          "values": [
+            300,
+            300,
+            300,
+            300
+          ]
+        },
+        "temperature": {
+          "times": [
+            1,
+            11,
+            241,
+            1112,
+            1122,
+            1583,
+            1593,
+            3485
+          ],
+          "values": [
+            290,
+            286,
+            255,
+            252,
+            252,
+            254,
+            254,
+            276
+          ]
+        },
+        "pressures": [
+          {
+            "times": [
+              1,
+              11,
+              241,
+              1112,
+              1122,
+              1583
+            ],
+            "values": [
+              2114,
+              2108,
+              1985,
+              1613,
+              1608,
+              1445
+            ],
+            "gas_number": 0
+          }
+        ],
+        "events": [
+          {
+            "time": 0,
+            "type": "gas_switch",
+            "gas_number": 0
+          },
+          {
+            "time": 1592,
+            "type": "gas_switch",
+            "gas_number": 1
+          }
+        ]
+      }
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "suunto_xml",
+      "source_generator": {
+        "name": "Suunto D5",
+        "version": "3.0.2143"
+      }
+    }
+  }
+}

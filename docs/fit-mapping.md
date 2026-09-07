@@ -6,11 +6,12 @@ here changes what a conforming document is.
 **Several of the messages below have never been read from a device that wrote them.**
 `dive_summary`, `tank_summary`, `tank_update` and every `dive_gas` field except
 `oxygen_content`, `helium_content`, `status` and `message_index` are Garmin's, and no
-Garmin file exists in this project: every FIT file this reader was built against is a
-Suunto one, and Suunto's exporter writes none of those four messages. They are unit-tested
-over messages built with an encoder driven by the same profile the reader decodes through,
-which proves the mapping and does not prove the device. Their rows are marked **untested**
-below, and they stay marked until a real Descent export has been converted.
+Garmin file is in hand: every FIT file this mapping was written against is a Suunto one, and
+Suunto's exporter writes none of those four messages. What stands in for a device is
+messages built with an encoder driven by the same profile a reader decodes through, which
+proves the mapping and does not prove the device. Their rows are marked **untested** below,
+and they stay marked until a real Descent export has been converted — a pair for one is what
+`fixtures/fit/` most wants next.
 
 **The rules that hold for every source format are in
 [`converting.md`](converting.md)** — leniency, identity, units and arithmetic, what a
@@ -19,9 +20,9 @@ report is, what a converter refuses to guess. This document carries only what is
 ## Why this format, and what makes it different
 
 FIT is the one binary format a dive computer is likely to hand a diver directly, and it is
-the one format in this package that is genuinely *shared*: a Garmin Descent and a Suunto
+the one format in this corpus that is genuinely *shared*: a Garmin Descent and a Suunto
 Ocean write the same message numbers with the same units, because the units come from the
-global FIT profile rather than from the vendor. Every other source this package reads
+global FIT profile rather than from the vendor. Every other source this corpus covers
 invents its own spelling and has to be read one writer at a time.
 
 That cuts both ways. There is almost no unit table here, and there is no scale for a reader
@@ -33,7 +34,7 @@ samples it summarises, so nothing can be read cheaply from a header.
 
 ### The magic is `.FIT` at offset 8, and the format id is `fit`
 
-Not at offset 0, which every other format in this package is claimed at, and not the `.fit`
+Not at offset 0, which every other format in this corpus is claimed at, and not the `.fit`
 extension, which a rename can fake. The four ASCII bytes sit immediately after the header
 preamble.
 
@@ -47,7 +48,7 @@ doing the only thing that works.
 
 **This is the whole of what a FIT reader has to get right for these files.** Suunto's
 exporter declares developer fields whose names collide with profile fields, so every Suunto
-`session` in this project's hand carries **two** `max_depth` values:
+`session` in this corpus carries **two** `max_depth` values:
 
 | | value | how it is stored |
 | --- | --- | --- |
@@ -79,7 +80,7 @@ At most **100,000 frames** are decoded, after which the file is refused as an ac
 rather than a dive log. Decoding is linear in frames and is the whole cost of reading a FIT,
 and a long run of bare `record`s behind one definition — about ten bytes each, which is how
 a device really encodes a long log — is where an unbounded read hurts. The fullest file in
-this project's hand decodes to 4,339 frames for a 72-minute dive, so the cap is about 23
+this corpus decodes to 4,339 frames for a 72-minute dive, so the cap is about 23
 times that, or roughly 28 hours of continuous logging.
 
 It **refuses rather than truncating**, because the summary comes last: stopping early and
@@ -87,7 +88,7 @@ keeping what had arrived would discard the start time, the duration and the dept
 convert a confidently empty dive.
 
 **The protocol version is recorded and not gated on.** It goes into
-`extensions.divejson.fit_protocol_version` — 2.0 on every file in this project's hand, which
+`extensions.divejson.fit_protocol_version` — 2.0 on both files in this corpus, which
 is the closest thing FIT has to `.ssrf`'s `@version` — and nothing branches on it. What a
 reader has to agree with a writer about is the message and field numbers, and those come
 from the profile.
@@ -102,12 +103,12 @@ The checksum is *not* enforced — it guards against transfer corruption rather 
 tampering, nothing downstream trusts it, and refusing an otherwise readable logbook over it
 would lose real dives for no gain.
 
-What is caught is everything else. This is the one place in the package where a third-party
-decoder walks bytes a stranger supplied, and a corrupt file does not reliably present as
-the decoder's own error type: flipped bytes past the header raise `AssertionError` from the
-reader, `ValueError` from a bad field definition and `TypeError` from the processors. Every
-one of them reaches the caller as this package's own error, because the message reaches an
-import screen.
+What is caught is everything else. This is the format most likely to be decoded through a
+third-party library walking bytes a stranger supplied, and a corrupt file does not reliably
+present as that decoder's own error type: flipped bytes past the header surface as a failed
+assertion inside the reader, a value error from a bad field definition, a type error from
+the processors. Every one of them has to reach the caller as the converter's own error,
+because the message reaches an import screen.
 
 ### One file, one dive
 
@@ -143,8 +144,8 @@ value.
 the profile declares no scale factor for it — so the raw count is what a decoder hands
 back and this is the one conversion FIT does not do for you. Six decimal places is about
 11 cm at the equator, and it is what makes one dive converted from two of its own exports
-produce one position rather than two: the same fix reaches this package as a semicircle
-count here and as a radian float from the Suunto app's JSON, and the two agree exactly at
+produce one position rather than two: the same fix arrives as a semicircle count here and
+as a radian float from the Suunto app's JSON, and the two agree exactly at
 six places and disagree below.
 
 `position_lat` is a `sint32` whose invalid sentinel is `0x7FFFFFFF`, and the arithmetic on
@@ -167,9 +168,9 @@ dive, and a watch that writes one file per dive gives an archive its order.
 
 ## The message map
 
-Every number below was read off real files and off the MIT-licensed profile this package
-decodes through. **Nothing here comes from Garmin's `Profile.xlsx`**, which nobody on this
-project downloads; see the notice in [`README.md`](../README.md).
+Every number below was read off real files and off the MIT-licensed global FIT profile that
+open decoders carry. **Nothing here comes from Garmin's `Profile.xlsx`** — see the notice in
+[`README.md`](../README.md#notices).
 
 ### Provenance — `file_id` (0), `device_info` (23), and the file header
 
@@ -281,9 +282,8 @@ A file with no `activity` message carries no offset to recover, and its dive is 
 UTC instant the device recorded, reported. That is not an invented offset — FIT states
 outright that its timestamps are UTC. What is lost is the wall clock the diver read.
 
-**A recorded sub-second fraction would be preserved.** FIT's `date_time` counts whole
-seconds, so no file can carry one today; §5.2 makes the fraction optional, and truncating a
-recorded value is not something any of the four report kinds could honestly describe.
+**FIT's `date_time` counts whole seconds**, so no file can carry the sub-second fraction
+`converting.md` preserves where a source records one.
 
 ### Cylinders — `dive_gas` (259)
 
@@ -350,11 +350,12 @@ is the only signal there is, so the two are paired in order and **only when the 
 exactly**; anything else — two gases and one pod — leaves the pressures out and says so,
 rather than attaching a start pressure to a cylinder it may not have been measured in.
 
-A file with tank telemetry and no gas list at all is the other way round: evidence of a tank
-is evidence of a tank, so each pod becomes a cylinder carrying its pressures and nothing
-else. A `tank_summary` naming a pod and carrying no pressures grows no cylinder, since it
-describes nothing; one with no `sensor` at all cannot be joined to anything and stands as its
-own cylinder, numbered after the identified ones and contributing no channel.
+A file with tank telemetry and no gas list at all is the other way round, and
+`converting.md`'s evidence-of-a-tank rule is what settles it: each pod becomes a cylinder
+carrying its pressures and nothing else. A `tank_summary` naming a pod and carrying no
+pressures grows no cylinder, since it describes nothing; one with no `sensor` at all cannot
+be joined to anything and stands as its own cylinder, numbered after the identified ones and
+contributing no channel.
 
 `sensor` is read **undecoded**. The profile renders a field whose type carries an enum by
 exact value match and keeps bitfield masks in that same slot, so an ANT id that lands on
@@ -385,31 +386,25 @@ time, two samples on one second, a dive whose samples carry nothing this format 
 
 **Each channel takes only the records that carried its reading.** A Suunto Ocean writes 4,295
 `record`s of which 431 carry a depth and 4,294 a temperature, and padding either to the
-other's length would invent nearly four thousand depths the dive never reached. Readings from
-different messages at one instant are collected into one sample, so a `record` and a
-`tank_update` at one second are one sample rather than two; two readings of the *same*
-channel at one instant keep the first and report the second.
+other's length would invent nearly four thousand depths the dive never reached. A `record`
+and a `tank_update` on one second are one sample rather than two, by `converting.md`'s
+per-channel collision rule — the two carry different channels and were never in
+competition.
 
 `next_stop_depth` is FIT's deco ceiling — the depth of the next required stop, in metres,
 scaled like `depth` beside it. **Not** `next_stop_time` (94), `time_to_surface` (95) or
 `ndl_time` (96), the three neighbouring fields that measure durations rather than a depth.
 
-**A ceiling of zero is not a ceiling.** Zero says the diver may surface — the absence of an
-obligation rather than an obligation at 0 m — and reading it as a reading would draw a flat
-line along the surface across every no-deco dive in a logbook.
+A zero in it is not a ceiling, by `converting.md`'s rule: zero says the diver may surface
+rather than that an obligation sits at 0 m.
 
-### Positions, and where a fix belongs
+### Positions
 
-**No fix is taken underwater**, a receiver not reaching a wrist through seawater, so every
-position in a dive log was recorded at the surface and the only question worth asking of one
-is which surface interval it belongs to. The deepest sample is the split: the last fix at or
-before it is the entry and the first after it is the exit, because the fix that says where a
-diver got in is the one taken just before they descended rather than the one from when the
-boat left the jetty.
-
-The deepest sample is the pivot in preference to an in-water *window*, which would need a
-depth threshold this reader would have to invent. With no depth channel there is no pivot and
-so no answer, and nothing is written.
+A `record`'s `position_lat` / `position_long` pair is a fix, and which surface interval a
+fix belongs to is `converting.md`'s question rather than this format's — the deepest sample
+is the split. What is FIT's is the semicircle encoding above and the `0x7FFFFFFF` sentinel
+beside it. The Ocean pair in `fixtures/fit/` is the case that shape produces: all 28 of its
+fixes land after the deepest sample, so the dive has an exit position and no entry.
 
 ### Events — `event` (21)
 
@@ -424,7 +419,7 @@ A table rather than a cast: this is Garmin's vocabulary, and the other 43 member
 shared enum holds — have to come out as nothing rather than be forced into a type of this
 format's.
 
-**`timer` is the deliberate omission.** It is the only `event` any file in this project's hand
+**`timer` is the deliberate omission.** It is the only `event` either file in this corpus
 writes, and its start/stop pair says where the dive begins and ends, which §6.4's `started_at`
 and the profile's own axis already say twice over.
 
@@ -453,8 +448,8 @@ for a magnitude test to decide. This reader therefore raises no `resolved` findi
 three kinds its report can carry are `absent`, `inferred` and `dropped`. A `resolved` appearing
 here would mean it had started guessing at something the profile already says.
 
-It is the only reader in this package that raises `inferred`, and the only one for which the
-`extensions.divejson.inferred` list is ever written.
+It is the only format in this corpus whose reader raises `inferred`, and so the only one for
+which the `extensions.divejson.inferred` list is ever written.
 
 ## Deliberately not mapped
 
@@ -484,21 +479,7 @@ It is the only reader in this package that raises `inferred`, and the only one f
 
 ## The pairs
 
-`fixtures/fit/` holds the conformance pairs for this reader — an input, and the document a
-correct reader produces from it. The specification adopts them after a release, and
-`fixtures/README.md` gains its rows then.
-
-**Both inputs are committed as recorded**, which is the exception `fixtures/README.md` already
-carries: a binary file cannot be reduced by hand, and a synthetic one would prove that an
-encoder and a decoder agree rather than that a device's file reads. The recorder chose a dive
-whose position they are content to publish.
-
-| file | recorded on | what it covers |
-| --- | --- | --- |
-| `suunto-ocean.fit` | Suunto Ocean, product 62 | The known answer, and the developer-field trap: a `session` carrying `max_depth` 45.91 natively beside a developer `float32` of 45.90999984741211. 4,295 `record`s of which 431 carry a depth and 4,294 a temperature, on their own axes; two enabled gases at 21 % and 54 %; 28 satellite fixes, all of them after the deepest sample, so the dive has an exit position and no entry; a `+02:00` recovered from `activity`; and `start_cns` as the one mapped member its session leaves empty. |
-| `suunto-d5.fit` | Suunto D5, product 39 | The same trap on a different product six years earlier — 32.41 against a developer 32.40999984741211 — and the small end of the format: 200 `record`s carrying a depth and a temperature each, one gas, and no position at all. |
-
-Neither file carries a `dive_summary`, a `tank_summary`, a `tank_update`, a `water_type`, a
-`software_version`, a disabled gas or any `event` but `timer` — which is the list of what a
-Garmin export is expected to bring, and what the encoder-built tests stand in for until it
-arrives.
+[`fixtures/fit/`](../fixtures/fit) holds the conformance pairs for this format — an
+input, and the document a correct reader produces from it. What each one covers, and how it
+was built, is one row per pair in [`fixtures/README.md`](../fixtures/README.md#fit); the
+rules those expectations follow are this document and [`converting.md`](converting.md).

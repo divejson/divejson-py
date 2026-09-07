@@ -1,0 +1,97 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-07T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.3.0"
+  },
+  "dives": [
+    {
+      "uuid": "c4b3ed00-9b9e-5374-9280-13b157ad8761",
+      "started_at": "2025-05-01T09:58:12.5",
+      "notes": "Shore entry; the pod was paired to the computer but the app never wrote which tank it was on.",
+      "bottom_temperature": 22.0,
+      "cns_start": 0.0,
+      "cns_end": 3.0,
+      "otu_start": 0.0,
+      "otu_end": 8.0,
+      "surface_pressure": 1.013,
+      "cylinders": [
+        {
+          "volume": 12.0,
+          "oxygen": 21.0,
+          "helium": 0.0,
+          "po2_limit": 1.4,
+          "gas_number": 0
+        },
+        {
+          "gas_number": 1
+        }
+      ],
+      "profile": {
+        "duration": 40,
+        "depth": {
+          "times": [
+            10,
+            20,
+            30,
+            40
+          ],
+          "values": [
+            142,
+            861,
+            1735,
+            40
+          ]
+        },
+        "ceiling": {
+          "times": [
+            30
+          ],
+          "values": [
+            450
+          ]
+        },
+        "temperature": {
+          "times": [
+            10,
+            20,
+            30,
+            40
+          ],
+          "values": [
+            224,
+            222,
+            220,
+            219
+          ]
+        },
+        "pressures": [
+          {
+            "times": [
+              10,
+              20,
+              40
+            ],
+            "values": [
+              1980,
+              1870,
+              720
+            ],
+            "gas_number": 1
+          }
+        ]
+      }
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "suunto_xml",
+      "source_generator": {
+        "name": "Suunto D5",
+        "version": "3.0.2143"
+      }
+    }
+  }
+}

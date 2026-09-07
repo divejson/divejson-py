@@ -12,15 +12,21 @@ what it deliberately leaves unmapped.
 It is also where a reader learns why the same logbook converts differently through
 Subsurface's two export paths, and which of the two answers is the closer one.
 
+Every claim below was checked against real Subsurface output: one eight-dive logbook
+exported both as a `.ssrf` save file and as UDDF. Neither whole export is carried here —
+`fixtures/ssrf/subsurface.ssrf` and `fixtures/uddf/subsurface.uddf` are two-dive reductions
+of them — so where a rule rests on a file this repository does not carry, it says so in
+place.
+
 ## Why this format and not the UDDF export
 
 `.ssrf` is Subsurface's **save file** rather than an export, so it holds everything
 Subsurface knows. Its UDDF export holds what UDDF has room for, and Subsurface fills the
 gaps in ways that survive into a converted document —
-[`uddf-mapping.md`](uddf-mapping.md) *Known writer artefacts* records several. Both readers
-in this repository have been run over the same eight-dive logbook in both of its export
-paths, and every difference between the two documents is the UDDF exporter's doing rather
-than either reader's. *Where the two readings differ* below lists them.
+[`uddf-mapping.md`](uddf-mapping.md) *Known writer artefacts* records several. A reader of
+each format has been run over that logbook in both of its export paths, and every difference
+between the two documents is the UDDF exporter's doing rather than either reader's. *Where
+the two readings differ* below lists them.
 
 Subsurface is also where most of a diver's history ends up after leaving a vendor
 application, which makes reading its own file the shortest route out of it.
@@ -56,7 +62,7 @@ states outright, and the cost of getting it wrong is why: a `'150.6 ft'` read at
 scale puts a recreational dive at 150 metres, in a document that validates perfectly.
 
 **Imperial spellings are deliberately not in the table.** Subsurface writes them for a diver
-whose units are set that way, and no export in this repository's hand carries one — so
+whose units are set that way, and no export in hand carries one — so
 neither the spellings nor the factors could be checked against a file Subsurface produced,
 which `converting.md` requires of a claim about a real writer. A reader who has such a file
 should add the rows and a hand-computed test for each; until then the refusal is loud, and
@@ -109,7 +115,7 @@ unchanged file and moves when the file's order does.
 That makes the archive case ordinary rather than exotic. Two `.ssrf` files in one zip would
 hand their first dives one UUID if the stand-in were not prefixed by the member name, and
 the merged document would fail its own validation on a duplicate uuid. `converting.md`'s
-prefixing rule is what stops it, and `tests/test_ssrf_parsing.py` holds it there.
+prefixing rule is what stops it.
 
 **A `<site @uuid>` is eight hex digits rather than a UUID**, so it is hashed like any other
 source id. It is read as an opaque string: Subsurface writes one of them in the reference
@@ -222,8 +228,8 @@ is structural rather than derived. It is regularly longer than the dive's own `@
 make the two agree.
 
 **So the report this reader produces carries two kinds and only two: `absent` and
-`dropped`.** `tests/test_ssrf_fixtures.py` asserts that over the whole corpus, and a
-`resolved` finding appearing there would mean this reader had started guessing at a scale.
+`dropped`.** No pair in `fixtures/ssrf/` expects another, and a `resolved` finding appearing
+there would mean a reader had started guessing at a scale.
 
 ## Three things read and deliberately not carried
 
@@ -246,7 +252,7 @@ them in the converted document deserves to be told where they went.
 ## Deliberately not mapped
 
 Listed rather than left silent, because a port needs to know these were considered. Several
-say the same thing, and it is `converting.md`'s: no file in this repository's hand carries
+say the same thing, and it is `converting.md`'s: no file in hand carries
 one, so nothing about it could be checked against output Subsurface actually produced.
 
 | `.ssrf` | why not |
@@ -267,7 +273,7 @@ one, so nothing about it could be checked against output Subsurface actually pro
 
 ## Where the two readings differ
 
-Both readers in this repository have been run over one Subsurface logbook exported both
+A reader of each format has been run over one Subsurface logbook exported both
 ways — eight dives and five sites, converted whole and compared member by member, ignoring
 only the three things neither reader is claiming anything about: `uuid`, `site_uuids` and
 `extensions`. The depth and temperature channels come out **equal, sample for sample**,
@@ -324,12 +330,7 @@ says why converted logbooks are not safe to merge on UUID.
 
 ## The pairs
 
-`fixtures/ssrf/` holds the conformance pairs for this reader — an input, and the document a
-correct reader produces from it. The specification adopts them after a release, and
-`fixtures/README.md` gains its rows then.
-
-| file | modelled on | what it covers |
-| --- | --- | --- |
-| `subsurface.ssrf` | Subsurface 6.0.x | The same two dives of the same logbook as `fixtures/uddf/subsurface.uddf`, reduced from the `.ssrf` the way that file is reduced from the UDDF export: the first dive keeps eight of its 431 depth samples and two of its 29 temperatures, sample for sample the same eight and two, which is what makes the two documents comparable. The second keeps all six of the profile Subsurface fabricates for a dive that has none, carried through as recorded — the UDDF fixture reduced that one to three. Also the site id `' ff47210'` with its leading space, a cylinder with a gas and one without, and the three read-and-dropped attributes. |
-| `trip-grouping.ssrf` | hand-built | A `<trip>` wrapping two dives with a third beside it, so the walk-through and the dropped grouping are both visible, and the positional identities run across the flattening. |
-| `refusals.ssrf` | hand-built | Everything this reader refuses: a `'150.6 ft'` maximum depth and a `'67.1 F'` sample temperature, a nameless site and the dive whose reference to it therefore resolves to nothing, a reference to a site nothing defines, a dive with no date, a `@time` with no seconds, two `<divecomputer>` elements on one dive, a sample with no time, two samples on one second, a zero start pressure beside a zero end pressure, a pressure past 350 bar, and a mix summing past 100 %. |
+[`fixtures/ssrf/`](../fixtures/ssrf) holds the conformance pairs for this format — an
+input, and the document a correct reader produces from it. What each one covers, and how it
+was built, is one row per pair in [`fixtures/README.md`](../fixtures/README.md#ssrf); the
+rules those expectations follow are this document and [`converting.md`](converting.md).
