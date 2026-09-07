@@ -17,7 +17,7 @@ from helpers import FIXTURES
 
 from divejson.cli import main
 from divejson.conform import DIFF_LINES, IGNORED, compared, run
-from divejson.registry import known_formats, read_formats
+from divejson.registry import adapter_for, known_formats, read_formats
 
 # The stand-in for a format nothing here registers. It used to be `ssrf`, which stopped
 # standing in for anything the day the Subsurface reader landed and took several tests with
@@ -30,7 +30,12 @@ UNREAD = "unregistered"
 # The smallest pair each format has, since every test below copies the whole set: the
 # Suunto Ocean's 4,295 records make a 165 KB expectation, and the D5's 200 make a 15 KB one
 # that exercises the same reader.
-PAIRS = {"uddf": "mix-only-cylinder", "ssrf": "refusals", "fit": "suunto-d5"}
+PAIRS = {
+    "uddf": "mix-only-cylinder",
+    "ssrf": "refusals",
+    "fit": "suunto-d5",
+    "suunto_json": "header-only",
+}
 
 
 def _corpus(tmp_path: Path) -> Path:
@@ -43,7 +48,10 @@ def _corpus(tmp_path: Path) -> Path:
     for fmt in read_formats():
         (corpus / fmt).mkdir()
         stem = PAIRS[fmt]
-        for name in (f"{stem}.{fmt}", f"{stem}.divejson"):
+        # The adapter's own first suffix rather than the format id: a pair directory is
+        # named for the id and its inputs are named for the extension a file of that
+        # format carries, and for `suunto_json` those are not the same string.
+        for name in (f"{stem}{adapter_for(fmt).suffixes[0]}", f"{stem}.divejson"):
             shutil.copy(FIXTURES / fmt / name, corpus / fmt)
     return corpus
 
