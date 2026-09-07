@@ -129,8 +129,10 @@ class Adapter(Protocol):
 # alongside it — FIT claims a binary magic no XML document can carry, and the Suunto app's
 # JSON claims an object opening on a member name no XML or FIT file has anywhere. So no two
 # of them can answer for one file and `sniff` reaches the same verdict whichever it asks
-# first. The `.json` and `.xml` suffixes are each shared by two of the formats here and
-# decide nothing — nothing sniffs on a suffix.
+# first. The suffixes decide nothing at all — nothing here sniffs on one — which is just as
+# well: `.json` is also what a DiveJSON document is called, and `.xml` is what half the
+# dive-log formats in existence are called, this build's own UDDF reader included where a
+# writer chose that extension over `.uddf`.
 ADAPTERS: tuple[Adapter, ...] = (UDDF, SSRF, FIT, SUUNTO_JSON, SUUNTO_XML)
 
 

@@ -135,8 +135,9 @@ MAX_CYLINDER_PRESSURE = Decimal(350)
 MIN_SURFACE_PRESSURE, MAX_SURFACE_PRESSURE = Decimal("0.4"), Decimal("1.2")
 MIN_PO2_LIMIT, MAX_PO2_LIMIT = Decimal("0.4"), Decimal("2.0")
 
-# How many cylinders one dive may describe. The corpus never reaches two, but a
-# `<DiveMixtures>` element may hold any number and each one is a row in a diver's logbook.
+# How many cylinders one dive may describe. The corpus reaches two — 11 of its 342 dives
+# with mixtures carry a back gas and a deco bottle — but a `<DiveMixtures>` element may hold
+# any number, and each one is a row in a diver's logbook.
 MAX_CYLINDERS = 16
 
 # The `i:nil` attribute this serializer marks an unrecorded member with, matched by its
@@ -913,13 +914,13 @@ class _Converter:
 
         `<Marks>` is deliberately not read, and it is the only other event-shaped block in
         the format. Its `<Type>` is an undocumented numeric code the corpus says plainly
-        cannot be guessed at: 29 distinct values across 4 068 marks, of which the two
-        commonest appear in **all 384** exports at about 1.3 per dive, which is not the
-        shape of a bookmark a diver pressed. Mapping one onto §6.5's vocabulary would be a
-        confident label over a number nobody has decoded — the same mistake as reading
-        `<Type>1</Type>` on a `<DiveMixture>` as the cylinder's role. The same dives' app
-        JSON spells its events out in words, so a diver who wants them has a file that says
-        so.
+        cannot be guessed at: 29 distinct values across 4 095 marks, and the one that
+        appears in **every single export** — `257`, 503 of them, about 1.3 per dive — is
+        not the shape of a bookmark a diver pressed. Mapping one onto §6.5's vocabulary
+        would be a confident label over a number nobody has decoded — the same mistake as
+        reading `<Type>1</Type>` on a `<DiveMixture>` as the cylinder's role. The same
+        dives' app JSON spells its events out in words, so a diver who wants them has a
+        file that says so.
         """
         return [
             {"time": second, "type": "gas_switch", "gas_number": cylinder.number}
