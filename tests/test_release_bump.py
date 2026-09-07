@@ -108,10 +108,15 @@ def test_the_bump(current: str, subjects: list[str], expected: str) -> None:
     "text",
     [
         "1.0", "0.2.0a1", "v0.2.0", "0.2.0+1", "01.2.0", "",
-        # Python's `$` also matches before a trailing newline, so an anchored `match`
-        # would accept these — and the version then lands in `__version__ = "..."` as two
-        # physical lines, leaving a package that does not import and a tag already pushed.
-        "0.2.0\n", "0.2.0 ", " 0.2.0", "0.2\n.0",
+        # This one, and only this one, an anchored `match` accepted: Python's `$` matches
+        # before a trailing newline as well as at the end of the string. The version then
+        # landed in `__version__ = "..."` as two physical lines, leaving a package that
+        # does not import and a tag already pushed.
+        "0.2.0\n",
+        # The rest were always refused, and are here because `main` strips the dispatch
+        # input before it reaches this: surrounding whitespace is a typo and is forgiven
+        # there, whitespace *inside* a version is not a version and is refused here.
+        "0.2.0 ", " 0.2.0", "0.2\n.0",
     ],
 )
 def test_a_version_that_is_not_three_integers_is_refused(text: str) -> None:
