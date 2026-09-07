@@ -194,3 +194,81 @@ def test_validate_still_works(capsys) -> None:
     """The dispatch used to call one command unconditionally; a second one has to not break it."""
     assert main(["validate", str(FIXTURES / "valid" / "minimal.divejson")]) == 0
     assert main(["validate", str(FIXTURES / "invalid" / "missing-format.divejson")]) == 1
+
+
+# -- `--to`: the writer's one command-line surface --------------------------------------
+
+
+@pytest.fixture()
+def logbook(tmp_path):
+    """A conforming document, so the command has something it will agree to write."""
+    path = tmp_path / "logbook.divejson"
+    path.write_bytes((FIXTURES / "write" / "uddf" / "opendiving.divejson").read_bytes())
+    return path
+
+
+def test_the_written_file_lands_beside_the_document(logbook, capsys) -> None:
+    assert main(["convert", "--to", "uddf", str(logbook)]) == 0
+    written = logbook.with_suffix(".uddf")
+    assert written.read_bytes().startswith(b'<?xml version="1.0" encoding="utf-8"?>')
+    out = capsys.readouterr().out
+    assert f"→ {written}" in out
+    assert "1 dive, 1 trip, 1 site, 3 gear items" in out
+
+
+def test_the_report_says_what_the_format_could_not_hold(logbook, capsys) -> None:
+    """The other half of the output, going out as much as coming in."""
+    main(["convert", "--to", "uddf", str(logbook)])
+    out = capsys.readouterr().out
+    assert any(f"  {kind}" in out for kind in NOTE_KINDS)
+    assert "extensions" in out
+
+
+def test_an_existing_file_is_refused_unless_forced(logbook, capsys) -> None:
+    logbook.with_suffix(".uddf").write_text("mine", encoding="utf-8")
+
+    assert main(["convert", "--to", "uddf", str(logbook)]) == 1
+    assert "already exists" in capsys.readouterr().out
+    assert logbook.with_suffix(".uddf").read_text(encoding="utf-8") == "mine"
+
+    assert main(["convert", "--to", "uddf", "--force", str(logbook)]) == 0
+    assert logbook.with_suffix(".uddf").read_text(encoding="utf-8") != "mine"
+
+
+def test_a_document_that_does_not_conform_is_refused_before_anything_is_written(tmp_path, capsys) -> None:
+    """A writer places a document into another format's shape; it does not vet one.
+
+    So the vetting happens here, where the alternative is a UDDF file carrying a member the
+    format it came from would have rejected — and nobody downstream to notice.
+    """
+    path = tmp_path / "broken.divejson"
+    path.write_bytes((FIXTURES / "invalid" / "avg-depth-exceeds-max.divejson").read_bytes())
+
+    assert main(["convert", "--to", "uddf", str(path)]) == 1
+    assert "does not conform" in capsys.readouterr().out
+    assert not path.with_suffix(".uddf").exists()
+
+
+def test_output_names_the_file(logbook, tmp_path, capsys) -> None:
+    elsewhere = tmp_path / "elsewhere.uddf"
+    assert main(["convert", "--to", "uddf", "-o", str(elsewhere), str(logbook)]) == 0
+    assert elsewhere.is_file()
+    assert not logbook.with_suffix(".uddf").exists()
+
+
+def test_from_and_to_are_opposite_directions(logbook, capsys) -> None:
+    assert main(["convert", "--to", "uddf", "--from", "uddf", str(logbook)]) == 1
+    assert "opposite directions" in capsys.readouterr().out
+
+
+def test_exported_at_belongs_to_a_document_being_produced(logbook, capsys) -> None:
+    """It is a member of the document a conversion *writes*, and `--to` is given one."""
+    assert main(["convert", "--to", "uddf", "--exported-at", "2026-01-01T00:00:00Z", str(logbook)]) == 1
+    assert "--exported-at" in capsys.readouterr().out
+
+
+def test_a_format_this_build_does_not_write_is_refused(logbook, capsys) -> None:
+    """`--to ssrf` is the case: this build reads Subsurface's save format and writes none."""
+    with pytest.raises(SystemExit):
+        main(["convert", "--to", "ssrf", str(logbook)])
+    assert "invalid choice" in capsys.readouterr().err

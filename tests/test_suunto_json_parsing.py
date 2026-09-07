@@ -318,12 +318,18 @@ def test_a_header_with_no_dive_time_leaves_the_readings_unbounded() -> None:
     assert dive["cylinders"][0]["end_pressure"] == 0.14062
 
 
-def test_the_extremes_are_taken_over_the_samples_and_not_over_the_axis() -> None:
+def test_the_extremes_are_taken_over_the_samples_and_not_off_the_profile() -> None:
     """The reading that shares its second with an earlier entry is still the dive's first.
 
-    Taking the extremes off the whole-second axis instead loses it — on the real dive this
-    reader is measured against that moves the start pressure from 211.625 bar to 211.26562,
-    which is a wrong answer frozen into a conformance corpus.
+    The merged axis is **not** what would lose it: `axis` folds this cylinder reading into
+    the second the depth entry 0.1 s earlier already holds, so an axis-based reading of the
+    extremes would reach 211.625 too. The two answers that are wrong, on the real dive this
+    reader is measured against, are an *unmerged* one-entry-per-second axis, where the first
+    entry takes the second whole and the start pressure becomes 211.26562, and the axis's
+    pressure channel, which §6.5 stores in tenths of a bar and would give 211.6.
+
+    So this case is about the rule rather than about a difference it makes here, and the
+    channel below is where the difference is: the channel rounds and the cylinder does not.
     """
     dive = _dive(
         {},
@@ -334,6 +340,7 @@ def test_the_extremes_are_taken_over_the_samples_and_not_over_the_axis() -> None
         ],
     )
     assert dive["cylinders"][0]["start_pressure"] == 211.625
+    assert dive["profile"]["pressures"][0]["values"][0] == 2116  # 211.6 bar, in tenths
 
 
 def test_a_zero_start_pressure_is_a_device_s_absent_marker() -> None:

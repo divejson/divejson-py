@@ -42,8 +42,8 @@ export's sample timestamps is not monotonic — adjacent entries go backwards by
 the separate sensor streams being appended out of order — so the last entry in the file is
 not the last reading of the dive. That is `converting.md`'s ordering rule meeting the writer
 that makes it obvious, and it is why the cylinder's extremes are taken over the samples'
-recorded instants rather than over the profile's whole-second axis, which drops a reading
-that shares its second with an earlier sample.
+recorded instants rather than off the profile — see `transmitted` for the two ways off the
+profile that lose the answer, neither of which is the merged axis.
 """
 
 from __future__ import annotations
@@ -836,12 +836,20 @@ class _Converter:
     def transmitted(self, origin: datetime) -> dict[int, tuple[Decimal | None, Decimal | None]]:
         """Each slot's first and last transmitter reading, bounded by `Header.DiveTime`.
 
-        **Over the samples' own recorded instants, not over the profile's axis.** The axis
-        rounds to whole seconds and keeps the first sample on each of them, and a cylinder
-        reading that shares its second with an earlier sample of another channel is dropped
-        by that rule — which is right for a channel and wrong for the extremes: on the file
-        this reader is measured against it moves the start pressure from 211.625 bar to
-        211.26562. So this walks every sample, and `None` readings are skipped rather than
+        **Over the samples' own recorded instants, and not off the profile.** Two ways of
+        taking them off the profile lose the answer, and *neither is the merged axis* —
+        which reproduces it, `axis` folding an entry into the second another channel's entry
+        already holds rather than dropping it. What loses it is either of the two below,
+        measured on the file this reader is checked against, whose start pressure is
+        211.625 bar:
+
+        * an **unmerged** axis, one entry per second with the first winning it whole, gives
+          211.26562 — the earlier depth entry taking the second and carrying the cylinder
+          reading 0.1 s later away with it;
+        * the axis's pressure **channel**, which §6.5 stores in tenths of a bar, gives
+          211.6 — owner-ruled out, the reader carrying Suunto's own figure exactly.
+
+        So this walks every sample, and `None` readings are skipped rather than
         ending the series: an Ocean reports five slots on every sample with `Pressure: null`
         in the four nothing is paired to, and its final samples null out even the live one.
 

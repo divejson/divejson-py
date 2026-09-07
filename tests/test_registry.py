@@ -27,7 +27,15 @@ from divejson import (
     sniff,
 )
 from divejson.converter import INFERRED, PRODUCER_KEY, Note, Scope
-from divejson.registry import ZIP, adapter_for, known_formats, read_formats
+from divejson.registry import (
+    WRITTEN,
+    ZIP,
+    adapter_for,
+    known_formats,
+    read_formats,
+    write_formats,
+    writer_for,
+)
 
 EXPORTED_AT = datetime(2026, 9, 5, tzinfo=timezone.utc)
 
@@ -64,6 +72,33 @@ def _anonymous(count: int) -> bytes:
 def test_the_registered_formats_are_what_this_build_reads() -> None:
     assert read_formats() == ("uddf", "ssrf", "fit", "suunto_json")
     assert known_formats() == {"uddf", "ssrf", "fit", "suunto_json"}
+
+
+def test_reading_a_format_and_writing_it_are_separate_registrations() -> None:
+    """One id, two lists, and `known_formats` is their union.
+
+    UDDF is the only format registered on both sides today, which is exactly why the lists
+    have to be asked separately: a corpus's `write/ssrf/` directory is one this build cannot
+    answer for, however fluently it answers for `ssrf/` two directories away.
+    """
+    assert write_formats() == ("uddf",)
+    assert WRITTEN == {"uddf"}
+    assert WRITTEN < set(read_formats())
+    assert known_formats() == set(read_formats()) | WRITTEN
+
+
+def test_a_format_this_build_does_not_write_has_no_writer() -> None:
+    with pytest.raises(UnsupportedSourceError, match="not a format this build writes"):
+        writer_for("ssrf")
+
+
+def test_every_writer_pairs_a_document_with_a_file_of_its_own_extension() -> None:
+    """The suffix is what pairs an expected file with its input in a `write/<id>/` directory,
+    so a writer whose suffix was `.divejson` would pair a document with itself."""
+    for fmt in write_formats():
+        writer = writer_for(fmt)
+        assert writer.format == fmt
+        assert writer.suffix.startswith(".") and writer.suffix != ".divejson"
 
 
 def test_zip_is_a_container_and_not_a_registered_format() -> None:
