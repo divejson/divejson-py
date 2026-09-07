@@ -411,8 +411,59 @@ def test_samples_carrying_a_time_and_nothing_else_produce_no_profile() -> None:
     assert any(note.kind == "dropped" and "no reading this format can hold" in note.message for note in found.notes)
 
 
+@pytest.mark.parametrize(
+    "samples",
+    [
+        "",
+        "<DiveSamples />",
+        suunto_xml_samples('<Time i:nil="true" /><Depth>4.5</Depth>'),
+    ],
+    ids=["no DiveSamples", "an empty one", "every sample dropped"],
+)
+def test_gas_switches_with_no_profile_to_sit_on_are_reported(samples: str) -> None:
+    """This reader's events come from outside the sample stream, so they can be lost.
+
+    Every other reader in this package builds its events out of the samples, which makes
+    "no samples, no events" a tautology there and a real loss here: the switch times are on
+    the `<DiveMixture>` elements and survive a dive whose profile does not.
+    """
+    found = convert(
+        suunto_xml(
+            suunto_mixtures(
+                "<DiveGasChanges><DiveGasChange><GasChangeTime>0</GasChangeTime></DiveGasChange>"
+                "</DiveGasChanges><Oxygen>21</Oxygen>"
+            )
+            + samples
+        )
+    )
+    assert "profile" not in found.document["dives"][0]
+    assert any(
+        note.kind == "dropped" and "no profile for a marker to sit on" in note.message
+        for note in found.notes
+    )
+
+
+def test_a_switch_survives_samples_that_carry_a_time_and_nothing_else() -> None:
+    """The one shape where the axis keeps the markers: something was on the axis.
+
+    §6.4 makes `duration` the span of the samples, and here that span is zero — but the
+    source did record a marker, and `series.SampleAxis.profile` emits a profile for events
+    alone rather than dropping them, which is every reader in this package's answer.
+    """
+    found = convert(
+        suunto_xml(
+            suunto_mixtures(
+                "<DiveGasChanges><DiveGasChange><GasChangeTime>0</GasChangeTime></DiveGasChange>"
+                "</DiveGasChanges>"
+            )
+            + suunto_xml_samples("<Time>10</Time>")
+        )
+    ).document["dives"][0]["profile"]
+    assert found == {"duration": 0, "events": [{"time": 0, "type": "gas_switch", "gas_number": 0}]}
+
+
 def test_the_marks_block_is_not_read() -> None:
-    """29 undocumented numeric types across 4 068 marks, two of them in all 384 exports.
+    """29 undocumented numeric types across 4 095 marks, one of them in all 384 exports.
 
     Mapping one onto §6.5's vocabulary would be a confident label over a number nobody has
     decoded. It is not reported either: it is a block this format has and this reader has

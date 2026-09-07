@@ -788,10 +788,19 @@ class _Converter:
         `<SacRate>` and `<GasTime>` are the computer's own gas arithmetic, which §6.5 has no
         channel for; `<Heading>` is a compass bearing, likewise, and is nil on all 115 602
         samples in hand.
+
+        **The gas switches are read before the samples are, and are reported if there turns
+        out to be no profile to put them on.** This is the one reader in this package whose
+        events come from outside the sample stream — they are on the `<DiveMixture>`
+        elements — so "no samples, no events" is a real loss here where in every other
+        reader it is a tautology. A dive whose `<DiveSamples>` is empty, or whose samples
+        are every one of them dropped, still recorded the times the diver changed gas, and
+        §6.4 has nowhere to put a marker without a profile to hang it from.
         """
+        events = self.read_events(cylinders)
         samples = _children(_child(self.root, "DiveSamples"), "Dive.Sample")
         if not samples:
-            return None
+            return self.without_a_profile(events, where)
 
         axis = SampleAxis(self.note, where, noun="sample", time_member="<Time>")
         for index, sample in enumerate(samples):
@@ -838,19 +847,44 @@ class _Converter:
             )
 
         pressures = self.label_pressures(pressure, cylinders, where)
-        events = self.read_events(cylinders)
         profile = axis.profile(
             {"depth": depth, "ceiling": ceiling, "temperature": temperature},
             pressures=pressures,
             events=events,
         )
+        if profile is None:
+            return self.without_a_profile(events, where)
         # §6.3 calls `gas_number` a label rather than an array index, so a numbering is
         # asserted only where something in the profile depends on it — a pressure channel,
         # or a gas switch naming the cylinder it switched to.
-        if profile is not None and (profile.get("pressures") or any("gas_number" in event for event in events)):
+        if profile.get("pressures") or any("gas_number" in event for event in events):
             for cylinder in cylinders:
                 cylinder.member["gas_number"] = cylinder.number
         return profile
+
+    def without_a_profile(self, events: list[dict[str, Any]], where: str) -> None:
+        """No profile, and a line for the gas switches that had nowhere to go.
+
+        The two ways here are a `<DiveSamples>` with nothing in it and a `<DiveSamples>`
+        whose every sample was dropped, and neither is silent about the *samples*: the
+        first said nothing to begin with, and the second reported each one as it went. What
+        would be silent without this is the switches, which this format keeps on the
+        `<DiveMixture>` elements rather than on the samples and which are therefore still
+        there to lose.
+
+        One line carrying a count rather than one line per switch, and no times in it: the
+        report groups on the message, so a value in the text would turn one habit of an
+        archive into a separate line per dive.
+        """
+        if events:
+            self.note(
+                where,
+                f"the export records {len(events)} gas "
+                f"{'change' if len(events) == 1 else 'changes'} and the dive has no profile for a marker "
+                "to sit on, its samples carrying nothing this format can hold; dropped (spec §6.4)",
+                "dropped",
+            )
+        return None
 
     def label_pressures(
         self, pressure: Channel, cylinders: list[_Cylinder], where: str

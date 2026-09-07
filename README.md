@@ -190,8 +190,9 @@ in this project's hand carries a `float32` `max_depth` of 45.90999984741211 besi
 native `uint32`'s exact 45.91, and a reader that takes the last match by name produces a
 document that validates perfectly and is wrong by a rounding error.
 
-The Suunto app's JSON is what a Suunto owner arrives with, and it is the one format here
-written by an *application* about a device rather than by the device itself. Its units are
+The Suunto app's JSON is what a Suunto owner arrives with, and it is one of the two formats
+here written by an *application* about a device rather than by the device itself — the DM5
+XML in the paragraph below is the other, from the same vendor's desktop side. Its units are
 SI throughout — Pascal, cubic metres, Kelvin, a 0-1 gas fraction — where §6 holds none of
 them; its newest generation moved a dive's cylinders out of the header and into the sample
 stream, where they have to be rebuilt from the diver's **gas switches** rather than from
