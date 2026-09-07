@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.3.0
+
 - **The Suunto app's JSON is the fourth format this package reads.** `divejson convert
   my-dive.json`, `sniff` answers `"suunto_json"`, a zip of them converts as one logbook, and
   `fixtures/suunto_json/` carries the pairs any port is measured against. A file is claimed
