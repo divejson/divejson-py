@@ -19,9 +19,9 @@ DiveJSON's own **reference writer** is the application the format came out of, a
 the reference: this is a second writer serving applications that are not that one, not a
 replacement for it. The two agree on everything a logbook actually holds, and differ wherever
 an application exporting its own data and a converter producing an interchange file want
-opposite things. Each of those is marked **Differs from the reference writer** below, which
-is the list — a count of them stated up here would only be a second place for it to be
-wrong.
+opposite things. **Each such place is marked "Differs from the reference writer" below**, and
+those markers are the list — no count of them is stated anywhere, a figure kept away from the
+thing it counts being a second place for it to be wrong.
 
 ## What a correct writer is checked against
 
@@ -183,6 +183,12 @@ its uuid — so it carries no finding.
 `geographyType` makes `<location>` mandatory, so **coordinates are written only where the
 record has a place name**: a site with a `position` and no `location`, or a trip location
 with a `position` and no `display_name`, keeps its name and loses its coordinates, reported.
+
+**Differs from the reference writer**: it puts the record's own **name** in `<location>` and
+keeps the coordinates, which is defensible for an application exporting data it holds a name
+for and wrong for a converter — a round trip through it hands the diver back a `location`
+they never wrote. This is the same trade *The three answers* describes, and it is the one
+place in the document where the reference writer takes the third of them.
 
 A trip becomes one `<trippart>` **per §6.9 location**, which is the only shape a list of
 places fits: a reader takes a trip's span as the span of its parts and its locations from

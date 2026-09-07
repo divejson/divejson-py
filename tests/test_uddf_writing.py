@@ -460,8 +460,9 @@ def test_a_gear_finding_names_the_piece_it_is_about(schema) -> None:
     are different numbers — so a finding raised while writing a piece has to take its path
     from the piece rather than from wherever the pass that grouped them ended up.
 
-    The boots are `gear/0` in the document and the *last* element written, `<variouspieces>`
-    coming after them in `equipmentType`'s sequence; only the boots carry the empty note.
+    The boots are `gear/0` in the document and the *first* element written, `boots` opening
+    `equipmentType`'s sequence and `variouspieces` closing it — so the SMB is where the
+    grouping pass leaves its path, and only the boots carry the empty note.
     """
     source = document(
         gear=[

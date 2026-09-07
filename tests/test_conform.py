@@ -383,8 +383,9 @@ def test_a_non_conforming_document_is_never_handed_to_the_writer(tmp_path, capsy
     assert main(["conform", str(corpus)]) == 1
     out = capsys.readouterr().out
     assert "does not itself conform" in out
-    # The groups after `write/uddf` in the walk still reported, which is what says the run
-    # finished rather than fell over on the way.
+    # Nothing is printed until the whole walk returns a `Result`, so any output at all is
+    # what says the run finished rather than fell over on the way — this asserts on a group
+    # from earlier in the walk, `write/uddf` being the last of them.
     assert "uddf: 1 reader pair checked" in out
 
 
