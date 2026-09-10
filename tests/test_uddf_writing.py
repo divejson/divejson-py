@@ -702,7 +702,29 @@ def test_two_different_computers_claiming_one_kit_item_is_a_tie_and_is_reported(
     text = written(source, schema)
     assert _computers(text) == [f"gear-{GEAR_UUID}", "device-0"]
     assert "<serialnumber>42</serialnumber>" in text
-    assert any("keep an element of their own" in message for _, _, message in notes(source))
+    assert any("takes an element of its own" in message for _, _, message in notes(source))
+
+
+def test_one_computer_answering_to_two_kit_items_is_the_other_tie(schema) -> None:
+    """The other shape the cardinality rule refuses, and it loses something else: there is
+    one `<divecomputer>` for the device and the leftover kit items stay plain entries,
+    where the tie above leaves a second computer with an element of its own."""
+    source = document(
+        gear=[_computer(), {"uuid": GEAR_TWO, "name": "Ocean", "type": "computer"}],
+        dives=[
+            {
+                "uuid": DIVE_UUID,
+                "started_at": STARTED_AT,
+                "gear_uuids": [GEAR_UUID, GEAR_TWO],
+                "recordings": [{"device": {"name": "Ocean", "serial": "42"}}],
+            }
+        ],
+    )
+    text = written(source, schema)
+    assert _computers(text) == [f"gear-{GEAR_UUID}", f"gear-{GEAR_TWO}"]
+    assert text.count("<serialnumber>42</serialnumber>") == 1
+    assert any("the rest are written as the kit entries they are" in message
+               for _, _, message in notes(source))
 
 
 def test_an_unmatched_device_id_is_not_a_uuid(schema) -> None:
@@ -807,4 +829,64 @@ def test_a_devices_firmware_is_reported_on_every_export_that_has_one(schema) -> 
     assert any(
         "no slot for firmware" in message
         for message in messages(source, "dives/0/recordings/0/device")
+    )
+
+
+def test_a_kit_computer_linked_ahead_of_the_recordings_own_is_reported(schema) -> None:
+    """UDDF gives a dive one `<samples>` and one `<internaldivenumber>` and a reader takes
+    both off the **first** `<divecomputer>` the dive links — while the links come from the
+    kit list in the diver's own order, with the unfolded devices appended after them.
+
+    So a dive that lists an old computer it no longer wears, on a dive some other computer
+    recorded, sends the profile and the counter back on the old one. Reordering the links
+    is not open: `<equipmentused>` is the diver's own list and its order is a member of the
+    document, so this is a loss to name rather than a bug to route around.
+    """
+    source = document(
+        gear=[{"uuid": GEAR_UUID, "name": "Old Puck", "brand": "Mares", "type": "computer"}],
+        dives=[
+            {
+                "uuid": DIVE_UUID,
+                "started_at": STARTED_AT,
+                "gear_uuids": [GEAR_UUID],
+                "recordings": [
+                    {
+                        "device": {"name": "Ocean", "brand": "Suunto", "serial": "S1", "dive_number": 118},
+                        "profile": {"duration": 60, "depth": {"times": [0, 60], "values": [0, 500]}},
+                    }
+                ],
+            }
+        ],
+    )
+    written(source, schema)
+    assert any(
+        "come back on that computer instead" in message for message in messages(source, "dives/0")
+    )
+
+    # And the report is not merely decorative: this is what actually comes back.
+    back = read_back(source)
+    assert recorded(back)["device"]["name"] == "Old Puck"
+    assert recorded(back, 1)["device"]["name"] == "Ocean"
+
+
+def test_a_dive_whose_links_run_in_its_recordings_order_is_not_reported(schema) -> None:
+    """The ordinary case, and both corpus pairs: the first link is the primary's element."""
+    source = document(
+        gear=[_computer(serial="42")],
+        dives=[
+            {
+                "uuid": DIVE_UUID,
+                "started_at": STARTED_AT,
+                "gear_uuids": [GEAR_UUID],
+                "recordings": [
+                    {"device": {"name": "Ocean", "serial": "42"}, "profile": {"duration": 0,
+                     "depth": {"times": [0], "values": [0]}}}
+                ],
+            }
+        ],
+    )
+    written(source, schema)
+    assert not any(
+        "come back on that computer instead" in message or "in a different order" in message
+        for message in messages(source, "dives/0")
     )

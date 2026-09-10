@@ -413,9 +413,12 @@ class _Converter:
         profile = self.read_profile(cylinders, where)
         if cylinders:
             dive["cylinders"] = [cylinder.member for cylinder in cylinders]
-        # One document is one dive written by one computer, so a converted document has at
-        # most one recording (§6.4a); a document naming no computer and keeping no usable
-        # sample produces none, §6.4a forbidding a recording that carries nothing.
+        # One document is one dive written by one computer, so a converted document has
+        # exactly one recording (§6.4a) — **exactly**, not at most, and this is the one
+        # reader of the five where that is true: the brand is the format's rather than the
+        # file's, so `read_device` always has a member to write and §6.4a's "carries at
+        # least one" is met before a sample is read. The guard stays because `recording`'s
+        # contract is the shared one and a reader that lost that constant would need it.
         built = recording(device=self.read_device(where), profile=profile)
         if built is not None:
             dive["recordings"] = [built]

@@ -119,10 +119,11 @@ MAGIC_END = MAGIC_OFFSET + len(MAGIC)
 # convert a confidently empty dive.
 MAX_MESSAGES = 100_000
 
-# How many `device_info` messages are kept while looking for the computer's firmware
-# version. A device writes one every few minutes — the two Suunto Ocean files in hand
-# carry two and three — and only the first that names the file's own manufacturer is read,
-# so this bounds a list nothing else does.
+# How many `device_info` messages are kept while looking for the computer's own record. A
+# device writes one every few minutes, and two readers walk the list — `computer_info` for
+# the message at `device_index` 0, which is the computer itself, and `device_version` for
+# the first that names the file's own manufacturer. This bounds a list nothing else does;
+# no fixture in `fixtures/fit/` comes near it.
 MAX_DEVICES = 8
 
 # `message_index` is a bitfield rather than a counter: the low 12 bits are the index and
@@ -626,8 +627,10 @@ class _Converter:
 
         Raw rather than decoded, for `_native_raw`'s reason: `device_index` is a profile
         enum whose 0 renders as `creator`, so a decoded comparison against 0 never fires.
-        Neither fixture in `fixtures/fit/` carries a `device_index` at all, so this returns
-        nothing for both of them and the two members it feeds wait on a file that has one.
+        **No fixture in `fixtures/fit/` carries a `device_index` at all**, so this returns
+        nothing for every one of them and the two members it feeds wait on a file that has
+        one — which is also why the count is not written down here: it moves whenever a
+        fixture lands, and the claim is about all of them rather than about how many.
         """
         for message in self.scan.devices:
             if _native_raw(message, "device_index") == 0:

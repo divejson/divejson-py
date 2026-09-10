@@ -311,13 +311,6 @@ def _mix_key(cylinder: dict[str, Any]) -> _MixKey:
     )
 
 
-# The members of a §6.4b Device a `<divecomputer>` element has somewhere to put, in the
-# order `_DeviceRecord.merged` fills them. `firmware` is deliberately absent:
-# `equipmentPieceType` carries no such element, so it is the one member of the section that
-# is reported on every export whose device has one.
-_DEVICE_PLACED = ("brand", "model", "serial", "name", "dive_number")
-
-
 def _folded(value: Any) -> str | None:
     """A source string reduced to what the fold compares: trimmed and case-folded.
 
@@ -366,7 +359,7 @@ class _DeviceRecord:
     # document order. The link leg is asked per recording, so the record has to keep them
     # rather than a count.
     recordings: list[tuple[int, int]]
-    # The gear item this record folded into, once `_plan_computers` has decided.
+    # The gear item this record folded into, once `plan_computers` has decided.
     gear_index: int | None = None
     # The `<divecomputer id="device-<n>">` this record's *unfolded* recordings share, and
     # the recordings that use it. Both stay unset where every recording folded.
@@ -665,15 +658,24 @@ class _Writer:
             if free:
                 record.gear_index = free[0]
                 claimed.add(free[0])
-            # One candidate this record took is the ordinary case and says nothing. Anything
-            # else is a tie: a kit item another computer already holds, or several this one
-            # matches at once, and either way a fold that did not happen.
-            if len(candidates) > (1 if record.gear_index is not None else 0):
+            # One candidate this record took is the ordinary case and says nothing.
+            # Anything else is a tie, and there are two shapes of one: a kit item an
+            # earlier computer already holds, and several kit items this one computer
+            # answers to at once. They lose different things, so they say different things.
+            if record.gear_index is None and candidates:
                 self.note(
                     self.device_where(record),
-                    "more than one <divecomputer> of this document answers to the same kit item, and "
-                    "each carries one of the other; the first in document order takes it and the rest "
-                    "keep an element of their own",
+                    "the kit item this computer answers to is already another computer's, and a "
+                    "<divecomputer> carries one of each; the first in document order keeps it and this "
+                    "one takes an element of its own",
+                    "dropped",
+                )
+            elif len(candidates) > 1:
+                self.note(
+                    self.device_where(record),
+                    "this computer answers to more than one item in the kit list, and a <divecomputer> "
+                    "carries one of each; the first in document order takes it and the rest are written "
+                    "as the kit entries they are, with nothing about the hardware on them",
                     "dropped",
                 )
 
@@ -1125,6 +1127,7 @@ class _Writer:
             # `device-<n>` elements, which no gear link reaches.
             for element_id in dict.fromkeys(devices):
                 _sub(used, "link", ref=element_id)
+        self.check_link_order(index, recordings, gear_uuids, devices, where)
         if dive.get("trip_uuid"):
             _sub(before, "tripmembership", ref=_uddf_id("trip", dive["trip_uuid"]))
         if dive.get("surface_pressure") is not None:
@@ -1167,6 +1170,81 @@ class _Writer:
         _sub(after, "diveduration", _num(duration if duration is not None else 0))
         _optional(after, "averagedepth", dive.get("avg_depth"))
         return element
+
+    def check_link_order(
+        self,
+        index: int,
+        recordings: list[dict[str, Any]],
+        gear_uuids: list[str],
+        devices: list[str],
+        where: str,
+    ) -> None:
+        """Report a dive whose computers do not come back in the order they went out.
+
+        UDDF has no per-recording anything: a dive gets one `<datetime>`, one `<samples>`
+        and one `<internaldivenumber>`, and a reader recovers a dive's recordings from its
+        `<equipmentused>` links, giving the two dive-level facts to the **first** linked
+        `<divecomputer>` because there is nothing else in the file to give them to
+        (`docs/uddf-mapping.md` says so, and says a reader must not read primacy into that
+        order). The links themselves come from the kit list in the diver's own order, with
+        an element appended for every device that folded into nothing — so the sequence is
+        a fact about the gear list rather than about the recordings, and the two agree only
+        by construction.
+
+        Where they do not, something real is lost and `writing.md`'s rule is that it is
+        named: a `computer` gear item the dive links but no recording's device matches
+        takes the first link, so **the profile and the counter come back on that computer**
+        and not on the one that recorded the dive. Reordering the links instead is not
+        open — `<equipmentused>` is the diver's own list and its order is a member of the
+        document — so this is a loss to report rather than a bug to fix.
+        """
+        computers = {
+            item.get("uuid")
+            for item in self.document.get("gear") or []
+            if item.get("type") == "computer"
+        }
+        linked = list(
+            dict.fromkeys(
+                [_uddf_id("gear", uuid) for uuid in gear_uuids if uuid in computers] + devices
+            )
+        )
+        if not linked:
+            return
+        carried = list(
+            dict.fromkeys(
+                self.recording_element(index, rec_index)
+                for rec_index, entry in enumerate(recordings)
+                if entry.get("device")
+            )
+        )
+        if carried and linked[0] == carried[0]:
+            if linked != carried:
+                self.note(
+                    where,
+                    "a reader recovers this dive's recordings from its <equipmentused> links, which run in "
+                    "the kit list's order rather than the recordings' own; they come back in a different "
+                    "order (spec §6.4a)",
+                    "dropped",
+                )
+            return
+        self.note(
+            where,
+            "UDDF gives a dive one <samples> and one <internaldivenumber>, and a reader takes both off the "
+            "first <divecomputer> the dive links — which is not the element this dive's primary recording "
+            "was written into; the profile and the device counter come back on that computer instead",
+            "dropped",
+        )
+
+    def recording_element(self, index: int, rec_index: int) -> str | None:
+        """The `xs:ID` of the `<divecomputer>` one recording's device was written into."""
+        at = (index, rec_index)
+        if at in self.device_links:
+            return self.device_links[at]
+        for record in self.computers:
+            if at in record.recordings and record.gear_index is not None:
+                uuid = (self.document.get("gear") or [])[record.gear_index].get("uuid")
+                return _uddf_id("gear", uuid) if uuid else f"gear-{record.gear_index}"
+        return None
 
     def internal_dive_number(
         self, before: ET.Element, recordings: list[dict[str, Any]], where: str
