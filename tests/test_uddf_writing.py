@@ -890,3 +890,53 @@ def test_a_dive_whose_links_run_in_its_recordings_order_is_not_reported(schema) 
         "come back on that computer instead" in message or "in a different order" in message
         for message in messages(source, "dives/0")
     )
+
+
+def test_recordings_that_come_back_reordered_are_reported(schema) -> None:
+    """A recording has no uuid (§5.3), so its position is the only thing that says it is
+    the primary — and the links run in the kit list's order with the unfolded devices
+    appended after, which is a fact about the gear list rather than about the recordings.
+
+    Here the middle recording's computer is in nobody's kit list, so its element is
+    appended last and the third recording's comes back second.
+    """
+    source = document(
+        gear=[_computer(), {"uuid": GEAR_TWO, "name": "Perdix", "type": "computer"}],
+        dives=[
+            {
+                "uuid": DIVE_UUID,
+                "started_at": STARTED_AT,
+                "gear_uuids": [GEAR_UUID, GEAR_TWO],
+                "recordings": [
+                    {"device": {"name": "Ocean"}},
+                    {"device": {"name": "Puck"}},
+                    {"device": {"name": "Perdix"}},
+                ],
+            }
+        ],
+    )
+    written(source, schema)
+    assert any("come back in a different order" in message for message in messages(source, "dives/0"))
+    assert [recorded(read_back(source), index)["device"]["name"] for index in range(3)] == [
+        "Ocean",
+        "Perdix",
+        "Puck",
+    ]
+
+
+def test_a_dive_with_no_recordings_at_all_reports_nothing_about_its_computer(schema) -> None:
+    """The ordinary hand-logged dive in a logbook whose owner listed their computer.
+
+    Nothing was recorded, so nothing was dropped: the element comes back as a recording
+    the document never had, which is the gain `docs/uddf-writing.md` documents and does
+    not report.
+    """
+    source = document(
+        gear=[_computer()],
+        dives=[{"uuid": DIVE_UUID, "started_at": STARTED_AT, "gear_uuids": [GEAR_UUID]}],
+    )
+    written(source, schema)
+    assert not any(
+        "come back on that computer instead" in message or "come back in a different order" in message
+        for message in messages(source, "dives/0")
+    )

@@ -1194,9 +1194,19 @@ class _Writer:
         Where they do not, something real is lost and `writing.md`'s rule is that it is
         named: a `computer` gear item the dive links but no recording's device matches
         takes the first link, so **the profile and the counter come back on that computer**
-        and not on the one that recorded the dive. Reordering the links instead is not
-        open — `<equipmentused>` is the diver's own list and its order is a member of the
-        document — so this is a loss to report rather than a bug to fix.
+        and not on the one that recorded the dive; and where the links merely run through
+        this dive's own computers in another order, the recordings come back reordered,
+        which §6.4a makes a fact about the document — a recording has no uuid, so its
+        position is the only thing that says it is the primary. Reordering the links
+        instead is not open: `<equipmentused>` is the diver's own list and its order is a
+        member of the document.
+
+        **What is *gained* is not reported here, and that is the same rule read the other
+        way.** A linked computer no recording answers to comes back as a recording the
+        document never had, exactly as it comes back as a gear item the document never had
+        — the documented exception in `docs/uddf-writing.md`, where nothing is lost and so
+        nothing is said. That covers a dive with no recordings at all, which is every
+        hand-logged dive in a logbook whose owner listed their computer in their kit.
         """
         computers = {
             item.get("uuid")
@@ -1208,8 +1218,6 @@ class _Writer:
                 [_uddf_id("gear", uuid) for uuid in gear_uuids if uuid in computers] + devices
             )
         )
-        if not linked:
-            return
         carried = list(
             dict.fromkeys(
                 self.recording_element(index, rec_index)
@@ -1217,23 +1225,32 @@ class _Writer:
                 if entry.get("device")
             )
         )
-        if carried and linked[0] == carried[0]:
-            if linked != carried:
-                self.note(
-                    where,
-                    "a reader recovers this dive's recordings from its <equipmentused> links, which run in "
-                    "the kit list's order rather than the recordings' own; they come back in a different "
-                    "order (spec §6.4a)",
-                    "dropped",
-                )
+        if not (linked and carried):
             return
-        self.note(
-            where,
-            "UDDF gives a dive one <samples> and one <internaldivenumber>, and a reader takes both off the "
-            "first <divecomputer> the dive links — which is not the element this dive's primary recording "
-            "was written into; the profile and the device counter come back on that computer instead",
-            "dropped",
-        )
+        if linked[0] != carried[0]:
+            self.note(
+                where,
+                "UDDF gives a dive one <samples> and one <internaldivenumber>, and a reader takes both off "
+                "the first <divecomputer> the dive links — which is not the element this dive's primary "
+                "recording was written into; the profile and the device counter come back on that computer "
+                "instead",
+                "dropped",
+            )
+            return
+        # Only the elements this dive's own recordings went out on, in the order a reader
+        # will meet them. Every one of them is linked — a folded element only exists
+        # because the dive links its gear item, and an unfolded one gets a link of its own
+        # — so this is a permutation of `carried` and differs from it exactly when the
+        # recordings come back in another order.
+        met = [element for element in linked if element in set(carried)]
+        if met != carried:
+            self.note(
+                where,
+                "a reader recovers this dive's recordings from its <equipmentused> links, which run in the "
+                "kit list's order rather than the recordings' own; this dive's come back in a different "
+                "order, and §6.4a makes the first of them the primary",
+                "dropped",
+            )
 
     def recording_element(self, index: int, rec_index: int) -> str | None:
         """The `xs:ID` of the `<divecomputer>` one recording's device was written into."""
