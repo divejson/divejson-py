@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.5.0
+
 - **Breaking: a dive's `profile` and `source_file` move into `recordings[]`.** A dive now
   carries an array of §6.4a Recordings — one device's record of one dive — and nothing is
   left behind on the dive itself: `dive["profile"]` is gone, and a reader wanting the
