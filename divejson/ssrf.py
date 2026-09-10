@@ -12,7 +12,7 @@ one — the note kinds, identity, the way a zero reads, the number bound, the sa
 the `<!DOCTYPE>` refusal, taking a child by its lowercased local name — lives in
 `converter.py`, `series.py` and `xmlsource.py`, and this module inherits it.
 
-Three decisions shape what is below.
+Four decisions shape what is below.
 
 **Every measurement carries its unit in the text, and the unit is read rather than
 assumed.** `depth max='45.91 m'`, `duration='66:50 min'`, `cns='11%'`, `size='12.0 l'`,
@@ -627,14 +627,15 @@ class _Converter:
         with samples becomes a recording with a profile; one without becomes a device-only
         recording; **one that yields neither yields no recording**, §6.4a forbidding a
         recording that carries nothing — which the corpus reaches in
-        `fixtures/ssrf/trip-grouping.ssrf`, whose `<divecomputer last-manual-time='…'>`
-        elements carry a `<depth>` and nothing this section can hold.
+        `fixtures/ssrf/trip-grouping.ssrf`, whose dives 43 and 44 carry a
+        `<divecomputer last-manual-time='…'>` with a `<depth>` on it and nothing this
+        section can hold. Its dive 42 is the ordinary shape beside them, samples and all.
 
         The dive's own `max_depth`, `avg_depth` and `bottom_temperature` come from the
         **first element in file order** and never from a later one — see `read_summary`.
         That rule is keyed on the element rather than on the primary recording, and the
-        two are not always the same one: those `trip-grouping` elements become nothing
-        while still supplying the dive's three figures.
+        two are not always the same one: those two elements become nothing while still
+        supplying their dive's three figures.
         """
         recordings: list[dict[str, Any]] = []
         for index, computer in enumerate(children(element, "divecomputer")):

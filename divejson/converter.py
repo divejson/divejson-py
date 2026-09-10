@@ -485,9 +485,10 @@ def capped(value: str, limit: int, *, note: Reporter, where: str, member: str) -
 # -- recordings and devices ----------------------------------------------------------
 
 # §6.4b's own caps, and its own member order: a device written through `device` below
-# reads down the section. The three lengths are the section's rather than shared with
-# `MAX_NAME`, because §6.4b is narrower than §6's REQUIRED names by design — a serial
-# longer than 64 characters is not a serial any hardware here writes.
+# reads down the section. The lengths are the section's rather than `MAX_NAME`'s, because
+# §6.4b is narrower than §6's REQUIRED names by design — a serial longer than 64
+# characters is not a serial any hardware here writes, and a firmware version is narrower
+# still. Read the numbers off the rows rather than off any count of them.
 DEVICE_CAPS: dict[str, int] = {
     "brand": 64,
     "model": 64,

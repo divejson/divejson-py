@@ -326,13 +326,14 @@ def _folded(value: Any) -> str | None:
 def _agree(one: Any, other: Any) -> bool:
     """Whether two brands do not disagree — an absent one disagreeing with nothing.
 
-    **Deliberately not decision 3's symmetric absent rule**, and the difference is worth
-    stating because the neighbouring comparison is symmetric. Asking whether two *files*
-    are records of one computer, an absent member means "this format has no such field";
-    the fold is not that comparison, one side being a user's own record whose `name` is
-    REQUIRED (§6.12) and the other a file reading routinely one member wide. The asymmetry
-    lives in the caller's `label` leg, which refuses an absent label outright; the brands
-    are the one place where absence really is silence.
+    **Deliberately not the symmetric absent rule the neighbouring comparison uses**, and
+    `docs/uddf-writing.md` says so in as many words under *Devices, and the one element
+    they share with gear*. Asking whether two *files* are records of one computer, an
+    absent member means "this format has no such field"; the fold is not that comparison,
+    one side being a user's own record whose `name` is REQUIRED (§6.12) and the other a
+    file reading routinely one member wide. The asymmetry lives in the caller's `label`
+    leg, which refuses an absent label outright; the brands are the one place where
+    absence really is silence.
     """
     left, right = _folded(one), _folded(other)
     return left is None or right is None or left == right
@@ -1089,8 +1090,10 @@ class _Writer:
         recordings = dive.get("recordings") or []
         element = ET.Element("dive", {"id": _uddf_id("dive", dive["uuid"])})
 
-        # `informationbeforediveType` is an `xs:sequence`: link, divenumber, datetime,
-        # altitude, equipmentused, tripmembership, surfacepressure, in exactly this order.
+        # `informationbeforediveType` is an `xs:sequence`, and this is the whole of what
+        # this writer puts in it, in the schema's order: link, divenumber,
+        # internaldivenumber, datetime, altitude, equipmentused, tripmembership,
+        # surfacepressure.
         before = _sub(element, "informationbeforedive")
         for site_uuid in dive.get("site_uuids") or []:
             _sub(before, "link", ref=_uddf_id("site", site_uuid))
