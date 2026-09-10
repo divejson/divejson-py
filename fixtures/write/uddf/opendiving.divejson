@@ -53,88 +53,99 @@
           "gas_number": 1
         }
       ],
-      "profile": {
-        "duration": 2880,
-        "depth": {
-          "times": [
-            0,
-            120,
-            600,
-            2400,
-            2700,
-            2880
-          ],
-          "values": [
-            0,
-            1460,
-            2960,
-            600,
-            500,
-            0
-          ]
-        },
-        "temperature": {
-          "times": [
-            0,
-            120,
-            600
-          ],
-          "values": [
-            244,
-            236,
-            220
-          ]
-        },
-        "pressures": [
-          {
-            "times": [
-              0,
-              120,
-              600,
-              2880
-            ],
-            "values": [
-              2100,
-              1940,
-              1420,
-              600
-            ],
-            "gas_number": 0
+      "recordings": [
+        {
+          "device": {
+            "brand": "Suunto",
+            "model": "Ocean",
+            "serial": "000000000042",
+            "name": "Ocean",
+            "dive_number": 118
           },
-          {
-            "times": [
-              2400,
-              2700
+          "profile": {
+            "duration": 2880,
+            "depth": {
+              "times": [
+                0,
+                120,
+                600,
+                2400,
+                2700,
+                2880
+              ],
+              "values": [
+                0,
+                1460,
+                2960,
+                600,
+                500,
+                0
+              ]
+            },
+            "temperature": {
+              "times": [
+                0,
+                120,
+                600
+              ],
+              "values": [
+                244,
+                236,
+                220
+              ]
+            },
+            "pressures": [
+              {
+                "times": [
+                  0,
+                  120,
+                  600,
+                  2880
+                ],
+                "values": [
+                  2100,
+                  1940,
+                  1420,
+                  600
+                ],
+                "gas_number": 0
+              },
+              {
+                "times": [
+                  2400,
+                  2700
+                ],
+                "values": [
+                  2000,
+                  1500
+                ],
+                "gas_number": 1
+              }
             ],
-            "values": [
-              2000,
-              1500
-            ],
-            "gas_number": 1
+            "events": [
+              {
+                "time": 0,
+                "type": "gas_switch",
+                "gas_number": 0
+              },
+              {
+                "time": 600,
+                "type": "other",
+                "label": "Deepest point"
+              },
+              {
+                "time": 2400,
+                "type": "gas_switch",
+                "gas_number": 1
+              },
+              {
+                "time": 2700,
+                "type": "safety_stop"
+              }
+            ]
           }
-        ],
-        "events": [
-          {
-            "time": 0,
-            "type": "gas_switch",
-            "gas_number": 0
-          },
-          {
-            "time": 600,
-            "type": "other",
-            "label": "Deepest point"
-          },
-          {
-            "time": 2400,
-            "type": "gas_switch",
-            "gas_number": 1
-          },
-          {
-            "time": 2700,
-            "type": "safety_stop"
-          }
-        ]
-      }
+        }
+      ]
     }
   ],
   "trips": [
@@ -175,6 +186,7 @@
       "uuid": "0198a6f0-2222-7002-8000-000000000002",
       "name": "Ocean",
       "brand": "Suunto",
+      "serial": "000000000042",
       "type": "computer",
       "notes": "Firmware 2.4.1; wrist strap replaced 2026-03."
     },

@@ -38,77 +38,86 @@
           "gas_number": 1
         }
       ],
-      "profile": {
-        "duration": 4683,
-        "depth": {
-          "times": [
-            0,
-            2000,
-            4000,
-            4683
-          ],
-          "values": [
-            110,
-            4629,
-            2100,
-            500
-          ]
-        },
-        "ceiling": {
-          "times": [
-            2000
-          ],
-          "values": [
-            300
-          ]
-        },
-        "temperature": {
-          "times": [
-            0,
-            2000
-          ],
-          "values": [
-            206,
-            182
-          ]
-        },
-        "pressures": [
-          {
-            "times": [
-              0,
-              2000,
-              4683
+      "recordings": [
+        {
+          "device": {
+            "brand": "Suunto",
+            "firmware": "3.0.2143",
+            "name": "Suunto D5"
+          },
+          "profile": {
+            "duration": 4683,
+            "depth": {
+              "times": [
+                0,
+                2000,
+                4000,
+                4683
+              ],
+              "values": [
+                110,
+                4629,
+                2100,
+                500
+              ]
+            },
+            "ceiling": {
+              "times": [
+                2000
+              ],
+              "values": [
+                300
+              ]
+            },
+            "temperature": {
+              "times": [
+                0,
+                2000
+              ],
+              "values": [
+                206,
+                182
+              ]
+            },
+            "pressures": [
+              {
+                "times": [
+                  0,
+                  2000,
+                  4683
+                ],
+                "values": [
+                  2071,
+                  1500,
+                  1178
+                ],
+                "gas_number": 0
+              }
             ],
-            "values": [
-              2071,
-              1500,
-              1178
-            ],
-            "gas_number": 0
+            "events": [
+              {
+                "time": 0,
+                "type": "gas_switch",
+                "gas_number": 0
+              },
+              {
+                "time": 4000,
+                "type": "gas_switch",
+                "gas_number": 1
+              },
+              {
+                "time": 4000,
+                "type": "other",
+                "label": "Ascent Speed"
+              },
+              {
+                "time": 4683,
+                "type": "safety_stop"
+              }
+            ]
           }
-        ],
-        "events": [
-          {
-            "time": 0,
-            "type": "gas_switch",
-            "gas_number": 0
-          },
-          {
-            "time": 4000,
-            "type": "gas_switch",
-            "gas_number": 1
-          },
-          {
-            "time": 4000,
-            "type": "other",
-            "label": "Ascent Speed"
-          },
-          {
-            "time": 4683,
-            "type": "safety_stop"
-          }
-        ]
-      }
+        }
+      ]
     }
   ],
   "extensions": {

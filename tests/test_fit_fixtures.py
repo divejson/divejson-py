@@ -22,7 +22,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from helpers import EXPORTED_AT, FIXTURES
+from helpers import EXPORTED_AT, FIXTURES, profile_of
 
 from divejson import compared, convert
 from divejson.converter import INFERRED, PRODUCER_KEY
@@ -137,7 +137,7 @@ def test_the_ocean_profile_takes_each_channel_only_where_it_was_recorded() -> No
     writer that makes it obvious: padding depth out to the temperature axis would invent
     3,863 depths this dive never reached.
     """
-    profile = convert(OCEAN.read_bytes(), exported_at=EXPORTED_AT).document["dives"][0]["profile"]
+    profile = profile_of(convert(OCEAN.read_bytes(), exported_at=EXPORTED_AT).document["dives"][0])
     assert len(profile["depth"]["times"]) == 431
     assert len(profile["temperature"]["times"]) == 4294
     assert profile["depth"]["times"] != profile["temperature"]["times"][: len(profile["depth"]["times"])]
@@ -157,7 +157,7 @@ def test_the_d5_reads_the_same_way_from_a_different_device() -> None:
     dive = convert(D5.read_bytes(), exported_at=EXPORTED_AT).document["dives"][0]
     assert dive["max_depth"] == 32.41
     assert dive["started_at"] == "2021-04-06T11:16:42+02:00"
-    assert len(dive["profile"]["depth"]["times"]) == 200
+    assert len(profile_of(dive)["depth"]["times"]) == 200
 
 
 def test_neither_file_carries_a_gas_the_device_only_had_configured() -> None:

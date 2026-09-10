@@ -222,35 +222,29 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
                 except TypeError:
                     pass
 
-        source_file = dive.get("source_file")
-        if isinstance(source_file, dict):
-            _claim_uuid(source_file, f"{here}/source_file", seen_uuids, issues)
-
-        profile = dive.get("profile")
-        if isinstance(profile, dict):
-            latest = 0
-            for channel in ("depth", "ceiling", "temperature"):
-                series = profile.get(channel)
-                if isinstance(series, dict):
-                    latest = max(latest, _check_series(series, f"{here}/profile/{channel}", issues))
-            for series_index, series in enumerate(profile.get("pressures") or []):
-                if isinstance(series, dict):
-                    latest = max(
-                        latest, _check_series(series, f"{here}/profile/pressures/{series_index}", issues)
-                    )
-            # Events are deliberately not folded into `latest`: `duration` spans the
-            # samples, and an event after the last one is conforming (spec §6.4). A
-            # marker pressed at the surface after the recorder's final sample is real
-            # logbook data, and requiring `duration` to swallow it would make a writer
-            # invent a sample span the file never had.
-            duration = profile.get("duration")
-            if isinstance(duration, (int, float)) and duration < latest:
+        # §3 rules 3 and 4 are quantified over **every** recording, not over the primary
+        # one. A validator that walked `recordings[0]` alone is the shape §6.4a's ordering
+        # rule invites, and `fixtures/invalid/` keeps each of its three recording defects
+        # off the first entry for exactly that reason.
+        for rec_index, recording in enumerate(dive.get("recordings") or []):
+            if not isinstance(recording, dict):
+                continue
+            rec_path = f"{here}/recordings/{rec_index}"
+            _check_datetime(recording, "started_at", rec_path, issues)
+            for file_index, stored in enumerate(recording.get("source_files") or []):
+                if isinstance(stored, dict):
+                    _claim_uuid(stored, f"{rec_path}/source_files/{file_index}", seen_uuids, issues)
+            if not any(
+                _present(recording, member) for member in ("device", "profile", "source_files")
+            ):
                 issues.append(
                     Issue(
-                        f"{here}/profile/duration",
-                        f"duration {duration} does not cover the latest sample at {latest} (spec §6.4)",
+                        rec_path,
+                        "a recording carries at least one of device, profile and source_files "
+                        "(spec §3, §6.4a)",
                     )
                 )
+            _check_profile(recording.get("profile"), f"{rec_path}/profile", issues)
 
     for index, trip in enumerate(collections["trips"]):
         here = f"trips/{index}"
@@ -355,6 +349,37 @@ def _check_reference_list(
             issues.append(
                 Issue(f"{path}/{member}/{index}", f"references {value}, not present in {collection}")
             )
+
+
+def _check_profile(profile: Any, path: str, issues: list[Issue]) -> None:
+    """§3 rule 3 against one recording's profile: series integrity and the span.
+
+    A function rather than a block inside the dive loop because the rule is quantified
+    per recording (§6.4a) and a dive may carry several — the second of which is where
+    `fixtures/invalid/non-increasing-samples.divejson` puts its defect.
+    """
+    if not isinstance(profile, dict):
+        return
+    latest = 0
+    for channel in ("depth", "ceiling", "temperature"):
+        series = profile.get(channel)
+        if isinstance(series, dict):
+            latest = max(latest, _check_series(series, f"{path}/{channel}", issues))
+    for series_index, series in enumerate(profile.get("pressures") or []):
+        if isinstance(series, dict):
+            latest = max(latest, _check_series(series, f"{path}/pressures/{series_index}", issues))
+    # Events are deliberately not folded into `latest`: `duration` spans the samples, and
+    # an event after the last one is conforming (spec §6.4). A marker pressed at the
+    # surface after the recorder's final sample is real logbook data, and requiring
+    # `duration` to swallow it would make a writer invent a sample span the file never had.
+    duration = profile.get("duration")
+    if isinstance(duration, (int, float)) and duration < latest:
+        issues.append(
+            Issue(
+                f"{path}/duration",
+                f"duration {duration} does not cover the latest sample at {latest} (spec §6.4)",
+            )
+        )
 
 
 def _check_series(series: dict[str, Any], path: str, issues: list[Issue]) -> int:

@@ -16,6 +16,7 @@ from decimal import Decimal
 
 import pytest
 from fitbuild import DevField, dive_file, fit_file, message
+from helpers import device_of, profile_of
 
 from divejson.converter import Scope
 from divejson.fit import DEGREES_PER_SEMICIRCLE, FIT, _Converter, _native, _Scan
@@ -116,7 +117,11 @@ def test_a_developer_field_under_a_name_no_profile_field_has_is_ignored() -> Non
     )
     dive = _dive(data)
     assert dive["max_depth"] == 45.91
-    assert set(dive) <= {"uuid", "started_at", "duration", "max_depth", "avg_depth"}
+    assert set(dive) <= {"uuid", "started_at", "duration", "max_depth", "avg_depth", "recordings"}
+    # `recordings` is there because the `file_id` names a manufacturer, which is §6.4b's
+    # `brand`. What it must not carry is a counter off `dive_number_in_series`: that is a
+    # developer field, and §6.4b's `dive_number` comes from the native `session.dive_number`.
+    assert device_of(dive) == {"brand": "suunto"}
 
 
 # -- the §6.5 channel scales ----------------------------------------------------------
@@ -129,7 +134,7 @@ def test_a_developer_field_under_a_name_no_profile_field_has_is_ignored() -> Non
 def test_depth_samples_are_centimetres(metres: float, centimetres: int) -> None:
     """Through `Decimal`, so `2.6 * 100` is 260 and not 260.00000000000003."""
     data = dive_file(*_records((0, {"depth": metres})), session={"total_elapsed_time": 60.0})
-    assert _dive(data)["profile"]["depth"]["values"] == [centimetres]
+    assert profile_of(_dive(data))["depth"]["values"] == [centimetres]
 
 
 def test_temperature_samples_are_tenths_of_a_degree() -> None:
@@ -138,7 +143,7 @@ def test_temperature_samples_are_tenths_of_a_degree() -> None:
         *_records((0, {"depth": 5.0, "temperature": 22}), (30, {"depth": 6.0, "temperature": -1})),
         session={"total_elapsed_time": 60.0},
     )
-    assert _dive(data)["profile"]["temperature"]["values"] == [220, -10]
+    assert profile_of(_dive(data))["temperature"]["values"] == [220, -10]
 
 
 def test_a_ceiling_of_zero_is_not_a_ceiling() -> None:
@@ -155,7 +160,7 @@ def test_a_ceiling_of_zero_is_not_a_ceiling() -> None:
         ),
         session={"total_elapsed_time": 60.0},
     )
-    profile = _dive(data)["profile"]
+    profile = profile_of(_dive(data))
     assert profile["ceiling"] == {"times": [30], "values": [300]}
     assert len(profile["depth"]["times"]) == 3
 

@@ -17,7 +17,15 @@ import io
 import zipfile
 
 import pytest
-from helpers import SSRF_STARTED_AT, one_ssrf_computer, one_ssrf_dive, ssrf
+from helpers import (
+    SSRF_STARTED_AT,
+    device_of,
+    one_ssrf_computer,
+    one_ssrf_dive,
+    profile_of,
+    recorded_by,
+    ssrf,
+)
 
 from divejson import (
     ConverterError,
@@ -185,23 +193,102 @@ def test_a_surface_air_consumption_has_no_member_and_is_reported() -> None:
     assert any("surface air consumption" in message for message in messages(conversion))
 
 
-def test_the_dive_computer_model_is_the_telemetry_source_rather_than_owned_gear() -> None:
-    """§6.12 has a `computer` gear type, and this is not an item the diver's kit list holds."""
+def test_the_dive_computer_model_is_a_device_and_never_a_gear_item() -> None:
+    """§6.12 has a `computer` gear type, and this is not an item the diver's kit list holds.
+
+    The refusal that kept `@model` out of the document until §6.4b existed is the same one
+    that keeps it off the gear list now that it is carried: it names the source of one
+    dive's telemetry rather than a thing the diver owns.
+    """
     conversion = convert(one_ssrf_dive(body="<divecomputer model='Suunto Ocean'/>"))
     assert "gear" not in conversion.document
-    assert any("names the source of this dive's telemetry" in message for message in messages(conversion))
+    assert device_of(conversion.document["dives"][0]) == {"model": "Suunto Ocean"}
 
 
-def test_a_dive_with_two_computers_keeps_one_profile_and_reports_the_rest() -> None:
+def test_a_dive_with_two_computers_is_two_recordings_in_file_order() -> None:
+    """The format that made the case for §6.4a: two computers on one wrist, two records."""
     body = (
-        "<divecomputer><depth max='18.4 m'/><sample time='0:00 min' depth='0.0 m'/></divecomputer>"
-        "<divecomputer><depth max='99.0 m'/><sample time='0:00 min' depth='9.0 m'/></divecomputer>"
+        "<divecomputer model='Suunto Ocean'><depth max='18.4 m'/>"
+        "<sample time='0:00 min' depth='0.0 m'/></divecomputer>"
+        "<divecomputer model='Garmin Descent'><depth max='99.0 m'/>"
+        "<sample time='0:00 min' depth='9.0 m'/></divecomputer>"
+    )
+    conversion = convert(one_ssrf_dive(body=body))
+    found = conversion.document["dives"][0]
+    assert [device_of(found, index) for index in (0, 1)] == [
+        {"model": "Suunto Ocean"},
+        {"model": "Garmin Descent"},
+    ]
+    assert profile_of(found)["depth"]["values"] == [0]
+    assert profile_of(found, 1)["depth"]["values"] == [900]
+
+
+def test_the_dives_own_scalars_come_from_the_first_element_and_the_rest_are_reported() -> None:
+    """§6.2 gives a dive one greatest depth and `<depth>` sits inside `<divecomputer>`.
+
+    Two computers routinely differ, so the first element in file order supplies all three
+    and every later one is reported — nothing averaged, and nothing preferred silently.
+    """
+    body = (
+        "<divecomputer model='Suunto Ocean'><depth max='18.4 m'/></divecomputer>"
+        "<divecomputer model='Garmin Descent'><depth max='99.0 m' mean='40.0 m'/>"
+        "<temperature water='25.0 C'/></divecomputer>"
     )
     conversion = convert(one_ssrf_dive(body=body))
     found = conversion.document["dives"][0]
     assert found["max_depth"] == 18.4
-    assert found["profile"]["depth"]["values"] == [0]
-    assert any("more than one dive computer's record" in message for message in messages(conversion))
+    # Not reached past, either: the first element records no mean and no temperature, and
+    # an absence on it is what that computer recorded.
+    assert "avg_depth" not in found and "bottom_temperature" not in found
+    assert any("dropped rather than averaged or preferred" in message for message in messages(conversion))
+
+
+def test_an_element_that_yields_neither_a_device_nor_a_profile_yields_no_recording() -> None:
+    """§6.4a forbids a recording that carries nothing, and `.ssrf` writes exactly that shape.
+
+    `fixtures/ssrf/trip-grouping.ssrf`'s dives 43 and 44 are it: a `<divecomputer
+    last-manual-time='…'>` with a `<depth>` on it, no `@model`, no samples and no
+    `<extradata>`. The dive's own figures still come off that element.
+    """
+    conversion = convert(
+        one_ssrf_dive(body="<divecomputer last-manual-time='44:00 min'><depth max='21.2 m'/></divecomputer>")
+    )
+    found = conversion.document["dives"][0]
+    assert "recordings" not in found
+    assert found["max_depth"] == 21.2
+
+
+def test_a_computer_stating_its_own_start_carries_it_and_one_agreeing_does_not() -> None:
+    """§6.4a reads an absent `started_at` as the dive's, which is every file in hand."""
+    agreeing = convert(
+        one_ssrf_dive(body=f"<divecomputer model='Ocean' {SSRF_STARTED_AT}/>")
+    ).document["dives"][0]
+    assert "started_at" not in recorded_by(agreeing)
+
+    later = convert(
+        one_ssrf_dive(body="<divecomputer model='Ocean' date='2026-04-17' time='11:50:00'/>")
+    ).document["dives"][0]
+    assert recorded_by(later)["started_at"] == "2026-04-17T11:50:00"
+
+
+def test_the_two_extradata_keys_are_the_only_route_to_a_serial_and_a_firmware() -> None:
+    """Neither has an attribute of its own; `Serial` and `FW Version` are what libdivecomputer
+    writes what its download read off the hardware under."""
+    conversion = convert(
+        one_ssrf_dive(
+            body=(
+                "<divecomputer model='Perdix 2' deviceid='deadbeef'>"
+                "<extradata key='Serial' value='D9123456'/>"
+                "<extradata key='FW Version' value='V92'/>"
+                "</divecomputer>"
+            )
+        )
+    )
+    assert device_of(conversion.document["dives"][0]) == {
+        "model": "Perdix 2",
+        "serial": "D9123456",
+        "firmware": "V92",
+    }
 
 
 # -- sites and the references to them -------------------------------------------------
@@ -285,7 +372,7 @@ def test_a_channel_is_not_padded_to_another_channels_length() -> None:
         "<sample time='0:10 min' depth='1.83 m'/>"
         "<sample time='0:20 min' depth='2.22 m'/>"
     )
-    found = convert(one_ssrf_computer(samples)).document["dives"][0]["profile"]
+    found = profile_of(convert(one_ssrf_computer(samples)).document["dives"][0])
     assert found["depth"]["times"] == [0, 10, 20]
     assert found["temperature"]["times"] == [0]
 
@@ -294,7 +381,7 @@ def test_a_sample_with_no_time_has_no_place_on_the_axis() -> None:
     conversion = convert(
         one_ssrf_computer("<sample time='0:00 min' depth='1.0 m'/><sample depth='9.0 m'/>")
     )
-    assert conversion.document["dives"][0]["profile"]["depth"]["values"] == [100]
+    assert profile_of(conversion.document["dives"][0])["depth"]["values"] == [100]
     assert any("no place on the profile's time axis" in message for message in messages(conversion))
 
 
@@ -303,14 +390,14 @@ def test_two_samples_on_one_second_keep_the_first() -> None:
     conversion = convert(
         one_ssrf_computer("<sample time='0:30 min' depth='6.2 m'/><sample time='0:30 min' depth='6.4 m'/>")
     )
-    assert conversion.document["dives"][0]["profile"]["depth"]["values"] == [620]
+    assert profile_of(conversion.document["dives"][0])["depth"]["values"] == [620]
     assert any("share the second 30" in message for message in messages(conversion))
 
 
 def test_samples_are_ordered_by_their_own_recorded_time() -> None:
     """Never by position: §6.5 requires increasing times and no writer guarantees its order."""
     samples = "<sample time='1:00 min' depth='9.0 m'/><sample time='0:00 min' depth='1.0 m'/>"
-    found = convert(one_ssrf_computer(samples)).document["dives"][0]["profile"]
+    found = profile_of(convert(one_ssrf_computer(samples)).document["dives"][0])
     assert found["depth"]["times"] == [0, 60]
     assert found["depth"]["values"] == [100, 900]
 
@@ -318,7 +405,7 @@ def test_samples_are_ordered_by_their_own_recorded_time() -> None:
 def test_samples_carrying_a_time_and_no_reading_produce_no_profile_at_all() -> None:
     """Rather than one with a bare `duration: 0`, which is a claim the source did not make."""
     conversion = convert(one_ssrf_computer("<sample time='0:00 min'/><sample time='1:00 min'/>"))
-    assert "profile" not in conversion.document["dives"][0]
+    assert profile_of(conversion.document["dives"][0]) is None
     assert any("no profile at all" in message for message in messages(conversion))
 
 
@@ -326,7 +413,7 @@ def test_a_dive_that_recorded_no_samples_says_nothing_at_all() -> None:
     """Unlike the case above: there the source recorded a profile this reader could not
     carry, here it recorded none."""
     conversion = convert(one_ssrf_computer("<depth max='18.4 m'/>"))
-    assert "profile" not in conversion.document["dives"][0]
+    assert profile_of(conversion.document["dives"][0]) is None
     assert not any("profile" in message for message in messages(conversion))
 
 
@@ -337,7 +424,7 @@ def test_the_profiles_duration_is_the_span_of_its_own_samples() -> None:
     conversion = convert(one_ssrf_dive("duration='66:50 min'", f"<divecomputer>{samples}</divecomputer>"))
     found = conversion.document["dives"][0]
     assert found["duration"] == 4010
-    assert found["profile"]["duration"] == 4300
+    assert profile_of(found)["duration"] == 4300
 
 
 # -- trips ----------------------------------------------------------------------------

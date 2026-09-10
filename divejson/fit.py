@@ -74,10 +74,12 @@ from .converter import (
     Scope,
     SourceTooLargeError,
     decimal_of,
+    device,
     header,
     position,
     record_inferred,
     recorded,
+    recording,
     rounded,
 )
 from .series import Channel, SampleAxis
@@ -261,6 +263,18 @@ def _native_raw(frame: fitdecode.FitDataMessage | None, name: str) -> Any | None
         return None
     field_data = _native_field(frame, name)
     return field_data.raw_value if field_data is not None else None
+
+
+def _version_text(value: Any) -> str | None:
+    """A `software_version` as the text a version is, or nothing where none was recorded.
+
+    The profile scales the field, so `fitdecode` hands back a number rather than a string
+    and the digits are the device's own. `bool` is excluded because it is an `int` in
+    Python and never a firmware version anywhere else.
+    """
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return str(value)
+    return None
 
 
 @dataclass(slots=True, eq=False)
@@ -553,6 +567,73 @@ class _Converter:
         record_inferred(provenance, self.inferred)
         return provenance
 
+    def read_device(self, session: fitdecode.FitDataMessage, where: str) -> dict[str, Any] | None:
+        """The same two messages read as hardware rather than as provenance (§6.4b).
+
+        `source_generator` and the device are one fact seen twice for a format a wrist
+        writes: the provenance block records what produced the *file*, and here that is the
+        computer. Both are written, and `converting.md` says why.
+
+        **`product` (2) is not a model and there is no fall-through to it.** It is a numeric
+        vendor id — the Ocean's is `62` — where §6.4b's `model` is the product string as the
+        source names it, and a decoder that resolves one resolves it to a profile constant,
+        which is the profile's vocabulary rather than what the vendor calls the computer.
+        Falling back to `file_id.manufacturer` is not open either: `brand` is a member of
+        its own, and copying it into `model` would say `suunto` is the product. A file
+        stating no `product_name` therefore carries **no model**, which is the ordinary
+        absence rather than a gap to fill. The same reading governs `brand`: a manufacturer
+        id the profile does not resolve to a name arrives as an integer, and an integer is
+        not what the maker is called.
+        """
+        computer = self.computer_info()
+        serial = _native(computer, "serial_number")
+        if serial is None:
+            # The file's own claim about what wrote it, which is the fallback rather than
+            # the first answer: `device_index` 0 is the computer and every other
+            # `device_info` in the chain is a transmitter or a strap.
+            serial = _native(self.scan.file_id, "serial_number")
+        firmware = _native(computer, "software_version")
+        return device(
+            {
+                # `brand` and `model` are handed over as the decoder rendered them: a
+                # profile enum that resolved gives a string, and one that did not gives the
+                # bare number, which `device` drops for not being a string at all.
+                "brand": _native(self.scan.file_id, "manufacturer"),
+                "model": _native(self.scan.file_id, "product_name"),
+                "serial": None if serial is None else str(serial),
+                "firmware": _version_text(firmware),
+                "dive_number": _native(session, "dive_number"),
+            },
+            note=self.note,
+            where=where,
+            labels={
+                "brand": "file_id.manufacturer",
+                "model": "file_id.product_name",
+                "serial": "the device's serial_number",
+                "firmware": "device_info.software_version",
+                "dive_number": "session.dive_number",
+            },
+        )
+
+    def computer_info(self) -> fitdecode.FitDataMessage | None:
+        """The `device_info` for the computer itself: `device_index` 0, and no other.
+
+        libdivecomputer's rule, and the right one. A dive computer writes a `device_info`
+        for every device in the chain — the computer, a pressure transmitter, a heart-rate
+        strap — and only index 0 is the computer; `garmin_parser.c` copies a serial, a
+        product and a firmware from that message and no other. Reading a transmitter's
+        serial as the computer's would pair two dives that were never on one wrist.
+
+        Raw rather than decoded, for `_native_raw`'s reason: `device_index` is a profile
+        enum whose 0 renders as `creator`, so a decoded comparison against 0 never fires.
+        Neither fixture in `fixtures/fit/` carries a `device_index` at all, so this returns
+        nothing for both of them and the two members it feeds wait on a file that has one.
+        """
+        for message in self.scan.devices:
+            if _native_raw(message, "device_index") == 0:
+                return message
+        return None
+
     def device_version(self) -> str | None:
         """The firmware the computer was running, where a `device_info` message says.
 
@@ -561,12 +642,12 @@ class _Converter:
         its firmware as the computer's would put a transmitter's version on the dive.
         """
         maker = _native(self.scan.file_id, "manufacturer")
-        for device in self.scan.devices:
-            if _native(device, "manufacturer") != maker:
+        for message in self.scan.devices:
+            if _native(message, "manufacturer") != maker:
                 continue
-            version = _native(device, "software_version")
-            if isinstance(version, (int, float)) and not isinstance(version, bool):
-                return str(version)
+            version = _version_text(_native(message, "software_version"))
+            if version is not None:
+                return version
         return None
 
     # -- the dive ----------------------------------------------------------------
@@ -604,8 +685,12 @@ class _Converter:
         # a `gas_number` is asserted only where a pressure channel or a gas switch needs
         # one to point at.
         profile = self.read_profile(samples, cylinders, sensors, where)
-        if profile is not None:
-            dive["profile"] = profile
+        # A FIT file is one dive written by one computer, so a converted document has
+        # exactly one recording (§6.4a) — and none at all where the file names no computer
+        # and kept no usable sample, §6.4a forbidding a recording that carries nothing.
+        built = recording(device=self.read_device(session, where), profile=profile)
+        if built is not None:
+            dive["recordings"] = [built]
         return dive
 
     def session(self, where: str) -> fitdecode.FitDataMessage:

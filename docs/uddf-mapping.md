@@ -172,8 +172,17 @@ trip at its dives. It is not read, because no writer in the corpus emits it.
 ### Gear — `/uddf/diver/owner/equipment`
 
 The element's own name is the type. `name` is REQUIRED by §6.12, so a nameless piece is
-dropped; `manufacturer/name` becomes `brand` and `notes/para` becomes `notes`. A dive's
+dropped; `manufacturer/name` becomes `brand`, `serialnumber` becomes `serial` and
+`notes/para` becomes `notes`. A dive's
 `informationbeforedive/equipmentused/link/@ref` becomes `dives[].gear_uuids`.
+
+`<serialnumber>` is on `equipmentPieceType`, so it is read for **every** gear type that
+carries one and not only for a computer — which is what §6.12's own member says. On a
+computer it is the member that lets a writer recognise the kit item and a recording's
+device (§6.4b) as one machine without comparing names, and
+[`uddf-writing.md`](uddf-writing.md) is where that test is written down. `<model>` is not
+read: §6.12 has no member for it, and on a computer the model is the *device's*
+(§6.4b), read from the same element below.
 
 | UDDF element | `gear.type` |
 | --- | --- |
@@ -189,6 +198,114 @@ The last row is translation rather than invention: `<variouspieces>` is UDDF's o
 catch-all, and a scooter and a weight belt are equipment this format's vocabulary does not
 yet name. `<equipmentconfiguration>` is skipped — it describes how the pieces are rigged
 together, not a piece.
+
+**`<divecomputer>` is one element read two ways.** It is a piece of kit the diver owns, and
+it is the hardware that recorded a dive, and UDDF has one element for both — alone among
+the formats here. So the reader does both: it keeps minting the gear item of type
+`computer`, exactly as the table above says, **and** reads a recording's device (§6.4b) from
+the same element for every dive whose `<equipmentused><link>` names it. The two are
+different records of one object rather than one record written twice: the gear item is a
+thing in a kit list and the device is what a recording says about the hardware. They
+overlap on this format more than on any other — a `<name>` and a `<serialnumber>` each land
+on both — and that overlap is the point, being exactly what lets a writer recognise the two
+as one computer again. A dive that links no computer gets no device, which is most files
+— see *Device* below.
+
+### Device — the linked `<divecomputer>` elements
+
+| UDDF | DiveJSON (§6.4b) |
+| --- | --- |
+| `divecomputer/manufacturer/name` | `brand` |
+| `divecomputer/model` | `model` |
+| `divecomputer/serialnumber` | `serial` |
+| `divecomputer/name` | `name` |
+| `informationbeforedive/internaldivenumber` | `dive_number`, the **device's** counter |
+
+**`<divecomputer><name>` is read twice, into two members of two records, and that is not a
+duplication.** It is the only string in this format that names the computer at all, and the
+two members it lands in mean different things: §6.12's `name` is the diver's label for a
+thing in their kit list, and §6.4b's `name` is what the device calls itself. UDDF has one
+element for both because it has one element for the whole computer. Reading it only as the
+gear item's name would leave the corpus's only UDDF computer with a device that has no
+string naming it — `opendiving.uddf` below carries a `<name>` and no `<model>` — and reading
+it into `model` instead would put `Ocean` where the same dive's FIT export puts
+`Suunto Ocean`, conflating two members §6.4b defines separately.
+
+A `<name>` of pure whitespace is no name (*What UDDF's leniencies look like* above), so it
+yields neither, and an **empty** `<name>` is the same answer — which is what makes a written
+file round-trip: [`uddf-writing.md`](uddf-writing.md) emits an empty one for a device that
+has no name, `<name>` being mandatory on the element.
+
+`<internaldivenumber>` is on the dive rather than on the element, which is where UDDF puts
+it, and it is why a device read from a shared element still differs between two dives that
+link it. It is the counter §6.2's `dive_number` is explicitly not — `<divenumber>` is the
+diver's and stays there.
+
+**A device whose every member is absent is not written at all** (§6.4b). With `<name>` on
+the list above, that now takes an element carrying **nothing** this reader maps — no
+`<name>`, no `<manufacturer>`, no `<model>`, no `<serialnumber>` — on a dive that also
+states no `<internaldivenumber>` the element is entitled to, which the multi-computer rule
+below makes the dive's first link alone.
+An element carrying only a `<name>` yields both records: a gear item named by it and a
+device named by it.
+
+`fixtures/uddf/opendiving.uddf`, the reference writer's own export, is the shape to expect.
+It has one `<divecomputer>` with a `<name>` and a `<manufacturer><name>` and no `<model>`,
+`<serialnumber>` or `<internaldivenumber>` — so its dive's recording carries a device of
+exactly two members, `{"brand": "Suunto", "name": "Ocean"}`, and the gear item carries the
+same name beside its own uuid and notes. UDDF records what the diver owns far more often
+than it records what recorded the dive, and on this format the two overlap almost entirely:
+a device read here is usually the kit item read again, which is why the fold going the other
+way ([`uddf-writing.md`](uddf-writing.md)) matters as much as it does.
+
+UDDF has no equipment element for a firmware version, so §6.4b's `firmware` has no source
+here.
+
+**A dive may link more than one computer, and each linked `<divecomputer>` is a recording**
+(§6.4a), in the order the dive's `<equipmentused>` links them. That is `converting.md`'s
+general rule rather than anything of UDDF's, and it is the same shape `.ssrf` reaches from
+its own repeated element — the carve-out included, and in `converting.md`'s own words: a
+link that yields **neither a device nor a profile** yields no recording, §6.4a forbidding
+one that carries nothing.
+
+**The first link is where the dive's own once-per-dive facts land**, both of them, because
+UDDF states each once per **dive** and never once per computer:
+
+- **Its `<samples>` become that first recording's profile.** A dive has one `<samples>`
+  element, so there is nothing to give the others and nothing to divide, and every recording
+  after the first is device-only. That profile is also the only thing that carries a link
+  past the carve-out without a device, and it reaches exactly one link — so **where the dive
+  has a profile**, the first link is a recording whether or not its element names a device,
+  exactly as a dive linking no computer at all is one recording made of its samples alone,
+  and the carve-out bites only on the *later* links whose elements name none. **Where the
+  dive has no profile** — an absent `<samples>`, or samples `converting.md` found wholly
+  unusable — there is nothing to protect any link, so every one of them is judged on its
+  device alone, the first included, and a dive whose elements all name none has no recordings
+  at all.
+- **Its `<internaldivenumber>` joins that first link's device**, and only that one's. It is a
+  child of the dive (above), so a dive linking two computers has one counter and no way to
+  say whose it is; giving it to the first is the only reading that does not put one machine's
+  count on another's device. Confining it there is also what keeps the rule above from
+  circling: every **later** link's device is made of that element's own four members and
+  nothing the dive supplies, so whether it yields a device never depends on which link came
+  first — while the first link's device may still be a counter and nothing else, which is why
+  the emptiness test above names the dive's `<internaldivenumber>` beside the element's own.
+
+**No file in this corpus links two**, so this has no pair of its own and is written down
+here rather than discovered by the first reader to meet one.
+
+**It is not a round trip, and the writing direction says so first.** A document whose dive
+carries more than one recording cannot be written whole — one `<samples>` per dive — so
+[`uddf-writing.md`](uddf-writing.md) writes the primary's samples and **reports every other
+recording as dropped**, keeping its device in `<equipment>` so that what was worn is not
+lost with what it sampled. Nothing here recovers a dropped recording, and **the order does
+not survive either**: a dive's links come from its `gear_uuids`, in the diver's own order,
+with a link appended after them for every device that took an element of its own, so which
+computer reads back first is a fact about the kit list rather than about the recordings. A
+reader must not take the first link as evidence that its computer was the document's
+primary — there is no such evidence in the file. This rule exists to read somebody else's
+two-computer file; on output from the writer above it returns what that writer's report
+already said would come back.
 
 ### Dives — `/uddf/profiledata/repetitiongroup/dive`
 
@@ -283,13 +400,58 @@ inventing 402 readings.
   a linked double measured at one pressure — is taken as the dive's cylinder when there is
   exactly one, and dropped when there is a choice to get wrong.
 
+## Generators this reader knows
+
+`converting.md` settles a *meaning* on the writer, not on the value, and this is the table
+that does it: an entry here changes how one generator's files are read and no others'. It is
+the sharpest tool in this document — a wrong entry misreads every file that generator ever
+produced — so it gains a row only against real files, and each row says which.
+
+| `<generator><name>` | what is read differently |
+| --- | --- |
+| `Shearwater Cloud Desktop` | a `Z` on a dive's `<datetime>` means **no offset** |
+
+**The Shearwater `Z` is the local wall clock, not UTC.** Shearwater Cloud Desktop writes the
+time the diver read off their wrist and suffixes it `Z`, so the instant the file appears to
+state is wrong by the diver's own offset — three hours, for the Red Sea export this rule was
+written against, where a Perdix 3 stamped `15:18:10Z` for the same moment a Suunto beside it
+on the same wrist stamped `15:17:38+03:00`. So under this generator the `Z` is read as
+absent: the value becomes a **local date-time** (§5.2's third state, the wall clock
+with the instant unknown) and the report carries a `resolved` finding — "the generator writes
+the local wall clock with a `Z` suffix; read as a wall clock with no offset (spec §5.2)". It
+is `resolved` rather than `inferred` because the digits written are the ones the source
+recorded and only their meaning was in doubt, so nothing goes under
+`extensions.divejson.inferred`.
+
+The alternatives are both worse. Trusting the `Z` puts the dive three hours from where it
+happened and can never pair it with the same dive off another computer. Correcting it with
+an offset would be the fabrication §5.2 forbids outright — a wall clock with no offset is a
+state this format has precisely so a converter never has to invent one.
+
+Matching is on the exact `<generator><name>` string, with the manufacturer id
+`Shearwater_Research_Inc` checked beside it: a name alone is a string anything may claim,
+and two agreeing beats one. `<generator><datetime>` is left alone under this rule and every
+other — it is the export instant, a fact about the run rather than logbook data.
+
+**No first-party statement of this exists either way**, which is why the rule is keyed on
+the generator rather than asserted as the format's. What is on record: the owner of the two
+files confirms the wall clock; a third-party reader states in its own source that
+Shearwater's exports carry "a wall-clock reading stored as if it were a UTC epoch";
+Subsurface's import is consistent with it, copying the time part verbatim and ignoring a
+trailing `Z`; and one issue asserts the opposite with no evidence behind it. Three further
+Shearwater Cloud Desktop exports in public repositories carry the same shape. **No
+Shearwater-generated file is in this corpus**, so this rule has no pair of its own and rests
+on the files named above rather than on one this repository carries —
+`converting.md`'s rule about a claim resting on a file that is not here, said in place.
+
 ## Three places UDDF does not hand over the answer
 
-The last two are `converting.md`'s ambiguities: a value the source did record, whose scale
-the file cannot settle, so a heuristic reads it at the scale it must have meant and reports
-a finding of kind `resolved` when it fires. The first is the opposite shape and no ambiguity
-at all — a required DiveJSON member with no UDDF source — and §6.4 settles it outright, so
-it guesses nothing and reports nothing.
+The last two are `converting.md`'s ambiguities of *scale*: a value the source did record,
+whose scale the file cannot settle, so a heuristic reads it at the scale it must have meant
+and reports a finding of kind `resolved` when it fires. The generator table above is the
+same kind of finding settled the other way, on the writer rather than on the value. The
+first below is the opposite shape and no ambiguity at all — a required DiveJSON member with
+no UDDF source — and §6.4 settles it outright, so it guesses nothing and reports nothing.
 
 ### `profile.duration` has no UDDF source
 

@@ -12,7 +12,16 @@
       "started_at": "2021-04-06T11:16:42.600+02:00",
       "duration": 2001,
       "max_depth": 32.41,
-      "avg_depth": 17.73
+      "avg_depth": 17.73,
+      "recordings": [
+        {
+          "device": {
+            "brand": "Suunto",
+            "firmware": "2.5.1947",
+            "name": "Suunto D5"
+          }
+        }
+      ]
     }
   ],
   "extensions": {

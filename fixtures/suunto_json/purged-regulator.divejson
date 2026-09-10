@@ -20,45 +20,54 @@
           "gas_number": 0
         }
       ],
-      "profile": {
-        "duration": 4230,
-        "depth": {
-          "times": [
-            0,
-            1560,
-            3880
-          ],
-          "values": [
-            122,
-            1696,
-            127
-          ]
-        },
-        "pressures": [
-          {
-            "times": [
-              0,
-              1560,
-              3880,
-              4230
+      "recordings": [
+        {
+          "device": {
+            "brand": "Suunto",
+            "firmware": "2.40.56",
+            "name": "Suunto Ocean"
+          },
+          "profile": {
+            "duration": 4230,
+            "depth": {
+              "times": [
+                0,
+                1560,
+                3880
+              ],
+              "values": [
+                122,
+                1696,
+                127
+              ]
+            },
+            "pressures": [
+              {
+                "times": [
+                  0,
+                  1560,
+                  3880,
+                  4230
+                ],
+                "values": [
+                  2047,
+                  1280,
+                  533,
+                  1
+                ],
+                "gas_number": 0
+              }
             ],
-            "values": [
-              2047,
-              1280,
-              533,
-              1
-            ],
-            "gas_number": 0
+            "events": [
+              {
+                "time": 0,
+                "type": "gas_switch",
+                "gas_number": 0
+              }
+            ]
           }
-        ],
-        "events": [
-          {
-            "time": 0,
-            "type": "gas_switch",
-            "gas_number": 0
-          }
-        ]
-      }
+        }
+      ]
     }
   ],
   "extensions": {

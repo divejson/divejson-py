@@ -1,0 +1,102 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-05T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.4.0"
+  },
+  "dives": [
+    {
+      "uuid": "99ca578d-a074-52d2-9216-e98057a33dcb",
+      "dive_number": 118,
+      "started_at": "2026-09-08T15:17:38",
+      "duration": 3051,
+      "notes": "Both computers on the same wrist; the Perdix went in a few seconds late.",
+      "site_uuids": [
+        "a908941f-84bb-5e06-b955-bcdfb621aaf8"
+      ],
+      "cylinders": [
+        {
+          "volume": 12.0,
+          "start_pressure": 207.3,
+          "end_pressure": 44.0,
+          "oxygen": 33.0
+        }
+      ],
+      "max_depth": 19.04,
+      "avg_depth": 10.74,
+      "bottom_temperature": 29.8,
+      "recordings": [
+        {
+          "device": {
+            "model": "Suunto Ocean",
+            "serial": "253810000400",
+            "firmware": "2.51.28"
+          },
+          "profile": {
+            "duration": 3051,
+            "depth": {
+              "times": [
+                0,
+                600,
+                3051
+              ],
+              "values": [
+                0,
+                1904,
+                0
+              ]
+            },
+            "temperature": {
+              "times": [
+                0,
+                3051
+              ],
+              "values": [
+                298,
+                301
+              ]
+            }
+          }
+        },
+        {
+          "device": {
+            "model": "Shearwater Perdix 3"
+          },
+          "started_at": "2026-09-08T15:18:10",
+          "profile": {
+            "duration": 3019,
+            "depth": {
+              "times": [
+                0,
+                568,
+                3019
+              ],
+              "values": [
+                0,
+                1960,
+                0
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "sites": [
+    {
+      "uuid": "a908941f-84bb-5e06-b955-bcdfb621aaf8",
+      "name": "Blue Hole"
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "ssrf",
+      "ssrf_version": "3",
+      "source_generator": {
+        "name": "subsurface"
+      }
+    }
+  }
+}

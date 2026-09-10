@@ -69,10 +69,12 @@ from .converter import (
     NoteKind,
     Scope,
     decimal_of,
+    device,
     header,
     position,
     record_inferred,
     recorded,
+    recording,
     rounded,
 )
 from .series import Channel, SampleAxis
@@ -250,6 +252,30 @@ def _number(value: Any) -> Decimal | None:
     return decimal_of(str(value))
 
 
+# The maker every file of this format was written by. §5.4 forbids inventing a value the
+# source did not record, and this is not one: a vendor-proprietary export format *is* the
+# vendor saying so, which is the same reading that already lets `source_generator` name the
+# device rather than the application. A format several manufacturers write gets no such
+# constant, which is why the FIT reader takes a field instead.
+SUUNTO = "Suunto"
+
+
+def _counter(value: Any) -> int | None:
+    """`Header.Diving.NumberInSeries` as §6.4b's device counter, or nothing.
+
+    The export writes its numbers as JSON numbers, and a counter written as `3.0` is still
+    a count — but a fractional one is not a counter at all and is left to `device` to see
+    as no counter rather than rounded into one.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return None
+
+
 def _text(value: Any) -> str | None:
     """A source string with its whitespace stripped, or `None` where there is no text.
 
@@ -414,13 +440,15 @@ class _Converter:
         firmware under `Device.Info.SW` is that device's own version.
         """
         provenance: dict[str, Any] = {"converted_from": FORMAT}
-        device = self.head.get("Device")
-        device = device if isinstance(device, dict) else self.log.get("Device")
-        if isinstance(device, dict):
-            name = _text(device.get("Name"))
+        # `block` rather than `device`, which is the §6.4b builder this module imports:
+        # shadowing it here would leave the next line added to this method calling a dict.
+        block = self.head.get("Device")
+        block = block if isinstance(block, dict) else self.log.get("Device")
+        if isinstance(block, dict):
+            name = _text(block.get("Name"))
             if name is not None:
                 generator: dict[str, Any] = {"name": name}
-                info = device.get("Info")
+                info = block.get("Info")
                 version = _text(info.get("SW")) if isinstance(info, dict) else None
                 if version is not None:
                     generator["version"] = version
@@ -474,9 +502,60 @@ class _Converter:
         if cylinders:
             dive["cylinders"] = cylinders
         profile = self.read_profile(samples, cylinders, numbering, where)
-        if profile is not None:
-            dive["profile"] = profile
+        # One file is one activity, so a converted document has at most one recording
+        # (§6.4a) — and a header that names a device above an empty `Samples` still
+        # produces one, carrying the device and no profile. A computer worn is a fact about
+        # the dive rather than an empty record, which `fixtures/suunto_json/header-only.json`
+        # is the pair for.
+        built = recording(device=self.read_device(diving, where), profile=profile)
+        if built is not None:
+            dive["recordings"] = [built]
         return dive
+
+    def read_device(self, diving: dict[str, Any], where: str) -> dict[str, Any] | None:
+        """The same `Device` block `provenance` reads, read as hardware instead (§6.4b).
+
+        **The brand is written without being read**, which is the one place this reader
+        supplies a value the file does not state. It is not §5.4's fabrication: this is a
+        vendor-proprietary export format, so the vendor is a property of the format rather
+        than a guess about the file — the same reading that already lets `source_generator`
+        name the device instead of the application. A format several manufacturers write
+        gets no such line, which is why the FIT reader takes a field.
+
+        `Device.Name` lands on `name` and never on `model`, because it is exactly that:
+        settable by the owner, and `Porvoo` on one real Ocean. This format states no product
+        name anywhere, so §6.4b's `model` has no source here — the same dive's FIT export
+        does state one, which is how two files of one recording come to carry different
+        halves of one device.
+
+        `Device.SerialNumber` was refused here on the grounds that nothing in a logbook
+        needs it. That is no longer true: a logbook holding two records of one dive needs to
+        tell one wrist's computer from the other's, and the serial is the only thing that
+        does it reliably.
+        """
+        block = self.head.get("Device")
+        block = block if isinstance(block, dict) else self.log.get("Device")
+        if not isinstance(block, dict):
+            return None
+        info = block.get("Info")
+        info = info if isinstance(info, dict) else {}
+        return device(
+            {
+                "brand": SUUNTO,
+                "serial": _text(block.get("SerialNumber")),
+                "firmware": _text(info.get("SW")),
+                "name": _text(block.get("Name")),
+                "dive_number": _counter(diving.get("NumberInSeries")),
+            },
+            note=self.note,
+            where=where,
+            labels={
+                "serial": "Device.SerialNumber",
+                "firmware": "Device.Info.SW",
+                "name": "Device.Name",
+                "dive_number": "Header.Diving.NumberInSeries",
+            },
+        )
 
     def is_a_dive(self, where: str) -> bool:
         """Whether this activity is one, on the header's own say-so.

@@ -12,6 +12,11 @@ what it deliberately does not map. Those documents do not repeat what is here. W
 turns out to hold for more than one format, it moves into this file and the format's
 document keeps the example that first showed it.
 
+The other direction has a document of its own, [`writing.md`](writing.md): the rules a
+converter follows whatever format it is *writing*, and one `<format>-writing.md` beside it
+per written format. Rules that hold in either direction — the note kinds, identity, decimal
+arithmetic — stay here, and that document points at them.
+
 A claim about a real writer is checked against a file that writer produced. Where a rule
 rests on a file this repository does not carry — a personal export, a sample from a public
 issue tracker — the document says so in place rather than implying otherwise.
@@ -52,6 +57,15 @@ own schema forbids, and where refusing would cost a diver their logbook.
 - **Samples are ordered by their own recorded time, never by their position in the source.**
   §6.5 requires strictly increasing sample times and nothing guarantees a writer emitted
   them in order.
+- **A date-time is matched against a lenient ISO 8601 pattern, and the calendar is checked
+  afterwards.** A standard library's own ISO parser is not reliably lenient enough to be the
+  whole answer: Python's `datetime.fromisoformat` before 3.11 accepts a three- or six-digit
+  sub-second fraction and rejects `.6`, which real exports write. That is a property of one
+  parser's version rather than of the data, and every language has its own version of it.
+  What a pattern cannot do is tell a real date from a well-formed one, which is what the
+  library parser is then used for.
+- **A time of day with no seconds is read as `:00`, and reported.** §5.2's grammar requires
+  them, and refusing would cost a diver a whole dive over a spelling.
 
 ### For every XML source, a `<!DOCTYPE>` is refused outright
 
@@ -78,6 +92,13 @@ are worth more than its fixtures here.
 **The channel conversions carry a scale the scalar ones do not.** That is the trap. The
 most-executed conversion in a converter is its depth samples, and a list of the scalar
 conversions alone does not contain it.
+
+**Nothing a source recorded is quantized.** A transmitter or an application commonly records
+in steps far finer than a gauge a diver reads, and those digits are the source's: rounding
+them to something more human writes a convention into the document that nothing else here
+applies, and a conformance pair carrying such a document freezes it. Rounding happens where
+§6.5's integer channels require it, and on values the converter itself computed — a derived
+mean, a conversion by an irrational factor — which each format's mapping document names.
 
 Arithmetic runs on decimal values parsed from the source text, not on floating point:
 `2.6 × 100` is exactly `260` that way, where the float route arrives at
@@ -143,6 +164,13 @@ document. `exported_at` is the moment of conversion, always offset-aware.
   a dangling reference, so the references go with the record. A source that records nothing
   at all about a logbook's owner produces no `diver` member (§6.1): minting an identity for
   one would be §5.4's fabrication applied to people.
+- **A source record that is not a scuba dive is skipped, and reported.** §6.2 has no member
+  for the *kind* of a dive, so a freedive or a swim converted as an ordinary one arrives
+  indistinguishable from a scuba dive that recorded no gas and no decompression algorithm —
+  mislabelled by omission, in a logbook it shares with real ones. Skipping it and saying so
+  is the honest answer; a marker under `extensions` would invent vocabulary the format does
+  not have, in a document that outlives the converter. Each format's mapping document names
+  the element or field its source states the kind in.
 - **An exact `0.000000` / `0.000000` pair is not a position.** Null Island is a place: a
   reader that trusts it pins a Red Sea wreck into the Atlantic. Half a pair is not a
   position either — §6's Position object makes both members REQUIRED, which is §5.4
@@ -180,6 +208,82 @@ document. `exported_at` is the moment of conversion, always offset-aware.
   both pressures, which is exactly the shape a gas-consumption figure is derived from, so a
   stage bottle's pressure drop would be attributed to the whole dive. A cylinder is listed
   because the source recorded it was on the dive; its pressures are a separate question.
+
+## Recordings and devices
+
+A dive's samples now sit inside a **recording** (§6.4a) — one device's record of one dive —
+and a source that describes more than one computer's record of a dive produces more than
+one, in file order, the first primary. A source that names a computer and records no
+samples still produces one, carrying the device and nothing else: a computer worn is a fact
+about the dive, and the recording is where it lives.
+
+- **A recording's `started_at` is written only where the source states one *for that
+  record*.** Absent, §6.4a reads it as the dive's, which is the honest answer for every
+  format that states a dive's start once. A source that timestamps each computer's record
+  separately — `.ssrf`'s `<divecomputer @date @time>` — states one per recording, and
+  writing it is what keeps a second computer's samples on their own axis.
+- **A device is data on a recording, never a gear item.** The two can describe one piece
+  of hardware; they are not one record. A converter that minted a `computer` gear item per
+  dive from a model string would fill a logbook's kit list with duplicates of one computer,
+  which is why `ssrf-mapping.md` refused to, and that refusal stands. UDDF is the one
+  source that carries both in one element, and its document says what that costs.
+- **A serial is opaque**, matched against other serials and never parsed — *Reading the
+  source*'s ids-and-references rule, applied to hardware. This holds for both members that
+  carry one: a device's
+  (§6.4b) and a gear item's (§6.12), which a source stating a serial on a piece of kit fills
+  the same way. Equality between the two is what says a kit item and a device are one
+  machine, which is why neither may be normalised beyond trimming and case-folding.
+- **`source_generator` and the device are the same fact seen twice**, for the formats a
+  wrist writes: the provenance block records what produced the *file*, and for those
+  formats that is the computer. Both are written. The block is about the file and the
+  device is about the recording, and a document that merges two sources keeps a device per
+  recording where it can keep only one `source_generator`.
+
+### The Devices table
+
+What each reader takes a device from. A blank cell is a member that format does not carry,
+which is an absence rather than a gap to fill (§5.4).
+
+| format | `brand` | `model` | `serial` | `firmware` | `name` | `dive_number` |
+| --- | --- | --- | --- | --- | --- | --- |
+| `uddf` | `<divecomputer><manufacturer><name>` | `<model>` | `<serialnumber>` | | `<divecomputer><name>` | the dive's `<internaldivenumber>` |
+| `ssrf` | | `<divecomputer @model>` | the `Serial` `<extradata>` | the `FW Version` `<extradata>` | | |
+| `fit` | `file_id.manufacturer` | `file_id.product_name` | the `device_info` at `device_index` 0's `serial_number`, else `file_id.serial_number` | that `device_info`'s `software_version` | | `session.dive_number` |
+| `suunto_json` | the literal `Suunto` | | `Header.Device.SerialNumber` | `Header.Device.Info.SW` | `Header.Device.Name` | `Header.Diving.NumberInSeries` |
+| `suunto_xml` | the literal `Suunto` | `<Source>` | `<SerialNumber>` | `<Software>` | | `<DiveNumberInSerie>` |
+
+Four things the table does not say on its own.
+
+**Which record the device comes from is the format's own question**, and each document
+answers it: UDDF gives a recording to each `<divecomputer>` the dive's `<equipmentused><link>`
+names **that yields either a device or a profile**, so a dive that links none has no device —
+and where it links two, the dive's single `<samples>` and `<internaldivenumber>` go to the
+first, those being the dive's rather than any computer's; `.ssrf` gives a recording to every
+`<divecomputer>` on a dive **that yields either a device or a profile**, and none to one that
+yields neither, §6.4a forbidding a recording carrying nothing; the three one-dive-per-file
+formats have exactly one.
+
+**A model comes from a name the source wrote, never from a code a decoder resolved.** §6.4b
+defines `model` as the product string as the source names it, so a numeric vendor id is not
+one and neither is a profile constant a decoder maps such an id onto — the string those
+produce is the decoder's vocabulary rather than what the vendor calls the computer. Where a
+format states no product name, the device carries **no model**, which is the ordinary
+absence (§5.4) rather than a gap to fill from the brand: `brand` is a member of its own and
+copying it into `model` would say the maker's name is the product's.
+
+**The two literal `Suunto`s are not fabrications.** §5.4 forbids inventing a value the
+source did not record, and a vendor-proprietary export format *is* the vendor saying so —
+the same reading that already lets `source_generator` name the device rather than the
+application. A format shared by several manufacturers gets no such row, which is why the
+FIT line reads a field instead.
+
+**A device counter is not the diver's dive number**, and this is where the three formats
+that carry one stop being refusals. `session.dive_number`, `<DiveNumberInSerie>` and
+`Header.Diving.NumberInSeries` were each read and dropped with a finding, because §6.2's
+`dive_number` is the diver's own numbering and a counter that restarts on a new device is
+not it. §6.4b's `dive_number` is that counter, in as many words, so each now lands there
+and the finding goes with it. UDDF's `<internaldivenumber>` is the same member and had no
+reader at all.
 
 ## Profiles
 
@@ -256,16 +360,26 @@ learns what their file did not carry. In particular:
 - No name invented for a record whose format-required name is missing; the record and the
   references to it go instead.
 
-**An ambiguity is not this case.** A format has places where a recorded value's *scale* or
-spelling is genuinely in doubt — the same field written as a fraction by one writer and a
-percentage by another, both schema-valid, with no way to tell from the file which you have.
-None of those has a clean answer. Each is handled explicitly and reported when its
-heuristic fires — as a `resolved` finding, the kind *The report* below defines for exactly
-this — because a silent guess is the failure a converter exists to avoid. The difference
-from the rule above is that the value **was** recorded and only its
-interpretation is in doubt, so a magnitude test interprets data rather than inventing it;
-dropping the member instead would lose a real reading from every file that writer produced.
-Each format's mapping document names its own ambiguities and the test each one uses.
+**An ambiguity is not this case.** A format has places where a recorded value's *scale*,
+its spelling, or its **meaning** is genuinely in doubt — the same field written as a
+fraction by one writer and a percentage by another, both schema-valid, with no way to tell
+from the file which you have; or a timestamp one writer stamps `Z` while meaning the wall
+clock in front of the diver, which is a value whose scale is not in question at all and
+whose meaning is. None of those has a clean answer. Each is handled explicitly and reported
+when its heuristic fires — as a `resolved` finding, the kind *The report* below defines for
+exactly this — because a silent guess is the failure a converter exists to avoid. The
+difference from the rule above is that the value **was** recorded and only its
+interpretation is in doubt, so a test interprets data rather than inventing it; dropping the
+member instead would lose a real reading from every file that writer produced.
+
+**A meaning is settled on the writer, a scale on the value.** A magnitude test asks the
+number what it is; nothing about a wall clock's digits says whether an offset was meant, so
+the only honest test is which software wrote the file — a generator table, which each
+format's document carries where it needs one. That makes the two kinds of ambiguity differ
+in what a wrong answer costs: a magnitude test misreads one value, a generator table
+misreads every file that generator produced, so a table gains an entry only against real
+files and says which. Each format's mapping document names its own ambiguities and the test
+each one uses.
 
 ## The report
 
@@ -291,11 +405,11 @@ Four, and the difference between them is what a diver needs from the report:
 | --- | --- |
 | `absent` | the source never recorded this |
 | `inferred` | the converter computed this from readings the source did record |
-| `resolved` | the source recorded the number and left its scale or units ambiguous; the converter decided only how to read it, and the value is still the source's own |
+| `resolved` | the source recorded the value and left its scale, its units or its **meaning** ambiguous; the converter decided only how to read it, and the value is still the source's own |
 | `dropped` | the source recorded this and the converter could not carry it |
 
 They read in order of how much of the value the source itself supplied: nothing at all, the
-readings it was computed from, the number with its scale left open, and the whole thing,
+readings it was computed from, the value with its reading left open, and the whole thing,
 uncarriable.
 
 **An inferred value is emitted, and labelled.** A maximum depth computed from a dive's own
@@ -310,9 +424,9 @@ change.
 **The list is written only when it is non-empty**, so a conversion that infers nothing
 produces exactly the document it would have produced without this rule.
 
-**A resolved value is not listed, and that is why it is its own kind.** The number a
+**A resolved value is not listed, and that is why it is its own kind.** The value a
 converter writes after settling an ambiguity is still the one the source recorded — only
-its scale was in doubt — so there is no derivation for a downstream reader to be told
+how to read it was in doubt — so there is no derivation for a downstream reader to be told
 about, and nothing goes under `extensions.divejson.inferred`. Keeping the two apart is what
 makes the coupling above exact in both directions: every `inferred` note's member is listed,
 and every listed member has an `inferred` note. Filing a resolution under `inferred`
@@ -329,6 +443,9 @@ It carries no finding of any kind.
 
 Each format's document carries, beside its map: the format's frozen identity namespace and
 the string it was derived from; its unit factor table, channels included; the dialects and
-writer habits its rules answer to; its own ambiguities and their tests; the kinds its
-report can emit; and **what it deliberately does not map, listed rather than left silent**,
-because a port needs to know those were considered rather than missed.
+writer habits its rules answer to; **where a recording's device comes from and what about
+the hardware it deliberately leaves** (§6.4b), which is the row of the table above spelled
+out against that format's own elements; its own ambiguities and their tests, a generator
+table among them where the format needs one; the kinds its report can emit; and **what it
+deliberately does not map, listed rather than left silent**, because a port needs to know
+those were considered rather than missed.

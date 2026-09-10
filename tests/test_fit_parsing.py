@@ -20,7 +20,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 from fitbuild import STARTED_AT, dive_file, fit_file, message, record_stream
-from helpers import FIXTURES
+from helpers import FIXTURES, device_of, profile_of
 
 from divejson.converter import Scope, SourceTooLargeError, UnsupportedSourceError
 from divejson.fit import DEGREES_PER_SEMICIRCLE, FIT, MAX_MESSAGES, MalformedFitError
@@ -500,7 +500,7 @@ def test_a_transmitters_pressures_become_a_profile_channel_numbered_by_its_cylin
     )
     dive = _dive(data)
     assert dive["cylinders"][0]["gas_number"] == 0
-    assert dive["profile"]["pressures"] == [{"times": [0, 60], "values": [2100, 640], "gas_number": 0}]
+    assert profile_of(dive)["pressures"] == [{"times": [0, 60], "values": [2100, 640], "gas_number": 0}]
 
 
 def test_a_pods_ends_are_its_earliest_and_latest_readings_not_the_files_first_and_last() -> None:
@@ -524,7 +524,7 @@ def test_a_pods_ends_are_its_earliest_and_latest_readings_not_the_files_first_an
     dive = conversion.document["dives"][0]
     assert dive["cylinders"][0]["start_pressure"] == 210.0
     assert dive["cylinders"][0]["end_pressure"] == 64.0
-    assert dive["profile"]["pressures"][0]["values"] == [2100, 640]
+    assert profile_of(dive)["pressures"][0]["values"] == [2100, 640]
     assert _messages(conversion, "dropped") == []
 
 
@@ -621,7 +621,7 @@ def test_a_gas_switch_names_the_cylinder_the_logbook_shows() -> None:
         session={"total_elapsed_time": 60.0},
     )
     dive = _dive(data)
-    assert dive["profile"]["events"] == [{"time": 60, "type": "gas_switch", "gas_number": 1}]
+    assert profile_of(dive)["events"] == [{"time": 60, "type": "gas_switch", "gas_number": 1}]
     assert [c["gas_number"] for c in dive["cylinders"]] == [0, 1]
 
 
@@ -636,7 +636,7 @@ def test_a_switch_to_a_gas_this_file_does_not_describe_is_still_a_switch() -> No
         session={"total_elapsed_time": 60.0},
     )
     dive = _dive(data)
-    assert dive["profile"]["events"] == [{"time": 60, "type": "gas_switch"}]
+    assert profile_of(dive)["events"] == [{"time": 60, "type": "gas_switch"}]
     assert "gas_number" not in dive["cylinders"][0]
 
 
@@ -647,7 +647,7 @@ def test_a_user_marker_is_a_bookmark() -> None:
         _event(60, "user_marker"),
         session={"total_elapsed_time": 60.0},
     )
-    assert _dive(data)["profile"]["events"] == [{"time": 60, "type": "bookmark"}]
+    assert profile_of(_dive(data))["events"] == [{"time": 60, "type": "bookmark"}]
 
 
 def test_a_dive_alert_carries_the_devices_own_wording() -> None:
@@ -659,7 +659,7 @@ def test_a_dive_alert_carries_the_devices_own_wording() -> None:
         _event(60, "dive_alert", data=0),
         session={"total_elapsed_time": 60.0},
     )
-    assert _dive(data)["profile"]["events"] == [
+    assert profile_of(_dive(data))["events"] == [
         {"time": 60, "type": "other", "label": "ndl_reached"}
     ]
 
@@ -672,7 +672,7 @@ def test_an_alert_the_device_gives_no_code_for_is_dropped_rather_than_failing_th
         session={"total_elapsed_time": 60.0},
     )
     conversion = _run(data)
-    assert "events" not in conversion.document["dives"][0]["profile"]
+    assert "events" not in profile_of(conversion.document["dives"][0])
     assert any("gives no code for" in text for text in _messages(conversion, "dropped"))
 
 
@@ -686,7 +686,7 @@ def test_the_timer_event_every_file_carries_is_not_an_event_of_this_format() -> 
         _event(60, "timer"),
         session={"total_elapsed_time": 60.0},
     )
-    assert "events" not in _dive(data)["profile"]
+    assert "events" not in profile_of(_dive(data))
 
 
 def test_an_event_at_an_instant_the_samples_do_not_reach_is_dropped() -> None:
@@ -697,7 +697,7 @@ def test_an_event_at_an_instant_the_samples_do_not_reach_is_dropped() -> None:
         session={"total_elapsed_time": 60.0},
     )
     conversion = _run(data)
-    assert "events" not in conversion.document["dives"][0]["profile"]
+    assert "events" not in profile_of(conversion.document["dives"][0])
     assert any("no place on the profile's time axis" in text for text in _messages(conversion, "dropped"))
 
 
@@ -707,7 +707,7 @@ def test_an_event_at_an_instant_the_samples_do_not_reach_is_dropped() -> None:
 def test_a_record_with_no_timestamp_has_no_place_on_the_axis() -> None:
     data = dive_file(_at(0, depth=5.0), message("record", depth=9.0), session={"total_elapsed_time": 60.0})
     conversion = _run(data)
-    assert conversion.document["dives"][0]["profile"]["depth"]["values"] == [500]
+    assert profile_of(conversion.document["dives"][0])["depth"]["values"] == [500]
     assert any("records no timestamp" in text for text in _messages(conversion, "dropped"))
 
 
@@ -719,7 +719,7 @@ def test_two_messages_at_one_instant_are_one_sample() -> None:
         _at(0, temperature=22),
         session={"total_elapsed_time": 60.0},
     )
-    profile = _dive(data)["profile"]
+    profile = profile_of(_dive(data))
     assert profile["depth"] == {"times": [0], "values": [500]}
     assert profile["temperature"] == {"times": [0], "values": [220]}
 
@@ -728,7 +728,7 @@ def test_two_readings_of_one_channel_at_one_instant_report_the_collision() -> No
     """§6.5's times are strictly increasing, so only one of them can be kept."""
     data = dive_file(_at(0, depth=5.0), _at(0, depth=9.0), session={"total_elapsed_time": 60.0})
     conversion = _run(data)
-    assert conversion.document["dives"][0]["profile"]["depth"]["values"] == [500]
+    assert profile_of(conversion.document["dives"][0])["depth"]["values"] == [500]
     assert any("two messages record a depth at one instant" in text for text in _messages(conversion, "dropped"))
 
 
@@ -737,7 +737,7 @@ def test_a_record_before_the_session_started_is_dropped() -> None:
     from the moment the dive began — the same instant `started_at` names."""
     data = dive_file(_at(-30, depth=1.0), _at(0, depth=5.0), session={"total_elapsed_time": 60.0})
     conversion = _run(data)
-    assert conversion.document["dives"][0]["profile"]["depth"] == {"times": [0], "values": [500]}
+    assert profile_of(conversion.document["dives"][0])["depth"] == {"times": [0], "values": [500]}
     assert any("before the dive began" in text for text in _messages(conversion, "dropped"))
 
 
@@ -745,14 +745,14 @@ def test_samples_carrying_a_time_and_no_reading_produce_no_profile_at_all() -> N
     """Rather than one with a bare `duration: 0`, which is a claim the source did not make."""
     data = dive_file(_at(0, heart_rate=70), _at(30, heart_rate=72), session={"total_elapsed_time": 60.0})
     conversion = _run(data)
-    assert "profile" not in conversion.document["dives"][0]
+    assert profile_of(conversion.document["dives"][0]) is None
     assert any("no reading this format can hold" in text for text in _messages(conversion, "dropped"))
 
 
 def test_a_file_with_no_samples_at_all_says_nothing_about_a_profile() -> None:
     """The source said nothing here, where above it said something uncarriable."""
     conversion = _run(dive_file())
-    assert "profile" not in conversion.document["dives"][0]
+    assert profile_of(conversion.document["dives"][0]) is None
     assert not any("profile" in note.message for note in conversion.notes)
 
 
@@ -836,3 +836,65 @@ def test_an_archive_mixing_fit_with_another_format_is_refused() -> None:
     ssrf = (FIXTURES / "ssrf" / "subsurface.ssrf").read_bytes()
     with pytest.raises(UnsupportedSourceError, match="mixes fit and ssrf"):
         convert(_zip({"a.fit": OCEAN, "b.ssrf": ssrf}))
+
+
+# -- the device ------------------------------------------------------------------------
+
+
+def test_the_device_is_the_file_ids_maker_and_product_name() -> None:
+    """A FIT file is one dive written by one computer, so a document has one recording."""
+    data = fit_file(
+        message("file_id", type="activity", manufacturer="suunto", product_name="Suunto Ocean"),
+        _at(0, depth=5.0),
+        message("session", sport="diving", start_time=STARTED_AT, total_elapsed_time=60.0, dive_number=3),
+    )
+    assert device_of(_dive(data)) == {"brand": "suunto", "model": "Suunto Ocean", "dive_number": 3}
+
+
+def test_a_numeric_product_id_is_not_a_model() -> None:
+    """§6.4b's `model` is the product string as the source names it, and `product` (2) is a
+    bare vendor id — the Ocean's is `62`. There is no fall-through to it and none to the
+    manufacturer either: copying the maker in would say `suunto` is the product."""
+    data = fit_file(
+        message("file_id", type="activity", manufacturer="suunto", product=62),
+        _at(0, depth=5.0),
+        message("session", sport="diving", start_time=STARTED_AT, total_elapsed_time=60.0),
+    )
+    assert device_of(_dive(data)) == {"brand": "suunto"}
+
+
+def test_the_serial_and_firmware_come_from_device_index_zero() -> None:
+    """libdivecomputer's rule. A computer writes a `device_info` for everything in the
+    chain — a transmitter, a heart-rate strap — and reading a transmitter's serial as the
+    computer's would pair two dives that were never on one wrist."""
+    data = fit_file(
+        message("file_id", type="activity", manufacturer="suunto", serial_number=11111111),
+        message("device_info", device_index=1, serial_number=99999999, software_version=9.9),
+        message("device_info", device_index=0, serial_number=3810000400, software_version=2.51),
+        _at(0, depth=5.0),
+        message("session", sport="diving", start_time=STARTED_AT, total_elapsed_time=60.0),
+    )
+    device = device_of(_dive(data))
+    assert device["serial"] == "3810000400" and device["firmware"] == "2.51"
+
+
+def test_the_file_ids_own_serial_is_the_fallback() -> None:
+    """The file's own claim about what wrote it, where no `device_info` names index 0 —
+    which is both Suunto files in `fixtures/fit/`."""
+    data = fit_file(
+        message("file_id", type="activity", manufacturer="suunto", serial_number=11111111),
+        message("device_info", device_index=1, serial_number=99999999),
+        _at(0, depth=5.0),
+        message("session", sport="diving", start_time=STARTED_AT, total_elapsed_time=60.0),
+    )
+    assert device_of(_dive(data))["serial"] == "11111111"
+    assert "firmware" not in device_of(_dive(data))
+
+
+def test_a_file_that_names_no_computer_and_kept_no_sample_has_no_recording() -> None:
+    """§6.4a forbids a recording that carries nothing."""
+    data = fit_file(
+        message("file_id", type="activity"),
+        message("session", sport="diving", start_time=STARTED_AT, total_elapsed_time=60.0),
+    )
+    assert "recordings" not in _dive(data)

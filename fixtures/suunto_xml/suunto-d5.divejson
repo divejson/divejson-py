@@ -28,56 +28,67 @@
           "gas_number": 0
         }
       ],
-      "profile": {
-        "duration": 2001,
-        "depth": {
-          "times": [
-            1,
-            11,
-            21,
-            241,
-            251,
-            1991,
-            2001
-          ],
-          "values": [
-            186,
-            588,
-            756,
-            3212,
-            3202,
-            141,
-            36
-          ]
-        },
-        "temperature": {
-          "times": [
-            1,
-            11,
-            21,
-            241,
-            251,
-            1991,
-            2001
-          ],
-          "values": [
-            237,
-            235,
-            233,
-            220,
-            220,
-            219,
-            219
-          ]
-        },
-        "events": [
-          {
-            "time": 0,
-            "type": "gas_switch",
-            "gas_number": 0
+      "recordings": [
+        {
+          "device": {
+            "brand": "Suunto",
+            "model": "Suunto D5",
+            "serial": "192410004212",
+            "firmware": "2.5.1947",
+            "dive_number": 5
+          },
+          "profile": {
+            "duration": 2001,
+            "depth": {
+              "times": [
+                1,
+                11,
+                21,
+                241,
+                251,
+                1991,
+                2001
+              ],
+              "values": [
+                186,
+                588,
+                756,
+                3212,
+                3202,
+                141,
+                36
+              ]
+            },
+            "temperature": {
+              "times": [
+                1,
+                11,
+                21,
+                241,
+                251,
+                1991,
+                2001
+              ],
+              "values": [
+                237,
+                235,
+                233,
+                220,
+                220,
+                219,
+                219
+              ]
+            },
+            "events": [
+              {
+                "time": 0,
+                "type": "gas_switch",
+                "gas_number": 0
+              }
+            ]
           }
-        ]
-      }
+        }
+      ]
     }
   ],
   "extensions": {

@@ -25,7 +25,8 @@
   <temperature water='21.0 C' />
   </divecomputer>
   <divecomputer model='Garmin Descent'>
-  <depth max='18.4 m' />
+  <depth max='19.6 m' mean='9.0 m' />
+  <temperature water='23.5 C' />
   </divecomputer>
 </dive>
 <dive number='4' divesiteid='deadbeef' date='2026-05-03' time='08:40:00'>

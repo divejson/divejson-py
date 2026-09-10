@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from helpers import EXPORTED_AT, suunto_json, suunto_sample, suunto_slots
+from helpers import EXPORTED_AT, profile_of, suunto_json, suunto_sample, suunto_slots
 
 from divejson import convert
 
@@ -66,7 +66,7 @@ def test_a_pressure_channel_is_tenths_of_a_bar() -> None:
         ],
     )
     # 200 bar and 183.85938 bar, the second rounded half-away-from-zero at the tenth.
-    assert dive["profile"]["pressures"][0]["values"] == [2000, 1839]
+    assert profile_of(dive)["pressures"][0]["values"] == [2000, 1839]
 
 
 # -- gas mixture ----------------------------------------------------------------------
@@ -111,13 +111,13 @@ def test_a_sample_temperature_is_kelvin_and_the_channel_is_tenths_of_celsius() -
     the error.
     """
     dive = _dive({}, [suunto_sample(0, Temperature=293.75, Depth=1.0)])
-    assert dive["profile"]["temperature"]["values"] == [206]
+    assert profile_of(dive)["temperature"]["values"] == [206]
 
 
 def test_a_temperature_below_freezing_stays_negative() -> None:
     """271.65 K is −1.5 °C, which an ice dive really records."""
     dive = _dive({}, [suunto_sample(0, Temperature=271.65, Depth=1.0)])
-    assert dive["profile"]["temperature"]["values"] == [-15]
+    assert profile_of(dive)["temperature"]["values"] == [-15]
 
 
 # -- depth ----------------------------------------------------------------------------
@@ -126,7 +126,7 @@ def test_a_temperature_below_freezing_stays_negative() -> None:
 def test_a_depth_channel_is_centimetres() -> None:
     """§6.5's other channel scale. 45.91 m is 4 591 cm, exactly."""
     dive = _dive({}, [suunto_sample(0, Depth=45.91)])
-    assert dive["profile"]["depth"]["values"] == [4591]
+    assert profile_of(dive)["depth"]["values"] == [4591]
 
 
 def test_a_ceiling_channel_is_centimetres_and_a_zero_is_no_ceiling() -> None:
@@ -137,7 +137,7 @@ def test_a_ceiling_channel_is_centimetres_and_a_zero_is_no_ceiling() -> None:
             suunto_sample(60, Depth=5.0, Ceiling=0),
         ],
     )
-    assert dive["profile"]["ceiling"] == {"times": [0], "values": [450]}
+    assert profile_of(dive)["ceiling"] == {"times": [0], "values": [450]}
 
 
 def test_a_header_depth_is_metres_and_reaches_the_member_unscaled() -> None:
@@ -232,4 +232,4 @@ def test_a_duration_is_seconds_and_rounds_half_away_from_zero() -> None:
 def test_a_sample_second_is_elapsed_time_from_the_header_s_own_start() -> None:
     """The axis's origin, which is the instant `started_at` names."""
     dive = _dive({}, [suunto_sample(0, Depth=1.0), suunto_sample(120.49, Depth=2.0)])
-    assert dive["profile"]["depth"]["times"] == [0, 120]
+    assert profile_of(dive)["depth"]["times"] == [0, 120]

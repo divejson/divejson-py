@@ -18,7 +18,7 @@ which is the trap this file exists for.
 from __future__ import annotations
 
 import pytest
-from helpers import FIXTURES, STARTED_AT, before, one_dive
+from helpers import FIXTURES, STARTED_AT, before, one_dive, profile_of
 
 from divejson import convert
 
@@ -30,7 +30,7 @@ def cylinder(body: str, *, mix: str = "") -> dict:
 
 def profile(samples: str) -> dict:
     document = convert(one_dive(f"{STARTED_AT}<samples>{samples}</samples>")).document
-    return document["dives"][0]["profile"]
+    return profile_of(document["dives"][0])
 
 
 @pytest.mark.parametrize(
@@ -82,7 +82,7 @@ def test_tank_pressure_samples_are_tenths_of_a_bar() -> None:
     body = f'{STARTED_AT}<tankdata><link ref="mix-1"/></tankdata><samples>{samples}</samples>'
     header = '<gasdefinitions><mix id="mix-1"><name>Air</name><o2>0.21</o2></mix></gasdefinitions>'
     document = convert(one_dive(body, header=header)).document
-    assert document["dives"][0]["profile"]["pressures"][0]["values"] == [2100]
+    assert profile_of(document["dives"][0])["pressures"][0]["values"] == [2100]
 
 
 def test_cylinder_pressures_are_plain_bar() -> None:
@@ -170,7 +170,7 @@ def test_depths_and_temperatures_match_the_reference_export() -> None:
     the head of that comparison, and they are what makes this a known answer rather than a
     fixture agreeing with the code that produced it.
     """
-    found = convert((FIXTURES / "uddf" / "subsurface.uddf").read_bytes()).document["dives"][0]["profile"]
+    found = profile_of(convert((FIXTURES / "uddf" / "subsurface.uddf").read_bytes()).document["dives"][0])
     assert found["depth"]["times"] == [0, 10, 20, 30, 40, 80, 170, 4300]
     assert found["depth"]["values"] == [145, 183, 222, 257, 260, 332, 911, 0]
     assert found["temperature"]["times"] == [30, 80]

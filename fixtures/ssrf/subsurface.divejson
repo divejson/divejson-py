@@ -28,41 +28,48 @@
       "max_depth": 45.91,
       "avg_depth": 20.841,
       "bottom_temperature": 22.4,
-      "profile": {
-        "duration": 4300,
-        "depth": {
-          "times": [
-            0,
-            10,
-            20,
-            30,
-            40,
-            80,
-            170,
-            4300
-          ],
-          "values": [
-            145,
-            183,
-            222,
-            257,
-            260,
-            332,
-            911,
-            0
-          ]
-        },
-        "temperature": {
-          "times": [
-            30,
-            80
-          ],
-          "values": [
-            244,
-            240
-          ]
+      "recordings": [
+        {
+          "device": {
+            "model": "Open Diving"
+          },
+          "profile": {
+            "duration": 4300,
+            "depth": {
+              "times": [
+                0,
+                10,
+                20,
+                30,
+                40,
+                80,
+                170,
+                4300
+              ],
+              "values": [
+                145,
+                183,
+                222,
+                257,
+                260,
+                332,
+                911,
+                0
+              ]
+            },
+            "temperature": {
+              "times": [
+                30,
+                80
+              ],
+              "values": [
+                244,
+                240
+              ]
+            }
+          }
         }
-      }
+      ]
     },
     {
       "uuid": "a27d7fb1-89c9-52aa-9531-4d33de232b2e",
@@ -86,27 +93,34 @@
       "max_depth": 29.6,
       "avg_depth": 17.2,
       "bottom_temperature": 24.0,
-      "profile": {
-        "duration": 2880,
-        "depth": {
-          "times": [
-            0,
-            197,
-            1176,
-            1308,
-            2815,
-            2880
-          ],
-          "values": [
-            0,
-            2960,
-            2960,
-            977,
-            977,
-            0
-          ]
+      "recordings": [
+        {
+          "device": {
+            "model": "Open Diving"
+          },
+          "profile": {
+            "duration": 2880,
+            "depth": {
+              "times": [
+                0,
+                197,
+                1176,
+                1308,
+                2815,
+                2880
+              ],
+              "values": [
+                0,
+                2960,
+                2960,
+                977,
+                977,
+                0
+              ]
+            }
+          }
         }
-      }
+      ]
     }
   ],
   "sites": [

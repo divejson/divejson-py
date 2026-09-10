@@ -29,9 +29,10 @@ divejson validate my-logbook.divejson
 ```
 
 The JSON Schema, and then the requirements the specification states in prose and a schema
-cannot — identifier uniqueness, referential closure, profile-series integrity, the member
-order, the UTC offset on `exported_at`. Exit status is non-zero if any file fails, with
-one line per violation.
+cannot — identifier uniqueness, referential closure, profile-series integrity in **every**
+recording of a dive, a recording carrying at least one of a device, a profile and its
+stored files, the member order, the UTC offset on `exported_at`. Exit status is non-zero if
+any file fails, with one line per violation.
 
 ## Convert a logbook into DiveJSON
 
@@ -49,14 +50,17 @@ old application never kept. Every line says which kind of news it is:
 | --- | --- |
 | `absent` | the source never recorded this |
 | `inferred` | the converter computed it from other readings the source did keep |
-| `resolved` | the source recorded the number and left its scale ambiguous; the converter decided how to read it |
+| `resolved` | the source recorded the value and left its scale, its units or its meaning ambiguous; the converter decided how to read it |
 | `dropped` | the source recorded it and this format cannot hold it |
 
 `inferred` and `resolved` are worth telling apart, because they answer different questions
-about the number in front of you: an `inferred` one is the converter's arithmetic, a
-`resolved` one is the source's own figure at the scale it must have meant — a
-`<tankvolume>` of `12` in a field UDDF specifies in cubic metres is twelve litres, not a
-twelve-thousand-litre cylinder.
+about the value in front of you: an `inferred` one is the converter's arithmetic, a
+`resolved` one is the source's own figure read as it must have meant — a `<tankvolume>` of
+`12` in a field UDDF specifies in cubic metres is twelve litres, not a twelve-thousand-litre
+cylinder, and a Shearwater Cloud Desktop `<datetime>` suffixed `Z` is the wall clock the
+diver read off their wrist rather than an instant in UTC. A scale is settled on the value by
+a magnitude test; a *meaning* is settled on the writer, by a table of generators whose
+habits are known.
 
 An `inferred` member is also listed under `extensions.divejson.inferred` in the document
 itself, so a reader can tell a derivation from a reading (spec §5.4). A `resolved` one is
@@ -70,7 +74,9 @@ refused rather than partly imported.
 
 Each format has a mapping document of its own: the rules every converter follows whatever
 it is reading are in
-[`docs/converting.md`](https://github.com/divejson/divejson-py/blob/main/docs/converting.md),
+[`docs/converting.md`](https://github.com/divejson/divejson-py/blob/main/docs/converting.md)
+— and the ones it follows whatever it is *writing* are in
+[`docs/writing.md`](https://github.com/divejson/divejson-py/blob/main/docs/writing.md) —
 and what is one format's — its element map, its writers' habits, its ambiguities, and what
 is deliberately left unmapped — is in
 [`docs/uddf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/uddf-mapping.md),
@@ -103,7 +109,10 @@ other direction: `absent` is a required element the document had nothing for and
 is a member the format has nowhere to put, and a writer produces neither of the other two
 kinds, computing nothing and settling no scale.
 
-UDDF is the only format this package writes today. **Nothing is invented to fill a required
+UDDF is the only format this package writes today. A dive's computer goes out with it: a
+`computer` gear item and a recording's device that the fold recognises as one machine become
+one `<divecomputer>`, and a device that matches no kit item gets an element of its own so
+that what recorded the dive is never lost. **Nothing is invented to fill a required
 element**: where UDDF has its own spelling for "not recorded" — a `<greatestdepth>` of `0`,
 which is mandatory where §6's `max_depth` is not — that is what goes in, and where it has
 none, the value is dropped and reported rather than substituted for. The rules, and every
@@ -170,7 +179,9 @@ documents using the same names are read too: the corpus it is checked against ca
 Subsurface can export both, and the two are not equivalent: `.ssrf` is its **save file**
 and holds everything it knows, while its UDDF export fills gaps in ways that survive into a
 converted document. Reading the same logbook both ways gives the same profiles, sample for
-sample, and eight members that differ — each of them the exporter's doing.
+sample, and a handful of members that differ — each of them the exporter's doing, and the
+newest of them the computer itself: the save file records a `<divecomputer @model>` where
+the export writes no equipment element for it at all.
 [`docs/ssrf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/ssrf-mapping.md)
 lists them.
 

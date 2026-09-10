@@ -16,7 +16,7 @@ import json
 import re
 
 import pytest
-from helpers import EXPORTED_AT, FIXTURES
+from helpers import EXPORTED_AT, FIXTURES, profile_of
 
 from divejson import compared, convert
 from divejson.converter import INFERRED, PRODUCER_KEY
@@ -95,15 +95,16 @@ def test_the_two_readings_of_one_subsurface_logbook_agree_where_they_can() -> No
     """
     ssrf = convert((FIXTURES / "ssrf" / "subsurface.ssrf").read_bytes()).document["dives"][0]
     uddf = convert((FIXTURES / "uddf" / "subsurface.uddf").read_bytes()).document["dives"][0]
-    for member in ("started_at", "dive_number", "duration", "max_depth", "avg_depth", "notes", "profile"):
+    for member in ("started_at", "dive_number", "duration", "max_depth", "avg_depth", "notes"):
         assert ssrf[member] == uddf[member], member
+    assert profile_of(ssrf) == profile_of(uddf)
     assert ssrf["cylinders"][0]["volume"] == uddf["cylinders"][0]["volume"] == 12.0
     assert ssrf["cylinders"][0]["start_pressure"] == uddf["cylinders"][0]["start_pressure"] == 200.0
     assert ssrf["cylinders"][0]["end_pressure"] == uddf["cylinders"][0]["end_pressure"] == 80.0
 
 
 def test_where_the_two_readings_differ_it_is_the_exporters_doing() -> None:
-    """Eight differences, none of them a disagreement about the mapping.
+    """Nine differences, none of them a disagreement about the mapping.
 
     Subsurface's UDDF export writes the five-star visibility as `15` metres, invents an
     `mix(21/0)` air blend for a cylinder its own save file records no gas for, writes
@@ -115,21 +116,26 @@ def test_where_the_two_readings_differ_it_is_the_exporters_doing() -> None:
     reading is the closer one to what the diver logged in every case, which is the argument
     for reading the save file rather than the export.
 
+    The ninth is the newest and runs the same way: the save file's `<divecomputer @model>`
+    is a device (§6.4b) and the UDDF export carries no `<divecomputer>` equipment element
+    for that computer at all, so only one of the two documents can say what recorded the
+    dive. It arrived exactly as the paragraph below said a ninth would.
+
     **Walked over the whole document, with nothing set aside unchecked.** The count here
-    was four and then six before it was eight, and both undercounts are worth keeping.
+    was four, then six, then eight, and every undercount is worth keeping.
     `sites[].location` and `helium` were missed by walking a dive's obvious members:
     `location` is not on a dive at all, and `helium` fires even on the dives whose `oxygen`
     agrees, so a check that stopped at the gas that differed never reached it. `cns_end`
     and `otu_end` were missed a different way — excluded outright as a pair the two exports
     record to different precisions, which they are not. The set is derived from a
-    member-by-member walk and the eight are then named, so a ninth appearing fails here
+    member-by-member walk and the members are then named, so a tenth appearing fails here
     rather than going unnoticed for another reader.
 
     The walk covers the first dive and both sites, which is every record the two reductions
     kept the same. The **second** dive is out because the two fixtures reduce it
     differently on purpose — six of the fabricated samples here against three there, which
     each file's own `notes` then describes — and that is a property of the reduction rather
-    than of either exporter. The eight are the same eight on the unreduced exports those
+    than of either exporter. They are the same on the unreduced exports those
     two files were cut from, though not on every record there: `cns_end` and `otu_end`
     differ on seven of the eight dives, the eighth carrying neither attribute, and
     `oxygen` on the four whose `<cylinder>` carries no `@o2`.
@@ -146,6 +152,7 @@ def test_where_the_two_readings_differ_it_is_the_exporters_doing() -> None:
         "dives[]/cns_end",
         "dives[]/otu_end",
         "sites[]/location",
+        "dives[]/recordings[]/device/model",
     }
 
     first_ssrf, first_uddf = ssrf["dives"][0], uddf["dives"][0]
@@ -157,6 +164,8 @@ def test_where_the_two_readings_differ_it_is_the_exporters_doing() -> None:
     assert first_ssrf["cns_end"] == 11.0 and "cns_end" not in first_uddf
     assert first_ssrf["otu_end"] == 31.0 and "otu_end" not in first_uddf
     assert "location" not in ssrf["sites"][0] and uddf["sites"][0]["location"] == uddf["sites"][0]["name"]
+    assert (ssrf["dives"][0]["recordings"][0]["device"] or {}).get("model") == "Open Diving"
+    assert "device" not in uddf["dives"][0]["recordings"][0]
 
 
 # What neither reader is claiming anything about, and so what the walk below skips. The

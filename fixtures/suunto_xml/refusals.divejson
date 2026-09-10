@@ -34,38 +34,49 @@
           "gas_number": 1
         }
       ],
-      "profile": {
-        "duration": 21,
-        "depth": {
-          "times": [
-            1,
-            21
-          ],
-          "values": [
-            186,
-            1840
-          ]
-        },
-        "temperature": {
-          "times": [
-            1,
-            11,
-            21
-          ],
-          "values": [
-            245,
-            243,
-            241
-          ]
-        },
-        "events": [
-          {
-            "time": 1200,
-            "type": "gas_switch",
-            "gas_number": 1
+      "recordings": [
+        {
+          "device": {
+            "brand": "Suunto",
+            "model": "Suunto D5",
+            "serial": "192410004212",
+            "firmware": "3.0.2143",
+            "dive_number": 1
+          },
+          "profile": {
+            "duration": 21,
+            "depth": {
+              "times": [
+                1,
+                21
+              ],
+              "values": [
+                186,
+                1840
+              ]
+            },
+            "temperature": {
+              "times": [
+                1,
+                11,
+                21
+              ],
+              "values": [
+                245,
+                243,
+                241
+              ]
+            },
+            "events": [
+              {
+                "time": 1200,
+                "type": "gas_switch",
+                "gas_number": 1
+              }
+            ]
           }
-        ]
-      }
+        }
+      ]
     }
   ],
   "extensions": {

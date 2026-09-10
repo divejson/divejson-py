@@ -22,7 +22,7 @@ metric scale, which is what the last group below is about.
 from __future__ import annotations
 
 import pytest
-from helpers import FIXTURES, one_ssrf_computer, one_ssrf_dive
+from helpers import FIXTURES, one_ssrf_computer, one_ssrf_dive, profile_of
 
 from divejson import convert
 
@@ -32,7 +32,7 @@ def one(attributes: str = "", body: str = "") -> dict:
 
 
 def profile(samples: str) -> dict:
-    return convert(one_ssrf_computer(samples)).document["dives"][0]["profile"]
+    return profile_of(convert(one_ssrf_computer(samples)).document["dives"][0])
 
 
 def cylinder(attributes: str) -> dict:
@@ -189,8 +189,8 @@ def test_the_reference_export_converts_to_the_same_channels_the_uddf_reader_prod
     through two entirely different unit paths: metres and Celsius written in the text here,
     metres and Kelvin in elements there. A wrong factor on either side moves one of them.
     """
-    ssrf = convert((FIXTURES / "ssrf" / "subsurface.ssrf").read_bytes()).document["dives"][0]["profile"]
-    uddf = convert((FIXTURES / "uddf" / "subsurface.uddf").read_bytes()).document["dives"][0]["profile"]
+    ssrf = profile_of(convert((FIXTURES / "ssrf" / "subsurface.ssrf").read_bytes()).document["dives"][0])
+    uddf = profile_of(convert((FIXTURES / "uddf" / "subsurface.uddf").read_bytes()).document["dives"][0])
     assert ssrf["depth"]["times"] == uddf["depth"]["times"] == [0, 10, 20, 30, 40, 80, 170, 4300]
     assert ssrf["depth"]["values"] == uddf["depth"]["values"] == [145, 183, 222, 257, 260, 332, 911, 0]
     assert ssrf["temperature"]["times"] == uddf["temperature"]["times"] == [30, 80]

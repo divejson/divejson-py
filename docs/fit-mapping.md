@@ -190,6 +190,48 @@ writes one every few minutes.
 Neither Suunto file in `fixtures/fit/` carries a `software_version`, so neither generator
 has a version, which is the honest answer rather than an omission to fill in.
 
+### Device — the same two messages, read as hardware
+
+A FIT file is one dive written by one computer, so a document converted from one has
+exactly one recording (§6.4a) and that recording's device is this:
+
+| field | | into (§6.4b) |
+| --- | --- | --- |
+| `file_id.manufacturer` (1) | | `brand` |
+| `file_id.product_name` (8) | | `model` — and **no `model` at all** where the file states none |
+| `device_info.serial_number` (3) at `device_index` (0) **0**, else `file_id.serial_number` (3) | | `serial` — **untested**, no file in hand carries either |
+| `device_info.software_version` (5), the one already taken for the generator | | `firmware` — **untested**, neither file carries one |
+| `session.dive_number` (156) | | `dive_number`, the device's counter |
+
+**The `device_index` 0 rule is libdivecomputer's, and it is the right one.** A dive computer
+writes a `device_info` for every device in the chain — the computer itself, a pressure
+transmitter, a heart-rate strap — and only index 0 is the computer. libdivecomputer's
+`garmin_parser.c` copies a serial, a product and a firmware from that message and no other,
+and reading a transmitter's serial as the computer's would pair two dives that were never on
+one wrist. `file_id.serial_number` is the fallback, being the file's own claim about what
+wrote it. Neither fixture here carries a `device_index` at all — the Ocean writes two
+`device_info` messages with no index and no serial, the D5 writes none — so both rows above
+wait on a file that has one, exactly as the tank-telemetry rows do.
+
+**`product` (2) is not a model, and there is no fall-through to it.** It is a numeric vendor
+id where §6.4b's `model` is the product string as the source names it, and a decoder that
+resolves one resolves it to a profile constant — `descent_mk2s` — which is the profile's
+vocabulary rather than what the vendor calls the computer. The global profile resolves it
+only for the manufacturers the `garmin_product` and `favero_product` subfields name, so a
+Suunto file's stays the bare `62` the Ocean here writes, and a Garmin file that states no
+`product_name` reports **no model** rather than a constant. Falling back to
+`file_id.manufacturer` instead — which is what this reader's single-string
+`source_generator.name` does one section above — is not open to a device either: §6.4b gives
+the maker a member of its own, and copying it into `model` would say `suunto` is the
+product. Both fixtures here carry a `product_name`, so both devices have a model; the
+absent case waits on a file, like the two rows marked untested above.
+
+`file_id.manufacturer` decodes to the profile's own lowercase spelling (`suunto`), where the
+same vendor's JSON export writes `Suunto`. Both are carried as read: §6.4b compares devices
+case-folded rather than asking either reader to tidy the other's spelling.
+
+FIT has no field for what a device calls itself, so §6.4b's `name` has no source here.
+
 ### The dive — `session` (18), and `dive_summary` (268) where there is one
 
 | field | | into |
@@ -463,10 +505,14 @@ which the `extensions.divejson.inferred` list is ever written.
   `training_stress_score`, `total_training_effect`, `enhanced_min_altitude` /
   `max_altitude`** — an activity tracker's members, not a dive log's. §6.2's `altitude` is the
   altitude of the *site*, which none of these is.
-- **`session.dive_number` and `surface_interval`** — the device's own counter and the gap
-  before the dive. §6.2's `dive_number` is the diver's own numbering, and a device's is not
-  reliably it; the surface interval is derivable from two dives' start times and is a
-  property of a pair rather than of one file.
+- **`session.surface_interval`** — the gap before the dive, derivable from two dives' start
+  times and a property of a pair rather than of one file. `session.dive_number` was refused
+  beside it until §6.4b gave a device's counter a home; it is carried now, under *Device*
+  above, and §6.2's `dive_number` is still the diver's and still not this.
+- **`dive_summary.dive_number` (10)** — the same counter in a second place, **untested**:
+  no file in hand carries a `dive_summary` at all, so nothing says whether the two ever
+  disagree. libdivecomputer declares the field and ignores it, which is the answer here too
+  until a file arrives that has one.
 - **`record.vertical_speed`, `distance`, `speed`, `altitude`, `cns_load`, `n2_load`, `po2`,
   `ndl_time`, `time_to_surface`, `absolute_pressure`** — §6.5 fixes the channels a profile
   carries, and none of these is one of them.

@@ -28,33 +28,37 @@
           "helium": 0.0
         }
       ],
-      "profile": {
-        "duration": 16,
-        "depth": {
-          "times": [
-            0,
-            4,
-            8,
-            12,
-            16
-          ],
-          "values": [
-            0,
-            140,
-            0,
-            250,
-            0
-          ]
-        },
-        "temperature": {
-          "times": [
-            4
-          ],
-          "values": [
-            244
-          ]
+      "recordings": [
+        {
+          "profile": {
+            "duration": 16,
+            "depth": {
+              "times": [
+                0,
+                4,
+                8,
+                12,
+                16
+              ],
+              "values": [
+                0,
+                140,
+                0,
+                250,
+                0
+              ]
+            },
+            "temperature": {
+              "times": [
+                4
+              ],
+              "values": [
+                244
+              ]
+            }
+          }
         }
-      }
+      ]
     },
     {
       "uuid": "6306fa65-83db-5858-911e-69b17ce5089a",

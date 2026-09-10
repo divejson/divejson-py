@@ -29,60 +29,71 @@
           "gas_number": 1
         }
       ],
-      "profile": {
-        "duration": 40,
-        "depth": {
-          "times": [
-            10,
-            20,
-            30,
-            40
-          ],
-          "values": [
-            142,
-            861,
-            1735,
-            40
-          ]
-        },
-        "ceiling": {
-          "times": [
-            30
-          ],
-          "values": [
-            450
-          ]
-        },
-        "temperature": {
-          "times": [
-            10,
-            20,
-            30,
-            40
-          ],
-          "values": [
-            224,
-            222,
-            220,
-            219
-          ]
-        },
-        "pressures": [
-          {
-            "times": [
-              10,
-              20,
-              40
-            ],
-            "values": [
-              1980,
-              1870,
-              720
-            ],
-            "gas_number": 1
+      "recordings": [
+        {
+          "device": {
+            "brand": "Suunto",
+            "model": "Suunto D5",
+            "serial": "192410004212",
+            "firmware": "3.0.2143",
+            "dive_number": 2
+          },
+          "profile": {
+            "duration": 40,
+            "depth": {
+              "times": [
+                10,
+                20,
+                30,
+                40
+              ],
+              "values": [
+                142,
+                861,
+                1735,
+                40
+              ]
+            },
+            "ceiling": {
+              "times": [
+                30
+              ],
+              "values": [
+                450
+              ]
+            },
+            "temperature": {
+              "times": [
+                10,
+                20,
+                30,
+                40
+              ],
+              "values": [
+                224,
+                222,
+                220,
+                219
+              ]
+            },
+            "pressures": [
+              {
+                "times": [
+                  10,
+                  20,
+                  40
+                ],
+                "values": [
+                  1980,
+                  1870,
+                  720
+                ],
+                "gas_number": 1
+              }
+            ]
           }
-        ]
-      }
+        }
+      ]
     }
   ],
   "extensions": {

@@ -43,15 +43,17 @@ everything else anybody has ever exported; the suffix is a hint for a message to
 never how a source is decided.
 
 The id is `suunto_json` rather than `suunto`, because the same vendor's DM5 desktop
-application exports a different format that a reader may register beside this one.
+application exports a different format, [`suunto-xml-mapping.md`](suunto-xml-mapping.md),
+which a reader registers beside this one.
 
 ### One file, one activity, and not every activity is a dive
 
 The app writes one file per activity in this same shape — a run, a swim and a dive differ
 only in `Header.ActivityType`, which reads **51** for a dive on all 35 files in hand.
 Nothing else in the file distinguishes a run from a dive whose computer recorded no depth,
-so an activity that states some other type is dropped with a `dropped` finding rather than
-converted into a dive with no readings.
+so an activity that states some other type is skipped and reported — `converting.md`'s rule
+for a record that is not a scuba dive, and this is the format that shows it at its plainest,
+since a run and a dive here are the same shape.
 
 A header that states **no** `ActivityType` is read on. Absence is not a claim, and
 [`converting.md`](converting.md)'s first rule is that schema validity is never a
@@ -72,13 +74,11 @@ of it is in hand**, so `fixtures/suunto_json/header-only.json` is constructed; w
 proves is that the reader reaches the same answer by carrying nothing rather than by
 failing, which is the same code path the two real shapes take when their gas is missing.
 
-### A start time is parsed by pattern, not by the standard library
+### A start time carries its offset and its fraction
 
-A standard library's ISO 8601 parser is not reliably lenient enough for this: Python's
-`datetime.fromisoformat` before 3.11 accepts a three- or six-digit sub-second fraction and
-rejects `.6`, which the same vendor's other export writes. That is a property of one
-parser's version rather than of the data, so the timestamp is matched against a lenient
-ISO 8601 pattern and the calendar is checked afterwards.
+`converting.md` has how a date-time is parsed — by pattern, with the calendar checked
+afterwards — and this vendor's pair of exports is the reason it says so: the same dive's
+DM5 XML writes the `.6` that a standard library's ISO parser is most likely to reject.
 
 This is the format that made `converting.md` state the fraction rule: nothing here asks for
 a recorded fraction to be dropped, so `2026-04-17T11:49:23.510+02:00` converts to exactly
@@ -111,12 +111,12 @@ two Suunto exports: `EndTissue.CNS: 0.069` is the desktop export's `<CnsEnd>7</C
 while its OTU `17.89002799987793` is that export's rounded `18`. Converting both would
 report the oxygen tolerance units as 1 789 of them.
 
-**Nothing recorded is rounded.** A transmitter reports in steps far finer than a gauge a
-diver reads, so 21 162 500 Pa is `211.625` bar and not `211.62` — the digits are the
-source's, and rounding them here would write a convention into a conformance corpus that
-this corpus applies nowhere else. The one quantized value is the radian-to-degree
-conversion, which is this converter's own arithmetic on an irrational factor and is cut at
-six places, about 11 cm. `DiveRouteOrigin` is already degrees and is carried untouched.
+**Nothing recorded is rounded** (`converting.md`), and this format is where it costs the
+most digits: a transmitter reports in steps far finer than a gauge a diver reads, so
+21 162 500 Pa is `211.625` bar and not `211.62`. The one quantized value is the
+radian-to-degree conversion, which is a converter's own arithmetic on an irrational factor
+and is cut at six places, about 11 cm. `DiveRouteOrigin` is already degrees and is carried
+untouched.
 
 **Two coordinate units in one file is not an ambiguity.** A sample fix and a route origin
 are different members, each with one unit, so there is no magnitude test and no `resolved`
@@ -156,6 +156,34 @@ the computer on the diver's wrist recorded, and `Device.Name` is what that compu
 itself. It is user-settable on an Ocean, so a name that is not a product name is the
 owner's, carried as recorded. `Device` appears both inside `Header` and beside it in every
 file in hand; the header's copy is preferred and the outer one is the fallback.
+
+### Device — the same block, read as hardware
+
+One file is one activity, so a document converted from one has at most one recording
+(§6.4a) and its device is read from the block above:
+
+| member | | into (§6.4b) |
+| --- | --- | --- |
+| — | | `brand`, the literal `Suunto` |
+| `Device.SerialNumber` | | `serial` |
+| `Device.Info.SW` | | `firmware` |
+| `Device.Name` | | `name` |
+| `Diving.NumberInSeries` | | `dive_number`, the device's counter |
+
+**The brand is written without being read**, which is the one place this reader
+supplies a value the file does not state. It is not §5.4's fabrication: this is a
+vendor-proprietary export format, so the vendor is a property of the format rather than a
+guess about the file — the same reading that already lets `source_generator` name the device
+instead of the application. A format several manufacturers write gets no such line.
+
+`Device.Name` lands on the device's `name` rather than its `model` because it is exactly
+that — settable by the owner, and `Porvoo` on one real Ocean. This format states no product
+name anywhere, so §6.4b's `model` has no source here; the same dive's FIT export does state
+one, which is how two files of one recording come to carry different halves of one device.
+
+A file whose header names a device and holds no samples still produces a recording — a
+device-only one, carrying the device and no profile, which is a fact about the dive rather
+than an empty record (§6.4a). `fixtures/suunto_json/header-only.json` is that shape.
 
 ### The dive — `Header`, and `Header.Diving` where there is one
 
@@ -270,12 +298,17 @@ really recorded, and truncating it would drop surface readings the depth and tem
 channels keep. So a converted dive's last channel value and its cylinder's `end_pressure`
 disagree, on purpose, and both fixtures encode that.
 
-**The extremes are taken over the samples' own recorded instants, not over the profile's
-whole-second axis.** The axis rounds to whole seconds and keeps the first entry on each of
-them; a cylinder reading that shares its second with an earlier entry of another channel is
-dropped by that rule, which is right for a channel and wrong for the extremes. On the dive
-`suunto-ocean.json` is reduced from, taking them off the axis moves the start pressure from
-211.625 bar to 211.26562.
+**The extremes are taken over the samples' own recorded instants, not off the profile.**
+The merged axis is not what loses them — it folds an entry into a second another channel's
+entry already holds rather than dropping it, which is `converting.md`'s collision rule
+read per channel, and *The profile* below is where this exporter's habit of appending its
+sensor streams separately makes that rule visible. Two other readings do,
+and both are measured on the dive `suunto-ocean.json` is reduced from, whose start pressure
+is 211.625 bar: an **unmerged** axis, one entry per second with the first winning it whole,
+gives 211.26562, the earlier depth entry taking the second and carrying the cylinder reading
+0.1 s later away with it; and the axis's pressure **channel**, which §6.5 stores in tenths
+of a bar, gives 211.6, which is a rounding of a value the source recorded and so is
+`converting.md`'s rule the other way round.
 
 ### Numbering — a source gas number is a label, not a position
 
@@ -448,10 +481,15 @@ Read as a list of what was considered, not of what was missed.
   `AlgorithmBottomTime`, `AscentMode`, `Conservatism`, `DeepStopEnabled`, `DiveMode`,
   `LastDecoStopDepth`, `MiniLock`, `SafetyStopTime`** — the computer's decompression
   configuration, not the dive.
-- **`Diving.DaysInSeries`, `DesaturationTime`, `NoFlyTime`, `NumberInSeries`,
-  `PreviousDiveDepth`, `SurfaceTime`** — properties of a *series* of dives rather than of
-  this one. §6.2's `dive_number` is the diver's own numbering, and a device's counter is
-  not reliably it.
+- **`Diving.DaysInSeries`, `DesaturationTime`, `NoFlyTime`, `PreviousDiveDepth`,
+  `SurfaceTime`** — properties of a *series* of dives rather than of this one.
+  `NumberInSeries` was refused alongside them until §6.4b gave a device's counter a home;
+  it is carried now, under *Device* above. §6.2's `dive_number` is still the diver's own
+  numbering and a device's counter is still not reliably it — which is why the two are
+  different members rather than one. **Untested**: no file in hand carries a
+  `Header.Diving.NumberInSeries`. Only the D5 shapes have a `Header.Diving` at all — the
+  Ocean shape has none, per *The three header shapes* above — and the one D5 file in
+  `fixtures/suunto_json/` states no number inside it.
 - **`Diving.StartTissue` / `EndTissue`'s `Helium`, `Nitrogen`, `OLF`, `RgbmHelium` and
   `RgbmNitrogen`** — everything under those blocks but `CNS` and `OTU`. §6.2 has no member
   for a tissue model's state, and a loading figure is only meaningful beside the algorithm
@@ -460,10 +498,14 @@ Read as a list of what was considered, not of what was missed.
   not carry; `start_pressure` is the pressure at the start of the dive and the two differ.
 - **`Gases[].TransmitterID`, `TransmitterStartBatteryCharge`, `TransmitterEndBatteryCharge`**
   — a pod's serial and its battery. Neither is a property of the cylinder.
-- **`Device.SerialNumber`, `Device.Info.HW` / `BSL` / `BatteryAtStart` / `BatteryAtEnd` /
-  `BatteryDesignCapacity` / `BatteryFullCapacity`** — hardware identity and battery
-  telemetry. The firmware version is carried and the serial deliberately is not: it
-  identifies a piece of hardware and nothing in a logbook needs it.
+- **`Device.Info.HW` / `BSL` / `BatteryAtStart` / `BatteryAtEnd` /
+  `BatteryDesignCapacity` / `BatteryFullCapacity`** — a hardware revision, a bootloader
+  version and battery telemetry, none of which §6.4b models. `Device.SerialNumber` was
+  refused here too, on the grounds that it identifies a piece of hardware and nothing in a
+  logbook needs it. That is no longer true and the sentence is withdrawn: a logbook holding
+  two records of one dive needs to tell one wrist's computer from the other's, and the
+  serial is the only thing that does it reliably. It is carried under *Device* above, and
+  §9 covers what publishing a document with one in it means.
 - **`Samples[].NoDecTime`, `TimeToSurface`, `RtGradientFactors`, `AbsPressure`,
   `SeaLevelPressure`, `SurfacePressure`, `MinSurfacePressure`, `MaxSurfacePressure`,
   `DeviceInternalAbsPressure`, `DeviceInternalTemperature`, `Altitude`, `VerticalSpeed`,

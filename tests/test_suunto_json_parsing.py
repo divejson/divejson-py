@@ -10,7 +10,15 @@ from __future__ import annotations
 import json
 
 import pytest
-from helpers import EXPORTED_AT, SUUNTO_STARTED_AT, suunto_json, suunto_sample, suunto_slots
+from helpers import (
+    EXPORTED_AT,
+    SUUNTO_STARTED_AT,
+    device_of,
+    profile_of,
+    suunto_json,
+    suunto_sample,
+    suunto_slots,
+)
 
 from divejson import MalformedSuuntoJsonError, convert, sniff
 from divejson.converter import Scope
@@ -135,7 +143,7 @@ def test_a_one_digit_fraction_survives_the_python_floor() -> None:
 
 def test_a_sample_before_the_dive_began_has_no_place_on_the_axis() -> None:
     conversion = _conversion({}, [suunto_sample(-30, Depth=1.0), suunto_sample(0, Depth=2.0)])
-    assert conversion.document["dives"][0]["profile"]["depth"]["times"] == [0]
+    assert profile_of(conversion.document["dives"][0])["depth"]["times"] == [0]
     assert any("before the dive began" in message for message in _messages(conversion, "dropped"))
 
 
@@ -154,8 +162,8 @@ def test_samples_are_ordered_by_their_own_time_and_not_by_position() -> None:
             suunto_sample(30, Depth=10.0),
         ],
     )
-    assert dive["profile"]["depth"]["times"] == [0, 30, 60]
-    assert dive["profile"]["depth"]["values"] == [100, 1000, 2000]
+    assert profile_of(dive)["depth"]["times"] == [0, 30, 60]
+    assert profile_of(dive)["depth"]["values"] == [100, 1000, 2000]
 
 
 def test_two_entries_on_one_second_merge_rather_than_one_being_dropped() -> None:
@@ -168,7 +176,7 @@ def test_two_entries_on_one_second_merge_rather_than_one_being_dropped() -> None
             suunto_sample(0.2, Cylinders=suunto_slots(20_000_000)),
         ],
     )
-    profile = dive["profile"]
+    profile = profile_of(dive)
     assert profile["depth"]["times"] == [0]
     assert profile["temperature"]["times"] == [0]
     assert profile["pressures"][0]["times"] == [0]
@@ -189,7 +197,7 @@ def test_one_channel_twice_on_a_second_keeps_the_first_and_is_reported_once() ->
             suunto_sample(60, Depth=20.0),
         ],
     )
-    assert conversion.document["dives"][0]["profile"]["depth"]["values"] == [100, 2000]
+    assert profile_of(conversion.document["dives"][0])["depth"]["values"] == [100, 2000]
     assert _messages(conversion, "dropped") == [
         (
             "2 depth readings land on a second the dive already has one at; the later reading is "
@@ -263,7 +271,7 @@ def test_the_switch_order_is_the_cylinder_order() -> None:
     )
     assert len(dive["cylinders"]) == 2
     # The source numbers 4 and 2 became positions 0 and 1, which is what the markers name.
-    assert [event.get("gas_number") for event in dive["profile"]["events"]] == [0, 1, 0]
+    assert [event.get("gas_number") for event in profile_of(dive)["events"]] == [0, 1, 0]
 
 
 def test_a_slot_that_transmitted_without_a_switch_is_still_a_cylinder() -> None:
@@ -287,7 +295,7 @@ def test_a_null_pressure_is_skipped_rather_than_ending_the_series() -> None:
         ],
     )
     assert dive["cylinders"][0]["end_pressure"] == 150.0
-    assert dive["profile"]["pressures"] == [{"times": [0, 600], "values": [2000, 1500], "gas_number": 0}]
+    assert profile_of(dive)["pressures"] == [{"times": [0, 600], "values": [2000, 1500], "gas_number": 0}]
 
 
 def test_readings_after_the_dive_ended_are_dropped_from_the_cylinder() -> None:
@@ -302,7 +310,7 @@ def test_readings_after_the_dive_ended_are_dropped_from_the_cylinder() -> None:
     )
     assert dive["cylinders"][0]["end_pressure"] == 50.0
     # And the channel keeps the reading, because it is telemetry the device did record.
-    assert dive["profile"]["pressures"][0]["values"] == [2000, 500, 1]
+    assert profile_of(dive)["pressures"][0]["values"] == [2000, 500, 1]
 
 
 def test_a_header_with_no_dive_time_leaves_the_readings_unbounded() -> None:
@@ -340,7 +348,7 @@ def test_the_extremes_are_taken_over_the_samples_and_not_off_the_profile() -> No
         ],
     )
     assert dive["cylinders"][0]["start_pressure"] == 211.625
-    assert dive["profile"]["pressures"][0]["values"][0] == 2116  # 211.6 bar, in tenths
+    assert profile_of(dive)["pressures"][0]["values"][0] == 2116  # 211.6 bar, in tenths
 
 
 def test_a_zero_start_pressure_is_a_device_s_absent_marker() -> None:
@@ -440,14 +448,14 @@ def test_a_mix_whose_halves_sum_above_a_hundred_is_dropped_entirely() -> None:
 def test_samples_that_carry_a_time_and_no_reading_produce_no_profile() -> None:
     """A zero-length sampled record is a claim the source did not make."""
     conversion = _conversion({}, [suunto_sample(0, Speed=3.2), suunto_sample(60, Speed=3.4)])
-    assert "profile" not in conversion.document["dives"][0]
+    assert profile_of(conversion.document["dives"][0]) is None
     assert any("no reading this format can hold" in message for message in _messages(conversion, "dropped"))
 
 
 def test_a_dive_that_recorded_no_samples_at_all_is_not_reported() -> None:
     """The source said nothing, which is an absence rather than something uncarriable."""
     conversion = _conversion({"Duration": 2400})
-    assert "profile" not in conversion.document["dives"][0]
+    assert profile_of(conversion.document["dives"][0]) is None
     assert _messages(conversion, "dropped") == []
 
 
@@ -455,7 +463,7 @@ def test_the_device_s_own_ambient_pressure_sensor_is_not_a_tank_pressure() -> No
     """`DeviceInternalAbsPressure` sits beside `Cylinders` and reads ~96 400 Pa at the
     surface. Labelling it tank pressure on a chart divers plan gas from would be wrong."""
     dive = _dive({}, [suunto_sample(0, Depth=1.0, DeviceInternalAbsPressure=96_417)])
-    assert "cylinders" not in dive and "pressures" not in dive["profile"]
+    assert "cylinders" not in dive and "pressures" not in profile_of(dive)
 
 
 def test_the_computer_narrating_its_own_mode_is_not_an_event() -> None:
@@ -471,7 +479,7 @@ def test_the_computer_narrating_its_own_mode_is_not_an_event() -> None:
             )
         ],
     )
-    assert "events" not in dive["profile"]
+    assert "events" not in profile_of(dive)
 
 
 def test_only_the_active_edge_of_a_paired_notify_is_marked() -> None:
@@ -483,7 +491,7 @@ def test_only_the_active_edge_of_a_paired_notify_is_marked() -> None:
             suunto_sample(30, Depth=1.0, DiveEvents=[{"Notify": {"Active": False, "Type": "Deep Stop"}}]),
         ],
     )
-    assert dive["profile"]["events"] == [{"time": 0, "type": "deep_stop"}]
+    assert profile_of(dive)["events"] == [{"time": 0, "type": "deep_stop"}]
 
 
 def test_a_notify_this_reader_does_not_map_is_no_marker_at_all() -> None:
@@ -496,7 +504,7 @@ def test_a_notify_this_reader_does_not_map_is_no_marker_at_all() -> None:
             suunto_sample(30, Depth=1.0, DiveEvents=[{"Notify": {"Active": True, "Type": "Stop done"}}]),
         ],
     )
-    assert "events" not in dive["profile"]
+    assert "events" not in profile_of(dive)
 
 
 def test_an_alarm_carries_the_device_s_own_wording() -> None:
@@ -505,7 +513,7 @@ def test_an_alarm_carries_the_device_s_own_wording() -> None:
         {},
         [suunto_sample(0, Depth=1.0, Events=[{"Alarm": {"Active": True, "Type": "Ceiling Broken"}}])],
     )
-    assert dive["profile"]["events"] == [{"time": 0, "type": "other", "label": "Ceiling Broken"}]
+    assert profile_of(dive)["events"] == [{"time": 0, "type": "other", "label": "Ceiling Broken"}]
 
 
 def test_a_gas_switch_arrives_under_either_member_name() -> None:
@@ -513,7 +521,7 @@ def test_a_gas_switch_arrives_under_either_member_name() -> None:
     generation's worth of switches."""
     for key in ("Events", "DiveEvents"):
         dive = _dive({}, [suunto_sample(0, Depth=1.0, **{key: [{"GasSwitch": {"GasNumber": 0}}]})])
-        assert dive["profile"]["events"] == [{"time": 0, "type": "gas_switch", "gas_number": 0}]
+        assert profile_of(dive)["events"] == [{"time": 0, "type": "gas_switch", "gas_number": 0}]
 
 
 def test_a_switch_to_a_gas_this_file_describes_nowhere_still_happened() -> None:
@@ -522,7 +530,7 @@ def test_a_switch_to_a_gas_this_file_describes_nowhere_still_happened() -> None:
         _gas_block(Oxygen=0.21),
         [suunto_sample(0, Depth=1.0, Events=[{"GasSwitch": {"GasNumber": 7}}])],
     )
-    assert dive["profile"]["events"] == [{"time": 0, "type": "gas_switch"}]
+    assert profile_of(dive)["events"] == [{"time": 0, "type": "gas_switch"}]
 
 
 # -- identity and the archive ---------------------------------------------------------
@@ -569,3 +577,46 @@ def test_a_non_finite_number_is_read_as_not_recorded() -> None:
 def test_a_boolean_is_not_a_reading() -> None:
     """Python makes `True` an integer, and a `true` in a numeric member says something else."""
     assert "max_depth" not in _dive({"Depth": {"Max": True}})
+
+
+# -- the device ------------------------------------------------------------------------
+
+
+def test_the_brand_is_the_formats_and_not_the_files() -> None:
+    """The one place this reader supplies a value the file does not state, and not §5.4's
+    fabrication: a vendor-proprietary export format is the vendor saying so."""
+    data = suunto_json({"Device": {"Name": "Porvoo"}})
+    assert device_of(convert(data).document["dives"][0]) == {"brand": "Suunto", "name": "Porvoo"}
+
+
+def test_the_device_name_is_a_name_and_never_a_model() -> None:
+    """It is settable by the owner — `Porvoo` on one real Ocean — and this format states no
+    product name anywhere, so §6.4b's `model` has no source here."""
+    data = suunto_json({"Device": {"Name": "Suunto Ocean", "SerialNumber": "253810000400",
+                                   "Info": {"SW": "2.51.28"}}})
+    assert device_of(convert(data).document["dives"][0]) == {
+        "brand": "Suunto",
+        "serial": "253810000400",
+        "firmware": "2.51.28",
+        "name": "Suunto Ocean",
+    }
+
+
+def test_the_series_number_is_the_devices_counter() -> None:
+    """§6.2's `dive_number` is the diver's own numbering and a counter that restarts on a
+    new device is not it, which is why the two are different members."""
+    data = suunto_json({"Device": {"Name": "Porvoo"}, "Diving": {"NumberInSeries": 3}})
+    dive = convert(data).document["dives"][0]
+    assert "dive_number" not in dive
+    assert device_of(dive)["dive_number"] == 3
+
+
+def test_a_header_naming_a_device_above_no_samples_is_a_device_only_recording() -> None:
+    """A computer worn is a fact about the dive even when it sampled nothing (§6.4a)."""
+    dive = convert(suunto_json({"Device": {"Name": "Suunto D5"}})).document["dives"][0]
+    assert dive["recordings"] == [{"device": {"brand": "Suunto", "name": "Suunto D5"}}]
+
+
+def test_a_header_naming_no_device_and_holding_no_samples_has_no_recording() -> None:
+    """§6.4a forbids a recording that carries nothing at all."""
+    assert "recordings" not in convert(suunto_json({})).document["dives"][0]
