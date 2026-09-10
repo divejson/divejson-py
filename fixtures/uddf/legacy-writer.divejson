@@ -25,19 +25,23 @@
           "helium": 0.0
         }
       ],
-      "profile": {
-        "duration": 120,
-        "depth": {
-          "times": [
-            30,
-            120
-          ],
-          "values": [
-            250,
-            1840
-          ]
+      "recordings": [
+        {
+          "profile": {
+            "duration": 120,
+            "depth": {
+              "times": [
+                30,
+                120
+              ],
+              "values": [
+                250,
+                1840
+              ]
+            }
+          }
         }
-      }
+      ]
     }
   ],
   "sites": [

@@ -25,6 +25,28 @@ UDDF_NAMESPACE = "http://www.streit.cc/uddf/3.2/"
 EXPORTED_AT = datetime(2026, 9, 5, tzinfo=timezone.utc)
 
 
+def recorded_by(dive: dict, index: int = 0) -> dict:
+    """One dive's `recordings[index]`, or an empty dict where it has none.
+
+    A profile sits inside a recording (§6.4a) and a test about a unit conversion should not
+    have to say so two levels deep. Empty rather than raising, because "this dive has no
+    recording at all" is the assertion in several tests here, and `{}` is the shape that
+    lets `profile_of(dive) is None` say it.
+    """
+    recordings = dive.get("recordings") or []
+    return recordings[index] if index < len(recordings) else {}
+
+
+def profile_of(dive: dict, index: int = 0) -> dict | None:
+    """The profile of one dive's `recordings[index]`, or nothing at all."""
+    return recorded_by(dive, index).get("profile")
+
+
+def device_of(dive: dict, index: int = 0) -> dict | None:
+    """The device of one dive's `recordings[index]`, or nothing at all."""
+    return recorded_by(dive, index).get("device")
+
+
 def before(extra: str = "", *, datetime_text: str = "2026-04-17T11:49:23+02:00") -> str:
     """An `<informationbeforedive>` carrying a start time, which every dive needs.
 

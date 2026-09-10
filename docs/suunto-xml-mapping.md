@@ -25,7 +25,7 @@ presence of an element says nothing at all. `<BatteryLevel i:nil="true" />` appe
 is `converting.md`'s empty-is-absent rule with a name on it.
 
 **A logbook is a directory, not a file.** One dive per document means an account's whole
-logbook is a folder of them, which reaches this library as an archive — `converting.md`'s
+logbook is a folder of them, which reaches a converter as an archive — `converting.md`'s
 *A container is one logbook* — with each dive's `where` paths and positional identity
 prefixed by its own filename.
 
@@ -40,10 +40,10 @@ on its own.
 ### The shape is a namespaced `<Dive>`, and the format id is `suunto_xml`
 
 `suunto_xml` rather than `suunto`, because the same vendor's mobile application exports a
-different format this package also reads.
+different format this corpus also covers.
 
 The sniff asks for the root element's local name **and** the datacontract namespace, where
-this package's other XML readers ask only for the name. `<uddf>` and `<divelog>` are each
+the corpus's other XML formats are recognised by name alone. `<uddf>` and `<divelog>` are each
 one format's and nothing else's; `<dive>` is a name any dive-log format might reach for, so
 claiming it alone would have this reader answering for files it cannot read. The namespace
 declaration sits on the root element, so it is inside any bounded head that reached the root.
@@ -63,11 +63,9 @@ what makes it not matter.
 
 ### A `<Mode>3</Mode>` document is a freedive, and is skipped
 
-DiveJSON has **no member for the kind of a dive**, so a converted freedive arrives
-indistinguishable from a scuba dive with no gas and no decompression algorithm — mislabelled
-by omission, in a logbook it shares with real scuba dives. It is skipped and reported
-instead, which is what the app-JSON reader does with an activity whose `ActivityType` is not
-51.
+`<Mode>` is the element this format states a dive's kind in, and `converting.md`'s rule for
+one that is not a scuba dive applies: skipped and reported, rather than arriving
+indistinguishable from a scuba dive that recorded no gas and no algorithm.
 
 Of the 384 exports in hand, **42 are freedives** and they are exactly the 42 that carry no
 `<DiveMixture>` at all: `<Algorithm>`, `<DiveTime>` and `<BottomTime>` nil, durations of 3
@@ -80,7 +78,7 @@ of the 244 `<Mode>0</Mode>` exports carry a single 21 % mixture, and every one o
 states **no** `<Mode>` is read on — absence is not a claim, and `converting.md`'s first rule
 is that schema validity is never a precondition.
 
-### A start time is parsed by pattern, not by the standard library
+### A start time is a naive .NET timestamp
 
 `<StartTime>` is a naive .NET round-trip timestamp: a date, a `T`, a clock, and usually a
 fraction. 380 of the 384 exports write a fraction and four do not.
@@ -90,14 +88,13 @@ block — there is none. So a converted dive carries the wall clock alone and re
 absence (§5.2). The same dive's app-JSON export *does* carry one, and taking it from there
 would be this converter asserting a zone this file does not.
 
-**The fraction is preserved.** §5.2 makes it OPTIONAL rather than forbidden, so
-`2021-04-06T11:16:42.6` comes out as it went in. `datetime.fromisoformat` is deliberately
-not the parser: on this package's Python floor it accepts only a two- or six-digit fraction
-and rejects `.6`, which is exactly what this format writes. It is still used for the calendar
-check no pattern can make.
+**The fraction is preserved**, `converting.md`'s rule, so `2021-04-06T11:16:42.6` comes out
+as it went in — and this is the format that `.6` is written by, the one a standard library's
+ISO parser is most likely to reject and the reason that document says to match a date-time
+by pattern.
 
-Two leniencies and one refusal. A time of day with no seconds is read as `:00` and reported
-— §5.2's grammar requires them and refusing would cost the whole dive. A date that is not a
+Two leniencies and one refusal. A time of day with no seconds is read as `:00` and reported,
+which is `converting.md`'s again. A date that is not a
 real calendar date drops the dive. And a `<StartTime>` carrying an **offset** is refused
 rather than read: this serializer has no zone to state, so a file with one is not a document
 this reader knows the meaning of.
@@ -150,8 +147,8 @@ and §6.2's own 0.4 to 1.2 bar bound refuses the other one outright.
 channel carries two: millibar to bar, then §6.5's tenths. `211391` millibar is `211.391` bar
 on a cylinder and `2114` tenths in the channel.
 
-Nothing a source recorded is quantized. `211.391` is the file's own number and this reader
-rounds only where §6.5's integer channels require it, halves away from zero.
+Nothing a source recorded is quantized (`converting.md`): `211.391` is the file's own
+number, and the only rounding here is §6.5's integer channels, halves away from zero.
 
 ## Identity
 
@@ -162,6 +159,8 @@ export.
 
 A DM5 export **records no id for its dive**. `<DiveNumberInSerie>` is the computer's own
 counter and not an identifier; `<SerialNumber>` identifies the device rather than the dive.
+Both are carried, on the recording's device (§6.4b, *Device* below) — which changes nothing
+here, since neither was ever a candidate for the dive's own identity.
 So a dive takes `converting.md`'s positional stand-in and the report says so: an identity
 that moves if the file's order changes is a fact a diver may need.
 
@@ -192,6 +191,33 @@ An archive whose files came off two firmware versions has no single `source_gene
 the merged logbook records none and says so — `converting.md`'s merge rule, and it fires on
 the owner's own directory, whose 384 files span three firmware versions.
 
+### Device — `<Source>`, `<SerialNumber>`, `<Software>`, `<DiveNumberInSerie>`
+
+One file is one dive, so a document converted from one has at most one recording (§6.4a),
+and its device is where the archive-wide merge above does *not* reach: a device is per
+recording, so two firmware versions across a directory are two devices' worth of recordings
+rather than one absence.
+
+| `<Dive>` child | | into (§6.4b) |
+| --- | --- | --- |
+| — | | `brand`, the literal `Suunto` |
+| `<Source>` | | `model` |
+| `<SerialNumber>` | | `serial` |
+| `<Software>` | | `firmware` |
+| `<DiveNumberInSerie>` | | `dive_number`, the device's counter |
+
+The brand is supplied rather than read, which is the format's own property and not a
+guess about the file — `suunto-json-mapping.md` states the reasoning in full and it is the
+same here.
+
+`<Source>` lands on `model` where the app JSON's `Device.Name` lands on `name`: this
+element is the product ("Suunto D5"), the JSON's is settable by the owner, and reading each
+as what it is keeps a device converted from either comparable with the other.
+
+Every element here is one this document previously read and refused, and the refusals are
+withdrawn together under *Deliberately not mapped* below: they were refused for want of a
+place to put them, and §6.4b is that place.
+
 ### The dive — `<Dive>`
 
 | source | DiveJSON member | notes |
@@ -206,7 +232,7 @@ the owner's own directory, whose 384 files span three firmware versions.
 | `<OtuStart>`, `<OtuEnd>` | `otu_start`, `otu_end` | as above |
 | `<SurfacePressure>` | `surface_pressure` | Pascal; outside 0.4-1.2 bar it is dropped |
 | `<DiveMixtures>` | `cylinders` | below |
-| `<DiveSamples>` | `profile` | below |
+| `<DiveSamples>` | the recording's `profile` | below; a profile is a member of `recordings[]` (§6.4a), never of the dive |
 
 `<Duration>` is the whole period the computer logged, and it is the only element in this
 format observed holding a dive's length. `<BottomTime>` is the time spent at depth and runs
@@ -371,7 +397,7 @@ is `converting.md`'s refuse-rather-than-guess rule, not its ambiguity rule.
   placeholder; a duration below a whole second; tank readings no cylinder claims, arriving as
   a cylinder of their own.
 - **`dropped`** — a freedive; a start time that is not one; text in a numeric element;
-  `<DiveNumberInSerie>`; `<Visibility>`, `<Weather>` and `<Weight>`; an average depth deeper
+  `<Visibility>`, `<Weather>` and `<Weight>`; an average depth deeper
   than the maximum; a surface pressure or ppO₂ limit outside what §6 allows; a mix whose
   halves sum above 100 %; an end pressure above its start; a cylinder pressure past 350 bar;
   cylinders past the cap; a gas change before the dive began, or one left with no profile to
@@ -384,12 +410,17 @@ is `converting.md`'s refuse-rather-than-guess rule, not its ambiguity rule.
 ## Deliberately not mapped
 
 Read as a list of what was considered, not of what was missed. The datacontract puts 68
-elements on `<Dive>`, and this reader maps 16 of them and reads and refuses 4 more.
+elements on `<Dive>`, and this reader maps 18 of them and reads and refuses 3 more.
+`<DiveNumberInSerie>` and `<SerialNumber>` are the two that moved: the first out of the
+refusals and the second out of the silently unmapped, both into the device map above.
 
-- **`<DiveNumberInSerie>`** — read and refused, with a finding. It is the *computer's*
-  counter rather than the diver's lifetime dive number: it starts at 1 on a new or
-  factory-reset device and starts again on the next one, so carrying it would stamp a dive #1
-  onto somebody's three-hundredth dive. §6.2's `dive_number` is the diver's.
+- **`<DiveNumberInSerie>`** — **no longer refused.** It is the *computer's* counter rather
+  than the diver's lifetime dive number: it starts at 1 on a new or factory-reset device and
+  starts again on the next one, so carrying it as §6.2's `dive_number` would stamp a dive #1
+  onto somebody's three-hundredth dive. That reasoning is unchanged and is now the reason it
+  has a member of its own — §6.4b's `dive_number`, defined as the device's counter — so it is
+  carried under *Device* above and the finding is gone. §6.2's `dive_number` is still the
+  diver's, and this reader still writes nothing into it.
 - **`<Visibility>`, `<Weather>`, `<Weight>`** — read and refused, each with a finding. They
   are the desktop application's dive-conditions panel and arrive as a block: 25 of the 384
   exports carry all three, 359 carry none, and every recorded value is `0`. None can be read
@@ -462,9 +493,11 @@ elements on `<Dive>`, and this reader maps 16 of them and reads and refuses 4 mo
   carries and neither is one of them.
 - **`<Dive.Sample>`'s `<Heading>`** — a compass bearing, nil on all 115 602 samples in hand
   and with no §6.5 channel either way.
-- **`<SerialNumber>`** — the computer's serial. The firmware version is carried as
-  provenance and the serial deliberately is not: it identifies a piece of hardware and
-  nothing in a logbook needs it.
+- **`<SerialNumber>`** — **no longer refused.** It was left out on the grounds that it
+  identifies a piece of hardware and nothing in a logbook needs it. That is no longer true:
+  a logbook holding two records of one dive needs to tell one wrist's computer from the
+  other's, and the serial is the only thing that does it reliably. It is carried under
+  *Device* above; §9 covers what publishing a document with one in it means.
 - **`<Boat>`, `<Master>`, `<Partner>`, `<DiveTags>`, `<Deleted>`, `<BatteryLevel>`** — a
   boat name, a dive master, a buddy, a tag list, a deletion flag and a battery reading. Nil
   or empty on all 384, so there is nothing to carry from this corpus. `<Boat>`, `<Master>`
@@ -475,21 +508,7 @@ elements on `<Dive>`, and this reader maps 16 of them and reads and refuses 4 mo
 ## The pairs
 
 [`fixtures/suunto_xml/`](../fixtures/suunto_xml) holds the conformance pairs for this format
-— an input, and the document a correct reader produces from it. The rules those expectations
+— an input, and the document a correct reader produces from it. What each one covers, and
+how it was built, is one row per pair in
+[`fixtures/README.md`](../fixtures/README.md#suunto_xml); the rules those expectations
 follow are this document and [`converting.md`](converting.md).
-
-The three reductions keep every element this reader reads or refuses, with its recorded
-value unaltered, and drop the bulk elements nothing reads: `<SampleBlob>`, the four
-`TissuePressures*` arrays and their four blobs, most of the samples, and all but two of the
-`<Mark>`s.
-
-| file | modelled on | what it covers |
-| --- | --- | --- |
-| `suunto-d5.xml` | Suunto D5, 2021 | The known answer: `max_depth` 32.41 and `started_at` `2021-04-06T11:16:42.6`, the fraction preserved and no offset supplied. **The same dive as `fixtures/fit/suunto-d5.fit`**, recorded once and exported twice, so their depth channels agree sample for sample through two entirely different unit paths. Also the untransmitted cylinder whose pressures are both the zero absent-marker, a single-gas switch at second 0, and the `<Marks>` block producing nothing. |
-| `nitrox-deco.xml` | Suunto D5, 2025 | Two cylinders and three elements that have to agree: a 21 % back gas with the pod on it, a 52 % deco bottle that never transmitted and so carries no pressures at all, a pressure channel labelled from `<TransmitterId>`, markers at 0 and 1 592 s taken from the `<DiveMixture>` each sits inside, and a real ceiling channel. |
-| `freedive.xml` | Suunto D5, 2023 | `<Mode>3</Mode>`: skipped and reported, producing a conforming logbook with no dives. Its samples also carry the duplicate second that every one of the corpus's 37 collisions is in. |
-| `refusals.xml` | constructed | Everything this reader refuses that fits on one dive: a `<StartTime>` with no seconds, an average depth deeper than the maximum, a millibar surface pressure, a ppO₂ limit of 3.2 bar, a mix summing to 110 %, a gas change at -30 s, text in a `<Depth>`, a sample with a nil `<Time>`, two samples on one second, a tank reading past 350 bar, the dive-conditions block, and **two** cylinders claiming the transmitter. |
-| `unlabelled-pressure.xml` | constructed | Tank readings no cylinder claims, arriving as a cylinder of their own with nothing but the channel; beside them a zero `<MaxDepth>`, `<AvgDepth>` and `<Duration>`, a nil `<Mode>`, and a `<Note>` with whitespace around it. |
-
-The two constructed files are shapes no real export in hand has, which is exactly why they
-need pairs: the branches they exercise would otherwise be reachable only by reading the code.

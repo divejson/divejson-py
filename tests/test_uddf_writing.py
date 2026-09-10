@@ -16,6 +16,7 @@ open.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import pytest
@@ -50,8 +51,23 @@ def document(**members: Any) -> dict[str, Any]:
 
 
 def one_dive(**members: Any) -> dict[str, Any]:
-    """A document whose only dive carries `members`, `started_at` being REQUIRED."""
+    """A document whose only dive carries `members`, `started_at` being REQUIRED.
+
+    `profile` and `device` are lifted into the dive's one recording (§6.4a), which is where
+    both now live: a test about a gas switch reads better as `one_dive(profile=…)` than as
+    two levels of list literal, and a test that is *about* the recordings passes them whole.
+    """
+    profile, device = members.pop("profile", None), members.pop("device", None)
+    if (profile or device) and "recordings" not in members:
+        entry = {member: value for member, value in (("device", device), ("profile", profile)) if value}
+        members["recordings"] = [entry]
     return document(dives=[{"uuid": DIVE_UUID, "started_at": STARTED_AT, **members}])
+
+
+def recorded(document: dict[str, Any], index: int = 0) -> dict[str, Any]:
+    """The first dive's `recordings[index]` of a document read back, or an empty dict."""
+    recordings = document["dives"][0].get("recordings") or []
+    return recordings[index] if index < len(recordings) else {}
 
 
 def written(source: dict[str, Any], schema: xmlschema.XMLSchema | None = None) -> str:
@@ -181,8 +197,8 @@ def test_an_unlabelled_other_event_is_dropped_rather_than_written_as_the_word(sc
         }
     )
     assert "<setmarker>" not in written(source, schema)
-    assert "events" not in read_back(source)["dives"][0]["profile"]
-    assert "rather than written as the word" in messages(source, "dives/0/profile/events/0")[0]
+    assert "events" not in recorded(read_back(source))["profile"]
+    assert "rather than written as the word" in messages(source, "dives/0/recordings/0/profile/events/0")[0]
 
 
 def test_a_gas_switch_to_a_cylinder_this_dive_does_not_have_is_dropped(schema) -> None:
@@ -200,7 +216,7 @@ def test_a_gas_switch_to_a_cylinder_this_dive_does_not_have_is_dropped(schema) -
         },
     )
     assert "<switchmix" not in written(source, schema)
-    assert "the switch is dropped" in messages(source, "dives/0/profile/events/0")[0]
+    assert "the switch is dropped" in messages(source, "dives/0/recordings/0/profile/events/0")[0]
 
 
 # -- gases, and why a cylinder does not share one inside a dive ------------------------
@@ -232,7 +248,7 @@ def test_two_cylinders_on_one_blend_get_a_mix_each(schema) -> None:
     text = written(source, schema)
     assert text.count("<mix id=") == 2
 
-    channels = read_back(source)["dives"][0]["profile"]["pressures"]
+    channels = recorded(read_back(source))["profile"]["pressures"]
     assert channels == [
         {"times": [0], "values": [2200], "gas_number": 0},
         {"times": [600], "values": [2000], "gas_number": 1},
@@ -356,7 +372,7 @@ def test_a_reading_between_two_depth_samples_gets_its_own_waypoint(schema) -> No
     text = written(source, schema)
     assert text.count("<waypoint>") == 3
 
-    profile = read_back(source)["dives"][0]["profile"]
+    profile = recorded(read_back(source))["profile"]
     assert profile["temperature"] == {"times": [30], "values": [245]}
     assert profile["depth"] == {"times": [0, 60], "values": [0, 500]}
 
@@ -365,8 +381,8 @@ def test_a_profile_duration_longer_than_its_samples_is_reported() -> None:
     """§6.4 defines the member as the span of the samples, and UDDF records no such member
     at all — so a reader recomputes it and a document claiming more comes back with less."""
     source = one_dive(profile={"duration": 900, "depth": {"times": [0, 60], "values": [0, 500]}})
-    assert read_back(source)["dives"][0]["profile"]["duration"] == 60
-    assert "its samples span 60 s" in messages(source, "dives/0/profile")[0]
+    assert recorded(read_back(source))["profile"]["duration"] == 60
+    assert "its samples span 60 s" in messages(source, "dives/0/recordings/0/profile")[0]
 
 
 def test_two_events_on_one_second_keep_the_first(schema) -> None:
@@ -383,10 +399,10 @@ def test_two_events_on_one_second_keep_the_first(schema) -> None:
         }
     )
     written(source, schema)
-    assert read_back(source)["dives"][0]["profile"]["events"] == [
+    assert recorded(read_back(source))["profile"]["events"] == [
         {"time": 30, "type": "other", "label": "first"}
     ]
-    assert "the later event is dropped" in messages(source, "dives/0/profile/events/1")[0]
+    assert "the later event is dropped" in messages(source, "dives/0/recordings/0/profile/events/1")[0]
 
 
 def test_a_marker_event_keeps_its_type_and_loses_its_label(schema) -> None:
@@ -400,8 +416,8 @@ def test_a_marker_event_keeps_its_type_and_loses_its_label(schema) -> None:
         }
     )
     assert "<setmarker>safety_stop</setmarker>" in written(source, schema)
-    assert read_back(source)["dives"][0]["profile"]["events"] == [{"time": 30, "type": "safety_stop"}]
-    assert "the label is dropped" in messages(source, "dives/0/profile/events/0")[0]
+    assert recorded(read_back(source))["profile"]["events"] == [{"time": 30, "type": "safety_stop"}]
+    assert "the label is dropped" in messages(source, "dives/0/recordings/0/profile/events/0")[0]
 
 
 # -- identity, gear and the diver ------------------------------------------------------
@@ -522,3 +538,444 @@ def test_the_document_declares_the_uddf_namespace_and_version(schema) -> None:
     text = written(document(), schema)
     assert '<uddf xmlns="http://www.streit.cc/uddf/3.2/" version="3.2.2">' in text
     assert "<type>converter</type>" in text
+
+
+# -- the fold: one `<divecomputer>` per computer ----------------------------------------
+
+# `docs/uddf-writing.md` is the predicate, and these are its legs one at a time. What each
+# is defending against is in the docstring; the corpus reaches only two of them.
+
+GEAR_TWO = "0198a6f0-9999-7005-8000-000000000005"
+
+
+def _computer(**members: Any) -> dict[str, Any]:
+    return {"uuid": GEAR_UUID, "name": "Ocean", "type": "computer", **members}
+
+
+def _computers(text: str) -> list[str]:
+    """The `id` of every `<divecomputer>` in a written file, in document order."""
+    return re.findall(r'<divecomputer id="([^"]+)"', text)
+
+
+def test_a_linked_gear_item_and_a_device_with_one_serial_are_one_element(schema) -> None:
+    """The serial leg, which `fixtures/write/uddf/opendiving.divejson` is the corpus's pair for."""
+    source = document(
+        gear=[_computer(brand="Suunto", serial="42")],
+        dives=[
+            {
+                "uuid": DIVE_UUID,
+                "started_at": STARTED_AT,
+                "gear_uuids": [GEAR_UUID],
+                "recordings": [{"device": {"brand": "Suunto", "model": "Suunto Ocean", "serial": "42"}}],
+            }
+        ],
+    )
+    text = written(source, schema)
+    assert _computers(text) == [f"gear-{GEAR_UUID}"]
+    assert "<model>Suunto Ocean</model>" in text and "<serialnumber>42</serialnumber>" in text
+
+
+def test_serials_that_differ_mean_different_computers_with_no_fall_through(schema) -> None:
+    """Two Suunto Oceans, each plausibly named `Suunto Ocean` with brand `Suunto`.
+
+    Without this leg they fold on the label and one machine's serial goes out on the
+    other's element — which is a logbook saying the diver owns a computer they do not.
+    """
+    source = document(
+        gear=[_computer(name="Suunto Ocean", brand="Suunto", serial="42")],
+        dives=[
+            {
+                "uuid": DIVE_UUID,
+                "started_at": STARTED_AT,
+                "gear_uuids": [GEAR_UUID],
+                "recordings": [{"device": {"brand": "Suunto", "name": "Suunto Ocean", "serial": "43"}}],
+            }
+        ],
+    )
+    text = written(source, schema)
+    assert _computers(text) == [f"gear-{GEAR_UUID}", "device-0"]
+    assert "<serialnumber>42</serialnumber>" in text and "<serialnumber>43</serialnumber>" in text
+
+
+def test_a_device_carrying_only_a_brand_matches_nothing(schema) -> None:
+    """`label_D` absent means no fold, whatever else matches: folding a bare Suunto into
+    "any Suunto computer the diver owns" is a guess, and the fold does not guess."""
+    source = document(
+        gear=[_computer(brand="Suunto")],
+        dives=[
+            {
+                "uuid": DIVE_UUID,
+                "started_at": STARTED_AT,
+                "gear_uuids": [GEAR_UUID],
+                "recordings": [{"device": {"brand": "Suunto"}}],
+            }
+        ],
+    )
+    assert _computers(written(source, schema)) == [f"gear-{GEAR_UUID}", "device-0"]
+
+
+def test_brands_that_disagree_do_not_fold_and_an_absent_one_disagrees_with_nothing(schema) -> None:
+    source = document(
+        gear=[_computer(brand="Suunto"), {"uuid": GEAR_TWO, "name": "Perdix", "type": "computer"}],
+        dives=[
+            {
+                "uuid": DIVE_UUID,
+                "started_at": STARTED_AT,
+                "gear_uuids": [GEAR_UUID, GEAR_TWO],
+                "recordings": [
+                    {"device": {"brand": "Garmin", "name": "Ocean"}},
+                    {"device": {"brand": "Shearwater", "name": "Perdix"}},
+                ],
+            }
+        ],
+    )
+    # The first disagrees on the brand and takes an element of its own; the second meets a
+    # gear item with no brand at all, which disagrees with nothing.
+    assert _computers(written(source, schema)) == [f"gear-{GEAR_UUID}", f"gear-{GEAR_TWO}", "device-0"]
+
+
+def test_a_recording_whose_dive_does_not_link_the_item_takes_its_own_element(schema) -> None:
+    """The link leg. A folded element reaches a dive only through the `<equipmentused>`
+    link that dive's own `gear_uuids` produced, so folding here would drop the device from
+    the file altogether — nothing on the dive would point at the element holding it."""
+    source = document(
+        gear=[_computer(serial="42")],
+        dives=[
+            {
+                "uuid": DIVE_UUID,
+                "started_at": STARTED_AT,
+                "recordings": [{"device": {"name": "Ocean", "serial": "42"}}],
+            }
+        ],
+    )
+    text = written(source, schema)
+    assert _computers(text) == [f"gear-{GEAR_UUID}", "device-0"]
+    assert '<link ref="device-0" />' in text
+
+    # And both facts survive the trip back: the computer that recorded the dive, and the
+    # kit item — read back as a second one, which is the documented exception.
+    back = read_back(source)
+    assert recorded(back)["device"] == {"name": "Ocean", "serial": "42"}
+    assert len(back["gear"]) == 2
+
+
+def test_one_computer_recording_two_dives_is_two_recordings_and_one_element(schema) -> None:
+    """The devices fold with each other first. Read gear-first, this offers the kit item
+    two candidates and the cardinality rule reads one of them as a tie."""
+    source = document(
+        gear=[_computer(serial="42")],
+        dives=[
+            {
+                "uuid": DIVE_UUID,
+                "started_at": STARTED_AT,
+                "gear_uuids": [GEAR_UUID],
+                "recordings": [{"device": {"name": "Ocean", "serial": "42"}}],
+            },
+            {
+                "uuid": SITE_UUID,
+                "started_at": STARTED_AT,
+                "gear_uuids": [GEAR_UUID],
+                "recordings": [{"device": {"name": "Ocean", "serial": "42", "firmware": "2.4.1"}}],
+            },
+        ],
+    )
+    assert _computers(written(source, schema)) == [f"gear-{GEAR_UUID}"]
+
+
+def test_two_different_computers_claiming_one_kit_item_is_a_tie_and_is_reported(schema) -> None:
+    """At most one device record per gear item: the first in document order wins it and
+    the loser keeps an element of its own, because a fold is not a merge."""
+    source = document(
+        gear=[_computer()],
+        dives=[
+            {
+                "uuid": DIVE_UUID,
+                "started_at": STARTED_AT,
+                "gear_uuids": [GEAR_UUID],
+                "recordings": [
+                    {"device": {"name": "Ocean", "serial": "42"}},
+                    {"device": {"name": "Ocean", "serial": "43"}},
+                ],
+            }
+        ],
+    )
+    text = written(source, schema)
+    assert _computers(text) == [f"gear-{GEAR_UUID}", "device-0"]
+    assert "<serialnumber>42</serialnumber>" in text
+    assert any("takes an element of its own" in message for _, _, message in notes(source))
+
+
+def test_one_computer_answering_to_two_kit_items_is_the_other_tie(schema) -> None:
+    """The other shape the cardinality rule refuses, and it loses something else: there is
+    one `<divecomputer>` for the device and the leftover kit items stay plain entries,
+    where the tie above leaves a second computer with an element of its own."""
+    source = document(
+        gear=[_computer(), {"uuid": GEAR_TWO, "name": "Ocean", "type": "computer"}],
+        dives=[
+            {
+                "uuid": DIVE_UUID,
+                "started_at": STARTED_AT,
+                "gear_uuids": [GEAR_UUID, GEAR_TWO],
+                "recordings": [{"device": {"name": "Ocean", "serial": "42"}}],
+            }
+        ],
+    )
+    text = written(source, schema)
+    assert _computers(text) == [f"gear-{GEAR_UUID}", f"gear-{GEAR_TWO}"]
+    assert text.count("<serialnumber>42</serialnumber>") == 1
+    assert any("the rest are written as the kit entries they are" in message
+               for _, _, message in notes(source))
+
+
+def test_an_unmatched_device_id_is_not_a_uuid(schema) -> None:
+    """An id built from a dive's uuid would come back as a gear item wearing that dive's
+    identity, which §5.3 forbids outright — so the scheme is deliberately positional."""
+    source = one_dive(device={"name": "Perdix 2"})
+    text = written(source, schema)
+    assert '<divecomputer id="device-0">' in text
+    assert '<manufacturer id="mfr-device-0">' not in text  # no brand, so no manufacturer
+    assert DIVE_UUID not in _computers(text)[0]
+
+
+def test_a_nameless_device_gets_an_empty_name_and_comes_back_as_no_gear_item(schema) -> None:
+    """Outside the exception rather than a second one: `<name>` is mandatory on the element,
+    an empty one reads as no name, and §6.12 drops a nameless piece."""
+    source = one_dive(device={"model": "Perdix 2"})
+    assert "<name />" in written(source, schema)
+    back = read_back(source)
+    assert "gear" not in back
+    assert recorded(back)["device"] == {"model": "Perdix 2"}
+
+
+def test_the_primary_recordings_counter_is_the_dives_internal_dive_number(schema) -> None:
+    source = one_dive(device={"name": "Ocean", "dive_number": 118})
+    text = written(source, schema)
+    assert "<internaldivenumber>118</internaldivenumber>" in text
+    assert recorded(read_back(source))["device"]["dive_number"] == 118
+
+
+def test_a_device_counter_of_zero_is_not_written(schema) -> None:
+    """`xs:positiveInteger` where §6.4b floors the counter at 0 — the same trade
+    `<divenumber>` already makes: a zero there invalidates the whole document."""
+    source = one_dive(device={"name": "Ocean", "dive_number": 0})
+    assert "<internaldivenumber>" not in written(source, schema)
+    assert "the device's counter is 0" in messages(source, "dives/0/recordings/0/device")[0]
+
+
+def test_a_later_recordings_counter_has_nowhere_to_go(schema) -> None:
+    """UDDF records one counter per dive and the reader gives it to the first link."""
+    source = one_dive(
+        recordings=[
+            {"device": {"name": "Ocean", "dive_number": 118}},
+            {"device": {"name": "Perdix", "dive_number": 9}},
+        ]
+    )
+    text = written(source, schema)
+    assert text.count("<internaldivenumber>") == 1 and "<internaldivenumber>118</internaldivenumber>" in text
+    assert any(
+        "this device's counter has nowhere to go" in message
+        for message in messages(source, "dives/0/recordings/1/device")
+    )
+
+
+def test_a_second_recording_is_dropped_with_its_device_kept(schema) -> None:
+    """UDDF gives a dive one `<samples>`, so what was worn is kept even though what it
+    sampled cannot be."""
+    source = one_dive(
+        recordings=[
+            {"device": {"name": "Ocean"}, "profile": {"duration": 60, "depth": {"times": [0], "values": [500]}}},
+            {"device": {"name": "Perdix"}, "profile": {"duration": 60, "depth": {"times": [0], "values": [510]}}},
+        ]
+    )
+    text = written(source, schema)
+    assert text.count("<samples>") == 1 and "<depth>5</depth>" in text
+    assert _computers(text) == ["device-0", "device-1"]
+    assert any(
+        "UDDF holds one profile per dive" in message
+        for message in messages(source, "dives/0/recordings/1")
+    )
+
+
+def test_a_recordings_own_start_and_files_have_no_slot(schema) -> None:
+    """`<datetime>` stays the dive's: §6.2's `started_at` is the logbook's, and that is
+    what every reader of a UDDF file expects to find there."""
+    source = one_dive(
+        recordings=[
+            {
+                "device": {"name": "Ocean"},
+                "started_at": "2026-04-17T11:50:00+02:00",
+                "source_files": [{"uuid": GEAR_TWO, "filename": "dive.fit", "byte_size": 10, "digest": "x" * 64}],
+            }
+        ]
+    )
+    text = written(source, schema)
+    assert f"<datetime>{STARTED_AT}</datetime>" in text
+    reported = messages(source, "dives/0/recordings/0")
+    assert any("started_at" in message for message in reported)
+    assert any("source_files" in message for message in reported)
+
+
+def test_a_gear_item_that_is_not_a_computer_still_carries_its_serial(schema) -> None:
+    """`<serialnumber>` is on `equipmentPieceType`, which is the breadth §6.12 gives it."""
+    source = document(gear=[{"uuid": GEAR_UUID, "name": "MK25", "type": "regulator", "serial": "R-9"}])
+    assert "<serialnumber>R-9</serialnumber>" in written(source, schema)
+    assert read_back(source)["gear"][0]["serial"] == "R-9"
+
+
+def test_a_devices_firmware_is_reported_on_every_export_that_has_one(schema) -> None:
+    """`equipmentPieceType` carries no firmware element at all."""
+    source = one_dive(device={"name": "Ocean", "firmware": "2.4.1"})
+    written(source, schema)
+    assert any(
+        "no slot for firmware" in message
+        for message in messages(source, "dives/0/recordings/0/device")
+    )
+
+
+def test_a_kit_computer_linked_ahead_of_the_recordings_own_is_reported(schema) -> None:
+    """UDDF gives a dive one `<samples>` and one `<internaldivenumber>` and a reader takes
+    both off the **first** `<divecomputer>` the dive links — while the links come from the
+    kit list in the diver's own order, with the unfolded devices appended after them.
+
+    So a dive that lists an old computer it no longer wears, on a dive some other computer
+    recorded, sends the profile and the counter back on the old one. Reordering the links
+    is not open: `<equipmentused>` is the diver's own list and its order is a member of the
+    document, so this is a loss to name rather than a bug to route around.
+    """
+    source = document(
+        gear=[{"uuid": GEAR_UUID, "name": "Old Puck", "brand": "Mares", "type": "computer"}],
+        dives=[
+            {
+                "uuid": DIVE_UUID,
+                "started_at": STARTED_AT,
+                "gear_uuids": [GEAR_UUID],
+                "recordings": [
+                    {
+                        "device": {"name": "Ocean", "brand": "Suunto", "serial": "S1", "dive_number": 118},
+                        "profile": {"duration": 60, "depth": {"times": [0, 60], "values": [0, 500]}},
+                    }
+                ],
+            }
+        ],
+    )
+    written(source, schema)
+    assert any(
+        "come back on that computer instead" in message for message in messages(source, "dives/0")
+    )
+
+    # And the report is not merely decorative: this is what actually comes back.
+    back = read_back(source)
+    assert recorded(back)["device"]["name"] == "Old Puck"
+    assert recorded(back, 1)["device"]["name"] == "Ocean"
+
+
+def test_a_dive_whose_links_run_in_its_recordings_order_is_not_reported(schema) -> None:
+    """The ordinary case, and both corpus pairs: the first link is the primary's element."""
+    source = document(
+        gear=[_computer(serial="42")],
+        dives=[
+            {
+                "uuid": DIVE_UUID,
+                "started_at": STARTED_AT,
+                "gear_uuids": [GEAR_UUID],
+                "recordings": [
+                    {"device": {"name": "Ocean", "serial": "42"}, "profile": {"duration": 0,
+                     "depth": {"times": [0], "values": [0]}}}
+                ],
+            }
+        ],
+    )
+    written(source, schema)
+    assert not any(
+        "come back on that computer instead" in message or "in a different order" in message
+        for message in messages(source, "dives/0")
+    )
+
+
+def test_recordings_that_come_back_reordered_are_reported(schema) -> None:
+    """A recording has no uuid (§5.3), so its position is the only thing that says it is
+    the primary — and the links run in the kit list's order with the unfolded devices
+    appended after, which is a fact about the gear list rather than about the recordings.
+
+    Here the middle recording's computer is in nobody's kit list, so its element is
+    appended last and the third recording's comes back second.
+    """
+    source = document(
+        gear=[_computer(), {"uuid": GEAR_TWO, "name": "Perdix", "type": "computer"}],
+        dives=[
+            {
+                "uuid": DIVE_UUID,
+                "started_at": STARTED_AT,
+                "gear_uuids": [GEAR_UUID, GEAR_TWO],
+                "recordings": [
+                    {"device": {"name": "Ocean"}},
+                    {"device": {"name": "Puck"}},
+                    {"device": {"name": "Perdix"}},
+                ],
+            }
+        ],
+    )
+    written(source, schema)
+    assert any("come back in a different order" in message for message in messages(source, "dives/0"))
+    assert [recorded(read_back(source), index)["device"]["name"] for index in range(3)] == [
+        "Ocean",
+        "Perdix",
+        "Puck",
+    ]
+
+
+def test_a_dive_with_no_recordings_at_all_reports_nothing_about_its_computer(schema) -> None:
+    """The ordinary hand-logged dive in a logbook whose owner listed their computer.
+
+    Nothing was recorded, so nothing was dropped: the element comes back as a recording
+    the document never had, which is the gain `docs/uddf-writing.md` documents and does
+    not report.
+    """
+    source = document(
+        gear=[_computer()],
+        dives=[{"uuid": DIVE_UUID, "started_at": STARTED_AT, "gear_uuids": [GEAR_UUID]}],
+    )
+    written(source, schema)
+    assert not any(
+        "come back on that computer instead" in message or "come back in a different order" in message
+        for message in messages(source, "dives/0")
+    )
+
+
+def test_a_kit_computer_no_recording_answers_to_is_a_gain_and_is_silent(schema) -> None:
+    """The gain sitting *after* the first link, which is the case the order check has to
+    look past rather than through.
+
+    A diver's kit list holds two computers and this dive was recorded on one of them. The
+    written file links both, so the read-back carries a recording the document never had —
+    a gain, like the gear item in `docs/uddf-writing.md`'s documented exception — while the
+    recording that did go out comes back exactly where it started. Comparing the whole link
+    list against the recordings' own elements would call that a reordering and tell the
+    diver their primary recording had moved, on the most ordinary two-computer logbook
+    there is.
+    """
+    source = document(
+        gear=[_computer(), {"uuid": GEAR_TWO, "name": "Perdix", "type": "computer"}],
+        dives=[
+            {
+                "uuid": DIVE_UUID,
+                "started_at": STARTED_AT,
+                "gear_uuids": [GEAR_UUID, GEAR_TWO],
+                "recordings": [
+                    {
+                        "device": {"name": "Ocean"},
+                        "profile": {"duration": 60, "depth": {"times": [0, 60], "values": [0, 500]}},
+                    }
+                ],
+            }
+        ],
+    )
+    written(source, schema)
+    assert not any(
+        "come back in a different order" in message or "come back on that computer instead" in message
+        for message in messages(source, "dives/0")
+    )
+    back = read_back(source)
+    assert recorded(back)["device"] == {"name": "Ocean"}
+    assert recorded(back)["profile"]["depth"]["values"] == [0, 500]
+    assert recorded(back, 1)["device"] == {"name": "Perdix"}

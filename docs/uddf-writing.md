@@ -1,12 +1,19 @@
 # Writing DiveJSON as UDDF
 
-The way back out. `uddf-mapping.md` is the other direction — every element a reader takes
-into DiveJSON — and this document is what a writer does with a DiveJSON document that has
-to become a UDDF file: which member lands in which element, what UDDF has no room for, and
-what a reader will make of each thing that did not fit.
+**Non-normative.** The specification is [`spec/divejson.md`](../spec/divejson.md); nothing
+here changes what a conforming document is. [`uddf-mapping.md`](uddf-mapping.md) is the
+other direction — every element a reader takes into DiveJSON — and this document is what a
+writer does with a DiveJSON document that has to become a UDDF file: which member lands in
+which element, what UDDF has no room for, and what a reader will make of each thing that
+did not fit.
 
-It is written for a port in another language as much as for a reader of the Python. The
-*rules* are here; only their implementation is in `divejson/uddf_write.py`.
+The rules a writer follows whatever format it is writing are in
+[`writing.md`](writing.md) — how a writer is checked, the three answers to a required
+element the document has nothing for, the report's kinds read on the way out, and a
+writer being a function of its input — and the rules that hold in **either** direction are
+in [`converting.md`](converting.md), identity among them. Neither is repeated here. This
+document carries what is UDDF's, and keeps beside each general rule the example that first
+showed it.
 
 ## Why write UDDF at all
 
@@ -25,76 +32,51 @@ thing it counts being a second place for it to be wrong.
 
 ## What a correct writer is checked against
 
-Two things, and neither is a byte comparison against another implementation. A writer built
-to match another implementation byte for byte is a mirror of it, and the first divergence
-between the two is a bug in whichever was read last.
+The three checks are `writing.md`'s. What is UDDF's is how each one lands here.
 
-**The writer pairs.** `fixtures/write/uddf/` holds a DiveJSON document and the UDDF a
-correct writer produces from it — the reader pair's shape with its halves swapped. They are
-compared as **canonical XML with `<generator>` ignored**: two runs of one writer differ in
-the version stamped there and in nothing else, and a corpus that failed on every release
-would be a corpus nobody keeps green. `divejson conform` runs them.
+**The pairs are compared as canonical XML with `<generator>` ignored**, which is this
+format's answer to the general question of how two of its files are compared when one was
+produced just now: two runs of one writer differ in the version stamped there and in nothing
+else. [`fixtures/write/uddf/`](../fixtures/write/uddf) holds them and `divejson conform` runs
+them; what each covers is in [`fixtures/README.md`](../fixtures/README.md#writeuddf).
 
-**The self round trip.** Reading a written file back through a UDDF reader returns the
-document it was written from, on every member `uddf-mapping.md`'s element map carries — and
-everything that does not come back is named in the report. That is the check this whole
-document is a description of, and the list of what a pair loses is committed beside the
-implementation rather than left to be rediscovered.
+**The self round trip** reads a written file back through a UDDF reader and expects the
+document it was written from, on every member [`uddf-mapping.md`](uddf-mapping.md)'s element
+map carries. This document is the description of what does not come back.
 
-Two members are outside that comparison, for the reasons `conform.compared` gives:
-`exported_at` and `generator` are facts about a *run*. A third is outside it and is this
-direction's own: **`extensions`**. A converted document keeps the source file's own
-generator and declared version under the `divejson` producer key (§5.5), and once a writer
-has run, the file in front of a reader is one *it* produced — so `<generator>` and
-`/uddf/@version` describe the rewrite. Carrying the old block across would mean writing
-another application's name into the element that says what wrote this file.
+**`extensions` is the exclusion this direction adds** to the two the corpus already ignores
+(`writing.md`), and UDDF is where it is visible: `<generator>` and `/uddf/@version` describe
+the file in front of a reader, which after a write is the one this writer produced, so the
+source's own generator and declared version stay behind.
 
-The XSD is a third check and it belongs in an implementation's own suite rather than in a
-corpus, since a corpus holds documents and not schemas. It is the only check that can see
-element **order**, and order is a live hazard: `informationbeforedive`, `waypoint`,
-`equipment`, `tankdata` and `trippart` are all `xs:sequence`, so a member added in the wrong
-place produces a file a lenient reader — including this format's own, which takes children
-by name — is perfectly happy with and no other implementation can open.
+**The XSD is the check the corpus cannot make.** UDDF 3.2.2 has one, so validating output
+against it belongs in an implementation's own suite — and here it is the only check that can
+see element **order**, which is a live hazard in this format: `informationbeforedive`,
+`waypoint`, `equipment`, `tankdata` and `trippart` are all `xs:sequence`, so a member added
+in the wrong place produces a file a lenient reader — including this format's own, which
+takes children by name — is perfectly happy with and no other implementation can open.
 
-## The three answers, and the one that is never taken
+## The three answers, in UDDF
 
-Every hard case here is UDDF requiring something DiveJSON does not, or having nowhere to put
-something DiveJSON does. Three answers are available:
+`writing.md` states them: write the format's own spelling for "not recorded", or drop the
+value and report it, and never invent. UDDF is a clean example of the distinction that
+decides between the first two, because it has both shapes as **mandatory** elements.
 
-1. **Write the format's own spelling for "not recorded".** UDDF has one for some members —
-   a `<greatestdepth>` of `0` — and a reader takes it straight back off.
-2. **Drop the value and say so in the report.**
-3. **Invent something.**
-
-The third is never taken. The distinction that keeps it that way is whether the format has a
-spelling for absence at all: `<greatestdepth>` is mandatory and its zero *is* that spelling,
-while `<geography><location>` is mandatory and a place name has none — so a site with
-coordinates and no `location` loses the coordinates rather than having its own **name**
-copied into a member that means something else. A round trip would then hand the diver back
-a location they never wrote, which is §5.4's fabrication with an extra step.
+`<greatestdepth>` is mandatory and its `0` *is* the format's spelling for absence, so it is
+written and a reader takes it straight back off. `<geography><location>` is mandatory and a
+place name has no such spelling — so a site with coordinates and no `location` loses the
+coordinates rather than having its own **name** copied into a member that means something
+else. A round trip through that would hand the diver back a location they never wrote.
 
 ## The report, going out
 
-A writer returns a report beside the bytes, the same way a reader returns one beside the
-document, and it is half the output rather than a diagnostic. Its findings carry
-`converting.md`'s kinds, read in this direction:
+`writing.md` has the kinds and what a `where` is. In this format `absent` is an element UDDF
+requires that the document had nothing for, and `dropped` is a member UDDF has nowhere to
+put; the paths are `dives/0`, `dives/0/cylinders/1`, `trips/0/locations/1` and `$`.
 
-| kind | what it says on the way out |
-| --- | --- |
-| `absent` | UDDF requires an element the document has nothing for, so the format's own placeholder is written; the entry says what a reader will take it as |
-| `dropped` | the document recorded this and UDDF has nowhere to put it |
-| `inferred` | never produced by a writer: it computes nothing |
-| `resolved` | never produced by a writer: it reads no ambiguous scale |
-
-A finding's `where` is a path into the **document being written** — `dives/0`,
-`dives/0/cylinders/1`, `trips/0/locations/1`, `$` for the document itself — where a reader's
-is a path into the source file. Indices are zero-based and count records in document order.
-
-**A member with nowhere to go is reported from the record itself, not from a list.** A
-writer that carried a hand-kept list of unmapped members would silently drop the next member
-the format gains; asking each record which of its members were not placed reports that one
-instead. The tables below are therefore a description of the code's behaviour and not its
-source.
+A member with nowhere to go is reported from the record itself and not from a list
+(`writing.md`), so **the tables below are a description of what a writer does and not the
+source of it** — the next member §6 gains reports itself here rather than going silently.
 
 ## The element map
 
@@ -113,10 +95,10 @@ same rows. What follows is only where writing is not simply reading in reverse.
 `<generator><type>` is `converter`, which is one of the three values `generatorType`
 enumerates. The reference writer says `logbook`, being one.
 
-**`<generator><datetime>` is the document's own `exported_at` and never the clock.** That
-makes the whole file a function of its input: two writes of one document are one set of
-bytes, a writer pair in a corpus does not churn every time it is regenerated, and the pair
-comparison can ignore `<generator>` without losing anything but the version.
+**`<generator><datetime>` is the document's own `exported_at` and never the clock**, which
+is where `writing.md`'s function-of-its-input rule lands in this format: the only thing left
+moving between two writes of one document is the version stamped beside it, which is exactly
+what the pair comparison ignores.
 
 ### Identity
 
@@ -168,6 +150,14 @@ it is reported, since the type did not survive.
 extends `ID_TYPE` rather than `namedType`, so a `<camera>` has no `<name>` at all and could
 carry only a nameless body-and-lens breakdown.
 
+**A gear item's `serial` (§6.12) is written to `<serialnumber>`**, on whatever element its
+type produced. `equipmentPieceType` carries that element for every piece rather than only
+for a computer, which is the same breadth §6.12 gives the member, so a serialled regulator
+keeps its serial through a round trip like any other piece. On a `computer` it does more
+than travel: it is what the fold below tests before any name, and it is what a folded
+element hands back to the gear item on the way in ([`uddf-mapping.md`](uddf-mapping.md)),
+which is what closes that round trip rather than merely surviving it.
+
 **Differs from the reference writer**: it sends `line_cutter` and `shears` to `<knife>`, on
 the grounds that they are cutting tools and that scattering a diver's cutting tools into the
 catch-all beside the SMB reads worse. A converter does not, because `<knife>` asserts a
@@ -177,6 +167,152 @@ near one, and the report is what makes the loss visible either way.
 **`equipmentType` is an `xs:sequence`, so a logbook's gear comes back grouped by type**
 rather than in the order the document listed it. Nothing is lost by that — every piece keeps
 its uuid — so it carries no finding.
+
+### Devices, and the one element they share with gear
+
+UDDF's `<divecomputer>` is a piece of kit *and* the hardware that recorded a dive
+(`uddf-mapping.md` reads it both ways), and this direction has to put both into one
+element wherever it can: **one `<divecomputer>` per computer**, not one per gear item
+plus one per recording. Writing the same computer twice would put two kit items in a
+reader's gear list where the diver owns one, and give one machine two `xs:ID`s. The fold
+below is how the two are recognised as one — and its first leg is the only thing that can
+still cost a computer a second element, for a reason set out below.
+
+**When two are one computer.** The devices go first: they fold with each other before any
+gear item is considered, so that one computer's every recording is a single **device
+record**. That record is what the legs below test, and testing the record rather than each
+recording's device separately is what keeps the cardinality rule at the end of the list from
+reading one computer's nine other dives as nine ties.
+
+Between a gear item `G` whose `type` is `"computer"` and a device record `D`, with every
+string trimmed and case-folded and `label_D` being `D.name` else `D.model`:
+
+- **The dive must link the gear item**, and this leg is asked per **recording** rather than
+  per computer. A folded element reaches a dive only through the `<equipmentused><link>` the
+  dive's own `gear_uuids` produced, so a recording whose dive does not list `G` does **not**
+  fold, whatever the legs below would say, and its device takes an element of its own. Where
+  `D` covers several recordings and only some of their dives link `G`, `D` splits along that
+  line: those recordings fold and the rest do not. This leg asks whether folding is open at
+  all; the ones below ask which gear item a linked `D` folds into.
+- **Both carry a serial** — §6.12's and §6.4b's — → fold **iff** the two serials are equal.
+  **Serials that differ mean different computers, and there is no fall-through to the
+  label.** Without that leg, two Suunto Oceans each plausibly named `Suunto Ocean` with
+  brand `Suunto` fold on the label and one machine's serial goes out on the other's element.
+- **Otherwise** → fold iff `label_D` is present, `G.name` equals it, and the brands do not
+  disagree — `G.brand` against `D.brand`, an absent brand on either side disagreeing with
+  nothing.
+- **`label_D` absent** → **no fold**, whatever else matches. A device carrying only a brand
+  matches nothing.
+- The **same predicate folds two devices**, `label` being `name` else `model` on each side.
+  This is the step above stated as the rule it is, and it is the one leg the link plays no
+  part in: two devices have no gear item between them, so the first leg has nothing to ask
+  of them and a computer's recordings group whatever their dives link. That is where the
+  serial leg does its real work: one computer recording ten dives is ten recordings and one
+  device record.
+- **At most one gear item per device record and one device record per gear item.** On a tie,
+  the first in document order wins and the rest are reported — a fold is not a merge, and
+  silently picking one of three would put a serial on an element the diver never meant. A
+  tie here is two *different* computers claiming one kit item, the losing one keeping an
+  element of its own.
+
+**This is deliberately not symmetric about absence, and the asymmetry is worth stating
+because the neighbouring comparison is.** Asking whether two *files* are records of one
+computer, an absent member on either side means "this format has no such field" rather than
+a mismatch — calling it one there would split one computer's recordings across two records.
+The fold is not that comparison. One side is a user's own record whose `name` is REQUIRED
+(§6.12) and the other is a file reading that is routinely one member wide, so carrying the
+symmetric rule across would make a bare device match every computer the diver owns. Hence
+the `label_D`-absent leg above: absence on the device's side is a refusal to guess, not a
+match.
+
+What a folded element carries, in `equipmentPieceType`'s own sequence — `<name>`,
+`<manufacturer>`, `<model>`, `<serialnumber>`, `<notes>`, which is an `xs:sequence` and not
+a free order:
+
+| DiveJSON | UDDF |
+| --- | --- |
+| the gear item's `name`, else the device's `name` | `<name>` — mandatory, exactly one; **empty** where neither side carries one |
+| the gear item's `brand`, else the device's `brand` | `<manufacturer><name>` |
+| `recordings[].device.model` | `<model>` |
+| the device's `serial`, else the gear item's | `<serialnumber>` — where both carry one the fold has already made them equal |
+| `recordings[].device.dive_number` | the dive's `<internaldivenumber>` |
+
+**The `<name>` row stops at the device's `name` and does not fall through to its `model`**,
+which is what makes the element of a device that did not fold round-trip. `<name>` is
+mandatory on the element, so a device on an element of its own with no `name` of its own —
+there being no gear item beside it to supply one — gets an **empty** one: a valid
+`xs:string` that the reading direction takes as no name at all, so it comes back as no
+`device.name` (§6.4b forbids an empty member) and, because §6.12 makes a gear item's `name`
+REQUIRED, as no gear item either. Writing the model there instead would hand a reader back
+two things the document never had: a `device.name` and a kit item, both spelled `Perdix 2`.
+
+`<internaldivenumber>` sits on the dive rather than on the element, between `<divenumber>`
+and `<datetime>` in `informationbeforediveType`'s sequence, and it is an
+`xs:positiveInteger` where §6.4b puts a floor of 0 under the counter — so a device counter
+of `0` is **not written**, and is reported, the same trade `<divenumber>` already makes: a
+zero there invalidates the whole document rather than one element.
+
+**A device that does not fold gets an element of its own, and that element reads back
+as a gear item — where the device carries a name.** Three things send a device here: no gear
+item matches it; one does and its recording's dive does not link it, which is the first leg
+above; or one does and the cardinality rule awarded that gear item to a different device
+record, the tie's loser being reported and left with an element of its own. This is
+the one place a written file returns *more* than it was written from, and it is the only
+documented exception to `writing.md`'s self round trip, which is otherwise a rule about what
+does not come back. A **nameless** such device is outside the exception rather than a second
+one: its element carries the empty `<name>` above, the reading direction drops a nameless
+piece, and nothing comes back that did not go out. A logbook whose dives were imported from
+files but whose owner never listed the computer in their kit is the ordinary case, so the
+alternative — writing no element — would lose the device from every such file, and the
+device is why this member exists. The element is `<divecomputer id="device-<n>">`, numbered
+from 0 over the document's recordings in order, with `<manufacturer id="mfr-device-<n>">`
+beside it: a deliberately **non-UUID** id, so that `converting.md`'s identity rule mints the
+returning gear item a derived uuid of its own rather than reading a real one back off it —
+an id built from a dive's uuid would come back as a gear item wearing that dive's identity,
+which §5.3 forbids outright. The dive's `<equipmentused>` gains a `<link>` to it, after the
+links its `gear_uuids` produced.
+
+**A folded device reaches a dive only through its gear item's link, which is why the fold
+has a first leg at all.** The element is the gear item's, so a dive whose `gear_uuids` does
+not list that item carries no link to the computer that recorded it — and a document may
+perfectly well say a recording's device was `D` while leaving the matching kit item off that
+dive's list. Folding there would drop the device from the file: nothing on the dive would
+point at the element holding it, and a reader would hand that dive back with no device at
+all. So that recording does not fold, and its device takes the `device-<n>` element above,
+which needs no gear link. Both facts then survive — which computer recorded the dive, and
+which gear the diver recorded using — and since nothing is lost, nothing is reported.
+
+**Linking the gear item anyway** would be the tidier file and a worse one: `<equipmentused>`
+is what the diver wore, and a writer adding a piece to it would be answering a question about
+the dive that the document answered differently. Coming back in, it would also credit that
+item with a dive it was never worn on, inflating a `dive_count` the diver never recorded.
+
+**The price is a computer that appears twice**, and a document pays it whenever a `computer`
+gear item it carries is matched by a device whose dive does not link that item. That takes in
+the ordinary shape where **no** dive links any gear at all — a logbook keeping its kit list
+at the owner's level rather than per dive — as much as the mixed one: the gear item goes into
+`<equipment>` whatever the dives say, and the recordings that could not fold into it take a
+`device-<n>` element beside it, so two elements describe one machine and a reader takes the
+second as a second kit item, under the exception above. Where some dives link the item and
+others do not, both elements are in use at once, the linked dives reading their device off
+the gear item's element and the rest off the `device-<n>` one. This is the one thing the
+*one `<divecomputer>` per computer* rule this section opens with does not hold for. A
+duplicate in a kit list is visible to the diver and correctable in a moment; a device that
+never arrived is neither, which is what makes this the cheaper of the two.
+
+**`device.firmware` has no slot**, `equipmentPieceType` carrying no such element, and is
+reported once per device that has one. So is a recording's **`source_files`**: §6.7 is
+metadata about bytes UDDF has nowhere to reference, which is the same answer the dive-level
+member got before it moved.
+
+**A recording's `started_at` has no slot either**, and this is the one worth being careful
+about. UDDF gives a dive one `<datetime>` and one `<samples>`, so a document whose dive
+carries more than one recording cannot be written whole: the **primary** recording — the
+first, §6.4a — supplies the `<samples>`, and every other recording is reported as dropped,
+with its device still folded into `<equipment>` so that what was worn is not lost along with
+what it sampled. Where the primary recording states its own `started_at`, `<datetime>`
+remains the **dive's**: §6.2's `started_at` is the logbook's and is what every reader of a
+UDDF file expects to find there.
 
 ### Sites and trips
 
@@ -219,15 +355,20 @@ members, so a reader takes the zero back as "not recorded" rather than as the su
 a dive of no length.
 
 `informationbeforediveType` is an `xs:sequence`: `<link>`s first, then `<divenumber>`,
-`<datetime>`, `<altitude>`, `<equipmentused>`, `<tripmembership>`, `<surfacepressure>`.
-`informationafterdiveType` is an `xs:all` and its order is free.
+`<internaldivenumber>`, `<datetime>`, `<altitude>`, `<equipmentused>`, `<tripmembership>`,
+`<surfacepressure>`. `informationafterdiveType` is an `xs:all` and its order is free.
 
 `started_at` is written **exactly as recorded**, offset and sub-second fraction and all;
 §5.2's rule that an offset is never supplied applies as much to a writer as to a reader.
 
 Members with no UDDF slot anywhere: `water_type`, `cns_start`, `cns_end`, `otu_start`,
-`otu_end`, `entry_position`, `exit_position`, `course_uuid`, `species_uuids`, `source_file`,
-`created_at`.
+`otu_end`, `entry_position`, `exit_position`, `course_uuid`, `species_uuids`,
+`created_at`, and — on the recording rather than the dive —
+`recordings[].source_files`, `recordings[].started_at` and
+**`recordings[].device.firmware`**, `equipmentPieceType` carrying no firmware element, so a
+`dropped` finding reports it on every export whose device has one. *Devices* above has the
+reasoning for each of the three. `source_files` was a dive member until it moved onto the
+recording (§6.4a) and the answer did not change with it.
 
 ### Cylinders and gases
 
@@ -340,6 +481,7 @@ once per record that carries it, and none of them has anywhere in UDDF to go:
 | a record's `created_at` | no slot on any of them |
 | `gear` `rented`, `archived`, `archived_at`, `dive_count` | no slot |
 | `diver.username` | `<owner id>` is an XML id and not a handle |
+| a recording's `source_files`, `started_at` and its device's `firmware`, and every recording after the first | UDDF gives a dive one `<samples>`, and `equipmentPieceType` no firmware element — *Devices* above has each answer and why the device of a dropped recording is kept even so |
 | `trips[].locations[].bbox` | `geographyType` carries a point, not a box |
 | a record's `extensions` | producer-defined members (§5.5) |
 

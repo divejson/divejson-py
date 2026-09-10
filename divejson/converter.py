@@ -30,8 +30,9 @@ defines them for the way in, and this module holds only the vocabulary.
 **A note has a kind, and exactly one of the four means the value was computed.** `kind`
 says what the report is telling the diver — `absent` for what the source never recorded,
 `inferred` for a value this converter computed from readings the source *did* record,
-`resolved` for a recorded number whose scale or units the source left ambiguous and this
-converter had to decide, `dropped` for what was recorded and could not be carried.
+`resolved` for a recorded value whose scale, units or **meaning** the source left
+ambiguous and this converter had to decide, `dropped` for what was recorded and could not
+be carried.
 
 `inferred` and `resolved` are the pair worth separating, because a diver reading one
 report line has to know whether the number in the document is the converter's arithmetic
@@ -42,7 +43,10 @@ on that list has an `inferred` note. A maximum depth taken from the depth sample
 file that recorded none is `inferred`, and the document lists it. A `<tankvolume>` read as
 litres rather than cubic metres is `resolved` and lists nothing — the number is the
 source's own and only its scale was decided, which is a unit conversion like Kelvin to
-Celsius rather than a derivation.
+Celsius rather than a derivation. So is a timestamp a generator stamps `Z` while meaning
+the wall clock in front of the diver: nothing about the digits says which was meant, so
+that one is settled on the writer rather than on the value (`uddf.py`'s generator table),
+and the digits written are still the source's.
 
 **Identity is shared across an archive's members, and position is not.** A `Scope` carries
 the member name a conversion sits under and the UUIDs the whole upload has already handed
@@ -78,6 +82,7 @@ from .validate import Issue, load_schema
 
 __all__ = [
     "CENTIMETRES_PER_METRE",
+    "DEVICE_CAPS",
     "INFERRED",
     "MAX_MAGNITUDE",
     "MAX_NAME",
@@ -101,12 +106,14 @@ __all__ = [
     "Written",
     "capped",
     "decimal_of",
+    "device",
     "grouped",
     "header",
     "integer_of",
     "position",
     "record_inferred",
     "recorded",
+    "recording",
     "rounded",
     "zero_is_an_answer",
 ]
@@ -173,7 +180,7 @@ class NonConformingOutputError(ConverterError):
 NoteKind = Literal["absent", "inferred", "resolved", "dropped"]
 
 # In the order a report reads best, which is also how much of the value the source itself
-# supplied: nothing at all, the readings it was computed from, the number with its scale
+# supplied: nothing at all, the readings it was computed from, the value with its reading
 # left open, and the whole thing, uncarriable.
 NOTE_KINDS: tuple[NoteKind, ...] = ("absent", "inferred", "resolved", "dropped")
 
@@ -473,6 +480,98 @@ def capped(value: str, limit: int, *, note: Reporter, where: str, member: str) -
         "dropped",
     )
     return value[:limit]
+
+
+# -- recordings and devices ----------------------------------------------------------
+
+# §6.4b's own caps, and its own member order: a device written through `device` below
+# reads down the section. The lengths are the section's rather than `MAX_NAME`'s, because
+# §6.4b is narrower than §6's REQUIRED names by design — a serial longer than 64
+# characters is not a serial any hardware here writes, and a firmware version is narrower
+# still. Read the numbers off the rows rather than off any count of them.
+DEVICE_CAPS: dict[str, int] = {
+    "brand": 64,
+    "model": 64,
+    "serial": 64,
+    "firmware": 32,
+    "name": 64,
+}
+
+
+def device(
+    members: dict[str, Any],
+    *,
+    note: Reporter,
+    where: str,
+    labels: dict[str, str] | None = None,
+) -> dict[str, Any] | None:
+    """§6.4b's Device from whatever one reader read about the hardware, or nothing at all.
+
+    Every adapter reaches this section from a different set of fields and all of them meet
+    the same three rules, so the rules live here rather than five times over: **strings are
+    trimmed and an empty one is absence** (§5.4 — a device that records nothing about
+    itself is not written at all, rather than written as an object with no members),
+    every string is capped at §6.4b's own length, and `dive_number` floors at 0.
+
+    `labels` names the source's own spelling of a member for the report — `<serialnumber>`,
+    `Device.Info.SW` — so a note keeps speaking the format's language the way
+    `SampleAxis`'s `noun` does.
+    """
+    labels = labels or {}
+    built: dict[str, Any] = {}
+    for member, limit in DEVICE_CAPS.items():
+        value = members.get(member)
+        if not isinstance(value, str):
+            continue
+        trimmed = value.strip()
+        if not trimmed:
+            continue
+        built[member] = capped(
+            trimmed, limit, note=note, where=where, member=labels.get(member, f"the device's {member}")
+        )
+    counter = members.get("dive_number")
+    if isinstance(counter, int) and not isinstance(counter, bool):
+        if counter >= 0:
+            built["dive_number"] = counter
+        else:
+            note(
+                where,
+                f"{labels.get('dive_number', 'the device counter')} is {counter}, and the format records "
+                "a device's counter from zero up; dropped",
+                "dropped",
+            )
+    return built or None
+
+
+def recording(
+    *,
+    device: dict[str, Any] | None = None,
+    started_at: str | None = None,
+    source_files: list[dict[str, Any]] | None = None,
+    profile: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """§6.4a's Recording in the section's member order, or nothing at all.
+
+    Nothing at all is the point of the function. §3's rule 4 says a recording carries at
+    least one of `device`, `profile` and `source_files`, so a source that describes a
+    record of a dive without naming a device and without keeping a sample produces no
+    recording — and every adapter that built one anyway would emit `recordings: [{}]` and
+    fail its own output validation. `started_at` alone does not qualify: §6.4a reads an
+    absent one as the dive's, so a recording carrying only a start describes nothing the
+    dive does not already say.
+    """
+    if not (device or profile or source_files):
+        return None
+    built: dict[str, Any] = {}
+    if device:
+        built["device"] = device
+    if started_at:
+        built["started_at"] = started_at
+    if source_files:
+        built["source_files"] = source_files
+    if profile:
+        built["profile"] = profile
+    return built
 
 
 # -- identity ------------------------------------------------------------------------

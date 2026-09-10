@@ -13,10 +13,19 @@ between them would be a bug in whichever was read last. So the bar here is two t
 a written pair in `fixtures/write/uddf/`, compared as canonical XML with `<generator>`
 ignored, and the **self round trip** — reading a written file back through `uddf.py` returns
 the document it was written from, on every member `docs/uddf-mapping.md`'s element map
-carries. Everything else is named in the report, and the report is half the output here
-exactly as it is on the way in.
+carries, with one documented exception below. Everything else is named in the report, and
+the report is half the output here exactly as it is on the way in.
 
-Four things shape the module.
+Five things shape the module.
+
+**One `<divecomputer>` per computer.** UDDF's element is a piece of kit *and* the hardware
+that recorded a dive, where DiveJSON keeps a §6.12 gear item and a §6.4b device apart — so
+this direction has to put both into one element wherever it can, and `plan_computers` is
+the fold that decides where it can. Writing the same computer twice would put two kit items
+in a reader's gear list where the diver owns one and give one machine two `xs:ID`s. A
+device that folds into nothing takes an element of its own with a non-UUID id, which reads
+back as a gear item the document never had: the one documented exception to the self round
+trip, and the one place a written file returns *more* than it was written from.
 
 **The XSD is the referee.** `informationbeforedive` and `waypoint` are `xs:sequence`, so
 their children go in the schema's order and not in one that reads well; `equipment` is a
@@ -54,7 +63,7 @@ costs a consumer is in `docs/uddf-writing.md` under *Known consumer artefacts*.
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 
@@ -302,6 +311,114 @@ def _mix_key(cylinder: dict[str, Any]) -> _MixKey:
     )
 
 
+def _folded(value: Any) -> str | None:
+    """A source string reduced to what the fold compares: trimmed and case-folded.
+
+    §6.4b asks readers to case-fold and a writer to trim, and the comparison rules
+    elsewhere say *trimmed and case-folded* rather than assuming either was done upstream —
+    so this is applied at the comparison rather than to the values that go in the file.
+    """
+    if not isinstance(value, str):
+        return None
+    return value.strip().casefold() or None
+
+
+def _agree(one: Any, other: Any) -> bool:
+    """Whether two brands do not disagree — an absent one disagreeing with nothing.
+
+    **Deliberately not the symmetric absent rule the neighbouring comparison uses**, and
+    `docs/uddf-writing.md` says so in as many words under *Devices, and the one element
+    they share with gear*. Asking whether two *files* are records of one computer, an
+    absent member means "this format has no such field"; the fold is not that comparison,
+    one side being a user's own record whose `name` is REQUIRED (§6.12) and the other a
+    file reading routinely one member wide. The asymmetry lives in the caller's `label`
+    leg, which refuses an absent label outright; the brands are the one place where
+    absence really is silence.
+    """
+    left, right = _folded(one), _folded(other)
+    return left is None or right is None or left == right
+
+
+@dataclass(slots=True)
+class _DeviceRecord:
+    """One computer, and every recording of the document that is its record of a dive.
+
+    The devices fold with each other **before** any gear item is considered, which is the
+    ordering `docs/uddf-writing.md` states and the silence that used to be load-bearing:
+    read gear-first, one computer recording ten dives offers a gear item ten candidates and
+    the cardinality rule reads nine of them as ties, contradicting "one computer recording
+    ten dives is ten recordings and one element".
+
+    `merged` is what the gear legs test, and it fills member by member in document order —
+    the first device to carry a member supplies it. The fold has already made the two agree
+    wherever both carry a serial or a label, so what merging really buys is an element that
+    keeps a serial one recording's device carried and another's did not.
+    """
+
+    merged: dict[str, Any]
+    # `(dive index, recording index)` for every recording this computer recorded, in
+    # document order. The link leg is asked per recording, so the record has to keep them
+    # rather than a count.
+    recordings: list[tuple[int, int]]
+    # The gear item this record folded into, once `plan_computers` has decided.
+    gear_index: int | None = None
+    # The `<divecomputer id="device-<n>">` this record's *unfolded* recordings share, and
+    # the recordings that use it. Both stay unset where every recording folded.
+    element_id: str | None = None
+    unfolded: list[tuple[int, int]] = field(default_factory=list)
+
+    @property
+    def label(self) -> str | None:
+        """What the fold compares a name against: `name` else `model` (`docs/uddf-writing.md`).
+
+        Absent means no fold, whatever else matches — a device carrying only a brand
+        matches nothing, and folding it into "any Suunto computer the diver owns" is a
+        guess.
+        """
+        return _folded(self.merged.get("name")) or _folded(self.merged.get("model"))
+
+    def absorbs(self, other: dict[str, Any]) -> bool:
+        """Whether one more device is this same computer.
+
+        The same predicate the gear legs use, with `label` being `name` else `model` on
+        both sides — which is where the serial leg does its real work: one computer
+        recording ten dives is ten recordings and one device record.
+        """
+        mine, theirs = _folded(self.merged.get("serial")), _folded(other.get("serial"))
+        if mine and theirs:
+            return mine == theirs
+        label = _folded(other.get("name")) or _folded(other.get("model"))
+        return bool(self.label) and self.label == label and _agree(
+            self.merged.get("brand"), other.get("brand")
+        )
+
+    def absorb(self, other: dict[str, Any], at: tuple[int, int]) -> None:
+        for member, value in other.items():
+            self.merged.setdefault(member, value)
+        self.recordings.append(at)
+
+    def matches(self, item: dict[str, Any]) -> bool:
+        """Whether a `computer` gear item and this record are one machine.
+
+        The legs are `docs/uddf-writing.md`'s, minus the link — which is asked per
+        recording by the caller, because a folded element reaches a dive only through the
+        `<equipmentused><link>` that dive's own `gear_uuids` produced.
+
+        **Serials that differ mean different computers, and there is no fall-through to the
+        label.** Without that leg two Suunto Oceans, each plausibly named `Suunto Ocean`
+        with brand `Suunto`, fold on the label and one machine's serial goes out on the
+        other's element.
+        """
+        mine, theirs = _folded(self.merged.get("serial")), _folded(item.get("serial"))
+        if mine and theirs:
+            return mine == theirs
+        return (
+            self.label is not None
+            and _folded(item.get("name")) == self.label
+            and _agree(item.get("brand"), self.merged.get("brand"))
+        )
+
+
 def _gas_name(key: _MixKey) -> str:
     """A name for a blend, `<mix>` requiring one of every gas it defines.
 
@@ -332,6 +449,13 @@ class _Writer:
         # `(mix key, its occurrence within a dive)` to the `xs:ID` of the `<mix>` that pair
         # gets. The occurrence is what keeps two cylinders of one dive off one mix.
         self.mix_ids: dict[tuple[_MixKey, int], str] = {}
+        # The document's computers, one record each, filled by `plan_computers` before the
+        # equipment loop runs — a folded element is built from a gear item *and* a device,
+        # so neither half can be written until the fold has been decided.
+        self.computers: list[_DeviceRecord] = []
+        # `(dive index, recording index)` to the `xs:ID` of the element that recording's
+        # device took, for the dives that have to link it.
+        self.device_links: dict[tuple[int, int], str] = {}
 
     # -- reporting ---------------------------------------------------------------
 
@@ -374,6 +498,7 @@ class _Writer:
         root.append(self.generator_element())
 
         self.plan_mixes()
+        self.plan_computers()
         self.unmapped(
             "$",
             self.document,
@@ -480,6 +605,188 @@ class _Writer:
             owner.append(gear)
         return element
 
+    # -- computers ---------------------------------------------------------------
+
+    def plan_computers(self) -> None:
+        """Decide, before anything is written, which `<divecomputer>` each computer gets.
+
+        **One element per computer**, not one per gear item plus one per recording: writing
+        the same computer twice would put two kit items in a reader's gear list where the
+        diver owns one, and give one machine two `xs:ID`s. Three passes, in this order and
+        for `docs/uddf-writing.md`'s reasons.
+
+        1. **The devices fold with each other**, so that one computer's every recording is
+           a single record. Greedy in document order and against the *merged* record rather
+           than pairwise, which is what the gear legs are stated against and what keeps the
+           answer independent of which member of a record a later device is compared to.
+        2. **Each record takes at most one gear item, and each gear item at most one
+           record.** A tie is two different computers claiming one kit item; the first in
+           document order wins it and the rest are reported, because a fold is not a merge
+           and silently picking one of three would put a serial on an element the diver
+           never meant.
+        3. **The link leg, asked per recording.** A folded element reaches a dive only
+           through the `<equipmentused><link>` that dive's own `gear_uuids` produced, so a
+           recording whose dive does not list the gear item does not fold and its device
+           takes an element of its own — which needs no gear link, so both facts survive:
+           which computer recorded the dive, and which gear the diver recorded using. That
+           costs a computer two elements where some dives link the item and others do not,
+           and where **no** dive links any gear at all, which is an ordinary logbook shape.
+           A duplicate in a kit list is visible to the diver and correctable in a moment; a
+           device that never arrived is neither.
+        """
+        for dive_index, dive in enumerate(self.document.get("dives") or []):
+            for rec_index, entry in enumerate(dive.get("recordings") or []):
+                found = entry.get("device")
+                if not found:
+                    continue
+                at = (dive_index, rec_index)
+                for record in self.computers:
+                    if record.absorbs(found):
+                        record.absorb(found, at)
+                        break
+                else:
+                    self.computers.append(_DeviceRecord(merged=dict(found), recordings=[at]))
+
+        items = self.document.get("gear") or []
+        claimed: set[int] = set()
+        for record in self.computers:
+            candidates = [
+                gear_index
+                for gear_index, item in enumerate(items)
+                if item.get("type") == "computer" and record.matches(item)
+            ]
+            free = [gear_index for gear_index in candidates if gear_index not in claimed]
+            if free:
+                record.gear_index = free[0]
+                claimed.add(free[0])
+            # One candidate this record took is the ordinary case and says nothing.
+            # Anything else is a tie, and there are two shapes of one: a kit item an
+            # earlier computer already holds, and several kit items this one computer
+            # answers to at once. They lose different things, so they say different things.
+            if record.gear_index is None and candidates:
+                self.note(
+                    self.device_where(record),
+                    "the kit item this computer answers to is already another computer's, and a "
+                    "<divecomputer> carries one of each; the first in document order keeps it and this "
+                    "one takes an element of its own",
+                    "dropped",
+                )
+            elif len(candidates) > 1:
+                self.note(
+                    self.device_where(record),
+                    "this computer answers to more than one item in the kit list, and a <divecomputer> "
+                    "carries one of each; the first in document order takes it and the rest are written "
+                    "as the kit entries they are, with nothing about the hardware on them",
+                    "dropped",
+                )
+
+        # The `device-<n>` numbering runs over the document's recordings in order, so it is
+        # assigned here rather than inside the equipment loop, which walks the schema's
+        # order instead. Deliberately **not** a uuid: an id built from a dive's uuid would
+        # read back as a gear item wearing that dive's identity, which §5.3 forbids.
+        unfolded = 0
+        for record in self.computers:
+            linked = self.folded_recordings(record)
+            record.unfolded = [at for at in record.recordings if at not in linked]
+            if not record.unfolded:
+                continue
+            record.element_id = f"device-{unfolded}"
+            unfolded += 1
+            for at in record.unfolded:
+                self.device_links[at] = record.element_id
+
+    def folded_recordings(self, record: _DeviceRecord) -> set[tuple[int, int]]:
+        """The recordings of one record whose dive links its gear item, so they fold."""
+        if record.gear_index is None:
+            return set()
+        uuid = (self.document.get("gear") or [])[record.gear_index].get("uuid")
+        dives = self.document.get("dives") or []
+        return {
+            at
+            for at in record.recordings
+            if uuid is not None and uuid in (dives[at[0]].get("gear_uuids") or [])
+        }
+
+    def device_where(self, record: _DeviceRecord) -> str:
+        """A path into the document for a finding about a whole computer.
+
+        Its first recording's, that being the one place in the document the record can be
+        pointed at: `writing.md` makes a `where` a path into the document being written,
+        and a device record is a thing this writer computed rather than a record the
+        document holds.
+        """
+        dive_index, rec_index = record.recordings[0]
+        return f"dives/{dive_index}/recordings/{rec_index}/device"
+
+    def computer_element(
+        self,
+        equipment: ET.Element,
+        record: _DeviceRecord,
+        item: dict[str, Any] | None = None,
+        index: int = 0,
+    ) -> None:
+        """One `<divecomputer>`, built from a gear item and a device or from one of them.
+
+        `equipmentPieceType` is an `xs:sequence` — `<name>`, `<manufacturer>`, `<model>`,
+        `<serialnumber>`, `<notes>` — and not a free order, so this is the only order the
+        children may go in.
+
+        **The `<name>` row stops at the device's `name` and does not fall through to its
+        `model`**, which is what makes an unfolded element round-trip. `<name>` is mandatory
+        on the element, so a device with no name of its own and no gear item beside it to
+        supply one gets an **empty** one: a valid `xs:string` the reading direction takes as
+        no name at all, so it comes back as no `device.name` and, §6.12 making a gear item's
+        name REQUIRED, as no gear item either. Writing the model there instead would hand a
+        reader back two things the document never had.
+        """
+        item = item or {}
+        uuid = item.get("uuid")
+        if item:
+            element_id = _uddf_id("gear", uuid) if uuid else f"gear-{index}"
+            manufacturer_id = _uddf_id("mfr", uuid) if uuid else f"mfr-{index}"
+        else:
+            element_id = record.element_id or f"device-{index}"
+            manufacturer_id = f"mfr-{element_id}"
+        piece = _sub(equipment, "divecomputer", id=element_id)
+
+        placed: set[str] = set()
+        name = item.get("name") or record.merged.get("name")
+        if name == record.merged.get("name"):
+            placed.add("name")
+        _sub(piece, "name", str(name or ""))
+        brand = item.get("brand") or record.merged.get("brand")
+        if brand:
+            manufacturer = _sub(piece, "manufacturer", id=manufacturer_id)
+            _sub(manufacturer, "name", str(brand))
+        if brand == record.merged.get("brand"):
+            placed.add("brand")
+        if record.merged.get("model"):
+            _sub(piece, "model", str(record.merged["model"]))
+            placed.add("model")
+        serial = record.merged.get("serial") or item.get("serial")
+        if serial:
+            # Where both carry one the fold has already made them equal, so which side it
+            # is taken from cannot change the file.
+            _sub(piece, "serialnumber", str(serial))
+        if serial == record.merged.get("serial"):
+            placed.add("serial")
+        if item:
+            self.notes_of(piece, f"gear/{index}", item)
+
+        if not record.merged:
+            return
+        # `<internaldivenumber>` is the dive's child rather than the element's, so it is
+        # written by `dive_element` and a *value* it could not place is reported there —
+        # a counter of 0, which `xs:positiveInteger` refuses, and a counter riding on a
+        # recording UDDF had to drop. The member has a slot either way, which is what this
+        # set says.
+        placed.add("dive_number")
+        # Reported from the record rather than from a list, which is `writing.md`'s rule:
+        # `firmware` falls out of this without being named, and so does a name or a brand
+        # the gear item's own overrode — a real loss the round trip would otherwise show
+        # without the report having said so.
+        self.unmapped(self.device_where(record), record.merged, frozenset(placed))
+
     def equipment_element(self) -> ET.Element | None:
         """The whole gear list, grouped into `equipmentType`'s declaration order.
 
@@ -488,14 +795,20 @@ class _Writer:
         it is not reported, a reordering being a fact about the format rather than a member
         the file could not hold.
         """
-        items = self.document.get("gear")
-        if not items:
+        items = self.document.get("gear") or []
+        loose = [record for record in self.computers if record.element_id is not None]
+        if not (items or loose):
             return None
+        folded = {
+            record.gear_index: record
+            for record in self.computers
+            if record.gear_index is not None and len(record.unfolded) < len(record.recordings)
+        }
 
         by_tag: dict[str, list[tuple[int, dict[str, Any]]]] = {}
         for index, item in enumerate(items):
             where = f"gear/{index}"
-            self.unmapped(where, item, frozenset({"uuid", "name", "brand", "type", "notes"}))
+            self.unmapped(where, item, frozenset({"uuid", "name", "brand", "serial", "type", "notes"}))
             gear_type = item.get("type")
             tag = _EQUIPMENT_ELEMENT.get(gear_type, "variouspieces")
             if not gear_type:
@@ -520,6 +833,15 @@ class _Writer:
         equipment = ET.Element("equipment")
         for tag in _EQUIPMENT_ORDER:
             for index, item in by_tag.get(tag, []):
+                if tag == "divecomputer":
+                    # A `computer` gear item and the device that folded into it are one
+                    # element, built from both records — which is why `plan_computers` runs
+                    # before this loop. A gear item nothing folded into is written the same
+                    # way, from an empty record.
+                    self.computer_element(
+                        equipment, folded.get(index) or _DeviceRecord(merged={}, recordings=[]), item, index
+                    )
+                    continue
                 uuid = item.get("uuid")
                 piece = _sub(equipment, tag, id=_uddf_id("gear", uuid) if uuid else f"gear-{index}")
                 _sub(piece, "name", str(item.get("name") or ""))
@@ -531,6 +853,12 @@ class _Writer:
                     # document invalid.
                     manufacturer = _sub(piece, "manufacturer", id=_uddf_id("mfr", uuid) if uuid else f"mfr-{index}")
                     _sub(manufacturer, "name", str(item["brand"]))
+                if item.get("serial"):
+                    # `<serialnumber>` is on `equipmentPieceType`, which is the same breadth
+                    # §6.12 gives the member: a serialled regulator keeps its serial through
+                    # a round trip like any other piece. On a computer it does more, and
+                    # `computer_element` is where.
+                    _sub(piece, "serialnumber", str(item["serial"]))
                 # Recomputed rather than carried down from the pass above: this loop walks
                 # the pieces in the schema's order, not the document's, so the two indices
                 # are different numbers and a path taken from the wrong loop names whichever
@@ -540,6 +868,14 @@ class _Writer:
                     # After `<notes>`: `suitType` extends `equipmentPieceType` and its own
                     # sequence follows the base type's whole one.
                     _sub(piece, "suittype", _SUIT_TYPE[item["type"]])
+            if tag == "divecomputer":
+                # After the kit list's own computers and inside their group, `equipmentType`
+                # being an `xs:sequence`: a device that folded into no gear item, or into one
+                # its dive does not link, still gets an element — the device is why §6.4b
+                # exists, and a logbook whose owner never listed the computer in their kit is
+                # the ordinary case rather than the exotic one.
+                for record in loose:
+                    self.computer_element(equipment, record)
         return equipment
 
     # -- sites -------------------------------------------------------------------
@@ -747,14 +1083,17 @@ class _Writer:
                     "site_uuids",
                     "gear_uuids",
                     "cylinders",
-                    "profile",
+                    "recordings",
                 }
             ),
         )
+        recordings = dive.get("recordings") or []
         element = ET.Element("dive", {"id": _uddf_id("dive", dive["uuid"])})
 
-        # `informationbeforediveType` is an `xs:sequence`: link, divenumber, datetime,
-        # altitude, equipmentused, tripmembership, surfacepressure, in exactly this order.
+        # `informationbeforediveType` is an `xs:sequence`, and this is the whole of what
+        # this writer puts in it, in the schema's order: link, divenumber,
+        # internaldivenumber, datetime, altitude, equipmentused, tripmembership,
+        # surfacepressure.
         before = _sub(element, "informationbeforedive")
         for site_uuid in dive.get("site_uuids") or []:
             _sub(before, "link", ref=_uddf_id("site", site_uuid))
@@ -771,21 +1110,34 @@ class _Writer:
                     "number is not written",
                     "dropped",
                 )
+        self.internal_dive_number(before, recordings, where)
         _sub(before, "datetime", str(dive["started_at"]))
         _optional(before, "altitude", dive.get("altitude"))
         weight, gear_uuids = dive.get("weight"), dive.get("gear_uuids") or []
-        if weight is not None or gear_uuids:
+        devices = [
+            self.device_links[(index, rec_index)]
+            for rec_index in range(len(recordings))
+            if (index, rec_index) in self.device_links
+        ]
+        if weight is not None or gear_uuids or devices:
             used = _sub(before, "equipmentused")
             _optional(used, "leadquantity", weight)
             for gear_uuid in gear_uuids:
                 _sub(used, "link", ref=_uddf_id("gear", gear_uuid))
+            # After the links `gear_uuids` produced. `<equipmentused>` is what the diver
+            # wore, so nothing is added to it for a *folded* computer — that element is the
+            # gear item's and the gear item's own link already reaches it. These are the
+            # `device-<n>` elements, which no gear link reaches.
+            for element_id in dict.fromkeys(devices):
+                _sub(used, "link", ref=element_id)
+        self.check_link_order(index, recordings, gear_uuids, devices, where)
         if dive.get("trip_uuid"):
             _sub(before, "tripmembership", ref=_uddf_id("trip", dive["trip_uuid"]))
         if dive.get("surface_pressure") is not None:
             _sub(before, "surfacepressure", _num(_decimal(dive["surface_pressure"]) * PASCAL_PER_BAR))
 
         mix_by_gas_number, declared = self.tankdata_elements(element, dive, where)
-        numbered = self.samples_element(element, dive, where, mix_by_gas_number)
+        numbered = self.recording_elements(element, recordings, where, mix_by_gas_number)
         self.check_numbering(where, declared, numbered=numbered)
 
         # `informationafterdiveType` is an `xs:all`, so this order is a reader's convenience
@@ -821,6 +1173,171 @@ class _Writer:
         _sub(after, "diveduration", _num(duration if duration is not None else 0))
         _optional(after, "averagedepth", dive.get("avg_depth"))
         return element
+
+    def check_link_order(
+        self,
+        index: int,
+        recordings: list[dict[str, Any]],
+        gear_uuids: list[str],
+        devices: list[str],
+        where: str,
+    ) -> None:
+        """Report a dive whose computers do not come back in the order they went out.
+
+        UDDF has no per-recording anything: a dive gets one `<datetime>`, one `<samples>`
+        and one `<internaldivenumber>`, and a reader recovers a dive's recordings from its
+        `<equipmentused>` links, giving the two dive-level facts to the **first** linked
+        `<divecomputer>` because there is nothing else in the file to give them to
+        (`docs/uddf-mapping.md` says so, and says a reader must not read primacy into that
+        order). The links themselves come from the kit list in the diver's own order, with
+        an element appended for every device that folded into nothing — so the sequence is
+        a fact about the gear list rather than about the recordings, and the two agree only
+        by construction.
+
+        Where they do not, something real is lost and `writing.md`'s rule is that it is
+        named: a `computer` gear item the dive links but no recording's device matches
+        takes the first link, so **the profile and the counter come back on that computer**
+        and not on the one that recorded the dive; and where the links merely run through
+        this dive's own computers in another order, the recordings come back reordered,
+        which §6.4a makes a fact about the document — a recording has no uuid, so its
+        position is the only thing that says it is the primary. Reordering the links
+        instead is not open: `<equipmentused>` is the diver's own list and its order is a
+        member of the document.
+
+        **What is *gained* is not reported here, and that is the same rule read the other
+        way.** A linked computer no recording answers to comes back as a recording the
+        document never had, exactly as it comes back as a gear item the document never had
+        — the documented exception in `docs/uddf-writing.md`, where nothing is lost and so
+        nothing is said. That covers a dive with no recordings at all, which is every
+        hand-logged dive in a logbook whose owner listed their computer in their kit.
+        """
+        computers = {
+            item.get("uuid")
+            for item in self.document.get("gear") or []
+            if item.get("type") == "computer"
+        }
+        linked = list(
+            dict.fromkeys(
+                [_uddf_id("gear", uuid) for uuid in gear_uuids if uuid in computers] + devices
+            )
+        )
+        carried = list(
+            dict.fromkeys(
+                self.recording_element(index, rec_index)
+                for rec_index, entry in enumerate(recordings)
+                if entry.get("device")
+            )
+        )
+        if not (linked and carried):
+            return
+        if linked[0] != carried[0]:
+            self.note(
+                where,
+                "UDDF gives a dive one <samples> and one <internaldivenumber>, and a reader takes both off "
+                "the first <divecomputer> the dive links — which is not the element this dive's primary "
+                "recording was written into; the profile and the device counter come back on that computer "
+                "instead",
+                "dropped",
+            )
+            return
+        # Only the elements this dive's own recordings went out on, in the order a reader
+        # will meet them. Every one of them is linked — a folded element only exists
+        # because the dive links its gear item, and an unfolded one gets a link of its own
+        # — so this is a permutation of `carried` and differs from it exactly when the
+        # recordings come back in another order.
+        met = [element for element in linked if element in set(carried)]
+        if met != carried:
+            self.note(
+                where,
+                "a reader recovers this dive's recordings from its <equipmentused> links, which run in the "
+                "kit list's order rather than the recordings' own; this dive's come back in a different "
+                "order, and §6.4a makes the first of them the primary",
+                "dropped",
+            )
+
+    def recording_element(self, index: int, rec_index: int) -> str | None:
+        """The `xs:ID` of the `<divecomputer>` one recording's device was written into."""
+        at = (index, rec_index)
+        if at in self.device_links:
+            return self.device_links[at]
+        for record in self.computers:
+            if at in record.recordings and record.gear_index is not None:
+                uuid = (self.document.get("gear") or [])[record.gear_index].get("uuid")
+                return _uddf_id("gear", uuid) if uuid else f"gear-{record.gear_index}"
+        return None
+
+    def internal_dive_number(
+        self, before: ET.Element, recordings: list[dict[str, Any]], where: str
+    ) -> None:
+        """`<internaldivenumber>`, from the **primary** recording's device and no other.
+
+        It sits between `<divenumber>` and `<datetime>` in `informationbeforediveType`'s
+        sequence, and it is a child of the *dive* rather than of the computer — so a dive
+        carrying two recordings has one slot and no way to say whose counter is in it. The
+        reader gives it to the first linked computer, so the writer takes it off the first
+        recording; a later recording's counter goes with the recording UDDF had to drop.
+
+        `xs:positiveInteger` where §6.4b puts a floor of 0 under the counter, so a counter
+        of **0** is not written and is reported — the same trade `<divenumber>` already
+        makes: a zero there invalidates the whole document rather than one element.
+        """
+        for index, entry in enumerate(recordings):
+            counter = (entry.get("device") or {}).get("dive_number")
+            if counter is None:
+                continue
+            here = f"{where}/recordings/{index}/device"
+            if index > 0:
+                self.note(
+                    here,
+                    "UDDF records one dive counter per dive, under <informationbeforedive>, and it is the "
+                    "first recording's; this device's counter has nowhere to go",
+                    "dropped",
+                )
+            elif counter > 0:
+                _sub(before, "internaldivenumber", str(counter))
+            else:
+                self.note(
+                    here,
+                    f"the device's counter is {counter}, and UDDF's <internaldivenumber> is a positive "
+                    "integer; the counter is not written",
+                    "dropped",
+                )
+
+    def recording_elements(
+        self,
+        element: ET.Element,
+        recordings: list[dict[str, Any]],
+        where: str,
+        mix_by_gas_number: dict[int, str],
+    ) -> bool:
+        """The dive's `<samples>`, from the primary recording, and the report for the rest.
+
+        UDDF gives a dive one `<datetime>` and one `<samples>`, so a document whose dive
+        carries more than one recording cannot be written whole: the **primary** recording
+        — the first, §6.4a — supplies the samples, and every other recording is reported as
+        dropped, with its device still folded into `<equipment>` so that what was worn is
+        not lost along with what it sampled.
+
+        A recording's own `started_at` has no slot either, and `<datetime>` stays the
+        **dive's** even where the primary recording states one: §6.2's `started_at` is the
+        logbook's and is what every reader of a UDDF file expects to find there.
+        """
+        numbered = False
+        for index, entry in enumerate(recordings):
+            here = f"{where}/recordings/{index}"
+            # `device` and `profile` are the two this writer places; `started_at`,
+            # `source_files` and anything §6.4a gains report themselves from the record.
+            self.unmapped(here, entry, frozenset({"device", "profile"}))
+            if index == 0:
+                numbered = self.samples_element(element, entry.get("profile"), here, mix_by_gas_number)
+            else:
+                self.note(
+                    here,
+                    "UDDF holds one profile per dive, and this dive's is the primary recording's; this "
+                    "recording is dropped, its device kept under <equipment> (spec §6.4a)",
+                    "dropped",
+                )
+        return numbered
 
     def tankdata_elements(
         self, element: ET.Element, dive: dict[str, Any], where: str
@@ -899,7 +1416,11 @@ class _Writer:
     # -- profile -----------------------------------------------------------------
 
     def samples_element(
-        self, element: ET.Element, dive: dict[str, Any], where: str, mix_by_gas_number: dict[int, str]
+        self,
+        element: ET.Element,
+        profile: dict[str, Any] | None,
+        where: str,
+        mix_by_gas_number: dict[int, str],
     ) -> bool:
         """`<samples>`, and whether what was written asks a reader for a gas numbering.
 
@@ -911,7 +1432,6 @@ class _Writer:
         The return value is what `check_numbering` needs: a `<tankpressure ref>` or a
         `<switchmix ref>` is the only thing that makes a reader number the cylinders at all.
         """
-        profile = dive.get("profile")
         if not profile:
             return False
         profile_where = f"{where}/profile"

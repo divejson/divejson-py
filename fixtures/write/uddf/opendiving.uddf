@@ -24,6 +24,8 @@
           <manufacturer id="mfr-0198a6f0-2222-7002-8000-000000000002">
             <name>Suunto</name>
           </manufacturer>
+          <model>Ocean</model>
+          <serialnumber>000000000042</serialnumber>
           <notes>
             <para>Firmware 2.4.1; wrist strap replaced 2026-03.</para>
           </notes>
@@ -83,6 +85,7 @@
         <informationbeforedive>
           <link ref="site-0198a6f0-3333-7001-8000-000000000001" />
           <divenumber>46</divenumber>
+          <internaldivenumber>118</internaldivenumber>
           <datetime>2026-04-19T08:12:00+02:00</datetime>
           <altitude>0</altitude>
           <equipmentused>

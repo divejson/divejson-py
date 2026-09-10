@@ -70,8 +70,11 @@ from .converter import (
     Scope,
     capped,
     decimal_of,
+    device,
     header,
+    integer_of,
     recorded,
+    recording,
     rounded,
 )
 from .series import Channel, SampleAxis
@@ -105,6 +108,11 @@ NAMESPACE_MARKER = b"schemas.datacontract.org/2004/07/Suunto.Diving.Dal"
 # DM5 export, and `docs/suunto-xml-mapping.md` *Identity* records the value as normative for
 # any port.
 SUUNTO_XML_ID_NAMESPACE = uuid_pkg.UUID("cefc9278-1124-5d83-8af6-7f386f03a061")
+
+# The maker every document of this format was written by. Not §5.4's fabrication: a
+# vendor-proprietary export format is the vendor saying so, and `suunto_json.py`'s own
+# constant carries the reasoning at length.
+SUUNTO = "Suunto"
 
 # The `<Mode>` this reader refuses. 0 and 1 are air and nitrox — the oxygen fractions of the
 # corpus say so, 243 of the 244 `<Mode>0</Mode>` exports carrying a single 21 % mixture —
@@ -343,9 +351,11 @@ class _Converter:
         `source_generator` is the **dive computer**, not the desktop application: this
         document is that application's rendering of what the computer on the diver's wrist
         recorded, and `<Source>` is what the computer calls itself while `<Software>` is its
-        firmware. `<SerialNumber>` is deliberately not carried — it identifies one physical
-        device rather than the software that produced the readings, which is what §5.5's
-        provenance block is about.
+        firmware. `<SerialNumber>` does not belong in this block — it identifies one
+        physical device rather than the software that produced the readings, which is what
+        §5.5's provenance block is about — and `read_device` is where it does belong, §6.4b
+        being about exactly that piece of hardware. The two are one fact seen twice, and
+        `converting.md` says so.
 
         There is no `extensions.divejson.inferred` here, and its absence is a statement
         rather than an omission: this reader computes no value from other readings, so it
@@ -381,7 +391,6 @@ class _Converter:
             return None
 
         dive: dict[str, Any] = {"uuid": claimed, "started_at": started_at}
-        self.read_dive_number(where)
 
         # In §6.2's own member order, so a converted dive reads down the schema.
         self.read_duration(dive, where)
@@ -404,9 +413,49 @@ class _Converter:
         profile = self.read_profile(cylinders, where)
         if cylinders:
             dive["cylinders"] = [cylinder.member for cylinder in cylinders]
-        if profile is not None:
-            dive["profile"] = profile
+        # One document is one dive written by one computer, so a converted document has
+        # exactly one recording (§6.4a) — **exactly**, not at most, and this is the one
+        # reader of the five where that is true: the brand is the format's rather than the
+        # file's, so `read_device` always has a member to write and §6.4a's "carries at
+        # least one" is met before a sample is read. The guard stays because `recording`'s
+        # contract is the shared one and a reader that lost that constant would need it.
+        built = recording(device=self.read_device(where), profile=profile)
+        if built is not None:
+            dive["recordings"] = [built]
         return dive
+
+    def read_device(self, where: str) -> dict[str, Any] | None:
+        """The header elements `provenance` reads, read as hardware instead (§6.4b).
+
+        `<Source>` is the product string this application writes — `Suunto D5` — so it is
+        the `model` here where the app JSON's owner-settable `Device.Name` is a `name`.
+        `<SerialNumber>` and `<DiveNumberInSerie>` were each read and refused until §6.4b
+        existed: the first identifies a piece of hardware, which is exactly what a device
+        is, and the second counts this dive within the computer's own series, which is
+        §6.4b's `dive_number` in as many words. §6.2's `dive_number` is still the diver's
+        own numbering and still not this, which is why the two are different members.
+
+        The brand is the format's rather than the file's, for the reason
+        `suunto_json.py` gives at its own constant: a vendor-proprietary export format is
+        the vendor saying so.
+        """
+        return device(
+            {
+                "brand": SUUNTO,
+                "model": _recorded_text(self.root, "Source"),
+                "serial": _recorded_text(self.root, "SerialNumber"),
+                "firmware": _recorded_text(self.root, "Software"),
+                "dive_number": integer_of(decimal_of(_recorded_text(self.root, "DiveNumberInSerie"))),
+            },
+            note=self.note,
+            where=where,
+            labels={
+                "model": "<Source>",
+                "serial": "<SerialNumber>",
+                "firmware": "<Software>",
+                "dive_number": "<DiveNumberInSerie>",
+            },
+        )
 
     def is_a_scuba_dive(self, where: str) -> bool:
         """Whether this document is a dive this reader carries, on `<Mode>`'s say-so.
@@ -474,22 +523,6 @@ class _Converter:
         )
         return started_at
 
-    def read_dive_number(self, where: str) -> None:
-        """`<DiveNumberInSerie>`, read and deliberately not carried.
-
-        It is the *computer's* counter rather than the diver's lifetime dive number: it
-        starts at 1 on a new or factory-reset device and starts again on the next one, so
-        carrying it would stamp a dive #1 onto somebody's three-hundredth dive. §6.2's
-        `dive_number` is the diver's, and this file does not have it.
-        """
-        if _recorded_text(self.root, "DiveNumberInSerie") is not None:
-            self.note(
-                where,
-                "<DiveNumberInSerie> counts this dive within the computer's own series and starts again on "
-                "a new or reset device, so it is not carried as the diver's dive number; dropped "
-                "(spec §6.2)",
-                "dropped",
-            )
 
     def read_duration(self, dive: dict[str, Any], where: str) -> None:
         """`<Duration>`, the whole period the computer logged.

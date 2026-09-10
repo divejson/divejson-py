@@ -79,11 +79,13 @@ from .converter import (
     Scope,
     capped,
     decimal_of,
+    device,
     header,
     integer_of,
     position,
     record_inferred,
     recorded,
+    recording,
     rounded,
 )
 from .series import Channel, SampleAxis
@@ -119,10 +121,14 @@ LITRES_PER_CUBIC_METRE = Decimal(1000)
 # specifies — see `_volume_litres`.
 LITRES_THRESHOLD = Decimal(1)
 
-# `MAX_NOTES` and `MAX_NAME` are `converter.py`'s: every adapter meets those two. The two
-# below are UDDF's own, being the only reader that fills the members they cap.
+# `MAX_NOTES` and `MAX_NAME` are `converter.py`'s: every adapter meets those two. The three
+# below are UDDF's own, being the only reader that fills the members they cap. §6.12's
+# `serial` is 1-64 rather than the 255 its neighbours share, and the reason is worth
+# knowing: a gear serial longer than a device's (§6.4b) could never equal one, and equality
+# between the two is what says a kit item and a device are one machine.
 MAX_LOCATION = 255
 MAX_DISPLAY_NAME = 512
+MAX_SERIAL = 64
 MIN_PO2_LIMIT = Decimal("0.4")
 MAX_PO2_LIMIT = Decimal("2.0")
 MIN_SURFACE_PRESSURE = Decimal("0.4")
@@ -187,6 +193,36 @@ _DRYSUIT_TYPES = {"dry-suit", "drysuit", "hot-water-suit"}
 # `"other"` labelled with the word. It is what makes this format's own markers survive a
 # round trip through UDDF, whose `<setmarker>` is a bare string with no type beside it.
 _MARKER_TYPES = {"deep_stop", "safety_stop", "bookmark"}
+
+# The generators this reader knows, and what each one is read differently for. An entry
+# here changes how one application's files are read and no others', which makes it the
+# sharpest tool in this module: `converting.md` settles a *scale* on the value with a
+# magnitude test and a *meaning* on the writer with a table like this one, and the
+# difference is what a wrong answer costs — a magnitude test misreads one value, a row
+# here misreads every file that generator ever produced. So a row is added only against
+# real files, and `docs/uddf-mapping.md` says which.
+#
+# Matched on the exact `<generator><name>`, with the `<manufacturer>` id checked beside
+# it: a name alone is a string anything may claim, and two agreeing beats one.
+#
+# **The Shearwater `Z` is the local wall clock, not UTC.** Shearwater Cloud Desktop writes
+# the time the diver read off their wrist and suffixes it `Z`, so the instant the file
+# appears to state is wrong by the diver's own offset — three hours, for the Red Sea export
+# this rule was written against, where a Perdix 3 stamped `15:18:10Z` for the same moment a
+# Suunto on the same wrist stamped `15:17:38+03:00`. Trusting it puts the dive three hours
+# from where it happened and can never pair it with the same dive off another computer;
+# correcting it with an offset would be the fabrication §5.2 forbids outright.
+LOCAL_CLOCK_WITH_Z: dict[str, str] = {
+    "Shearwater Cloud Desktop": "Shearwater_Research_Inc",
+}
+
+# What the report says when that rule fires. `resolved` rather than `inferred` because the
+# digits written are the ones the source recorded and only their meaning was in doubt, so
+# nothing goes under `extensions.divejson.inferred`.
+LOCAL_CLOCK_NOTE = (
+    "the generator writes the local wall clock with a `Z` suffix; read as a wall clock "
+    "with no offset (spec §5.2)"
+)
 
 
 class UddfError(ConverterError):
@@ -345,13 +381,37 @@ class _Converter:
         self.site_uuids: dict[str, str] = {}
         self.trip_uuids: dict[str, str] = {}
         self.gear_uuids: dict[str, str] = {}
+        # `<divecomputer>` elements by their own `@id`, filled by `read_gear` and read by
+        # `read_recordings`. Keyed on the element rather than on the gear uuid because the
+        # two do not always both exist: §6.12 makes a gear item's `name` REQUIRED, so a
+        # nameless `<divecomputer>` mints no gear item and never reaches `gear_uuids` —
+        # while §6.4b is happy with a `<model>` alone, so that same element may still be a
+        # device. Resolving a dive's link through the gear table would lose exactly those.
+        self.computers: dict[str, ET.Element] = {}
         self.mixes: dict[str, dict[str, Any]] = {}
+        self.local_clock_with_z = self.generator_writes_a_local_z()
 
     # -- reporting ---------------------------------------------------------------
 
     def note(self, where: str, message: str, kind: NoteKind) -> None:
         """One line of the report, at a path into the source this conversion read."""
         self.notes.append(Note(self.scope.where(where), message, kind))
+
+    # -- the generator table -----------------------------------------------------
+
+    def generator_writes_a_local_z(self) -> bool:
+        """Whether `LOCAL_CLOCK_WITH_Z` claims the application that wrote this file.
+
+        Read once per file rather than per dive: `<generator>` is a property of the
+        document, and asking it again for every dive would make a logbook's cost depend on
+        how many dives it has for an answer that cannot change.
+        """
+        generator = _kid(self.root, "generator")
+        name = _text_of(generator, "name")
+        if name is None:
+            return False
+        maker = LOCAL_CLOCK_WITH_Z.get(name.strip())
+        return maker is not None and _attr(_kid(generator, "manufacturer"), "id") == maker
 
     # -- identity ----------------------------------------------------------------
 
@@ -668,6 +728,13 @@ class _Converter:
         for index, element in enumerate(pieces):
             kind = local_name(element)
             where = f"gear/{index}"
+            if kind == "divecomputer":
+                # Before the name test, and deliberately: `read_recordings` resolves a
+                # dive's `<equipmentused><link>` through this table, and an element that
+                # mints no gear item may still name a device (spec §6.4b).
+                computer_id = _attr(element, "id")
+                if computer_id:
+                    self.computers[computer_id] = element
             name = _text_of(element, "name")
             if not name:
                 self.note(
@@ -693,6 +760,14 @@ class _Converter:
             brand = _text_of(element, "manufacturer", "name")
             if brand:
                 item["brand"] = self.capped(brand, MAX_NAME, where, "the brand")
+            serial = _text_of(element, "serialnumber")
+            if serial:
+                # `<serialnumber>` is on `equipmentPieceType`, so it is read for **every**
+                # gear type that carries one and not only for a computer — which is the
+                # breadth §6.12 gives the member. On a computer it is also what lets a
+                # writer recognise the kit item and a recording's device as one machine
+                # without comparing names (`docs/uddf-writing.md`).
+                item["serial"] = self.capped(serial, MAX_SERIAL, where, "the serial number")
             gear_type = GEAR_TYPE[kind]
             if kind == "suit" and (_text_of(element, "suittype") or "").lower() in _DRYSUIT_TYPES:
                 gear_type = "drysuit"
@@ -875,9 +950,102 @@ class _Converter:
             )
         if cylinders:
             dive["cylinders"] = cylinders
-        if profile:
-            dive["profile"] = profile
+        recordings = self.read_recordings(before, used, profile, where)
+        if recordings:
+            dive["recordings"] = recordings
         return dive
+
+    def read_recordings(
+        self,
+        before: ET.Element | None,
+        used: ET.Element | None,
+        profile: dict[str, Any] | None,
+        where: str,
+    ) -> list[dict[str, Any]]:
+        """A §6.4a Recording per `<divecomputer>` the dive links, in link order.
+
+        UDDF states a dive's `<samples>` and its `<internaldivenumber>` **once per dive**
+        and never once per computer, so both go to the first linked computer and to no
+        other: a dive linking two has one profile and one counter, and there is no way in
+        the file to say whose the counter is. Confining the counter there is also what
+        keeps the emptiness test below from circling — every later link's device is made of
+        that element's own four members and nothing the dive supplies.
+
+        The carve-out follows from those two facts rather than adding to them. The profile
+        is the only thing that carries a link past it without a device, and it reaches
+        exactly one link, so **where the dive has a profile** the first link is a recording
+        whether or not its element names a device — exactly as a dive linking no computer
+        at all is one recording made of its samples alone — and a link yielding neither a
+        device nor a profile yields nothing, §6.4a forbidding a recording that carries
+        nothing. Where the dive has no profile, every link is judged on its device alone,
+        the first included.
+        """
+        counter = integer_of(decimal_of(_text_of(before, "internaldivenumber")))
+        linked = [
+            self.computers[ref]
+            for ref in (_attr(link, "ref") for link in _kids(used, "link"))
+            if ref is not None and ref in self.computers
+        ]
+        if not linked:
+            if counter is not None:
+                self.note(
+                    where,
+                    "the dive records the computer's own dive counter and links no <divecomputer> for it "
+                    "to belong to, so there is no device to carry it; dropped (spec §6.4b)",
+                    "dropped",
+                )
+            built = recording(profile=profile)
+            return [built] if built is not None else []
+
+        recordings: list[dict[str, Any]] = []
+        for index, element in enumerate(linked):
+            built = recording(
+                device=self.read_device(element, counter if index == 0 else None, where),
+                profile=profile if index == 0 else None,
+            )
+            if built is not None:
+                recordings.append(built)
+        return recordings
+
+    def read_device(
+        self, element: ET.Element, counter: int | None, where: str
+    ) -> dict[str, Any] | None:
+        """One linked `<divecomputer>` as a §6.4b Device.
+
+        **`<name>` is read twice, into two members of two records, and that is not a
+        duplication.** It is the only string in this format that names the computer at all,
+        and the two members mean different things: §6.12's `name` is the diver's label for
+        a thing in their kit list, and §6.4b's is what the device calls itself. Reading it
+        only as the gear item's would leave the corpus's own UDDF computer with a device
+        that has no string naming it — `fixtures/uddf/opendiving.uddf` carries a `<name>`
+        and no `<model>` — and reading it into `model` instead would put `Ocean` where the
+        same dive's FIT export puts `Suunto Ocean`.
+
+        An **empty** `<name>` is no name, which is what makes a written file round-trip:
+        `docs/uddf-writing.md` emits an empty one for a device that has none, `<name>`
+        being mandatory on the element, and it comes back as no `device.name`.
+
+        UDDF has no equipment element for a firmware version, so §6.4b's `firmware` has no
+        source here.
+        """
+        return device(
+            {
+                "brand": _text_of(element, "manufacturer", "name"),
+                "model": _text_of(element, "model"),
+                "serial": _text_of(element, "serialnumber"),
+                "name": _text_of(element, "name"),
+                "dive_number": counter,
+            },
+            note=self.note,
+            where=where,
+            labels={
+                "brand": "<manufacturer><name>",
+                "model": "<model>",
+                "serial": "<serialnumber>",
+                "name": "<name>",
+                "dive_number": "<internaldivenumber>",
+            },
+        )
 
     def read_started_at(self, before: ET.Element | None, where: str) -> str | None:
         raw = _text_of(before, "datetime")
@@ -895,6 +1063,16 @@ class _Converter:
             return None
         if forgiven:
             self.note(where, forgiven, "absent")
+        if self.local_clock_with_z and started_at.endswith(("Z", "z")):
+            # The generator table firing. `<generator><datetime>` is left alone under this
+            # rule and every other — it is the export instant, a fact about the run rather
+            # than logbook data.
+            self.note(where, LOCAL_CLOCK_NOTE, "resolved")
+            # And the no-offset note below is not also emitted, because it would be false:
+            # the source *did* record something in that position and this reader decided
+            # what it meant. Saying "the source recorded no UTC offset" beside a `resolved`
+            # finding that says otherwise is two report lines disagreeing about one value.
+            return started_at[:-1]
         if not _has_offset(started_at):
             self.note(where, "the source recorded no UTC offset on the dive's start time; the wall clock travels alone (spec §5.2)", "absent")
         return started_at

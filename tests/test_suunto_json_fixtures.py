@@ -21,7 +21,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from helpers import EXPORTED_AT, FIXTURES
+from helpers import EXPORTED_AT, FIXTURES, profile_of
 
 from divejson import compared, convert
 from divejson.converter import INFERRED, PRODUCER_KEY
@@ -151,7 +151,7 @@ def test_the_pressure_channel_outlives_the_end_pressure() -> None:
     both would drop surface readings the depth and temperature channels keep.
     """
     dive = _dive(OCEAN)
-    channel = dive["profile"]["pressures"][0]
+    channel = profile_of(dive)["pressures"][0]
     assert channel["gas_number"] == 0
     # 127.26562 bar in tenths, against an end pressure of 127.15625 taken 300 s earlier.
     assert channel["values"][-1] == 1273
@@ -167,7 +167,7 @@ def test_the_purged_regulator_is_not_the_dive_s_end_pressure() -> None:
     """
     dive = _dive(PURGED)
     assert dive["cylinders"] == [{"start_pressure": 204.6875, "end_pressure": 53.34375, "gas_number": 0}]
-    assert dive["profile"]["pressures"][0]["values"][-1] == 1
+    assert profile_of(dive)["pressures"][0]["values"][-1] == 1
 
 
 def test_the_ocean_profile_takes_each_channel_only_where_it_was_recorded() -> None:
@@ -178,7 +178,7 @@ def test_the_ocean_profile_takes_each_channel_only_where_it_was_recorded() -> No
     channels rather than two readings of one, so they are merged onto the second rather than
     one of them being dropped — which is what keeps the depth channel whole.
     """
-    profile = _dive(OCEAN)["profile"]
+    profile = profile_of(_dive(OCEAN))
     assert profile["duration"] == 4300
     assert profile["depth"]["times"] == [0, 1200, 4000]
     assert profile["depth"]["values"] == [145, 4464, 132]
@@ -191,7 +191,7 @@ def test_a_ceiling_of_zero_is_not_a_ceiling() -> None:
     """This shape writes `"Ceiling": 0` on every no-deco sample, twice in this file."""
     raw = json.loads(OCEAN.read_text(encoding="utf-8"))
     assert [sample.get("Ceiling") for sample in raw["DeviceLog"]["Samples"]].count(0) == 2
-    assert _dive(OCEAN)["profile"]["ceiling"]["times"] == [1200]
+    assert profile_of(_dive(OCEAN))["ceiling"]["times"] == [1200]
 
 
 def test_the_ocean_events_name_the_cylinder_they_switched_to() -> None:
@@ -201,7 +201,7 @@ def test_the_ocean_events_name_the_cylinder_they_switched_to() -> None:
     to the cylinder's position rather than passed through. Here the two happen to coincide;
     a file whose first switch is to gas 3 would not.
     """
-    events = _dive(OCEAN)["profile"]["events"]
+    events = profile_of(_dive(OCEAN))["events"]
     assert events == [
         {"time": 0, "type": "gas_switch", "gas_number": 0},
         {"time": 1230, "type": "other", "label": "Ceiling Broken"},
@@ -270,7 +270,7 @@ def test_the_d5_numbers_its_gases_from_one_and_the_ocean_from_zero() -> None:
         for slot in sample.get("Cylinders", ())
     ]
     assert set(slots) == {1}
-    profile = _dive(D5)["profile"]
+    profile = profile_of(_dive(D5))
     assert [channel["gas_number"] for channel in profile["pressures"]] == [0]
     assert [event.get("gas_number") for event in profile["events"] if event["type"] == "gas_switch"] == [0, 1]
 
@@ -302,7 +302,7 @@ def test_a_header_with_no_gas_and_no_samples_is_still_a_dive() -> None:
     conversion = convert(HEADER_ONLY.read_bytes(), exported_at=EXPORTED_AT)
     dive = conversion.document["dives"][0]
     assert dive["max_depth"] == 32.41 and dive["duration"] == 2001
-    assert "cylinders" not in dive and "profile" not in dive
+    assert "cylinders" not in dive and profile_of(dive) is None
     assert [note.kind for note in conversion.notes] == ["absent"]
 
 

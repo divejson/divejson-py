@@ -24,7 +24,14 @@ group below is the cross-format check that would catch any of the three moving.
 from __future__ import annotations
 
 import pytest
-from helpers import FIXTURES, suunto_mixtures, suunto_xml, suunto_xml_sample, suunto_xml_samples
+from helpers import (
+    FIXTURES,
+    profile_of,
+    suunto_mixtures,
+    suunto_xml,
+    suunto_xml_sample,
+    suunto_xml_samples,
+)
 
 from divejson import convert
 
@@ -34,7 +41,7 @@ def one(body: str = "") -> dict:
 
 
 def profile(*samples: str) -> dict:
-    return one(suunto_xml_samples(*samples))["profile"]
+    return profile_of(one(suunto_xml_samples(*samples)))
 
 
 def cylinder(body: str) -> dict:
@@ -99,12 +106,14 @@ def test_ceiling_samples_are_centimetres(metres: str, centimetres: int) -> None:
 def test_tank_pressure_samples_are_tenths_of_a_bar_from_millibar(
     millibar: str, tenths_of_a_bar: int
 ) -> None:
-    found = convert(
-        suunto_xml(
-            suunto_mixtures("<TransmitterId>2411100050</TransmitterId>")
-            + suunto_xml_samples(suunto_xml_sample(10, Pressure=millibar))
-        )
-    ).document["dives"][0]["profile"]
+    found = profile_of(
+        convert(
+            suunto_xml(
+                suunto_mixtures("<TransmitterId>2411100050</TransmitterId>")
+                + suunto_xml_samples(suunto_xml_sample(10, Pressure=millibar))
+            )
+        ).document["dives"][0]
+    )
     assert found["pressures"][0]["values"] == [tenths_of_a_bar]
 
 
@@ -224,7 +233,7 @@ def test_the_same_dive_read_from_fit_and_from_this_export_agrees() -> None:
 
     # Sample for sample on the three seconds the reduction and the whole recording share.
     shared = [0, 1, 2]
-    assert [xml["profile"]["depth"]["times"][index] for index in shared] == [1, 11, 21]
-    assert [fit["profile"]["depth"]["times"][index] for index in shared] == [1, 11, 21]
-    assert [xml["profile"]["depth"]["values"][index] for index in shared] == [186, 588, 756]
-    assert [fit["profile"]["depth"]["values"][index] for index in shared] == [186, 588, 756]
+    assert [profile_of(xml)["depth"]["times"][index] for index in shared] == [1, 11, 21]
+    assert [profile_of(fit)["depth"]["times"][index] for index in shared] == [1, 11, 21]
+    assert [profile_of(xml)["depth"]["values"][index] for index in shared] == [186, 588, 756]
+    assert [profile_of(fit)["depth"]["values"][index] for index in shared] == [186, 588, 756]

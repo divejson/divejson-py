@@ -13,6 +13,14 @@
         <lastname>Trim</lastname>
       </personal>
       <equipment>
+        <divecomputer id="device-0">
+          <name>Deco</name>
+          <manufacturer id="mfr-device-0">
+            <name>Shearwater</name>
+          </manufacturer>
+          <model>Perdix 2</model>
+          <serialnumber>D9123456</serialnumber>
+        </divecomputer>
         <suit id="gear-0198a6f0-1111-7051-8000-000000000051">
           <name>Tech drysuit</name>
           <manufacturer id="mfr-0198a6f0-1111-7051-8000-000000000051">
@@ -99,12 +107,14 @@
           <link ref="site-0198a6f0-1111-7040-8000-000000000040" />
           <link ref="site-0198a6f0-1111-7041-8000-000000000041" />
           <divenumber>412</divenumber>
+          <internaldivenumber>87</internaldivenumber>
           <datetime>2026-07-03T09:14:00+12:45</datetime>
           <altitude>0</altitude>
           <equipmentused>
             <leadquantity>0</leadquantity>
             <link ref="gear-0198a6f0-1111-7050-8000-000000000050" />
             <link ref="gear-0198a6f0-1111-7051-8000-000000000051" />
+            <link ref="device-0" />
           </equipmentused>
           <tripmembership ref="trip-0198a6f0-1111-7030-8000-000000000030" />
           <surfacepressure>101300</surfacepressure>

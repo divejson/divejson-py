@@ -1,0 +1,107 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-05T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.4.0"
+  },
+  "dives": [
+    {
+      "uuid": "29e7c994-34d6-5135-940d-1ec2b3a7e42d",
+      "started_at": "2026-09-08T15:17:38.670+03:00",
+      "duration": 3051,
+      "max_depth": 19.04,
+      "avg_depth": 10.74,
+      "entry_position": {
+        "latitude": 28.496524810791016,
+        "longitude": 34.51679992675781
+      },
+      "exit_position": {
+        "latitude": 28.496523,
+        "longitude": 34.516778
+      },
+      "cylinders": [
+        {
+          "start_pressure": 207.34376,
+          "end_pressure": 44.03125,
+          "gas_number": 0
+        }
+      ],
+      "recordings": [
+        {
+          "device": {
+            "brand": "Suunto",
+            "serial": "253810000400",
+            "firmware": "2.51.28",
+            "name": "Porvoo"
+          },
+          "profile": {
+            "duration": 3473,
+            "depth": {
+              "times": [
+                1,
+                1160,
+                1810,
+                2948,
+                3470
+              ],
+              "values": [
+                137,
+                1900,
+                1429,
+                336,
+                0
+              ]
+            },
+            "temperature": {
+              "times": [
+                8,
+                3473
+              ],
+              "values": [
+                298,
+                292
+              ]
+            },
+            "pressures": [
+              {
+                "times": [
+                  1,
+                  1160,
+                  1810,
+                  2948,
+                  3470
+                ],
+                "values": [
+                  2073,
+                  1534,
+                  1246,
+                  440,
+                  450
+                ],
+                "gas_number": 0
+              }
+            ],
+            "events": [
+              {
+                "time": 0,
+                "type": "gas_switch",
+                "gas_number": 0
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "suunto_json",
+      "source_generator": {
+        "name": "Porvoo",
+        "version": "2.51.28"
+      }
+    }
+  }
+}

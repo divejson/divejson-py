@@ -11,7 +11,15 @@ The unit factors are in `test_suunto_xml_units.py` and the whole-file answers in
 from __future__ import annotations
 
 import pytest
-from helpers import EXPORTED_AT, suunto_mixtures, suunto_xml, suunto_xml_sample, suunto_xml_samples
+from helpers import (
+    EXPORTED_AT,
+    device_of,
+    profile_of,
+    suunto_mixtures,
+    suunto_xml,
+    suunto_xml_sample,
+    suunto_xml_samples,
+)
 
 from divejson import convert, sniff
 from divejson.converter import DoctypeRefusedError, Scope
@@ -58,7 +66,7 @@ def test_a_nil_element_carrying_text_is_still_not_recorded() -> None:
     them and read this as a ceiling.
     """
     found = one(suunto_xml_samples('<Time>10</Time><Ceiling i:nil="true">0</Ceiling>'))
-    assert "profile" not in found or "ceiling" not in found["profile"]
+    assert "ceiling" not in (profile_of(found) or {})
 
 
 def test_an_unrecorded_member_is_silent_rather_than_reported() -> None:
@@ -197,15 +205,17 @@ def test_a_surface_pressure_outside_the_barometric_range_is_dropped() -> None:
     assert "surface_pressure" not in one("<SurfacePressure>1063</SurfacePressure>")
 
 
-def test_the_computers_own_dive_counter_is_read_and_not_carried() -> None:
+def test_the_computers_own_dive_counter_is_the_devices_and_not_the_divers() -> None:
     """`<DiveNumberInSerie>` restarts on a new or reset device.
 
-    Carrying it would stamp a dive #1 onto somebody's three-hundredth dive, so it is
-    reported rather than mapped onto §6.2's `dive_number`.
+    Mapping it onto §6.2's `dive_number` would stamp a dive #1 onto somebody's
+    three-hundredth dive, which is why the two are different members: it is §6.4b's
+    `dive_number`, the device's own counter, and it lands there.
     """
     found = convert(suunto_xml("<DiveNumberInSerie>5</DiveNumberInSerie>"))
-    assert "dive_number" not in found.document["dives"][0]
-    assert any(note.kind == "dropped" and "<DiveNumberInSerie>" in note.message for note in found.notes)
+    dive = found.document["dives"][0]
+    assert "dive_number" not in dive
+    assert device_of(dive)["dive_number"] == 5
 
 
 @pytest.mark.parametrize("name", ["Visibility", "Weather", "Weight"])
@@ -215,7 +225,10 @@ def test_the_dive_conditions_panel_is_read_and_refused(name: str) -> None:
     25 of the 384 exports in hand carry all three and every recorded value is `0`.
     """
     found = convert(suunto_xml(f"<{name}>0</{name}>"))
-    assert set(found.document["dives"][0]) == {"uuid", "started_at"}
+    # `recordings` is the brand this format states by being this format (§6.4b), and the
+    # three readings under test reach neither it nor the dive.
+    assert set(found.document["dives"][0]) == {"uuid", "started_at", "recordings"}
+    assert device_of(found.document["dives"][0]) == {"brand": "Suunto"}
     assert any(note.kind == "dropped" and f"<{name}>" in note.message for note in found.notes)
 
 
@@ -303,7 +316,7 @@ def test_a_gas_switch_names_the_cylinder_it_was_found_in() -> None:
         )
         + suunto_xml_samples(suunto_xml_sample(10, Depth="4.5"))
     )
-    assert found["profile"]["events"] == [
+    assert profile_of(found)["events"] == [
         {"time": 0, "type": "gas_switch", "gas_number": 0},
         {"time": 1592, "type": "gas_switch", "gas_number": 1},
     ]
@@ -322,7 +335,7 @@ def test_a_switch_at_second_zero_is_kept() -> None:
         )
         + suunto_xml_samples(suunto_xml_sample(1, Depth="1.86"))
     )
-    assert found["profile"]["events"] == [{"time": 0, "type": "gas_switch", "gas_number": 0}]
+    assert profile_of(found)["events"] == [{"time": 0, "type": "gas_switch", "gas_number": 0}]
 
 
 def test_a_switch_before_the_dive_began_is_dropped() -> None:
@@ -335,7 +348,7 @@ def test_a_switch_before_the_dive_began_is_dropped() -> None:
             + suunto_xml_samples(suunto_xml_sample(10, Depth="4.5"))
         )
     )
-    assert "events" not in found.document["dives"][0]["profile"]
+    assert "events" not in profile_of(found.document["dives"][0])
     assert any(note.kind == "dropped" and "before the dive began" in note.message for note in found.notes)
 
 
@@ -350,29 +363,31 @@ def test_no_gas_number_is_asserted_where_nothing_in_the_profile_needs_one() -> N
 
 def test_each_channel_takes_only_the_samples_that_carried_a_reading_for_it() -> None:
     """A nil `<Pressure>` is a transmitter dropout and must not truncate the depth channel."""
-    found = one(
-        suunto_mixtures("<TransmitterId>2411100050</TransmitterId>")
-        + suunto_xml_samples(
-            suunto_xml_sample(10, Depth="1.42", Pressure="198000"),
-            suunto_xml_sample(20, Depth="8.61", Pressure=None),
-            suunto_xml_sample(30, Depth="17.35", Pressure="187000"),
+    found = profile_of(
+        one(
+            suunto_mixtures("<TransmitterId>2411100050</TransmitterId>")
+            + suunto_xml_samples(
+                suunto_xml_sample(10, Depth="1.42", Pressure="198000"),
+                suunto_xml_sample(20, Depth="8.61", Pressure=None),
+                suunto_xml_sample(30, Depth="17.35", Pressure="187000"),
+            )
         )
-    )["profile"]
+    )
     assert found["depth"]["times"] == [10, 20, 30]
     assert found["pressures"][0]["times"] == [10, 30]
 
 
 def test_the_averaged_temperature_is_not_the_temperature_channel() -> None:
     """A smoothed reading sits beside the raw one in the same element; smoothing is a chart's job."""
-    found = one(
-        suunto_xml_samples(suunto_xml_sample(10, AveragedTemperature="30", Temperature="22.4"))
-    )["profile"]
+    found = profile_of(
+        one(suunto_xml_samples(suunto_xml_sample(10, AveragedTemperature="30", Temperature="22.4")))
+    )
     assert found["temperature"]["values"] == [224]
 
 
 def test_a_zero_ceiling_is_not_a_ceiling() -> None:
     """Zero says the diver may surface, and a gap in the times is how §6.5 spells that."""
-    found = one(suunto_xml_samples(suunto_xml_sample(10, Depth="4.5", Ceiling="0")))["profile"]
+    found = profile_of(one(suunto_xml_samples(suunto_xml_sample(10, Depth="4.5", Ceiling="0"))))
     assert "ceiling" not in found
 
 
@@ -384,7 +399,7 @@ def test_a_sample_with_no_time_is_dropped_and_reported() -> None:
             )
         )
     )
-    assert found.document["dives"][0]["profile"]["depth"]["times"] == [20]
+    assert profile_of(found.document["dives"][0])["depth"]["times"] == [20]
     assert any(note.kind == "dropped" and "no <Time>" in note.message for note in found.notes)
 
 
@@ -400,14 +415,14 @@ def test_two_samples_on_one_second_keep_the_first_and_report_the_second() -> Non
             suunto_xml_samples(suunto_xml_sample(1, Depth="1.86"), suunto_xml_sample(1, Depth="2.14"))
         )
     )
-    assert found.document["dives"][0]["profile"]["depth"]["values"] == [186]
+    assert profile_of(found.document["dives"][0])["depth"]["values"] == [186]
     assert any(note.kind == "dropped" and "share the second 1" in note.message for note in found.notes)
 
 
 def test_samples_carrying_a_time_and_nothing_else_produce_no_profile() -> None:
     """A zero-length sampled record is a claim the source did not make."""
     found = convert(suunto_xml(suunto_xml_samples("<Time>10</Time>", "<Time>20</Time>")))
-    assert "profile" not in found.document["dives"][0]
+    assert profile_of(found.document["dives"][0]) is None
     assert any(note.kind == "dropped" and "no reading this format can hold" in note.message for note in found.notes)
 
 
@@ -436,7 +451,7 @@ def test_gas_switches_with_no_profile_to_sit_on_are_reported(samples: str) -> No
             + samples
         )
     )
-    assert "profile" not in found.document["dives"][0]
+    assert profile_of(found.document["dives"][0]) is None
     assert any(
         note.kind == "dropped" and "no profile for a marker to sit on" in note.message
         for note in found.notes
@@ -450,15 +465,17 @@ def test_a_switch_survives_samples_that_carry_a_time_and_nothing_else() -> None:
     source did record a marker, and `series.SampleAxis.profile` emits a profile for events
     alone rather than dropping them, which is every reader in this package's answer.
     """
-    found = convert(
-        suunto_xml(
-            suunto_mixtures(
-                "<DiveGasChanges><DiveGasChange><GasChangeTime>0</GasChangeTime></DiveGasChange>"
-                "</DiveGasChanges>"
+    found = profile_of(
+        convert(
+            suunto_xml(
+                suunto_mixtures(
+                    "<DiveGasChanges><DiveGasChange><GasChangeTime>0</GasChangeTime></DiveGasChange>"
+                    "</DiveGasChanges>"
+                )
+                + suunto_xml_samples("<Time>10</Time>")
             )
-            + suunto_xml_samples("<Time>10</Time>")
-        )
-    ).document["dives"][0]["profile"]
+        ).document["dives"][0]
+    )
     assert found == {"duration": 0, "events": [{"time": 0, "type": "gas_switch", "gas_number": 0}]}
 
 
@@ -471,7 +488,7 @@ def test_the_marks_block_is_not_read() -> None:
     """
     marks = "<Marks><Mark><MarkTime>0</MarkTime><Type>257</Type></Mark></Marks>"
     found = convert(suunto_xml(marks + suunto_xml_samples(suunto_xml_sample(10, Depth="4.5"))))
-    assert "events" not in found.document["dives"][0]["profile"]
+    assert "events" not in profile_of(found.document["dives"][0])
     assert not any("Mark" in note.message for note in found.notes)
 
 
@@ -489,7 +506,7 @@ def test_the_transmitting_cylinder_claims_the_channel() -> None:
         suunto_mixtures("<Oxygen>21</Oxygen>", "<Oxygen>52</Oxygen><TransmitterId>2411100050</TransmitterId>")
         + suunto_xml_samples(suunto_xml_sample(10, Pressure="198000"))
     )
-    assert found["profile"]["pressures"][0]["gas_number"] == 1
+    assert profile_of(found)["pressures"][0]["gas_number"] == 1
 
 
 def test_readings_no_cylinder_claims_become_a_cylinder_of_their_own() -> None:
@@ -506,7 +523,7 @@ def test_readings_no_cylinder_claims_become_a_cylinder_of_their_own() -> None:
     )
     cylinders = found.document["dives"][0]["cylinders"]
     assert cylinders[1] == {"gas_number": 1}
-    assert found.document["dives"][0]["profile"]["pressures"][0]["gas_number"] == 1
+    assert profile_of(found.document["dives"][0])["pressures"][0]["gas_number"] == 1
     assert any(note.kind == "absent" and "cylinder of their own" in note.message for note in found.notes)
 
 
@@ -524,7 +541,7 @@ def test_readings_two_cylinders_both_claim_are_dropped() -> None:
             + suunto_xml_samples(suunto_xml_sample(10, Depth="4.5", Pressure="198000"))
         )
     )
-    assert "pressures" not in found.document["dives"][0]["profile"]
+    assert "pressures" not in profile_of(found.document["dives"][0])
     assert any(note.kind == "dropped" and "2 cylinders record" in note.message for note in found.notes)
 
 
@@ -540,7 +557,7 @@ def test_a_sample_pressure_outside_the_allowed_range_is_dropped_and_counted_once
             )
         )
     )
-    assert found.document["dives"][0]["profile"]["pressures"][0]["times"] == [30]
+    assert profile_of(found.document["dives"][0])["pressures"][0]["times"] == [30]
     out_of_range = [note for note in found.notes if "outside the 0 to 350" in note.message]
     assert len(out_of_range) == 1
     assert "2 samples record" in out_of_range[0].message
@@ -626,3 +643,28 @@ def test_nothing_this_reader_produces_is_inferred() -> None:
     found = convert(suunto_xml("<MaxDepth>32.41</MaxDepth>" + suunto_xml_samples(suunto_xml_sample(10, Depth="4.5"))))
     assert "inferred" not in found.document["extensions"]["divejson"]
     assert not any(note.kind == "inferred" for note in found.notes)
+
+
+def test_the_serial_number_is_the_devices_and_the_source_is_its_model() -> None:
+    """`<SerialNumber>` was read and refused until §6.4b existed, on the grounds that
+    nothing in a logbook needs it. A logbook holding two records of one dive does."""
+    found = convert(
+        suunto_xml(
+            "<Source>Suunto D5</Source><Software>2.5.1947</Software>"
+            "<SerialNumber>192410004212</SerialNumber><DiveNumberInSerie>5</DiveNumberInSerie>"
+        )
+    )
+    assert device_of(found.document["dives"][0]) == {
+        "brand": "Suunto",
+        "model": "Suunto D5",
+        "serial": "192410004212",
+        "firmware": "2.5.1947",
+        "dive_number": 5,
+    }
+
+
+def test_a_nil_serial_number_is_no_serial() -> None:
+    """`i:nil="true"` is this serializer's word for *not recorded*, and §6.4b forbids an
+    empty member."""
+    found = convert(suunto_xml('<SerialNumber i:nil="true" />'))
+    assert device_of(found.document["dives"][0]) == {"brand": "Suunto"}

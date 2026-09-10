@@ -96,156 +96,160 @@
           "usage": "staged"
         }
       ],
-      "profile": {
-        "duration": 5520,
-        "depth": {
-          "times": [
-            0,
-            120,
-            600,
-            1500,
-            2400,
-            3000,
-            3600,
-            4200,
-            4800,
-            5400,
-            5520
-          ],
-          "values": [
-            0,
-            1830,
-            6100,
-            6230,
-            5800,
-            2100,
-            1200,
-            900,
-            600,
-            300,
-            0
-          ]
-        },
-        "ceiling": {
-          "times": [
-            1500,
-            2400,
-            3000,
-            3600,
-            4200,
-            4800
-          ],
-          "values": [
-            1800,
-            1500,
-            900,
-            600,
-            300,
-            300
-          ]
-        },
-        "temperature": {
-          "times": [
-            0,
-            1500,
-            5400
-          ],
-          "values": [
-            162,
-            74,
-            158
-          ]
-        },
-        "pressures": [
-          {
-            "times": [
-              0,
-              2400,
-              5400
+      "recordings": [
+        {
+          "profile": {
+            "duration": 5520,
+            "depth": {
+              "times": [
+                0,
+                120,
+                600,
+                1500,
+                2400,
+                3000,
+                3600,
+                4200,
+                4800,
+                5400,
+                5520
+              ],
+              "values": [
+                0,
+                1830,
+                6100,
+                6230,
+                5800,
+                2100,
+                1200,
+                900,
+                600,
+                300,
+                0
+              ]
+            },
+            "ceiling": {
+              "times": [
+                1500,
+                2400,
+                3000,
+                3600,
+                4200,
+                4800
+              ],
+              "values": [
+                1800,
+                1500,
+                900,
+                600,
+                300,
+                300
+              ]
+            },
+            "temperature": {
+              "times": [
+                0,
+                1500,
+                5400
+              ],
+              "values": [
+                162,
+                74,
+                158
+              ]
+            },
+            "pressures": [
+              {
+                "times": [
+                  0,
+                  2400,
+                  5400
+                ],
+                "values": [
+                  2200,
+                  1400,
+                  800
+                ],
+                "gas_number": 1
+              },
+              {
+                "times": [
+                  0,
+                  2400,
+                  5400
+                ],
+                "values": [
+                  2180,
+                  1500,
+                  950
+                ],
+                "gas_number": 2
+              },
+              {
+                "times": [
+                  3000,
+                  4200
+                ],
+                "values": [
+                  2000,
+                  1600
+                ],
+                "gas_number": 3
+              },
+              {
+                "times": [
+                  4200,
+                  5400
+                ],
+                "values": [
+                  1950,
+                  0
+                ],
+                "gas_number": 4
+              }
             ],
-            "values": [
-              2200,
-              1400,
-              800
+            "events": [
+              {
+                "time": 0,
+                "type": "gas_switch",
+                "gas_number": 1
+              },
+              {
+                "time": 2980,
+                "type": "deep_stop"
+              },
+              {
+                "time": 3005,
+                "type": "gas_switch",
+                "gas_number": 3
+              },
+              {
+                "time": 4210,
+                "type": "gas_switch",
+                "gas_number": 4
+              },
+              {
+                "time": 5100,
+                "type": "safety_stop"
+              },
+              {
+                "time": 5200,
+                "type": "other",
+                "label": "Tissue ceiling cleared"
+              }
             ],
-            "gas_number": 1
-          },
-          {
-            "times": [
-              0,
-              2400,
-              5400
-            ],
-            "values": [
-              2180,
-              1500,
-              950
-            ],
-            "gas_number": 2
-          },
-          {
-            "times": [
-              3000,
-              4200
-            ],
-            "values": [
-              2000,
-              1600
-            ],
-            "gas_number": 3
-          },
-          {
-            "times": [
-              4200,
-              5400
-            ],
-            "values": [
-              1950,
-              0
-            ],
-            "gas_number": 4
-          }
-        ],
-        "events": [
-          {
-            "time": 0,
-            "type": "gas_switch",
-            "gas_number": 1
-          },
-          {
-            "time": 2980,
-            "type": "deep_stop"
-          },
-          {
-            "time": 3005,
-            "type": "gas_switch",
-            "gas_number": 3
-          },
-          {
-            "time": 4210,
-            "type": "gas_switch",
-            "gas_number": 4
-          },
-          {
-            "time": 5100,
-            "type": "safety_stop"
-          },
-          {
-            "time": 5200,
-            "type": "other",
-            "label": "Tissue ceiling cleared"
-          }
-        ],
-        "extensions": {
-          "com.example.deco": {
-            "model": "ZHL-16C",
-            "gf": [
-              30,
-              70
-            ]
+            "extensions": {
+              "com.example.deco": {
+                "model": "ZHL-16C",
+                "gf": [
+                  30,
+                  70
+                ]
+              }
+            }
           }
         }
-      },
+      ],
       "created_at": "2026-07-03T18:30:00+12:45"
     },
     {

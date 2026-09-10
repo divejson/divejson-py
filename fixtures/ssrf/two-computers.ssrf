@@ -1,0 +1,30 @@
+<divelog program='subsurface' version='3'>
+<settings>
+</settings>
+<divesites>
+<site uuid='7f3a1c02' name='Blue Hole'>
+</site>
+</divesites>
+<dives>
+<dive number='118' divesiteid='7f3a1c02' date='2026-09-08' time='15:17:38' duration='50:51 min'>
+  <notes>Both computers on the same wrist; the Perdix went in a few seconds late.</notes>
+  <cylinder size='12.0 l' o2='33.0%' start='207.3 bar' end='44.0 bar' />
+  <divecomputer model='Suunto Ocean' deviceid='9c1f04ab' date='2026-09-08' time='15:17:38'>
+  <depth max='19.04 m' mean='10.74 m' />
+  <temperature water='29.8 C' />
+  <extradata key='Serial' value='253810000400' />
+  <extradata key='FW Version' value='2.51.28' />
+  <sample time='0:00 min' depth='0.0 m' temp='29.8 C' />
+  <sample time='10:00 min' depth='19.04 m' />
+  <sample time='50:51 min' depth='0.0 m' temp='30.1 C' />
+  </divecomputer>
+  <divecomputer model='Shearwater Perdix 3' deviceid='d9772626' date='2026-09-08' time='15:18:10'>
+  <depth max='19.6 m' mean='11.2 m' />
+  <temperature water='30.2 C' />
+  <sample time='0:00 min' depth='0.0 m' />
+  <sample time='9:28 min' depth='19.6 m' />
+  <sample time='50:19 min' depth='0.0 m' />
+  </divecomputer>
+</dive>
+</dives>
+</divelog>

@@ -129,8 +129,7 @@
         "gear_uuids": { "$ref": "#/$defs/uuid_list" },
         "species_uuids": { "$ref": "#/$defs/uuid_list" },
         "cylinders": { "type": "array", "items": { "$ref": "#/$defs/cylinder" } },
-        "source_file": { "$ref": "#/$defs/stored_file" },
-        "profile": { "$ref": "#/$defs/profile" },
+        "recordings": { "type": "array", "items": { "$ref": "#/$defs/recording" } },
         "created_at": { "$ref": "#/$defs/date_time" },
         "extensions": { "$ref": "#/$defs/extensions" }
       },
@@ -149,6 +148,30 @@
         "gas_number": { "type": "integer", "minimum": 0 },
         "role": { "enum": ["bottom", "deco", "diluent", "oxygen"] },
         "usage": { "enum": ["parallel", "staged"] },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "additionalProperties": false
+    },
+    "recording": {
+      "type": "object",
+      "properties": {
+        "device": { "$ref": "#/$defs/device" },
+        "started_at": { "$ref": "#/$defs/date_time" },
+        "source_files": { "type": "array", "items": { "$ref": "#/$defs/stored_file" } },
+        "profile": { "$ref": "#/$defs/profile" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "additionalProperties": false
+    },
+    "device": {
+      "type": "object",
+      "properties": {
+        "brand": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "model": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "serial": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "firmware": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "dive_number": { "type": "integer", "minimum": 0 },
         "extensions": { "$ref": "#/$defs/extensions" }
       },
       "additionalProperties": false
@@ -329,6 +352,7 @@
         "uuid": { "$ref": "#/$defs/uuid" },
         "name": { "type": "string", "minLength": 1, "maxLength": 255 },
         "brand": { "type": "string", "maxLength": 255 },
+        "serial": { "type": "string", "minLength": 1, "maxLength": 64 },
         "type": {
           "enum": [
             "mask", "snorkel", "fins", "wetsuit", "drysuit", "vest", "hood",

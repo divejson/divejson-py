@@ -12,7 +12,7 @@ one — the note kinds, identity, the way a zero reads, the number bound, the sa
 the `<!DOCTYPE>` refusal, taking a child by its lowercased local name — lives in
 `converter.py`, `series.py` and `xmlsource.py`, and this module inherits it.
 
-Three decisions shape what is below.
+Four decisions shape what is below.
 
 **Every measurement carries its unit in the text, and the unit is read rather than
 assumed.** `depth max='45.91 m'`, `duration='66:50 min'`, `cns='11%'`, `size='12.0 l'`,
@@ -31,12 +31,19 @@ two dives one identity. The positional stand-in `converting.md` defines is what 
 gets, reported as such. Sites do carry a `@uuid`, and it is read as an opaque string —
 Subsurface writes one of them with a leading space.
 
-**Three attributes are read and deliberately not carried**, which is a different thing from
+**Two attributes are read and deliberately not carried**, which is a different thing from
 an attribute this reader never looks at (`docs/ssrf-mapping.md` lists those). `@visibility`
-is a five-star rating where §6.2's is metres, `@sac` has no member in §6 at all, and
-`<divecomputer model>` names the telemetry source of one dive rather than a piece of gear
-the diver owns. Each is reported as `dropped`, because a diver looking for it in the
-converted document deserves to be told where it went.
+is a five-star rating where §6.2's is metres, and `@sac` has no member in §6 at all. Each
+is reported as `dropped`, because a diver looking for it in the converted document deserves
+to be told where it went. `<divecomputer model>` was a third of these until §6.4b gave a
+device a home: it is carried now, and the rationale that refused it is the same one that
+keeps it off the gear list.
+
+**A dive may carry one `<divecomputer>` per computer the diver wore, and each is a
+recording** (§6.4a) in file order, the first primary — this is the only interchange format
+here that carries two computers' records of one dive at all. What stays on the dive is the
+first element's, which is the one place the plural recording forces a choice; `read_summary`
+and `drop_summary` are where it is made.
 """
 
 from __future__ import annotations
@@ -64,9 +71,11 @@ from .converter import (
     Scope,
     capped,
     decimal_of,
+    device,
     header,
     integer_of,
     recorded,
+    recording,
     rounded,
 )
 from .series import Channel, SampleAxis
@@ -447,12 +456,9 @@ class _Converter:
         if cylinders:
             dive["cylinders"] = cylinders
 
-        computer = self.read_computer(element, where)
-        if computer is not None:
-            self.read_summary(computer, dive, where)
-            profile = self.read_profile(computer, where)
-            if profile:
-                dive["profile"] = profile
+        recordings = self.read_recordings(element, dive, where)
+        if recordings:
+            dive["recordings"] = recordings
         return dive
 
     def read_started_at(self, element: ET.Element, where: str) -> str | None:
@@ -611,32 +617,125 @@ class _Converter:
 
     # -- the dive computer -------------------------------------------------------
 
-    def read_computer(self, element: ET.Element, where: str) -> ET.Element | None:
-        """The `<divecomputer>` whose readings this dive is converted from.
+    def read_recordings(
+        self, element: ET.Element, dive: dict[str, Any], where: str
+    ) -> list[dict[str, Any]]:
+        """Every `<divecomputer>` on the dive as a §6.4a Recording, in file order.
 
-        A dive may carry one record per computer the diver wore, and §6.4 gives a dive one
-        profile — so the first is read and the rest are reported. `@model` is read here and
-        deliberately carried nowhere: it names the telemetry source of one dive rather than
-        an item the diver owns, and §6.12's `computer` gear type is for the latter.
+        This is the format that made the case for the member: it is the only interchange
+        format here that carries two computers' records of one dive at all. One element
+        with samples becomes a recording with a profile; one without becomes a device-only
+        recording; **one that yields neither yields no recording**, §6.4a forbidding a
+        recording that carries nothing — which the corpus reaches in
+        `fixtures/ssrf/trip-grouping.ssrf`, whose dives 43 and 44 carry a
+        `<divecomputer last-manual-time='…'>` with a `<depth>` on it and nothing this
+        section can hold. Its dive 42 is the ordinary shape beside them, samples and all.
+
+        The dive's own `max_depth`, `avg_depth` and `bottom_temperature` come from the
+        **first element in file order** and never from a later one — see `read_summary`.
+        That rule is keyed on the element rather than on the primary recording, and the
+        two are not always the same one: those two elements become nothing while still
+        supplying their dive's three figures.
         """
-        computers = children(element, "divecomputer")
-        if not computers:
+        recordings: list[dict[str, Any]] = []
+        for index, computer in enumerate(children(element, "divecomputer")):
+            here = f"{where}/divecomputer/{index}"
+            if index == 0:
+                self.read_summary(computer, dive, where)
+            else:
+                self.drop_summary(computer, here)
+            built = recording(
+                device=self.read_device(computer, here),
+                started_at=self.read_recording_start(computer, dive["started_at"], here),
+                profile=self.read_profile(computer, here),
+            )
+            if built is not None:
+                recordings.append(built)
+        return recordings
+
+    def read_device(self, computer: ET.Element, where: str) -> dict[str, Any] | None:
+        """`@model` and the two `<extradata>` keys as a §6.4b Device.
+
+        `@model` was read and refused until this section existed, and the reason it was
+        refused still holds: it names the source of one dive's telemetry rather than an
+        item the diver owns, so it is a device and never a gear item. Subsurface's own
+        UDDF export of the same logbook carries no `<divecomputer>` equipment element for
+        it either.
+
+        `Serial` and `FW Version` are the keys libdivecomputer's download writes what it
+        read off the hardware under, and they are the only route to either member in this
+        format — neither has an attribute of its own. `@deviceid` is Subsurface's own key
+        for the computer rather than the serial §6.4b asks for, and `@diveid` keys a dive
+        rather than counting one, so neither is the device counter. This format carries no
+        device name at all: nothing in a `.ssrf` records what the diver called their
+        computer.
+        """
+        extradata = {
+            attribute(extra, "key"): attribute(extra, "value")
+            for extra in children(computer, "extradata")
+        }
+        return device(
+            {
+                "model": attribute(computer, "model"),
+                "serial": extradata.get("Serial"),
+                "firmware": extradata.get("FW Version"),
+            },
+            note=self.note,
+            where=where,
+            labels={
+                "model": "<divecomputer model>",
+                "serial": "the Serial <extradata>",
+                "firmware": "the FW Version <extradata>",
+            },
+        )
+
+    def read_recording_start(
+        self, computer: ET.Element, dive_start: str, where: str
+    ) -> str | None:
+        """`<divecomputer @date @time>` where it states a start of its own.
+
+        §6.4a reads an absent `started_at` as the dive's, so an element agreeing with its
+        dive writes nothing — which is every file in hand. Where it differs, writing it is
+        what keeps a second computer's samples on their own axis: that computer started
+        when its diver's wrist went under, not when the first one's did.
+
+        Composed rather than concatenated for `read_started_at`'s reason, and silent for a
+        different one: an element with no `@date` is not a defect here, it is the ordinary
+        case, and the dive's own start has already been read and reported on.
+        """
+        date, clock = attribute(computer, "date"), attribute(computer, "time")
+        if date is None or clock is None:
             return None
-        if len(computers) > 1:
-            self.note(
-                where,
-                "the dive carries more than one dive computer's record, and this format holds one profile per "
-                "dive; the first is read and the rest are dropped (spec §6.4)",
-                "dropped",
-            )
-        if any(attribute(computer, "model") for computer in computers):
-            self.note(
-                where,
-                "the <divecomputer model> names the source of this dive's telemetry rather than a piece of "
-                "gear the diver owns, so it is not carried as a gear item; dropped",
-                "dropped",
-            )
-        return computers[0]
+        parts = _TIME.match(clock)
+        if _DATE.match(date) is None or parts is None:
+            self.note(where, "the computer's own date and time are not a date and time; dropped", "dropped")
+            return None
+        started_at = f"{date}T{parts['hour']}:{parts['minute']}:{parts['second'] or '00'}"
+        try:
+            datetime.fromisoformat(started_at)
+        except ValueError:
+            self.note(where, "the computer's own date and time are not a date and time; dropped", "dropped")
+            return None
+        started_at += parts["fraction"] or ""
+        return None if started_at == dive_start else started_at
+
+    def drop_summary(self, computer: ET.Element, where: str) -> None:
+        """A later element's `<depth>` and `<temperature>`, reported rather than read.
+
+        One finding per element that carries either. Two computers routinely differ on a
+        maximum depth — `fixtures/ssrf/refusals.ssrf`'s second element states a deeper one,
+        its own mean and a warmer temperature than the first — and §6.2 gives the dive one
+        of each, so silently preferring one of them would put an unmarked choice in a
+        logbook. Nothing is averaged and nothing is reached past.
+        """
+        if child(computer, "depth") is None and child(computer, "temperature") is None:
+            return
+        self.note(
+            where,
+            "the dive's greatest depth, mean depth and water temperature are the first <divecomputer>'s, "
+            "and this one records its own; they are dropped rather than averaged or preferred (spec §6.2)",
+            "dropped",
+        )
 
     def read_summary(self, computer: ET.Element, dive: dict[str, Any], where: str) -> None:
         """`<depth>` and `<temperature>` as the dive's own scalars.
@@ -645,6 +744,11 @@ class _Converter:
         the difference is visible in the file this reader was built against: its first dive
         records `max='45.91 m'` where the deepest sample is 45.82 m. Nothing here is
         computed, so nothing here is `inferred`.
+
+        The **first** element in file order supplies all three, and a value it does not
+        carry is not taken from a later one: an absence on the first element is what that
+        computer recorded, and reaching past it would be the same silent choice
+        `drop_summary` refuses in the other direction.
         """
         depth = child(computer, "depth")
         max_depth = self.positive(self.measure(attribute(depth, "max"), "m", where, "<depth max>"), where, "max_depth", "<depth max>")

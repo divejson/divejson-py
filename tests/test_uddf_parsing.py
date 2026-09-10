@@ -11,9 +11,10 @@ from __future__ import annotations
 import json
 
 import pytest
-from helpers import STARTED_AT, before, one_dive, uddf
+from helpers import STARTED_AT, before, device_of, one_dive, profile_of, uddf
 
 from divejson import DoctypeRefusedError, MalformedUddfError, convert
+from divejson.uddf import LOCAL_CLOCK_NOTE
 from divejson.validate import validate_document
 
 
@@ -296,7 +297,7 @@ def test_a_number_too_large_to_carry_is_not_a_number(written: str) -> None:
     assert validate_document(conversion.document) == []
     found = conversion.document["dives"][0]
     assert found["cylinders"][0] == {}
-    assert "max_depth" not in found and "duration" not in found and "profile" not in found
+    assert "max_depth" not in found and "duration" not in found and profile_of(found) is None
     # `parse_constant` fires for exactly the three tokens RFC 8259 has no room for, which
     # are what `json.dumps` emits for a float that overflowed.
     json.loads(json.dumps(conversion.document), parse_constant=_refuse_non_json)
@@ -395,7 +396,7 @@ def test_channels_keep_their_own_time_axes() -> None:
         "<waypoint><depth>2.0</depth><divetime>10</divetime></waypoint>"
         "<waypoint><depth>3.0</depth><divetime>20</divetime></waypoint>"
     )
-    found = dive(f"{STARTED_AT}<samples>{samples}</samples>")["profile"]
+    found = profile_of(dive(f"{STARTED_AT}<samples>{samples}</samples>"))
     assert found["depth"]["times"] == [0, 10, 20]
     assert found["temperature"]["times"] == [0]
     assert found["duration"] == 20
@@ -414,7 +415,7 @@ def test_profile_duration_spans_the_samples_rather_than_the_logged_duration() ->
         "<informationafterdive><diveduration>4010</diveduration></informationafterdive>"
     )
     assert found["duration"] == 4010
-    assert found["profile"]["duration"] == 4300
+    assert profile_of(found)["duration"] == 4300
 
 
 def test_waypoints_are_ordered_by_their_recorded_time() -> None:
@@ -422,7 +423,7 @@ def test_waypoints_are_ordered_by_their_recorded_time() -> None:
         "<waypoint><depth>3.0</depth><divetime>20</divetime></waypoint>"
         "<waypoint><depth>1.0</depth><divetime>0</divetime></waypoint>"
     )
-    found = dive(f"{STARTED_AT}<samples>{samples}</samples>")["profile"]
+    found = profile_of(dive(f"{STARTED_AT}<samples>{samples}</samples>"))
     assert found["depth"]["times"] == [0, 20]
     assert found["depth"]["values"] == [100, 300]
 
@@ -450,7 +451,7 @@ def test_waypoints_landing_on_one_second_keep_the_first() -> None:
         "<waypoint><depth>2.0</depth><divetime>30.4</divetime></waypoint>"
     )
     data = one_dive(f"{STARTED_AT}<samples>{samples}</samples>")
-    found = convert(data).document["dives"][0]["profile"]
+    found = profile_of(convert(data).document["dives"][0])
     assert found["depth"]["times"] == [30]
     assert found["depth"]["values"] == [100]
     assert any("strictly increasing" in message for message in messages(data))
@@ -470,7 +471,7 @@ def test_waypoints_with_no_usable_reading_produce_no_profile_and_say_so() -> Non
         "<waypoint><depth/><divetime>10</divetime></waypoint>"
     )
     data = one_dive(f"{STARTED_AT}<samples>{samples}</samples>")
-    assert "profile" not in convert(data).document["dives"][0]
+    assert profile_of(convert(data).document["dives"][0]) is None
     assert "the dive's 2 waypoints carry a time but no reading this format can hold" in " ".join(messages(data))
 
 
@@ -492,7 +493,7 @@ def test_a_dive_with_no_samples_at_all_is_not_reported() -> None:
 def test_a_waypoint_with_no_time_has_no_place_on_the_axis() -> None:
     samples = "<waypoint><depth>1.0</depth></waypoint><waypoint><depth>2.0</depth><divetime>10</divetime></waypoint>"
     data = one_dive(f"{STARTED_AT}<samples>{samples}</samples>")
-    assert convert(data).document["dives"][0]["profile"]["depth"]["times"] == [10]
+    assert profile_of(convert(data).document["dives"][0])["depth"]["times"] == [10]
     assert any("no place on the profile's time axis" in message for message in messages(data))
 
 
@@ -510,8 +511,8 @@ def test_two_cylinders_on_one_blend_keep_separate_pressure_channels() -> None:
         '<tankpressure ref="m">20000000</tankpressure><tankpressure ref="m">18000000</tankpressure></waypoint>'
     )
     found = dive(f"{STARTED_AT}{tanks}<samples>{samples}</samples>", header=header)
-    assert [channel["gas_number"] for channel in found["profile"]["pressures"]] == [0, 1]
-    assert [channel["values"] for channel in found["profile"]["pressures"]] == [[2000], [1800]]
+    assert [channel["gas_number"] for channel in profile_of(found)["pressures"]] == [0, 1]
+    assert [channel["values"] for channel in profile_of(found)["pressures"]] == [[2000], [1800]]
     assert [cylinder["gas_number"] for cylinder in found["cylinders"]] == [0, 1]
 
 
@@ -521,8 +522,151 @@ def test_a_marker_naming_an_event_type_comes_back_as_that_type() -> None:
         "<waypoint><depth>1.0</depth><divetime>0</divetime><setmarker>safety_stop</setmarker></waypoint>"
         "<waypoint><depth>2.0</depth><divetime>10</divetime><setmarker>NoDecoTime</setmarker></waypoint>"
     )
-    events = dive(f"{STARTED_AT}<samples>{samples}</samples>")["profile"]["events"]
+    events = profile_of(dive(f"{STARTED_AT}<samples>{samples}</samples>"))["events"]
     assert events == [
         {"time": 0, "type": "safety_stop"},
         {"time": 10, "type": "other", "label": "NoDecoTime"},
     ]
+
+
+# -- recordings and devices ------------------------------------------------------------
+
+# `<diver><owner><equipment>` around one or more `<divecomputer>` elements, which is where
+# a UDDF file keeps both halves of a computer: the kit item and the hardware.
+def _equipment(*computers: str) -> str:
+    return f"<diver><owner><equipment>{''.join(computers)}</equipment></owner></diver>"
+
+
+def _computer(element_id: str, body: str) -> str:
+    return f'<divecomputer id="{element_id}">{body}</divecomputer>'
+
+
+def _uses(*refs: str) -> str:
+    return "<equipmentused>" + "".join(f'<link ref="{ref}"/>' for ref in refs) + "</equipmentused>"
+
+
+def test_a_dive_that_links_no_computer_is_one_recording_of_its_samples() -> None:
+    """Which is most of the corpus: UDDF records what a diver owns far more often than
+    it records what recorded the dive."""
+    found = dive(f"{STARTED_AT}<samples><waypoint><depth>1.0</depth><divetime>0</divetime></waypoint></samples>")
+    assert found["recordings"] == [{"profile": {"duration": 0, "depth": {"times": [0], "values": [100]}}}]
+
+
+def test_the_linked_computer_is_read_twice_into_two_records() -> None:
+    """§6.12's `name` is the diver's label for a thing in their kit list and §6.4b's is
+    what the device calls itself; UDDF has one element for both."""
+    body = "<name>Ocean</name><manufacturer><name>Suunto</name></manufacturer><serialnumber>42</serialnumber>"
+    document = convert(
+        one_dive(before(_uses("c1")), header=_equipment(_computer("c1", body)))
+    ).document
+    assert device_of(document["dives"][0]) == {"brand": "Suunto", "serial": "42", "name": "Ocean"}
+    assert document["gear"][0] == {
+        "uuid": document["gear"][0]["uuid"],
+        "name": "Ocean",
+        "brand": "Suunto",
+        "serial": "42",
+        "type": "computer",
+    }
+
+
+def test_a_nameless_computer_is_no_gear_item_and_may_still_be_a_device() -> None:
+    """§6.12 makes a gear item's `name` REQUIRED and §6.4b is happy with a model alone.
+
+    Which is what makes a written file round-trip: `docs/uddf-writing.md` emits an empty
+    `<name>` for a device that has none, and it comes back as neither a name nor a piece.
+    """
+    document = convert(
+        one_dive(before(_uses("c1")), header=_equipment(_computer("c1", "<name></name><model>Perdix 2</model>")))
+    ).document
+    assert "gear" not in document
+    assert device_of(document["dives"][0]) == {"model": "Perdix 2"}
+
+
+def test_a_link_yielding_neither_a_device_nor_a_profile_yields_no_recording() -> None:
+    """§6.4a forbids a recording that carries nothing, and the carve-out bites on the
+    later links: the dive's one `<samples>` reaches the first and nothing else."""
+    computers = _equipment(
+        _computer("c1", "<name>Ocean</name>"),
+        _computer("c2", "<notes><para>nothing this reader maps</para></notes>"),
+    )
+    found = dive(before(_uses("c1", "c2")), header=computers)
+    assert [entry["device"] for entry in found["recordings"]] == [{"name": "Ocean"}]
+
+
+def test_a_dive_with_no_profile_judges_every_link_on_its_device_alone() -> None:
+    """Including the first: there is nothing to protect a link past the carve-out."""
+    computers = _equipment(_computer("c1", "<notes><para>x</para></notes>"), _computer("c2", "<name>Ocean</name>"))
+    found = dive(before(_uses("c1", "c2")), header=computers)
+    assert [entry["device"] for entry in found["recordings"]] == [{"name": "Ocean"}]
+
+
+def test_the_samples_and_the_counter_go_to_the_first_link_and_no_other() -> None:
+    """Both are the dive's rather than any computer's: UDDF states each once per dive, so
+    a dive linking two computers has one profile and one counter and no way to say whose."""
+    computers = _equipment(_computer("c1", "<name>Ocean</name>"), _computer("c2", "<name>Perdix</name>"))
+    body = before(f"<internaldivenumber>118</internaldivenumber>{_uses('c1', 'c2')}")
+    found = dive(f"{body}<samples><waypoint><depth>1.0</depth><divetime>0</divetime></waypoint></samples>",
+                 header=computers)
+    assert [entry["device"] for entry in found["recordings"]] == [
+        {"name": "Ocean", "dive_number": 118},
+        {"name": "Perdix"},
+    ]
+    assert profile_of(found) is not None and profile_of(found, 1) is None
+
+
+def test_a_counter_with_no_computer_to_belong_to_is_reported() -> None:
+    """`<internaldivenumber>` is a child of the dive, so a dive may state one and link
+    nothing; §6.4b puts the counter on a device and there is no device to put it on."""
+    data = one_dive(before("<internaldivenumber>118</internaldivenumber>"))
+    assert "recordings" not in convert(data).document["dives"][0]
+    assert any("no device to carry it" in message for message in messages(data))
+
+
+def test_the_dives_own_divenumber_is_the_divers_and_stays_there() -> None:
+    """The two counters are different members, and this is the one the diver keeps."""
+    computers = _equipment(_computer("c1", "<name>Ocean</name>"))
+    found = dive(before(f"<divenumber>412</divenumber><internaldivenumber>87</internaldivenumber>{_uses('c1')}"),
+                 header=computers)
+    assert found["dive_number"] == 412
+    assert device_of(found)["dive_number"] == 87
+
+
+# -- the generator table ---------------------------------------------------------------
+
+SHEARWATER = (
+    "<generator><name>Shearwater Cloud Desktop</name>"
+    '<manufacturer id="Shearwater_Research_Inc"><name>Shearwater Research, Inc</name></manufacturer>'
+    "<datetime>2026-09-08T15:36:44Z</datetime></generator>"
+)
+
+
+def test_the_shearwater_z_is_read_as_no_offset_and_reported() -> None:
+    """That application writes the wall clock the diver read off their wrist and suffixes
+    it `Z`, so the instant the file appears to state is wrong by the diver's own offset."""
+    data = one_dive(before(datetime_text="2026-09-08T15:18:10Z"), header=SHEARWATER)
+    assert convert(data).document["dives"][0]["started_at"] == "2026-09-08T15:18:10"
+    notes = [(note.kind, note.message) for note in convert(data).notes]
+    assert ("resolved", LOCAL_CLOCK_NOTE) in notes
+    # And not also the no-offset note, which would say the source recorded nothing there.
+    assert not any("recorded no UTC offset" in message for _, message in notes)
+
+
+def test_the_generators_own_datetime_is_left_alone() -> None:
+    """It is the export instant, a fact about the run rather than logbook data."""
+    data = one_dive(before(datetime_text="2026-09-08T15:18:10Z"), header=SHEARWATER)
+    assert len([note for note in convert(data).notes if note.kind == "resolved"]) == 1
+
+
+def test_a_z_from_any_other_generator_is_an_instant() -> None:
+    """A row here misreads every file its generator ever produced, so it fires on one name."""
+    other = "<generator><name>Subsurface</name></generator>"
+    data = one_dive(before(datetime_text="2026-09-08T15:18:10Z"), header=other)
+    assert convert(data).document["dives"][0]["started_at"] == "2026-09-08T15:18:10Z"
+    assert not any(note.kind == "resolved" for note in convert(data).notes)
+
+
+def test_the_name_alone_does_not_fire_the_rule() -> None:
+    """A name is a string anything may claim, and two agreeing beats one."""
+    claimed = "<generator><name>Shearwater Cloud Desktop</name></generator>"
+    data = one_dive(before(datetime_text="2026-09-08T15:18:10Z"), header=claimed)
+    assert convert(data).document["dives"][0]["started_at"] == "2026-09-08T15:18:10Z"

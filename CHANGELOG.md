@@ -7,6 +7,56 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Breaking: a dive's `profile` and `source_file` move into `recordings[]`.** A dive now
+  carries an array of §6.4a Recordings — one device's record of one dive — and nothing is
+  left behind on the dive itself: `dive["profile"]` is gone, and a reader wanting the
+  profile a consumer would show takes `dive["recordings"][0]["profile"]`, the first entry
+  being the primary. A recording carries at least one of `device`, `profile` and
+  `source_files`, which `divejson validate` now checks per recording along with §3 rule 3's
+  series integrity and the uniqueness of every stored file's uuid across a dive's
+  recordings.
+
+  **Every reader writes one, and a computer worn that sampled nothing is one too.** A
+  source that names a device and records no samples yields a device-only recording, because
+  a computer on the wrist is a fact about the dive. `.ssrf` is where this shows most: a dive
+  may carry a `<divecomputer>` per computer the diver wore, each one a recording in file
+  order — while an element that names no computer and kept no sample yields none at all, and
+  the dive's own greatest depth, mean depth and water temperature come from the **first**
+  element in file order with every later one reported.
+
+- **A recording says what recorded it (§6.4b).** Every reader now fills a `device` — a
+  brand, a model, a serial, a firmware version, the name the owner set on the hardware, and
+  the device's own dive counter — from fields it previously read and dropped: `.ssrf`'s
+  `<divecomputer @model>` and its `Serial` and `FW Version` `<extradata>`, UDDF's
+  `<divecomputer>` and the dive's `<internaldivenumber>`, FIT's `file_id` and the
+  `device_info` at `device_index` 0, `Device.SerialNumber` and `Header.Diving.NumberInSeries`
+  in the Suunto app's JSON, and `<SerialNumber>` and `<DiveNumberInSerie>` in its DM5 XML.
+  A device is data on a recording and never a gear item — except in UDDF, which has one
+  element for both and where the reader keeps minting the kit item as well.
+
+- **The UDDF writer writes the computer back, folding a kit item and a device into one
+  `<divecomputer>`.** The predicate is in `docs/uddf-writing.md`: the dive must link the
+  gear item, equal serials settle it either way, and otherwise a device's name-else-model
+  has to equal the gear item's name with the brands not disagreeing. A device that folds
+  into nothing takes an element of its own, `id="device-<n>"`, with a `<link>` from the dive
+  — the one case where reading a written file back returns a gear item the document never
+  had. `<serialnumber>` is written for every gear item that carries one and read back into
+  §6.12's new `serial`, and the primary recording's counter goes out as the dive's
+  `<internaldivenumber>`. UDDF holds one profile per dive, so the primary recording supplies
+  the `<samples>` and every other recording is reported dropped with its device kept.
+
+- **Shearwater Cloud Desktop's `Z` is read as no offset.** That application writes the wall
+  clock the diver read off their wrist and suffixes it `Z`, so the instant the file appears
+  to state is wrong by the diver's own offset. Under a generator table keyed on the exact
+  `<generator><name>`, with the manufacturer id checked beside it, a dive's `<datetime>`
+  loses that `Z` and the report carries a `resolved` finding. Every other generator is
+  unchanged, and `<generator><datetime>` is left alone under this rule and every other.
+
+- The vendored `schema/`, `fixtures/` and `docs/` move to a `SPEC_REF` carrying all of the
+  above, along with `docs/writing.md` — the rules a converter follows whatever format it is
+  writing, the mirror of `docs/converting.md` — and `docs/uddf-writing.md`, which the
+  specification has now adopted.
+
 ## 0.4.0
 
 - **Suunto's DM5 XML is the fifth format this package reads.** `divejson convert

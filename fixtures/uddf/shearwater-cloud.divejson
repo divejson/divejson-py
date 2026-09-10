@@ -1,0 +1,131 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-05T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.4.0"
+  },
+  "dives": [
+    {
+      "uuid": "edcffec6-a81e-59a1-8699-f18db44c7245",
+      "dive_number": 1,
+      "started_at": "2026-09-08T15:18:10",
+      "duration": 163,
+      "notes": "Summary:\n\nEnvironment:\n\nGas:\n\nGear:\n\nIssues:",
+      "max_depth": 4.0,
+      "avg_depth": 2.70000029,
+      "surface_pressure": 1.019,
+      "gear_uuids": [
+        "bae2b91d-674c-5d38-875d-e3d3f69da1af"
+      ],
+      "cylinders": [
+        {
+          "end_pressure": 0.0
+        },
+        {
+          "end_pressure": 0.0
+        }
+      ],
+      "recordings": [
+        {
+          "device": {
+            "brand": "Shearwater Research, Inc",
+            "model": "Perdix 3",
+            "serial": "D9772626",
+            "name": "Perdix 3"
+          },
+          "profile": {
+            "duration": 180,
+            "depth": {
+              "times": [
+                0,
+                10,
+                20,
+                30,
+                40,
+                60,
+                80,
+                100,
+                120,
+                140,
+                160,
+                180
+              ],
+              "values": [
+                130,
+                200,
+                250,
+                260,
+                230,
+                360,
+                340,
+                310,
+                370,
+                290,
+                120,
+                0
+              ]
+            },
+            "temperature": {
+              "times": [
+                0,
+                10,
+                20,
+                30,
+                40,
+                60,
+                80,
+                100,
+                120,
+                140,
+                160,
+                180
+              ],
+              "values": [
+                330,
+                330,
+                330,
+                320,
+                320,
+                320,
+                320,
+                310,
+                310,
+                310,
+                300,
+                300
+              ]
+            },
+            "events": [
+              {
+                "time": 0,
+                "type": "gas_switch"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "gear": [
+    {
+      "uuid": "bae2b91d-674c-5d38-875d-e3d3f69da1af",
+      "name": "Perdix 3",
+      "brand": "Shearwater Research, Inc",
+      "serial": "D9772626",
+      "type": "computer",
+      "notes": "FirmV:39:\n\nLogV:17:"
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "uddf",
+      "uddf_version": "3.2.3",
+      "source_generator": {
+        "name": "Shearwater Cloud Desktop",
+        "version": "2.12.10"
+      }
+    }
+  }
+}

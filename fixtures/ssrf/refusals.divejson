@@ -19,27 +19,31 @@
           "oxygen": 21.0
         }
       ],
-      "profile": {
-        "duration": 30,
-        "depth": {
-          "times": [
-            0,
-            30
-          ],
-          "values": [
-            0,
-            620
-          ]
-        },
-        "temperature": {
-          "times": [
-            30
-          ],
-          "values": [
-            195
-          ]
+      "recordings": [
+        {
+          "profile": {
+            "duration": 30,
+            "depth": {
+              "times": [
+                0,
+                30
+              ],
+              "values": [
+                0,
+                620
+              ]
+            },
+            "temperature": {
+              "times": [
+                30
+              ],
+              "values": [
+                195
+              ]
+            }
+          }
         }
-      }
+      ]
     },
     {
       "uuid": "d51dfcdf-e98d-5027-9652-7a5a8a4b5224",
@@ -49,7 +53,19 @@
         "5508e90d-683a-5d1f-8d82-b3214e43d495"
       ],
       "max_depth": 18.4,
-      "bottom_temperature": 21.0
+      "bottom_temperature": 21.0,
+      "recordings": [
+        {
+          "device": {
+            "model": "Suunto Ocean"
+          }
+        },
+        {
+          "device": {
+            "model": "Garmin Descent"
+          }
+        }
+      ]
     },
     {
       "uuid": "6f6041b4-d396-5a30-8e03-db3e210e8c0c",
@@ -61,19 +77,23 @@
           "end_pressure": 60.0
         }
       ],
-      "profile": {
-        "duration": 120,
-        "depth": {
-          "times": [
-            0,
-            120
-          ],
-          "values": [
-            0,
-            900
-          ]
+      "recordings": [
+        {
+          "profile": {
+            "duration": 120,
+            "depth": {
+              "times": [
+                0,
+                120
+              ],
+              "values": [
+                0,
+                900
+              ]
+            }
+          }
         }
-      }
+      ]
     }
   ],
   "sites": [
