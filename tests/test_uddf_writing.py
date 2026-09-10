@@ -940,3 +940,42 @@ def test_a_dive_with_no_recordings_at_all_reports_nothing_about_its_computer(sch
         "come back on that computer instead" in message or "come back in a different order" in message
         for message in messages(source, "dives/0")
     )
+
+
+def test_a_kit_computer_no_recording_answers_to_is_a_gain_and_is_silent(schema) -> None:
+    """The gain sitting *after* the first link, which is the case the order check has to
+    look past rather than through.
+
+    A diver's kit list holds two computers and this dive was recorded on one of them. The
+    written file links both, so the read-back carries a recording the document never had —
+    a gain, like the gear item in `docs/uddf-writing.md`'s documented exception — while the
+    recording that did go out comes back exactly where it started. Comparing the whole link
+    list against the recordings' own elements would call that a reordering and tell the
+    diver their primary recording had moved, on the most ordinary two-computer logbook
+    there is.
+    """
+    source = document(
+        gear=[_computer(), {"uuid": GEAR_TWO, "name": "Perdix", "type": "computer"}],
+        dives=[
+            {
+                "uuid": DIVE_UUID,
+                "started_at": STARTED_AT,
+                "gear_uuids": [GEAR_UUID, GEAR_TWO],
+                "recordings": [
+                    {
+                        "device": {"name": "Ocean"},
+                        "profile": {"duration": 60, "depth": {"times": [0, 60], "values": [0, 500]}},
+                    }
+                ],
+            }
+        ],
+    )
+    written(source, schema)
+    assert not any(
+        "come back in a different order" in message or "come back on that computer instead" in message
+        for message in messages(source, "dives/0")
+    )
+    back = read_back(source)
+    assert recorded(back)["device"] == {"name": "Ocean"}
+    assert recorded(back)["profile"]["depth"]["values"] == [0, 500]
+    assert recorded(back, 1)["device"] == {"name": "Perdix"}
