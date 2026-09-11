@@ -550,9 +550,14 @@ def test_an_alert_the_table_does_not_name_arrives_with_no_type() -> None:
     assert profile_of(dive)["events"] == [{"time": 0, "label": "Battery Low"}]
 
 
-def test_the_two_carried_notify_values_are_typed_and_unlabelled() -> None:
+def test_a_notify_beyond_the_stops_is_typed_and_unlabelled() -> None:
     """A `Notify`'s `Type` names the computer's state rather than wording the diver was shown,
-    so writing it as a label would put "Deco" on a marker nobody read."""
+    so writing it as a label would put "Deco" on a marker nobody read.
+
+    The two here are the pair `STOP_TYPES` grew by — the moment a dive became a
+    decompression dive, and a safety stop broken — which were dropped for want of a §6.6
+    type until `type` became OPTIONAL and the vocabulary grew.
+    """
     dive = _dive(
         {},
         [
@@ -777,22 +782,41 @@ def test_a_time_to_surface_of_zero_is_the_absent_marker_and_is_reported() -> Non
 
 def test_a_negative_readout_is_dropped_by_the_channels_own_floor_and_reported() -> None:
     """`NoDecTime: -1` and `gf99: -100` are this device's absent-markers, and §6.4 floors
-    both channels at zero — so the drop is the channel's rule rather than this reader's."""
+    every one of these channels at zero — so the drop is the channel's rule rather than this
+    reader's, and nothing reaches it by a route that skips the floor.
+
+    `tts` is in here because it is the one channel this reader judges before offering it:
+    its *zero* is the absent-marker and its negative is not, so the negative has to go to
+    `Channel` like every other readout or it would be dropped with nothing said.
+    """
     conversion = _conversion(
         {},
         [
-            suunto_sample(0, Depth=20.0, NoDecTime=-1, RtGradientFactors={"gf99": -100, "gfSurface": 0}),
-            suunto_sample(10, Depth=20.0, NoDecTime=600, RtGradientFactors={"gf99": 42, "gfSurface": 30}),
+            suunto_sample(
+                0,
+                Depth=20.0,
+                NoDecTime=-1,
+                TimeToSurface=-1,
+                RtGradientFactors={"gf99": -100, "gfSurface": 0},
+            ),
+            suunto_sample(
+                10,
+                Depth=20.0,
+                NoDecTime=600,
+                TimeToSurface=120,
+                RtGradientFactors={"gf99": 42, "gfSurface": 30},
+            ),
         ],
     )
     profile = profile_of(conversion.document["dives"][0])
     assert profile["ndl"] == {"times": [10], "values": [600]}
+    assert profile["tts"] == {"times": [10], "values": [120]}
     assert profile["gradient_factor"] == {"times": [10], "values": [42]}
     # A zero surface gradient factor is a reading, and stays.
     assert profile["surface_gradient_factor"] == {"times": [0, 10], "values": [0, 30]}
     dropped = _messages(conversion, "dropped")
-    assert any("ndl readings" in message and "negative" in message for message in dropped)
-    assert any("gradient_factor readings" in message and "negative" in message for message in dropped)
+    for channel in ("ndl", "tts", "gradient_factor"):
+        assert any(f"{channel} readings" in message and "negative" in message for message in dropped)
 
 
 @pytest.mark.parametrize("spelling", ["gfSurface", "gtSurface"])

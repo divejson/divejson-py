@@ -1296,10 +1296,15 @@ class _Converter:
             if sample.ndl is not None:
                 ndl.record(second, rounded(sample.ndl))
             if sample.tts is not None:
-                if sample.tts > 0:
-                    tts.record(second, rounded(sample.tts))
-                elif sample.tts == 0:
+                if sample.tts == 0:
                     empty_tts += 1
+                else:
+                    # Everything that is not this device's zero goes to the channel,
+                    # negatives included: §6.4 floors `tts` at zero and `Channel` is where
+                    # that floor is applied and reported, once for every format. Refusing a
+                    # negative here instead would drop it silently, which is the one thing
+                    # the shared floor exists to stop.
+                    tts.record(second, rounded(sample.tts))
             if sample.gradient_factor is not None:
                 gradient_factor.record(second, rounded(sample.gradient_factor))
             if sample.surface_gradient_factor is not None:
@@ -1348,8 +1353,11 @@ class _Converter:
 
         Three families are read and the rest are dropped, which is a decision about noise
         rather than about trust. `GasSwitch` is the dive's gas history; `Notify` is the
-        device prompting the diver, two of whose values are stops; `Alarm` and `Warning` are
-        the things that went wrong, which are the events a diver most wants marked.
+        computer naming its own state, of which `STOP_TYPES` carries the values that name an
+        occurrence §6.6 has a type for — the two stops, the moment a dive became a
+        decompression dive, and a safety stop broken — and drops the rest for the reasons
+        that table gives; `Alarm` and `Warning` are the things that went wrong, which are the
+        events a diver most wants marked.
 
         **Everything under `State` is dropped**: it is the computer narrating its own mode —
         "Below Surface", "Wet Outside", "Dive Active" — which is not an event on a dive, and
