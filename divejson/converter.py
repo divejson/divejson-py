@@ -623,7 +623,14 @@ def deco_model(
     the DM5 XML's `<PersonalMode>` — so the rules that hold across all four are here rather
     than four times over: §6.4c's member order, the name trimmed and capped with an empty
     one read as absence (§5.4), the schema's range on a gradient factor, **both or neither**
-    on the pair, and §6.4b's rule that an object with no members is not written at all.
+    on the pair, **§3 rule 7's ordering**, and §6.4b's rule that an object with no members is
+    not written at all.
+
+    Every one of those is the same argument: a reading the format cannot hold resolves to an
+    omission and a note here, because the alternative is `validate_document` refusing this
+    converter's own output and taking the whole file — or, under an archive, every dive in
+    it — with it. `docs/converting.md` states the rule and calls a converter that reaches a
+    validation failure a bug rather than a file that was unusual.
 
     `conservatism` passes through whatever integer it was handed, and that is deliberate:
     §6.4c puts no floor on the member because Suunto's scale runs P−2 to P2, so a `-1` is a
@@ -665,7 +672,21 @@ def deco_model(
                 f"percent from 0 to {ceiling}; dropped",
                 "dropped",
             )
-    if len(pair) == 2:
+    if len(pair) == 2 and pair["gf_low"] > pair["gf_high"]:
+        # §3's rule 7, which the schema cannot express and this converter's own output is
+        # held to: a low above a high is a model nothing ran. **Both go**, because the file
+        # does not say which of the two is the wrong one and choosing would be §5.4's guess.
+        # It is dropped here rather than left to `validate_document`, which raises and takes
+        # the whole file — or the whole archive — with it: every way a source can be wrong
+        # is supposed to resolve to an omission and a note (`docs/converting.md`).
+        note(
+            where,
+            f"{labels.get('gf_low', 'gf_low')} is {pair['gf_low']} and "
+            f"{labels.get('gf_high', 'gf_high')} is {pair['gf_high']}, and §3 rule 7 records a low no higher "
+            "than its high; both are dropped, the source not saying which of the two is wrong",
+            "dropped",
+        )
+    elif len(pair) == 2:
         built.update(pair)
     elif pair:
         member, value = next(iter(pair.items()))

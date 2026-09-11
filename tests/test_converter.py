@@ -299,3 +299,26 @@ def test_the_recordings_members_come_out_in_the_sections_order() -> None:
         device={"model": "Perdix 3"},
     )
     assert list(built) == ["device", "mode", "deco_model", "started_at", "source_files", "profile"]
+
+
+def test_an_inverted_gradient_factor_pair_is_dropped_rather_than_reaching_validation() -> None:
+    """§3's rule 7, kept here rather than left to the validator.
+
+    `validate_document` does check it, and a converter that let an inverted pair through
+    would raise `NonConformingOutputError` and lose the whole file — every dive in it, under
+    an archive — over one setting the source got wrong. `docs/converting.md` calls reaching
+    a validation failure a bug in the converter rather than a property of the file.
+
+    **Both halves go**, because nothing in a source that states `85/50` says which of the two
+    it meant, and choosing would be §5.4's guess.
+    """
+    notes: list[str] = []
+    assert _built({"algorithm": "buhlmann", "gf_low": 85, "gf_high": 50}, notes) == {
+        "algorithm": "buhlmann"
+    }
+    assert any("§3 rule 7" in message for message in notes)
+
+
+def test_an_equal_pair_is_not_inverted() -> None:
+    """The rule is `gf_low <= gf_high`: a diver who dialled 85/85 ran a model."""
+    assert _built({"gf_low": 85, "gf_high": 85}) == {"gf_low": 85, "gf_high": 85}

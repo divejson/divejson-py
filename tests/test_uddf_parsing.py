@@ -768,6 +768,21 @@ def test_a_gradient_factor_pair_outside_the_range_takes_the_other_half_with_it()
     assert any("both or neither" in message for message in messages(data))
 
 
+def test_an_inverted_gradient_factor_pair_costs_the_pair_and_not_the_file() -> None:
+    """UDDF states its own `0.0 <= GF Low <= GF High <= 1.0` and a file may still break it.
+
+    The dive survives: a converter that carried the pair through would fail its own output
+    validation and lose the whole document over one setting.
+    """
+    header = (
+        '<decomodel><buehlmann id="m"><gradientfactorlow>0.85</gradientfactorlow>'
+        "<gradientfactorhigh>0.5</gradientfactorhigh></buehlmann></decomodel>"
+    )
+    body = before('<link ref="m" />') + ONE_SAMPLE
+    assert _recording(body, header=header)["deco_model"] == {"algorithm": "buhlmann"}
+    assert any("§3 rule 7" in message for message in messages(one_dive(body, header=header)))
+
+
 @pytest.mark.parametrize(
     ("written", "mode"),
     [
