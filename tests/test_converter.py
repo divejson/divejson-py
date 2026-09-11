@@ -16,18 +16,33 @@ import pytest
 from divejson import Conversion, Note
 from divejson.converter import (
     INFERRED,
+    MAX_MODEL_NAME,
     NOTE_KINDS,
     Claimed,
     Scope,
+    channel_floor,
+    deco_model,
     header,
+    profile_members,
     record_inferred,
     recorded,
+    recording,
     zero_is_an_answer,
 )
 
 
 def _conversion(*notes: Note) -> Conversion:
     return Conversion({}, notes)
+
+
+def _built(members: dict, notes: list | None = None) -> dict | None:
+    """§6.4c's object from `members`, appending any report lines to `notes`."""
+    collected = notes if notes is not None else []
+    return deco_model(
+        members,
+        note=lambda where, message, kind: collected.append(message),
+        where="dive/0",
+    )
 
 
 # -- notes ----------------------------------------------------------------------------
@@ -185,3 +200,102 @@ def test_a_member_the_schema_does_not_have_raises_rather_than_guessing() -> None
 )
 def test_recorded_takes_the_members_floor_and_nothing_else(value, member: str, carried: bool) -> None:
     assert recorded(value, record="dive", member=member) is carried
+
+
+# -- a channel's floor, and §6.4's member order ----------------------------------------
+
+
+@pytest.mark.parametrize("channel", ["ndl", "tts", "ppo2", "cns", "gradient_factor", "surface_gradient_factor"])
+def test_the_decompression_readouts_floor_at_zero(channel: str) -> None:
+    """None of those quantities has a negative reading, so a source that writes one is
+    spelling *no figure* in the only space it had."""
+    assert channel_floor(channel) == 0
+
+
+@pytest.mark.parametrize("channel", ["depth", "ceiling", "temperature", "pressures"])
+def test_the_signed_channels_floor_at_nothing(channel: str) -> None:
+    """A ceiling and a temperature are both legitimately negative, and §6.3 bounds a
+    cylinder pressure in the reader that reads it rather than in the series definition."""
+    assert channel_floor(channel) is None
+
+
+def test_the_profile_member_order_is_the_schemas() -> None:
+    """A converted profile reads down §6.4, and the order is the schema's to say — so
+    `pressures` keeps its place between `temperature` and the readouts."""
+    assert profile_members()[:6] == ("duration", "depth", "ceiling", "temperature", "pressures", "ndl")
+    assert profile_members()[-2:] == ("events", "extensions")
+
+
+# -- §6.4c's Deco Model ----------------------------------------------------------------
+
+
+def test_a_model_with_nothing_in_it_is_not_written_at_all() -> None:
+    """§6.4b's rule applied to §6.4c: an object with no members is absence, not an object."""
+    assert _built({}) is None
+    assert _built({"algorithm": None, "name": None, "conservatism": None}) is None
+
+
+def test_the_members_come_out_in_the_sections_order() -> None:
+    built = _built({"conservatism": -1, "gf_high": 85, "gf_low": 30, "name": "ZHL-16C", "algorithm": "buhlmann"})
+    assert list(built) == ["algorithm", "name", "gf_low", "gf_high", "conservatism"]
+
+
+def test_a_name_is_trimmed_and_an_empty_one_is_absence() -> None:
+    assert _built({"name": "  Suunto Fused2 RGBM  "}) == {"name": "Suunto Fused2 RGBM"}
+    assert _built({"name": "   "}) is None
+
+
+def test_a_name_past_the_sections_cap_is_cut_and_reported() -> None:
+    """§6.4c caps it at 64: this is a product string a manufacturer chose, not free text."""
+    notes: list[str] = []
+    built = _built({"name": "M" * 100}, notes)
+    assert len(built["name"]) == MAX_MODEL_NAME
+    assert any("the format caps it at 64" in message for message in notes)
+
+
+@pytest.mark.parametrize("value", [-1, 101, 1000])
+def test_a_gradient_factor_outside_the_schemas_range_takes_its_partner_with_it(value: int) -> None:
+    """The pair is `dependentRequired` both ways, so half of it is a document this package's
+    own validation would reject."""
+    notes: list[str] = []
+    assert _built({"gf_low": 30, "gf_high": value}, notes) is None
+    assert any("whole percent from 0 to 100" in message for message in notes)
+    assert any("both or neither" in message for message in notes)
+
+
+def test_a_conservatism_has_no_floor_and_a_zero_is_a_setting() -> None:
+    """Suunto's scale runs P−2 to P2, so this is the one member here where a negative is a
+    reading — and §6.4c is what says so, by putting no `minimum` on it."""
+    assert _built({"conservatism": -2}) == {"conservatism": -2}
+    assert _built({"conservatism": 0}) == {"conservatism": 0}
+
+
+def test_a_boolean_is_not_an_integer_here() -> None:
+    """`True` is an `int` in Python and is not a gradient factor anywhere."""
+    assert _built({"gf_low": True, "gf_high": True, "conservatism": False}) is None
+
+
+# -- §6.4a's Recording -----------------------------------------------------------------
+
+
+def test_a_mode_or_a_model_alone_does_not_make_a_recording() -> None:
+    """§3's rule 4 names `device`, `profile` and `source_files`, and neither of the two
+    members §6.4a gained is one of them — a recording built from a mode alone would emit
+    `recordings: [{}]`'s conforming twin and describe no record of a dive at all."""
+    assert recording(mode="gauge", deco_model={"conservatism": 0}) is None
+    assert recording(mode="gauge", device={"model": "Perdix 3"}) == {
+        "device": {"model": "Perdix 3"},
+        "mode": "gauge",
+    }
+
+
+def test_the_recordings_members_come_out_in_the_sections_order() -> None:
+    built = recording(
+        profile={"duration": 60},
+        source_files=[{"uuid": "0198a6f0-2222-7120-8000-000000000120"}],
+        started_at="2026-04-17T11:49:23+02:00",
+        deco_model={"conservatism": 0},
+        mode="open_circuit",
+        device={"model": "Perdix 3"},
+    )
+    assert list(built) == ["device", "mode", "deco_model", "started_at", "source_files", "profile"]

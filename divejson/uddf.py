@@ -41,17 +41,23 @@ this format's own reference implementation writes `dive-<uuid>` — they are reu
 round trip through UDDF comes back with the identities it left with.
 
 **Absence is reported, never filled.** Every member the source did not record is omitted
-and named in the report. The two *unit* ambiguities are the deliberate exceptions and are
-not the same case: `<tankvolume>`'s cubic-metres-or-litres and `<o2>`'s
-fraction-or-percent are values that **were** recorded, whose scale alone is in doubt, so a
-magnitude test there interprets data rather than inventing it. Both fire loudly into the
-report, as notes of kind `resolved` — the kind that exists for exactly this, a number the
-source supplied and the converter only had to read at the scale it must have meant. They
-are deliberately not `inferred`, which is reserved for a value computed from other
-readings and carries the obligation to list its member under
-`extensions.divejson.inferred`; a resolution lists nothing, because there is no derivation
-for a reader to be told about. So this reader infers nothing and that list is absent from
-every document it produces, while its report still says out loud where it chose a scale.
+and named in the report. The *unit* ambiguities are the deliberate exceptions and are not
+the same case: `<tankvolume>`'s cubic-metres-or-litres, `<o2>`'s fraction-or-percent and
+`<calculatedpo2>`'s bar-or-Pascal are values that **were** recorded, whose scale alone is in
+doubt, so a magnitude test there interprets data rather than inventing it. The gradient
+factors are the ambiguity a magnitude test cannot settle, and `PERCENT_GRADIENT_FACTORS`
+settles them on the generator instead. Every one of them fires loudly into the report, as a
+note of kind `resolved` — the kind that exists for exactly this, a number the source
+supplied and the converter only had to read at the scale it must have meant. They are
+deliberately not `inferred`, which is reserved for a value computed from other readings and
+carries the obligation to list its member under `extensions.divejson.inferred`; a resolution
+lists nothing, because there is no derivation for a reader to be told about. So this reader
+infers nothing and that list is absent from every document it produces, while its report
+still says out loud where it chose a scale.
+
+That paragraph carried a count until this reader gained a third scale. It does not carry one
+now, for the reason `docs/uddf-mapping.md`'s own heading gives: one more ambiguity is exactly
+the sort of thing that arrives without the number in front of it being corrected.
 """
 
 from __future__ import annotations
@@ -78,6 +84,7 @@ from .converter import (
     NoteKind,
     Scope,
     capped,
+    deco_model,
     decimal_of,
     device,
     header,
@@ -189,10 +196,39 @@ GEAR_TYPE: dict[str, str] = {
 # `wetsuit`, which is what every one of them is.
 _DRYSUIT_TYPES = {"dry-suit", "drysuit", "hot-water-suit"}
 
-# A `<setmarker>` whose text is exactly one of these is that event, rather than an
-# `"other"` labelled with the word. It is what makes this format's own markers survive a
-# round trip through UDDF, whose `<setmarker>` is a bare string with no type beside it.
+# A `<setmarker>` whose text is exactly one of these is that event, rather than an event
+# with no type at all labelled with the word. It is what makes this format's own markers
+# survive a round trip through UDDF, whose `<setmarker>` is a bare string with no type
+# beside it.
 _MARKER_TYPES = {"deep_stop", "safety_stop", "bookmark"}
+
+# `<divemode @type>` onto §6.4a's `mode`. `divemodeType` enumerates five values and
+# DiveJSON five, and they are not the same five: **UDDF spells a freedive twice** — `apnoe`
+# is the original and `apnea` was added beside it in 2017 as the English word, both current
+# in 3.2.x — and it has no value for a computer run as a **gauge**. A reader that knew one
+# freedive spelling would drop every freedive from whichever half of the installed base
+# wrote the other, which is why both are here.
+_DIVE_MODES = {
+    "opencircuit": "open_circuit",
+    "closedcircuit": "closed_circuit",
+    "semiclosedcircuit": "semi_closed",
+    "apnoe": "freedive",
+    "apnea": "freedive",
+}
+
+# `<calculatedpo2>` at or below this is bar; above it is the Pascal the documentation
+# states. Three orders of magnitude separate the two spellings and a breathable ppO₂ lives
+# between about 0.1 and 2 bar, so nothing overlaps — Shearwater Cloud Desktop writes
+# `0.399999976` for 0.4 bar where the documentation asks for 40 000.
+PO2_BAR_THRESHOLD = Decimal(10)
+
+# The scales §6.4 fixes for the two channels only this reader lands on, as factors off the
+# units UDDF states. ppO₂ is hundredths of a bar, so a reading already in bar multiplies by
+# 100 and one in Pascal divides by 1 000 — a hundredth of a bar being a kilopascal. A
+# gradient factor is whole percent, which is what the documented fraction multiplies by.
+HUNDREDTHS_PER_UNIT = Decimal(100)
+PASCAL_PER_PO2_HUNDREDTH = Decimal(1000)
+PERCENT_PER_FRACTION = Decimal(100)
 
 # The generators this reader knows, and what each one is read differently for. An entry
 # here changes how one application's files are read and no others', which makes it the
@@ -215,6 +251,30 @@ _MARKER_TYPES = {"deep_stop", "safety_stop", "bookmark"}
 LOCAL_CLOCK_WITH_Z: dict[str, str] = {
     "Shearwater Cloud Desktop": "Shearwater_Research_Inc",
 }
+
+# **The gradient factors are whole percent, not the documented fraction.** The same table
+# and the same two-keys rule, for a second thing that generator writes differently.
+# `<gradientfactorlow>` and `<gradientfactorhigh>` are documented as fractions and the
+# per-waypoint `<gradientfactor>` as "a percentage as a real number" with no range at all,
+# its one example `0.8` glossed as 80 %; Shearwater Cloud Desktop writes `50` and `85` for
+# the pair and `0`, `1` and `3` to `17` per waypoint.
+#
+# **A magnitude test cannot settle this one**, which is what makes it the table's case
+# rather than a heuristic's. Nearly every per-waypoint value in hand is `0` or `1`, and the
+# `<o2>` shape would read that `1` as 100 % — a leading tissue at its M-value on a 15 m
+# no-decompression dive, which is not what the file says. The pair follows the same row: a
+# file that writes one of the three in percent writes all three that way.
+PERCENT_GRADIENT_FACTORS: dict[str, str] = {
+    "Shearwater Cloud Desktop": "Shearwater_Research_Inc",
+}
+
+# What the report says when *that* rule fires, once per file rather than once per reading:
+# the scale is a property of the generator, so a line per waypoint would be one fact about
+# the file written out a hundred and twenty-eight times.
+PERCENT_GRADIENT_NOTE = (
+    "the generator writes gradient factors in whole percent where the documentation's "
+    "examples show a fraction; read as the percent §6.4 records (spec §6.4c)"
+)
 
 # What the report says when that rule fires. `resolved` rather than `inferred` because the
 # digits written are the ones the source recorded and only their meaning was in doubt, so
@@ -389,7 +449,15 @@ class _Converter:
         # device. Resolving a dive's link through the gear table would lose exactly those.
         self.computers: dict[str, ET.Element] = {}
         self.mixes: dict[str, dict[str, Any]] = {}
+        # `<decomodel>`'s children by their own `@id`, filled by `read_deco_models` and
+        # reached by a dive's `<link ref>` under `<informationbeforedive>`. Every child is
+        # listed and only `<buehlmann>` carries a §6.4c object, so a `<vpm>` or an `<rgbm>`
+        # a dive links resolves — it is not a dangling reference — and is reported as a
+        # model this reader cannot name.
+        self.deco_models: dict[str, ET.Element] = {}
         self.local_clock_with_z = self.generator_writes_a_local_z()
+        self.percent_gradient_factors = self.generator_writes_percent_gradient_factors()
+        self.reported_gradient_scale = False
 
     # -- reporting ---------------------------------------------------------------
 
@@ -400,7 +468,15 @@ class _Converter:
     # -- the generator table -----------------------------------------------------
 
     def generator_writes_a_local_z(self) -> bool:
-        """Whether `LOCAL_CLOCK_WITH_Z` claims the application that wrote this file.
+        """Whether `LOCAL_CLOCK_WITH_Z` claims the application that wrote this file."""
+        return self.generator_is_in(LOCAL_CLOCK_WITH_Z)
+
+    def generator_writes_percent_gradient_factors(self) -> bool:
+        """Whether `PERCENT_GRADIENT_FACTORS` claims the application that wrote this file."""
+        return self.generator_is_in(PERCENT_GRADIENT_FACTORS)
+
+    def generator_is_in(self, table: dict[str, str]) -> bool:
+        """Whether one generator table names this document's writer.
 
         Read once per file rather than per dive: `<generator>` is a property of the
         document, and asking it again for every dive would make a logbook's cost depend on
@@ -410,7 +486,7 @@ class _Converter:
         name = _text_of(generator, "name")
         if name is None:
             return False
-        maker = LOCAL_CLOCK_WITH_Z.get(name.strip())
+        maker = table.get(name.strip())
         return maker is not None and _attr(_kid(generator, "manufacturer"), "id") == maker
 
     # -- identity ----------------------------------------------------------------
@@ -472,10 +548,11 @@ class _Converter:
             if source_id is not None:
                 self.source_ids.add(source_id)
 
-        # Order matters: the dives resolve links into the tables the four calls above it
+        # Order matters: the dives resolve links into the tables the five calls above it
         # fill, and the diver is last only so its identity yields to a real record's on
         # the vanishingly rare id collision.
         self.read_mixes()
+        self.read_deco_models()
         sites = self.read_sites()
         trips = self.read_trips()
         gear = self.read_gear()
@@ -824,6 +901,78 @@ class _Converter:
                     self.note(where, f"<maximumpo2> is {po2_limit} bar, outside the 0.4 to 2.0 the format allows; dropped", "dropped")
             self.mixes[source_id] = mix
 
+    def read_deco_models(self) -> None:
+        """`<decomodel>`'s children into a table the dives' `<link ref>` resolves into.
+
+        A logbook holds one `<decomodel>` block and many dives, and nothing says every dive
+        ran the same model — so the model becomes *this dive's* through the `<link>` under
+        its `<informationbeforedive>` rather than by being the only one in the file. The
+        elements are kept rather than the objects they read as, because which of the three a
+        link landed on is what the dive has to report.
+
+        **`<tablegeneration><calculateprofile><profile><decomodel>` is deliberately not
+        read**: that element names the model a *recalculation* used, which is an
+        application's arithmetic rather than the device's, and §6.4c's object is what the
+        device ran. `_kids` takes only the root's own `<decomodel>` children, so the nested
+        one is out of reach by construction.
+        """
+        for element in _kids(self.root, "decomodel"):
+            for model in element:
+                source_id = _attr(model, "id")
+                if source_id is not None:
+                    self.deco_models[source_id] = model
+
+    def read_deco_model(self, before: ET.Element | None, where: str) -> dict[str, Any] | None:
+        """The §6.4c model a dive links, or nothing where it links none.
+
+        Only `<buehlmann>` is mapped. `<vpm>` and `<rgbm>` are on the not-mapped list with
+        the reason this reader gives everywhere: no file in hand carries either, and §6.4c's
+        `algorithm` has no value seeded for them, so a link to one is reported rather than
+        turned into a family this reader would be guessing at.
+        """
+        for link in _kids(before, "link"):
+            ref = _attr(link, "ref")
+            model = self.deco_models.get(ref) if ref is not None else None
+            if model is None:
+                continue
+            if local_name(model) != "buehlmann":
+                self.note(
+                    where,
+                    f"the dive's decompression model is a <{local_name(model)}>, and §6.4c names the two "
+                    "families a file in hand states; the model is dropped rather than read as one of them",
+                    "dropped",
+                )
+                return None
+            return deco_model(
+                {
+                    "algorithm": "buhlmann",
+                    "gf_low": self.gradient_factor(model, "gradientfactorlow"),
+                    "gf_high": self.gradient_factor(model, "gradientfactorhigh"),
+                },
+                note=self.note,
+                where=where,
+                labels={"gf_low": "<gradientfactorlow>", "gf_high": "<gradientfactorhigh>"},
+            )
+        return None
+
+    def gradient_factor(self, parent: ET.Element | None, tag: str = "gradientfactor") -> int | None:
+        """One gradient factor as §6.4's whole percent, at the scale its generator writes.
+
+        The same rule for all three elements, and it is the generator's rather than the
+        value's — `PERCENT_GRADIENT_FACTORS` says why a magnitude test cannot settle it.
+        Reported once per file, the first time it fires, because a scale is a property of
+        the writer and not of any one reading.
+        """
+        value = decimal_of(_text_of(parent, tag))
+        if value is None:
+            return None
+        if not self.percent_gradient_factors:
+            return rounded(value * PERCENT_PER_FRACTION)
+        if not self.reported_gradient_scale:
+            self.note("$", PERCENT_GRADIENT_NOTE, "resolved")
+            self.reported_gradient_scale = True
+        return rounded(value)
+
     # -- dives -------------------------------------------------------------------
 
     def dive_elements(self) -> list[ET.Element]:
@@ -938,7 +1087,7 @@ class _Converter:
             dive["gear_uuids"] = gear_uuids
 
         cylinders, mix_refs = self.read_cylinders(element, where)
-        profile, needs_gas_numbers = self.read_profile(element, where, mix_refs)
+        profile, needs_gas_numbers, mode = self.read_profile(element, where, mix_refs)
         if needs_gas_numbers:
             for gas_number, cylinder in enumerate(cylinders):
                 cylinder["gas_number"] = gas_number
@@ -950,7 +1099,9 @@ class _Converter:
             )
         if cylinders:
             dive["cylinders"] = cylinders
-        recordings = self.read_recordings(before, used, profile, where)
+        recordings = self.read_recordings(
+            before, used, profile, mode, self.read_deco_model(before, where), where
+        )
         if recordings:
             dive["recordings"] = recordings
         return dive
@@ -960,6 +1111,8 @@ class _Converter:
         before: ET.Element | None,
         used: ET.Element | None,
         profile: dict[str, Any] | None,
+        mode: str | None,
+        model: dict[str, Any] | None,
         where: str,
     ) -> list[dict[str, Any]]:
         """A §6.4a Recording per `<divecomputer>` the dive links, in link order.
@@ -994,13 +1147,19 @@ class _Converter:
                     "to belong to, so there is no device to carry it; dropped (spec §6.4b)",
                     "dropped",
                 )
-            built = recording(profile=profile)
+            built = recording(profile=profile, mode=mode, deco_model=model)
             return [built] if built is not None else []
 
         recordings: list[dict[str, Any]] = []
         for index, element in enumerate(linked):
             built = recording(
                 device=self.read_device(element, counter if index == 0 else None, where),
+                # The mode and the model go where the profile goes, and for the same
+                # reason: UDDF states `<divemode>` on the dive's one sample stream and links
+                # its `<decomodel>` from the dive, never from a computer, so a dive linking
+                # two computers has no way in the file to say whose either is.
+                mode=mode if index == 0 else None,
+                deco_model=model if index == 0 else None,
                 profile=profile if index == 0 else None,
             )
             if built is not None:
@@ -1110,11 +1269,13 @@ class _Converter:
                     resolved.append(table[ref])
             elif ref not in self.source_ids:
                 self.note(where, f"a link points at {ref!r}, which nothing in the file defines; the reference is dropped", "dropped")
-            elif ref not in self.mixes:
+            elif ref not in self.mixes and ref not in self.deco_models:
                 # A `<link>` under `informationbeforedive` addresses a site here, but the
                 # schema lets it address a buddy or a shop too, and one under
                 # `<equipmentused>` addresses a piece of kit. A reference to a record this
-                # converter carries nowhere is worth a note; a gas reference is not.
+                # converter carries nowhere is worth a note; a gas reference is not, and
+                # neither is a decompression model — that one resolves in `read_deco_model`
+                # and was reported there if it went nowhere.
                 self.note(where, f"a link points at {ref!r}, which is not a {kind} this converter carries; the reference is dropped", "dropped")
         return resolved
 
@@ -1211,8 +1372,8 @@ class _Converter:
 
     def read_profile(
         self, element: ET.Element, where: str, mix_refs: list[str | None]
-    ) -> tuple[dict[str, Any] | None, bool]:
-        """`<samples><waypoint>` as a Profile, and whether the dive needs gas numbers.
+    ) -> tuple[dict[str, Any] | None, bool, str | None]:
+        """`<samples><waypoint>` as a Profile, whether gas numbers are needed, and the mode.
 
         UDDF puts every reading taken at one instant inside one `<waypoint>`; DiveJSON
         splits them into channels sampled on their own axes. So the waypoints set the time
@@ -1224,10 +1385,15 @@ class _Converter:
         second, the profile that is not written at all — is `series.SampleAxis`, shared
         with every other format, and only what is UDDF's is below: which element carries
         which channel, and what a `<tankpressure ref>` resolves to.
+
+        **The recording's `mode` comes back from here** because `<divemode>` is a waypoint
+        child rather than a dive-level element: the first waypoint that states one gives the
+        recording its mode, and the third return value is that. §6.4a is where it lands, not
+        §6.5, so it leaves this method rather than joining the profile.
         """
         samples = _kid(element, "samples")
         if samples is None:
-            return None, False
+            return None, False, None
 
         axis = SampleAxis(self.note, where, noun="waypoint", time_member="<divetime>")
         for waypoint in _kids(samples, "waypoint"):
@@ -1238,11 +1404,17 @@ class _Converter:
             if ref is not None:
                 cylinders_of_mix.setdefault(ref, []).append(index)
 
-        depth = Channel()
-        temperature = Channel()
+        depth = Channel("depth")
+        temperature = Channel("temperature")
+        ndl = Channel("ndl")
+        ppo2 = Channel("ppo2")
+        cns = Channel("cns")
+        gradient_factor = Channel("gradient_factor")
         pressures: dict[int, Channel] = {}
         events: list[dict[str, Any]] = []
         needs_gas_numbers = False
+        mode: str | None = None
+        reported_pascal_po2 = False
 
         for second, waypoint in axis.ordered():
             metres = decimal_of(_text_of(waypoint, "depth"))
@@ -1253,11 +1425,45 @@ class _Converter:
             if kelvin is not None:
                 temperature.record(second, rounded((kelvin - KELVIN_OFFSET) * TENTHS_PER_UNIT))
 
+            # Seconds already, which is §6.4's unit. A value at the device's display cap —
+            # 5 940, the Shearwater's 99 minutes — is a reading rather than a missing one:
+            # it means *at least this*, which is the number the diver read off their wrist.
+            seconds = decimal_of(_text_of(waypoint, "nodecotime"))
+            if seconds is not None:
+                ndl.record(second, rounded(seconds))
+
+            po2, in_pascal = self.po2_hundredths(_text_of(waypoint, "calculatedpo2"))
+            if po2 is not None:
+                if in_pascal and not reported_pascal_po2:
+                    self.note(
+                        where,
+                        "<calculatedpo2> is above 10, so it is the Pascal the documentation states rather than "
+                        "the bar current writers emit; read as Pascal",
+                        "resolved",
+                    )
+                    reported_pascal_po2 = True
+                ppo2.record(second, po2)
+
+            percent = decimal_of(_text_of(waypoint, "cns"))
+            if percent is not None:
+                cns.record(second, rounded(percent * TENTHS_PER_UNIT))
+
+            factor = self.gradient_factor(waypoint)
+            if factor is not None:
+                gradient_factor.record(second, factor)
+
+            mode = self.waypoint_mode(waypoint, mode, second, where)
+
             for cylinder_index, tenths in self.waypoint_pressures(waypoint, where, second, cylinders_of_mix, len(mix_refs)):
-                channel = pressures.setdefault(cylinder_index, Channel())
-                if not channel.record(second, tenths):
+                channel = pressures.setdefault(cylinder_index, Channel("pressures"))
+                # Asked before the reading is offered rather than read off `record`'s
+                # answer, which has two refusals in it: a pressure channel carries no floor
+                # and so can only be refused for the second, but a caller that reported a
+                # floor refusal as a collision would be saying the wrong thing quietly.
+                if channel.taken(second):
                     self.note(where, f"two tank pressures at {second} s resolve to the same cylinder; the later one is dropped", "dropped")
                     continue
+                channel.record(second, tenths)
                 needs_gas_numbers = True
 
             marker = _text_of(waypoint, "setmarker")
@@ -1265,7 +1471,10 @@ class _Converter:
                 if marker in _MARKER_TYPES:
                     events.append({"time": second, "type": marker})
                 else:
-                    events.append({"time": second, "type": "other", "label": marker})
+                    # No `type` at all, which §6.6 makes the spelling of an unclassified
+                    # event: `<setmarker>` is a bare string with no type beside it, and the
+                    # device's own wording is all this one has.
+                    events.append({"time": second, "label": marker})
 
             switch = _kid(waypoint, "switchmix")
             if switch is not None:
@@ -1284,11 +1493,80 @@ class _Converter:
                 events.append(event)
 
         profile = axis.profile(
-            {"depth": depth, "temperature": temperature},
+            # §6.4's own member order, so a converted profile reads down the section.
+            {
+                "depth": depth,
+                "temperature": temperature,
+                "ndl": ndl,
+                "ppo2": ppo2,
+                "cns": cns,
+                "gradient_factor": gradient_factor,
+            },
             pressures=tuple(pressures.items()),
             events=events,
         )
-        return profile, (needs_gas_numbers if profile else False)
+        return profile, (needs_gas_numbers if profile else False), mode
+
+    def po2_hundredths(self, text: str | None) -> tuple[int | None, bool]:
+        """A `<calculatedpo2>` as §6.4's hundredths of a bar, and whether it was Pascal.
+
+        The documentation states Pascal and Shearwater Cloud Desktop writes `0.399999976`
+        for a ppO₂ of 0.4 bar. The two spellings are three orders of magnitude apart and a
+        breathable ppO₂ lives between about 0.1 and 2 bar, so nothing overlaps and the value
+        settles it: at or below 10 it is bar, above it Pascal. `converting.md`'s ambiguity of
+        scale, reported `resolved` when the second branch fires.
+        """
+        value = decimal_of(text)
+        if value is None:
+            return None, False
+        if value <= PO2_BAR_THRESHOLD:
+            return rounded(value * HUNDREDTHS_PER_UNIT), False
+        return rounded(value / PASCAL_PER_PO2_HUNDREDTH), True
+
+    def waypoint_mode(
+        self, waypoint: ET.Element, standing: str | None, second: int, where: str
+    ) -> str | None:
+        """One waypoint's `<divemode @type>` against the mode the recording already has.
+
+        **The first waypoint that states a value wins**, in recorded-time order, and a later
+        waypoint stating a *different* one is reported and dropped: the only place §6.6 could
+        carry a mid-dive switch is an event, an event with no type needs a `label`, and a
+        label a converter invents is §5.4's fabrication. A later waypoint that simply stops
+        stating the mode is not a change — an absence is not a claim — and no file in hand
+        changes mode mid-dive.
+
+        A `@type` outside the table, or a `<divemode>` with no `@type`, leaves the mode
+        absent and is reported: §6.4a forbids assuming open circuit, and the element is not
+        schema-valid without one anyway.
+        """
+        element = _kid(waypoint, "divemode")
+        if element is None:
+            return standing
+        stated = _attr(element, "type")
+        mode = _DIVE_MODES.get(stated) if stated is not None else None
+        if mode is None:
+            # `@type` is `use="required"` on `divemodeType`, so a `<divemode>` without one is
+            # not schema-valid either — and schema validity was never a precondition here, so
+            # it is read and reported like any other value this reader cannot place.
+            said = "no dive mode" if stated is None else f"the dive mode {stated!r}"
+            self.note(
+                where,
+                f"a waypoint records {said}, which is not one of the five UDDF spells; the recording's mode "
+                "is left unrecorded rather than assumed (spec §6.4a)",
+                "dropped",
+            )
+            return standing
+        if standing is None:
+            return mode
+        if mode != standing:
+            self.note(
+                where,
+                f"the dive mode changes to {stated!r} at {second} s, and §6.4a records one mode for a "
+                "recording; the change is dropped, there being no event a converter could label without "
+                "inventing the device's wording (spec §5.4)",
+                "dropped",
+            )
+        return standing
 
     def waypoint_pressures(
         self,

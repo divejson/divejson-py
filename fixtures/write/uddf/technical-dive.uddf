@@ -145,62 +145,99 @@
         </tankdata>
         <samples>
           <waypoint>
+            <cns>4.5</cns>
+            <calculatedpo2>0.18</calculatedpo2>
             <depth>0</depth>
             <divetime>0</divetime>
             <switchmix ref="mix-1" />
             <tankpressure ref="mix-1">22000000</tankpressure>
             <tankpressure ref="mix-2">21800000</tankpressure>
             <temperature>289.35</temperature>
+            <divemode type="opencircuit" />
+            <gradientfactor>0</gradientfactor>
+            <nodecotime>5940</nodecotime>
           </waypoint>
           <waypoint>
+            <cns>5</cns>
+            <calculatedpo2>0.51</calculatedpo2>
             <depth>18.3</depth>
             <divetime>120</divetime>
+            <gradientfactor>0.08</gradientfactor>
+            <nodecotime>1200</nodecotime>
           </waypoint>
           <waypoint>
+            <cns>9.5</cns>
+            <calculatedpo2>1.28</calculatedpo2>
             <depth>61</depth>
             <divetime>600</divetime>
+            <gradientfactor>0.22</gradientfactor>
+            <nodecotime>0</nodecotime>
           </waypoint>
           <waypoint>
+            <cns>21</cns>
+            <calculatedpo2>1.3</calculatedpo2>
             <depth>62.3</depth>
             <divetime>1500</divetime>
             <temperature>280.55</temperature>
+            <gradientfactor>0.31</gradientfactor>
+            <nodecotime>0</nodecotime>
           </waypoint>
           <waypoint>
+            <cns>33</cns>
+            <calculatedpo2>1.22</calculatedpo2>
             <depth>58</depth>
             <divetime>2400</divetime>
             <tankpressure ref="mix-1">14000000</tankpressure>
             <tankpressure ref="mix-2">15000000</tankpressure>
+            <gradientfactor>0.38</gradientfactor>
+            <nodecotime>0</nodecotime>
           </waypoint>
           <waypoint>
             <divetime>2980</divetime>
             <setmarker>deep_stop</setmarker>
           </waypoint>
           <waypoint>
+            <cns>36</cns>
+            <calculatedpo2>0.56</calculatedpo2>
             <depth>21</depth>
             <divetime>3000</divetime>
             <tankpressure ref="mix-4">20000000</tankpressure>
+            <gradientfactor>0.64</gradientfactor>
+            <nodecotime>0</nodecotime>
           </waypoint>
           <waypoint>
             <divetime>3005</divetime>
             <switchmix ref="mix-4" />
           </waypoint>
           <waypoint>
+            <cns>43</cns>
+            <calculatedpo2>1.1</calculatedpo2>
             <depth>12</depth>
             <divetime>3600</divetime>
+            <gradientfactor>0.68</gradientfactor>
+            <nodecotime>0</nodecotime>
           </waypoint>
           <waypoint>
+            <cns>48</cns>
+            <calculatedpo2>0.95</calculatedpo2>
             <depth>9</depth>
             <divetime>4200</divetime>
             <tankpressure ref="mix-4">16000000</tankpressure>
             <tankpressure ref="mix-5">19500000</tankpressure>
+            <gradientfactor>0.69</gradientfactor>
+            <nodecotime>0</nodecotime>
           </waypoint>
           <waypoint>
             <divetime>4210</divetime>
             <switchmix ref="mix-5" />
           </waypoint>
           <waypoint>
+            <cns>56</cns>
+            <calculatedpo2>1.6</calculatedpo2>
             <depth>6</depth>
             <divetime>4800</divetime>
+            <gradientfactor>0.67</gradientfactor>
+            <nodecotime>0</nodecotime>
           </waypoint>
           <waypoint>
             <divetime>5100</divetime>
@@ -211,16 +248,24 @@
             <setmarker>Tissue ceiling cleared</setmarker>
           </waypoint>
           <waypoint>
+            <cns>60</cns>
+            <calculatedpo2>1.3</calculatedpo2>
             <depth>3</depth>
             <divetime>5400</divetime>
             <tankpressure ref="mix-1">8000000</tankpressure>
             <tankpressure ref="mix-2">9500000</tankpressure>
             <tankpressure ref="mix-5">0</tankpressure>
             <temperature>288.95</temperature>
+            <gradientfactor>0.55</gradientfactor>
+            <nodecotime>1800</nodecotime>
           </waypoint>
           <waypoint>
+            <cns>61</cns>
+            <calculatedpo2>1</calculatedpo2>
             <depth>0</depth>
             <divetime>5520</divetime>
+            <gradientfactor>0.41</gradientfactor>
+            <nodecotime>5940</nodecotime>
           </waypoint>
           <waypoint>
             <divetime>5605</divetime>

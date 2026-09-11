@@ -1,0 +1,621 @@
+{
+  "DeviceLog": {
+    "Header": {
+      "ActivityType": 51,
+      "DateTime": "2025-06-03T12:15:33.800+02:00",
+      "Depth": {
+        "Avg": 17.79,
+        "Max": 46.29
+      },
+      "Device": {
+        "Name": "Suunto D5",
+        "SerialNumber": "192410004212",
+        "Info": {
+          "SW": "3.0.2143",
+          "HW": "68.6.0",
+          "BSL": "3.0.2143",
+          "BatteryAtStart": "Charge: 84%, Voltage: 4.127V",
+          "BatteryAtEnd": "Charge: 75%, Voltage: 4.014V"
+        }
+      },
+      "Diving": {
+        "SurfaceTime": 83212,
+        "NumberInSeries": 6,
+        "Algorithm": "Suunto Fused2 RGBM",
+        "SurfacePressure": 105700,
+        "Conservatism": -1,
+        "Altitude": 0,
+        "DeepStopEnabled": false,
+        "SafetyStopTime": 180,
+        "LastDecoStopDepth": 6,
+        "AscentMode": "Follow ceiling",
+        "DaysInSeries": 4,
+        "PreviousDiveDepth": 47.43,
+        "MiniLock": false,
+        "StartTissue": {
+          "CNS": 0,
+          "OTU": 0,
+          "OLF": 0,
+          "Nitrogen": [
+            79000,
+            79000,
+            79000,
+            79000,
+            79000,
+            79000,
+            79000,
+            79015,
+            79094,
+            79505,
+            80094,
+            80692,
+            81229,
+            81691,
+            82421
+          ],
+          "Helium": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "RgbmNitrogen": 0.983,
+          "RgbmHelium": 0.986
+        },
+        "DiveMode": "Nitrox",
+        "AlgorithmBottomTime": 2410,
+        "AlgorithmAscentTime": 1454,
+        "AlgorithmBottomMixture": {
+          "Oxygen": 0.21,
+          "Helium": 0
+        },
+        "DesaturationTime": 97368,
+        "NoFlyTime": 28926,
+        "EndTissue": {
+          "CNS": 0.199,
+          "OTU": 52.996395111083984,
+          "OLF": 0.199,
+          "Nitrogen": [
+            78381,
+            75696,
+            72916,
+            91230,
+            129788,
+            142375,
+            128837,
+            117644,
+            110311,
+            101884,
+            97436,
+            94816,
+            93118,
+            91943,
+            90456
+          ],
+          "Helium": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "RgbmNitrogen": 0.983,
+          "RgbmHelium": 0.986
+        },
+        "Gases": [
+          {
+            "State": "Primary",
+            "Oxygen": 0.21,
+            "Helium": 0,
+            "PO2": 140000,
+            "TransmitterID": "2411100050",
+            "TankSize": 0.022,
+            "TankFillPressure": 20000000,
+            "StartPressure": 20714062,
+            "EndPressure": 12243750,
+            "TransmitterStartBatteryCharge": 0.54,
+            "TransmitterEndBatteryCharge": 0.54
+          },
+          {
+            "State": "Primary",
+            "Oxygen": 0.49,
+            "Helium": 0,
+            "PO2": 160000,
+            "TankSize": 0.011,
+            "TankFillPressure": 20000000
+          }
+        ]
+      },
+      "Duration": 4683
+    },
+    "Samples": [
+      {
+        "Events": [
+          {
+            "State": {
+              "Type": "Dive Active",
+              "Active": true
+            }
+          },
+          {
+            "State": {
+              "Type": "Wet Outside",
+              "Active": true
+            }
+          },
+          {
+            "State": {
+              "Type": "Below Wet Activation Depth",
+              "Active": true
+            }
+          },
+          {
+            "State": {
+              "Type": "Below Surface",
+              "Active": true
+            }
+          },
+          {
+            "State": {
+              "Type": "Tank pressure available",
+              "Active": true
+            }
+          },
+          {
+            "GasSwitch": {
+              "GasNumber": 1
+            }
+          }
+        ],
+        "TimeISO8601": "2025-06-03T12:15:33.800+02:00"
+      },
+      {
+        "Depth": 1.24,
+        "Temperature": 297.15,
+        "DeviceInternalAbsPressure": null,
+        "TimeToSurface": 0,
+        "NoDecTime": 6000,
+        "Ceiling": 0,
+        "GasTime": null,
+        "Ventilation": null,
+        "Cylinders": [
+          {
+            "GasNumber": 1,
+            "Pressure": 20714000
+          }
+        ],
+        "TimeISO8601": "2025-06-03T12:15:34.660+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Type": "Safety Stop Ahead",
+              "Active": true
+            }
+          }
+        ],
+        "TimeISO8601": "2025-06-03T12:26:18.760+02:00"
+      },
+      {
+        "Depth": 26.08,
+        "Temperature": 296.65,
+        "DeviceInternalAbsPressure": 96300,
+        "TimeToSurface": 156,
+        "NoDecTime": 1200,
+        "Ceiling": 0,
+        "GasTime": 4354,
+        "Ventilation": 0.000211,
+        "Cylinders": [
+          {
+            "GasNumber": 1,
+            "Pressure": 19215000
+          }
+        ],
+        "TimeISO8601": "2025-06-03T12:28:35.070+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Warning": {
+              "Type": "Max.Depth",
+              "Active": true
+            }
+          }
+        ],
+        "TimeISO8601": "2025-06-03T12:31:22.740+02:00"
+      },
+      {
+        "Depth": 42.61,
+        "Temperature": 296.85,
+        "DeviceInternalAbsPressure": 97500,
+        "TimeToSurface": 256,
+        "NoDecTime": 0,
+        "Ceiling": 0,
+        "GasTime": 3499,
+        "Ventilation": 0.000163,
+        "Cylinders": [
+          {
+            "GasNumber": 1,
+            "Pressure": 17709000
+          }
+        ],
+        "TimeISO8601": "2025-06-03T12:34:25.630+02:00"
+      },
+      {
+        "Depth": 43.24,
+        "Temperature": 296.85,
+        "DeviceInternalAbsPressure": 97600,
+        "TimeToSurface": 260,
+        "NoDecTime": 0,
+        "Ceiling": 0,
+        "GasTime": 3500,
+        "Ventilation": 0.00016,
+        "Cylinders": [
+          {
+            "GasNumber": 1,
+            "Pressure": 17653000
+          }
+        ],
+        "TimeISO8601": "2025-06-03T12:34:35.640+02:00"
+      },
+      {
+        "Depth": 43.95,
+        "Temperature": 296.75,
+        "DeviceInternalAbsPressure": 97600,
+        "TimeToSurface": 264,
+        "NoDecTime": 0,
+        "Ceiling": 0,
+        "GasTime": 3510,
+        "Ventilation": 0.000158,
+        "Cylinders": [
+          {
+            "GasNumber": 1,
+            "Pressure": 17568000
+          }
+        ],
+        "TimeISO8601": "2025-06-03T12:34:45.640+02:00"
+      },
+      {
+        "Depth": 44.16,
+        "Temperature": 296.75,
+        "DeviceInternalAbsPressure": 97600,
+        "TimeToSurface": 268,
+        "NoDecTime": 0,
+        "Ceiling": 0,
+        "GasTime": 3507,
+        "Ventilation": 0.000157,
+        "Cylinders": [
+          {
+            "GasNumber": 1,
+            "Pressure": 17476000
+          }
+        ],
+        "TimeISO8601": "2025-06-03T12:34:55.640+02:00"
+      },
+      {
+        "Depth": 44.52,
+        "Temperature": 296.75,
+        "DeviceInternalAbsPressure": 97600,
+        "TimeToSurface": 268,
+        "NoDecTime": 0,
+        "Ceiling": 0,
+        "GasTime": 3480,
+        "Ventilation": 0.000156,
+        "Cylinders": [
+          {
+            "GasNumber": 1,
+            "Pressure": 17479000
+          }
+        ],
+        "TimeISO8601": "2025-06-03T12:35:05.650+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Type": "Deco",
+              "Active": true
+            }
+          }
+        ],
+        "TimeISO8601": "2025-06-03T12:35:06.910+02:00"
+      },
+      {
+        "Depth": 44.79,
+        "Temperature": 296.65,
+        "DeviceInternalAbsPressure": 97700,
+        "TimeToSurface": 272,
+        "NoDecTime": null,
+        "Ceiling": 3,
+        "GasTime": 3434,
+        "Ventilation": 0.000157,
+        "Cylinders": [
+          {
+            "GasNumber": 1,
+            "Pressure": 17462000
+          }
+        ],
+        "TimeISO8601": "2025-06-03T12:35:15.650+02:00"
+      },
+      {
+        "Depth": 44.3,
+        "Temperature": 296.75,
+        "DeviceInternalAbsPressure": 97700,
+        "TimeToSurface": 618,
+        "NoDecTime": null,
+        "Ceiling": 7.11,
+        "GasTime": 3161,
+        "Ventilation": 0.000148,
+        "Cylinders": [
+          {
+            "GasNumber": 1,
+            "Pressure": 15385000
+          }
+        ],
+        "TimeISO8601": "2025-06-03T12:41:35.770+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Alarm": {
+              "Type": "Ascent Speed",
+              "Active": true
+            }
+          },
+          {
+            "Warning": {
+              "Type": "Mandatory Safety Stop",
+              "Active": true
+            }
+          }
+        ],
+        "TimeISO8601": "2025-06-03T12:51:21.780+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Type": "Gas Available",
+              "Active": true
+            }
+          }
+        ],
+        "TimeISO8601": "2025-06-03T12:53:13.750+02:00"
+      },
+      {
+        "Depth": 21.02,
+        "Temperature": 296.05,
+        "DeviceInternalAbsPressure": 96100,
+        "TimeToSurface": 1440,
+        "NoDecTime": null,
+        "Ceiling": 12.11,
+        "GasTime": 3533,
+        "Ventilation": 0.000173,
+        "Cylinders": [
+          {
+            "GasNumber": 1,
+            "Pressure": 12220000
+          }
+        ],
+        "TimeISO8601": "2025-06-03T12:54:36.050+02:00"
+      },
+      {
+        "Events": [
+          {
+            "GasSwitch": {
+              "GasNumber": 2
+            }
+          }
+        ],
+        "TimeISO8601": "2025-06-03T12:54:49.370+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Type": "Deco Window",
+              "Active": true
+            }
+          }
+        ],
+        "TimeISO8601": "2025-06-03T13:00:30.940+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Type": "Deco Window",
+              "Active": true
+            }
+          }
+        ],
+        "TimeISO8601": "2025-06-03T13:01:48.930+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Type": "Deco Window",
+              "Active": true
+            }
+          }
+        ],
+        "TimeISO8601": "2025-06-03T13:02:46.960+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Type": "Deco Window",
+              "Active": false
+            }
+          },
+          {
+            "Warning": {
+              "Type": "Ceiling Broken",
+              "Active": true
+            }
+          }
+        ],
+        "TimeISO8601": "2025-06-03T13:03:11.950+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Type": "Deco Window",
+              "Active": true
+            }
+          },
+          {
+            "Warning": {
+              "Type": "Ceiling Broken",
+              "Active": false
+            }
+          }
+        ],
+        "TimeISO8601": "2025-06-03T13:03:14.970+02:00"
+      },
+      {
+        "Depth": 7,
+        "Temperature": 296.25,
+        "DeviceInternalAbsPressure": 95200,
+        "TimeToSurface": 769,
+        "NoDecTime": null,
+        "Ceiling": 3.76,
+        "GasTime": null,
+        "Ventilation": null,
+        "Cylinders": [
+          {
+            "GasNumber": 1,
+            "Pressure": 12331000
+          }
+        ],
+        "TimeISO8601": "2025-06-03T13:07:36.470+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Type": "Deco Window",
+              "Active": true
+            }
+          }
+        ],
+        "TimeISO8601": "2025-06-03T13:08:52.870+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Type": "Deco Window",
+              "Active": true
+            }
+          }
+        ],
+        "TimeISO8601": "2025-06-03T13:12:37.840+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Type": "Deco Window",
+              "Active": true
+            }
+          }
+        ],
+        "TimeISO8601": "2025-06-03T13:15:10.870+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Type": "Safety Stop",
+              "Active": true
+            }
+          }
+        ],
+        "TimeISO8601": "2025-06-03T13:19:34.770+02:00"
+      },
+      {
+        "Depth": 5.2,
+        "Temperature": 296.35,
+        "DeviceInternalAbsPressure": 95100,
+        "TimeToSurface": 32,
+        "NoDecTime": 6000,
+        "Ceiling": 0,
+        "GasTime": null,
+        "Ventilation": null,
+        "Cylinders": [
+          {
+            "GasNumber": 1,
+            "Pressure": 12323000
+          }
+        ],
+        "TimeISO8601": "2025-06-03T13:20:36.790+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Type": "NoFly Time",
+              "Active": true
+            }
+          },
+          {
+            "State": {
+              "Type": "Surface Calculation",
+              "Active": true
+            }
+          },
+          {
+            "State": {
+              "Type": "Below Surface",
+              "Active": false
+            }
+          }
+        ],
+        "TimeISO8601": "2025-06-03T13:32:32.900+02:00"
+      },
+      {
+        "Depth": 0.05,
+        "Temperature": 296.55,
+        "DeviceInternalAbsPressure": 94900,
+        "TimeToSurface": 8,
+        "NoDecTime": 6000,
+        "Ceiling": 0,
+        "GasTime": null,
+        "Ventilation": null,
+        "Cylinders": [
+          {
+            "GasNumber": 1,
+            "Pressure": 11775000
+          }
+        ],
+        "TimeISO8601": "2025-06-03T13:33:37.270+02:00"
+      }
+    ]
+  }
+}

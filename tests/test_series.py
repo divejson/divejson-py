@@ -110,7 +110,7 @@ def test_the_order_is_worked_out_once_however_often_it_is_asked_for() -> None:
 
 def test_a_channel_takes_only_the_seconds_that_carried_a_reading_for_it() -> None:
     """No channel is padded to another's length, which is the whole shape of §6.5."""
-    depth, temperature = Channel(), Channel()
+    depth, temperature = Channel("depth"), Channel("temperature")
     for second in (0, 10, 20):
         depth.record(second, second * 10)
     temperature.record(10, 214)
@@ -119,7 +119,7 @@ def test_a_channel_takes_only_the_seconds_that_carried_a_reading_for_it() -> Non
 
 
 def test_a_channel_refuses_a_second_reading_at_one_second() -> None:
-    channel = Channel()
+    channel = Channel("depth")
     assert channel.record(30, 100) is True
     assert channel.record(30, 200) is False
     assert channel.member() == {"times": [30], "values": [100]}
@@ -134,7 +134,7 @@ def test_the_duration_is_the_span_of_the_samples_themselves() -> None:
     axis = _axis(report)
     for second in (0, 30, 90):
         axis.offer(second, second)
-    depth, temperature = Channel(), Channel()
+    depth, temperature = Channel("depth"), Channel("temperature")
     for second, _ in axis.ordered():
         depth.record(second, 100)
     temperature.record(30, 214)
@@ -154,7 +154,7 @@ def test_samples_that_carry_a_time_and_no_reading_produce_no_profile_and_say_so(
     axis.offer(30, "nothing usable")
     axis.ordered()
 
-    assert axis.profile({"depth": Channel()}) is None
+    assert axis.profile({"depth": Channel("depth")}) is None
     assert "the dive's 2 records carry a time but no reading" in report.messages[0]
 
 
@@ -163,7 +163,7 @@ def test_one_such_sample_is_reported_in_the_singular() -> None:
     axis = _axis(report)
     axis.offer(0, "nothing usable")
     axis.ordered()
-    assert axis.profile({"depth": Channel()}) is None
+    assert axis.profile({"depth": Channel("depth")}) is None
     assert "the dive's 1 record carries a time" in report.messages[0]
 
 
@@ -172,7 +172,7 @@ def test_a_dive_whose_samples_all_lost_their_place_says_nothing_further() -> Non
     report = Reported()
     axis = _axis(report)
     axis.offer(None, "no time")
-    assert axis.profile({"depth": Channel()}) is None
+    assert axis.profile({"depth": Channel("depth")}) is None
     assert len(report.notes) == 1
 
 
@@ -181,11 +181,11 @@ def test_pressures_are_emitted_in_gas_number_order_with_their_labels() -> None:
     axis = _axis(report)
     axis.offer(0, 0)
     axis.ordered()
-    second, first = Channel(), Channel()
+    second, first = Channel("pressures"), Channel("pressures")
     second.record(0, 2000)
     first.record(0, 1000)
 
-    profile = axis.profile({"depth": Channel()}, pressures=((1, second), (0, first)))
+    profile = axis.profile({"depth": Channel("depth")}, pressures=((1, second), (0, first)))
     assert profile is not None
     assert [series["gas_number"] for series in profile["pressures"]] == [0, 1]
     assert profile["duration"] == 0
@@ -198,8 +198,84 @@ def test_events_alone_are_a_profile_and_are_ordered_by_time() -> None:
     axis.ordered()
     events = [{"time": 300, "type": "bookmark"}, {"time": 120, "type": "safety_stop"}]
 
-    profile = axis.profile({"depth": Channel()}, events=events)
+    profile = axis.profile({"depth": Channel("depth")}, events=events)
     assert profile is not None
     assert [event["time"] for event in profile["events"]] == [120, 300]
     # `duration` spans the samples, and an event after the last one is conforming (§6.4).
     assert profile["duration"] == 0
+
+
+# -- a channel's floor ------------------------------------------------------------------
+
+
+def test_a_reading_below_the_channels_floor_is_refused_and_counted() -> None:
+    """§6.4 floors the decompression readouts at zero, and the floor comes off the schema
+    rather than out of an adapter — which is what keeps it one rule instead of five."""
+    channel = Channel("ndl")
+    assert channel.record(0, -1) is False
+    assert channel.record(10, 0) is True
+    assert (channel.times, channel.values) == ([10], [0])
+    assert channel.refused == 1
+
+
+def test_a_signed_channel_keeps_its_negative_readings() -> None:
+    """An under-ice dive is a negative temperature, and a `-20` there is a reading."""
+    channel = Channel("temperature")
+    assert channel.record(0, -20) is True
+    assert channel.values == [-20]
+    assert channel.refused == 0
+
+
+def test_the_refusals_are_reported_once_per_channel_rather_than_once_per_sample() -> None:
+    """A device writes its absent-marker for a run of samples — 5 531 of one export's 7 194
+    `gf99` readings — and a line apiece would bury every other finding in the report."""
+    report = Reported()
+    axis = _axis(report)
+    for second in (0, 10, 20):
+        axis.offer(second, second)
+    axis.ordered()
+    channel = Channel("gradient_factor")
+    for second in (0, 10, 20):
+        channel.record(second, -100)
+    depth = Channel("depth")
+    depth.record(0, 100)
+    axis.profile({"depth": depth, "gradient_factor": channel})
+    assert [note for note in report.notes if "gradient_factor" in note[1]] == [
+        (
+            "dive/0",
+            "3 of the dive's gradient_factor readings are negative, which is how a device spells a readout "
+            "it does not have; those samples are dropped from the channel, §6.4 recording it from zero up",
+            "dropped",
+        )
+    ]
+
+
+def test_one_refusal_is_reported_in_the_singular() -> None:
+    report = Reported()
+    axis = _axis(report)
+    axis.offer(0, 0)
+    axis.ordered()
+    channel = Channel("tts")
+    channel.record(0, -1)
+    depth = Channel("depth")
+    depth.record(0, 100)
+    axis.profile({"depth": depth, "tts": channel})
+    assert any("1 of the dive's tts readings is negative" in note[1] for note in report.notes)
+
+
+def test_the_profile_reads_down_section_6_4_whatever_order_the_channels_arrive_in() -> None:
+    """`pressures` sits between `temperature` and `ndl` in the section, and an adapter that
+    listed its channels in any other order would emit a profile that reads down nothing."""
+    report = Reported()
+    axis = _axis(report)
+    axis.offer(0, 0)
+    axis.ordered()
+    built = {}
+    for name in ("ndl", "depth", "temperature"):
+        channel = Channel(name)
+        channel.record(0, 1)
+        built[name] = channel
+    pressure = Channel("pressures")
+    pressure.record(0, 2000)
+    profile = axis.profile(built, pressures=((0, pressure),))
+    assert list(profile) == ["duration", "depth", "temperature", "pressures", "ndl"]

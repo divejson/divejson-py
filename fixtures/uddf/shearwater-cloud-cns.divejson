@@ -1,0 +1,295 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-12T00:48:30+03:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.5.0"
+  },
+  "dives": [
+    {
+      "uuid": "493dc166-437a-5dd1-b137-79a555bc5e5e",
+      "dive_number": 2,
+      "started_at": "2026-09-08T15:21:53",
+      "duration": 2921,
+      "notes": "Summary:\n\nEnvironment:\n\nGas:\n\nGear:\n\nIssues:",
+      "max_depth": 19.1,
+      "avg_depth": 11.0477839,
+      "surface_pressure": 1.019,
+      "gear_uuids": [
+        "bae2b91d-674c-5d38-875d-e3d3f69da1af"
+      ],
+      "cylinders": [
+        {
+          "end_pressure": 0.0
+        },
+        {
+          "end_pressure": 0.0
+        },
+        {
+          "end_pressure": 0.0
+        },
+        {
+          "end_pressure": 0.0
+        },
+        {
+          "end_pressure": 0.0
+        },
+        {
+          "end_pressure": 0.0
+        }
+      ],
+      "recordings": [
+        {
+          "device": {
+            "brand": "Shearwater Research, Inc",
+            "model": "Perdix 3",
+            "serial": "D9772626",
+            "name": "Perdix 3"
+          },
+          "mode": "open_circuit",
+          "deco_model": {
+            "algorithm": "buhlmann",
+            "gf_low": 50,
+            "gf_high": 85
+          },
+          "profile": {
+            "duration": 2940,
+            "depth": {
+              "times": [
+                0,
+                30,
+                310,
+                790,
+                840,
+                900,
+                1500,
+                2000,
+                2780,
+                2840,
+                2850,
+                2860,
+                2870,
+                2920,
+                2930,
+                2940
+              ],
+              "values": [
+                230,
+                170,
+                1250,
+                1740,
+                1710,
+                1900,
+                1460,
+                1410,
+                180,
+                130,
+                120,
+                120,
+                90,
+                100,
+                0,
+                0
+              ]
+            },
+            "temperature": {
+              "times": [
+                0,
+                30,
+                310,
+                790,
+                840,
+                900,
+                1500,
+                2000,
+                2780,
+                2840,
+                2850,
+                2860,
+                2870,
+                2920,
+                2930,
+                2940
+              ],
+              "values": [
+                300,
+                300,
+                290,
+                290,
+                290,
+                290,
+                290,
+                290,
+                290,
+                290,
+                290,
+                290,
+                290,
+                290,
+                290,
+                290
+              ]
+            },
+            "ndl": {
+              "times": [
+                0,
+                30,
+                310,
+                790,
+                840,
+                900,
+                1500,
+                2000,
+                2780,
+                2840,
+                2850,
+                2860,
+                2870,
+                2920,
+                2930,
+                2940
+              ],
+              "values": [
+                5940,
+                5940,
+                5940,
+                4920,
+                5100,
+                3720,
+                5940,
+                5940,
+                5940,
+                5940,
+                5940,
+                5940,
+                5940,
+                5940,
+                5940,
+                5940
+              ]
+            },
+            "ppo2": {
+              "times": [
+                0,
+                30,
+                310,
+                790,
+                840,
+                900,
+                1500,
+                2000,
+                2780,
+                2840,
+                2850,
+                2870,
+                2930
+              ],
+              "values": [
+                40,
+                39,
+                74,
+                90,
+                89,
+                96,
+                81,
+                80,
+                39,
+                38,
+                37,
+                36,
+                34
+              ]
+            },
+            "cns": {
+              "times": [
+                310,
+                790,
+                840,
+                900,
+                1500,
+                2000,
+                2780,
+                2840,
+                2850,
+                2860,
+                2870,
+                2920,
+                2930,
+                2940
+              ],
+              "values": [
+                10,
+                20,
+                20,
+                30,
+                50,
+                70,
+                80,
+                80,
+                80,
+                80,
+                80,
+                80,
+                80,
+                80
+              ]
+            },
+            "gradient_factor": {
+              "times": [
+                0,
+                30,
+                2780,
+                2840,
+                2850,
+                2860,
+                2870,
+                2920,
+                2930,
+                2940
+              ],
+              "values": [
+                0,
+                1,
+                4,
+                5,
+                7,
+                11,
+                10,
+                6,
+                17,
+                17
+              ]
+            },
+            "events": [
+              {
+                "time": 0,
+                "type": "gas_switch"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "gear": [
+    {
+      "uuid": "bae2b91d-674c-5d38-875d-e3d3f69da1af",
+      "name": "Perdix 3",
+      "brand": "Shearwater Research, Inc",
+      "serial": "D9772626",
+      "type": "computer",
+      "notes": "FirmV:39:\n\nLogV:17:\n\nBatType:2:\n\nIBat:150:\n\nDBV:12:\n\nOEM:0:\n\nLanguage:0:\n\nProduct:14:"
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "uddf",
+      "uddf_version": "3.2.3",
+      "source_generator": {
+        "name": "Shearwater Cloud Desktop",
+        "version": "2.12.10"
+      }
+    }
+  }
+}

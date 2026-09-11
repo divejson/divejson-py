@@ -220,8 +220,21 @@ XML — the surface pressure — is Pascal while every other one in the same fil
 Only a dive that exists in both makes any of that visible, which is why every factor in
 [`docs/suunto-xml-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/suunto-xml-mapping.md)
 is stated beside the JSON reading of the same dive. That format also writes a **freedive**
-in the same shape as a scuba dive, and DiveJSON has no member for the kind of a dive, so a
-freedive is skipped and reported rather than arriving mislabelled by omission.
+in the same shape as a scuba dive, and §6.4a's `mode` is what tells them apart: the
+recording says `freedive` and the dive is carried like any other. It was skipped and
+reported until that member existed, which is why an archive of the reference export
+directory now yields 384 dives where it used to yield 342.
+
+**What a recording carries beyond its samples.** Every reader fills §6.4a's `mode` and
+§6.4c's `deco_model` where its files state them — UDDF from `<divemode>` and the
+`<decomodel>` a dive links, FIT from `dive_settings`, the Suunto app's JSON from
+`Header.Diving`, the DM5 XML from `<Mode>` and `<PersonalMode>` — and the profile carries
+the readouts the computer *computed*, as distinct from what it measured. Which channels
+those are, and in what units, is
+[§6.4 of the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md);
+which of them a given format states, and what it does with a device's absent-markers and
+display caps, is that format's mapping document. Neither list is repeated here, because a
+list in two places is a list that disagrees with itself.
 
 ## Releasing
 

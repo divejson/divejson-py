@@ -789,8 +789,8 @@ class _Converter:
         for sample in samples:
             axis.offer(integer_of(self.measure(attribute(sample, "time"), "min", where, "<sample time>")), sample)
 
-        depth = Channel()
-        temperature = Channel()
+        depth = Channel("depth")
+        temperature = Channel("temperature")
         for second, sample in axis.ordered():
             metres = self.measure(attribute(sample, "depth"), "m", where, "<sample depth>")
             if metres is not None:

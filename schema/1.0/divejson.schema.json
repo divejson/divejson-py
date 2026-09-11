@@ -156,12 +156,28 @@
       "type": "object",
       "properties": {
         "device": { "$ref": "#/$defs/device" },
+        "mode": { "enum": ["open_circuit", "closed_circuit", "semi_closed", "gauge", "freedive"] },
+        "deco_model": { "$ref": "#/$defs/deco_model" },
         "started_at": { "$ref": "#/$defs/date_time" },
         "source_files": { "type": "array", "items": { "$ref": "#/$defs/stored_file" } },
         "profile": { "$ref": "#/$defs/profile" },
         "extensions": { "$ref": "#/$defs/extensions" }
       },
       "additionalProperties": false
+    },
+    "deco_model": {
+      "type": "object",
+      "properties": {
+        "algorithm": { "enum": ["buhlmann", "rgbm"] },
+        "name": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "gf_low": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "gf_high": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "conservatism": { "type": "integer" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "minProperties": 1,
+      "additionalProperties": false,
+      "dependentRequired": { "gf_low": ["gf_high"], "gf_high": ["gf_low"] }
     },
     "device": {
       "type": "object",
@@ -184,6 +200,12 @@
         "ceiling": { "$ref": "#/$defs/series" },
         "temperature": { "$ref": "#/$defs/series" },
         "pressures": { "type": "array", "items": { "$ref": "#/$defs/pressure_series" } },
+        "ndl": { "$ref": "#/$defs/unsigned_series" },
+        "tts": { "$ref": "#/$defs/unsigned_series" },
+        "ppo2": { "$ref": "#/$defs/unsigned_series" },
+        "cns": { "$ref": "#/$defs/unsigned_series" },
+        "gradient_factor": { "$ref": "#/$defs/unsigned_series" },
+        "surface_gradient_factor": { "$ref": "#/$defs/unsigned_series" },
         "events": { "type": "array", "items": { "$ref": "#/$defs/event" } },
         "extensions": { "$ref": "#/$defs/extensions" }
       },
@@ -195,6 +217,17 @@
       "properties": {
         "times": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
         "values": { "type": "array", "items": { "type": "integer" } },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["times", "values"],
+      "additionalProperties": false
+    },
+    "unsigned_series": {
+      "description": "A Series whose quantity has no negative reading: no-decompression time, time to surface, ppO2, CNS and the gradient factors. Depth, ceiling and temperature keep the signed definition above. A negative here is a device's absent-marker, which §5.4 spells as absence.",
+      "type": "object",
+      "properties": {
+        "times": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+        "values": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
         "extensions": { "$ref": "#/$defs/extensions" }
       },
       "required": ["times", "values"],
@@ -215,16 +248,22 @@
       "type": "object",
       "properties": {
         "time": { "type": "integer", "minimum": 0 },
-        "type": { "enum": ["gas_switch", "deep_stop", "safety_stop", "bookmark", "other"] },
+        "type": {
+          "enum": [
+            "gas_switch", "deep_stop", "safety_stop", "bookmark",
+            "ascent_rate", "safety_stop_mandatory", "safety_stop_violation",
+            "deep_stop_violation", "ceiling_violation", "ndl_reached",
+            "ppo2_high", "pressure_low", "depth_alarm"
+          ]
+        },
         "gas_number": { "type": "integer", "minimum": 0 },
         "label": { "type": "string" },
         "extensions": { "$ref": "#/$defs/extensions" }
       },
-      "required": ["time", "type"],
+      "required": ["time"],
       "additionalProperties": false,
       "if": {
-        "properties": { "type": { "const": "other" } },
-        "required": ["type"]
+        "not": { "required": ["type"] }
       },
       "then": {
         "required": ["label"],

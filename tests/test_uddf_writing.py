@@ -188,17 +188,56 @@ def test_a_dive_numbered_zero_is_not_written(schema) -> None:
     assert "is a positive integer" in messages(source, "dives/0")[0]
 
 
-def test_an_unlabelled_other_event_is_dropped_rather_than_written_as_the_word(schema) -> None:
+def test_a_typed_event_with_no_label_is_dropped_rather_than_written_as_the_word(schema) -> None:
+    """Writing `ppo2_high` as the marker's text would come back as a *label* saying that.
+
+    §6.6's `label` holds the device's wording, and the type's own spelling is not wording any
+    diver was shown — so the event goes rather than arriving with one the document never had.
+    """
     source = one_dive(
         profile={
             "duration": 60,
             "depth": {"times": [0, 60], "values": [0, 500]},
-            "events": [{"time": 30, "type": "other"}],
+            "events": [{"time": 30, "type": "ppo2_high"}],
         }
     )
     assert "<setmarker>" not in written(source, schema)
     assert "events" not in recorded(read_back(source))["profile"]
     assert "rather than written as the word" in messages(source, "dives/0/recordings/0/profile/events/0")[0]
+
+
+def test_an_event_with_a_label_and_no_type_goes_out_and_comes_back_whole(schema) -> None:
+    """§6.6's spelling of an unclassified event, which is what `<setmarker>` *is*."""
+    source = one_dive(
+        profile={
+            "duration": 60,
+            "depth": {"times": [0, 60], "values": [0, 500]},
+            "events": [{"time": 30, "label": "Ceiling Broken"}],
+        }
+    )
+    assert "<setmarker>Ceiling Broken</setmarker>" in written(source, schema)
+    assert recorded(read_back(source))["profile"]["events"] == [{"time": 30, "label": "Ceiling Broken"}]
+    assert messages(source, "dives/0/recordings/0/profile/events/0") == []
+
+
+def test_a_typed_event_with_a_label_keeps_the_label_and_loses_the_type(schema) -> None:
+    """The mirror of the labelled bookmark, and that way round on purpose.
+
+    `<setmarker>ppo2_high</setmarker>` would return as an unclassified event labelled
+    `ppo2_high`; `<setmarker>PO2 High</setmarker>` returns as the marker the diver saw. The
+    alternative — dropping the event — loses the whole alarm class in the one direction this
+    writer exists to make less lossy.
+    """
+    source = one_dive(
+        profile={
+            "duration": 60,
+            "depth": {"times": [0, 60], "values": [0, 500]},
+            "events": [{"time": 30, "type": "ppo2_high", "label": "PO2 High"}],
+        }
+    )
+    assert "<setmarker>PO2 High</setmarker>" in written(source, schema)
+    assert recorded(read_back(source))["profile"]["events"] == [{"time": 30, "label": "PO2 High"}]
+    assert "the type is dropped" in messages(source, "dives/0/recordings/0/profile/events/0")[0]
 
 
 def test_a_gas_switch_to_a_cylinder_this_dive_does_not_have_is_dropped(schema) -> None:
@@ -350,7 +389,120 @@ def test_a_numbering_that_survives_is_not_reported() -> None:
     assert not any("records no cylinder numbering" in message for message in messages(source, "dives/0"))
 
 
+# -- the mode and the decompression model ------------------------------------------------
+
+
+def _with_readouts(**channels: Any) -> dict[str, Any]:
+    """The smallest profile that carries a channel, on two depth samples."""
+    return {"duration": 60, "depth": {"times": [0, 60], "values": [0, 500]}, **channels}
+
+
+@pytest.mark.parametrize(
+    ("mode", "spelling"),
+    [
+        ("open_circuit", "opencircuit"),
+        ("closed_circuit", "closedcircuit"),
+        ("semi_closed", "semiclosedcircuit"),
+        ("freedive", "apnoe"),
+    ],
+)
+def test_the_mode_is_written_on_the_first_waypoint_and_comes_back(schema, mode, spelling) -> None:
+    """`apnoe` for a freedive because it is the older of UDDF's two spellings, and every
+    3.2.x reader knows it — while the reader here reads both."""
+    source = one_dive(recordings=[{"mode": mode, "profile": _with_readouts()}])
+    text = written(source, schema)
+    assert f'<divemode type="{spelling}" />' in text
+    assert text.count("<divemode") == 1
+    assert recorded(read_back(source))["mode"] == mode
+
+
+def test_a_gauge_recording_has_no_uddf_spelling_and_is_reported(schema) -> None:
+    """`divemodeType`'s five values do not include a computer run as a bottom timer, and
+    writing the nearest is the guess §5.4 forbids."""
+    source = one_dive(recordings=[{"mode": "gauge", "profile": _with_readouts()}])
+    assert "<divemode" not in written(source, schema)
+    assert "mode" not in recorded(read_back(source))
+    assert "no value for a gauge recording" in messages(source, "dives/0/recordings/0/mode")[0]
+
+
+def test_a_mode_with_no_samples_to_carry_it_is_reported(schema) -> None:
+    """`<divemode>` is a `<waypoint>` child and nothing else, so a recording that kept no
+    sample has nowhere to put one — and `mode` is inside the carried set, so without its own
+    note the loss would be silent."""
+    source = one_dive(recordings=[{"mode": "open_circuit", "device": {"model": "Perdix 3"}}])
+    assert "<divemode" not in written(source, schema)
+    assert "no samples to carry one" in messages(source, "dives/0/recordings/0/mode")[0]
+
+
+def test_the_deco_model_is_dropped_because_uddf_wants_a_tissue_table(schema) -> None:
+    """`<decomodel>` is an `xs:all` of `<buehlmann>`, `<rgbm>` and `<vpm>` with none of the
+    three optional, and each requires a `<tissue>` carrying a half-time and its coefficients.
+
+    §6.4c carries a family, a name and a gradient-factor pair and no tissue table, so there
+    is no way to write one and stay valid against the schema these pairs are held to — and
+    nothing is invented to satisfy a required element. The gradient factors reach the file
+    nowhere at all: `<gradientfactorlow>` and `<gradientfactorhigh>` exist only inside
+    `<buehlmann>`.
+    """
+    source = one_dive(
+        recordings=[
+            {
+                "deco_model": {"algorithm": "buhlmann", "name": "ZHL-16C", "gf_low": 30, "gf_high": 70},
+                "profile": _with_readouts(),
+            }
+        ]
+    )
+    text = written(source, schema)
+    assert "<decomodel" not in text
+    assert "gradientfactorlow" not in text
+    assert "deco_model" not in recorded(read_back(source))
+    assert "requires a tissue table" in messages(source, "dives/0/recordings/0/deco_model")[0]
+
+
 # -- the profile -----------------------------------------------------------------------
+
+
+def test_the_readout_channels_go_out_at_uddfs_scales_and_come_back_at_the_formats(schema) -> None:
+    """The check `divejson conform` cannot make, and the one a wrong factor hides behind.
+
+    The corpus compares a written file with a committed one and never reads it back, so a
+    writer and a reader that disagreed about whether `<gradientfactor>` is percent or a
+    fraction would produce two green corpora and a value a hundred times wrong. Every member
+    this writer scales is here, at a value that cannot be confused with its own conversion.
+
+    `0.67` rather than `67` for the gradient factor because this writer is **not** a
+    generator `uddf-mapping.md`'s table names — it stamps `divejson convert` — so a file it
+    produces is read back by the fraction branch of that rule.
+    """
+    channels = {
+        "ndl": {"times": [0], "values": [5940]},
+        "ppo2": {"times": [0], "values": [128]},
+        "cns": {"times": [0], "values": [45]},
+        "gradient_factor": {"times": [0], "values": [67]},
+    }
+    source = one_dive(profile=_with_readouts(**channels))
+    text = written(source, schema)
+    assert "<nodecotime>5940</nodecotime>" in text
+    assert "<calculatedpo2>1.28</calculatedpo2>" in text
+    assert "<cns>4.5</cns>" in text
+    assert "<gradientfactor>0.67</gradientfactor>" in text
+
+    profile = recorded(read_back(source))["profile"]
+    assert {name: profile[name] for name in channels} == channels
+
+
+def test_the_two_channels_uddf_has_no_element_for_are_reported(schema) -> None:
+    """There is no time-to-surface element in 3.2.1 and no surface gradient factor at all."""
+    source = one_dive(
+        profile=_with_readouts(
+            tts={"times": [0], "values": [900]},
+            surface_gradient_factor={"times": [0], "values": [141]},
+        )
+    )
+    written(source, schema)
+    reported = messages(source, "dives/0/recordings/0/profile")
+    assert "UDDF has no slot for tts; it is not written" in reported
+    assert "UDDF has no slot for surface_gradient_factor; it is not written" in reported
 
 
 def test_a_reading_between_two_depth_samples_gets_its_own_waypoint(schema) -> None:
@@ -393,15 +545,13 @@ def test_two_events_on_one_second_keep_the_first(schema) -> None:
             "duration": 60,
             "depth": {"times": [0, 60], "values": [0, 500]},
             "events": [
-                {"time": 30, "type": "other", "label": "first"},
-                {"time": 30, "type": "other", "label": "second"},
+                {"time": 30, "label": "first"},
+                {"time": 30, "label": "second"},
             ],
         }
     )
     written(source, schema)
-    assert recorded(read_back(source))["profile"]["events"] == [
-        {"time": 30, "type": "other", "label": "first"}
-    ]
+    assert recorded(read_back(source))["profile"]["events"] == [{"time": 30, "label": "first"}]
     assert "the later event is dropped" in messages(source, "dives/0/recordings/0/profile/events/1")[0]
 
 

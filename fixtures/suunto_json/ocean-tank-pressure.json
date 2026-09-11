@@ -1,0 +1,749 @@
+{
+  "DeviceLog": {
+    "Header": {
+      "ActivityType": 51,
+      "DateTime": "2026-04-04T13:34:11.360+02:00",
+      "Depth": {
+        "Max": 16.96
+      },
+      "DepthAverage": 9.4,
+      "Device": {
+        "Info": {
+          "BatteryDesignCapacity": 1980,
+          "BatteryFullCapacity": 1962,
+          "HW": "Seal_RevA3",
+          "SW": "2.40.56"
+        },
+        "Name": "Porvoo",
+        "SerialNumber": "253810000400"
+      },
+      "DiveTime": 3888.4,
+      "Duration": 4231.065,
+      "Notes": "",
+      "Temperature": {
+        "Max": 295.7,
+        "Min": 297.1
+      }
+    },
+    "Samples": [
+      {
+        "DiveRouteOrigin": {
+          "Altitude": 0.6000000238418579,
+          "Latitude": 28.498851776123047,
+          "Longitude": 34.5198860168457
+        },
+        "DiveRouteQuality": 1,
+        "QualityFeatures": [
+          2,
+          0.10000000149011612,
+          0.8640000224113464,
+          2.1117136478424072,
+          30.61188507080078,
+          28.618322372436523,
+          48.88349151611328,
+          3657.265625,
+          25.266050338745117,
+          0.8454560041427612,
+          -9.8121337890625,
+          1.0393028259277344
+        ],
+        "TimeISO8601": "2026-04-04T13:34:11.360+02:00"
+      },
+      {
+        "DiveEvents": {
+          "GasSwitch": {
+            "GasNumber": 0
+          }
+        },
+        "TimeISO8601": "2026-04-04T13:34:11.360+02:00"
+      },
+      {
+        "AmbientIlluminance": 10515.8,
+        "BrightnessDisplayIntensity": 0.37,
+        "Ceiling": 0,
+        "Cylinders": [
+          {
+            "GasNumber": 0,
+            "GasTime": 2253,
+            "Pressure": 20468750,
+            "Ventilation": 0.000211
+          },
+          {
+            "GasNumber": 1,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 2,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 3,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 4,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          }
+        ],
+        "Depth": 1.22,
+        "DeviceInternalAbsPressure": 0,
+        "DeviceInternalTemperature": 0,
+        "NoDecTime": 6000,
+        "RtGradientFactors": {
+          "gf99": -100,
+          "gtSurface": 7
+        },
+        "TimeToSurface": 8,
+        "TimeISO8601": "2026-04-04T13:34:11.450+02:00"
+      },
+      {
+        "AbsPressure": 113785,
+        "Altitude": null,
+        "Cadence": null,
+        "Distance": null,
+        "Power": null,
+        "SeaLevelPressure": null,
+        "Speed": null,
+        "Temperature": 296.61,
+        "VerticalSpeed": null,
+        "TimeISO8601": "2026-04-04T13:34:19.470+02:00"
+      },
+      {
+        "AmbientIlluminance": 25264.32,
+        "BrightnessDisplayIntensity": 0.78,
+        "Ceiling": 0,
+        "Cylinders": [
+          {
+            "GasNumber": 0,
+            "GasTime": 4038,
+            "Pressure": 17915624,
+            "Ventilation": 0.000172
+          },
+          {
+            "GasNumber": 1,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 2,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 3,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 4,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          }
+        ],
+        "Depth": 11.85,
+        "DeviceInternalAbsPressure": 99285.2,
+        "DeviceInternalTemperature": 296.35,
+        "NoDecTime": 6000,
+        "RtGradientFactors": {
+          "gf99": -100,
+          "gtSurface": 21
+        },
+        "TimeToSurface": 72,
+        "TimeISO8601": "2026-04-04T13:45:51.360+02:00"
+      },
+      {
+        "AmbientIlluminance": 868.36,
+        "BrightnessDisplayIntensity": 0.29,
+        "Ceiling": 0,
+        "Cylinders": [
+          {
+            "GasNumber": 0,
+            "GasTime": 2635,
+            "Pressure": 15389062,
+            "Ventilation": 0.000215
+          },
+          {
+            "GasNumber": 1,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 2,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 3,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 4,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          }
+        ],
+        "Depth": 12.34,
+        "DeviceInternalAbsPressure": 99285.55,
+        "DeviceInternalTemperature": 296.19,
+        "NoDecTime": 6000,
+        "RtGradientFactors": {
+          "gf99": -100,
+          "gtSurface": 29
+        },
+        "TimeToSurface": 0,
+        "TimeISO8601": "2026-04-04T13:57:41.360+02:00"
+      },
+      {
+        "AmbientIlluminance": 3031.29,
+        "BrightnessDisplayIntensity": 0.32,
+        "Ceiling": 0,
+        "Cylinders": [
+          {
+            "GasNumber": 0,
+            "GasTime": 1839,
+            "Pressure": 12095312,
+            "Ventilation": 0.00021
+          },
+          {
+            "GasNumber": 1,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 2,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 3,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 4,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          }
+        ],
+        "Depth": 14.44,
+        "DeviceInternalAbsPressure": 99522.78,
+        "DeviceInternalTemperature": 296.15,
+        "NoDecTime": 6000,
+        "RtGradientFactors": {
+          "gf99": -100,
+          "gtSurface": 39
+        },
+        "TimeToSurface": 88,
+        "TimeISO8601": "2026-04-04T14:09:31.360+02:00"
+      },
+      {
+        "AmbientIlluminance": 26240.96,
+        "BrightnessDisplayIntensity": 0.47,
+        "Ceiling": 0,
+        "Cylinders": [
+          {
+            "GasNumber": 0,
+            "GasTime": 1370,
+            "Pressure": 8614062,
+            "Ventilation": 0.000235
+          },
+          {
+            "GasNumber": 1,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 2,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 3,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 4,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          }
+        ],
+        "Depth": 7.67,
+        "DeviceInternalAbsPressure": 98595.09,
+        "DeviceInternalTemperature": 296.16,
+        "NoDecTime": 6000,
+        "RtGradientFactors": {
+          "gf99": -100,
+          "gtSurface": 45
+        },
+        "TimeToSurface": 48,
+        "TimeISO8601": "2026-04-04T14:21:11.360+02:00"
+      },
+      {
+        "DiveEvents": {
+          "Notify": {
+            "Active": true,
+            "Type": "Stop done"
+          }
+        },
+        "TimeISO8601": "2026-04-04T14:26:06.790+02:00"
+      },
+      {
+        "AmbientIlluminance": 24720,
+        "BrightnessDisplayIntensity": 0.46,
+        "Ceiling": 0,
+        "Cylinders": [
+          {
+            "GasNumber": 0,
+            "GasTime": 921,
+            "Pressure": 6218750,
+            "Ventilation": 0.000243
+          },
+          {
+            "GasNumber": 1,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 2,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 3,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 4,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          }
+        ],
+        "Depth": 3.33,
+        "DeviceInternalAbsPressure": 98002.93,
+        "DeviceInternalTemperature": 296.27,
+        "NoDecTime": 6000,
+        "RtGradientFactors": {
+          "gf99": -100,
+          "gtSurface": 38
+        },
+        "TimeToSurface": 24,
+        "TimeISO8601": "2026-04-04T14:33:01.360+02:00"
+      },
+      {
+        "AmbientIlluminance": 5403.56,
+        "BrightnessDisplayIntensity": 0.34,
+        "Ceiling": 0,
+        "Cylinders": [
+          {
+            "GasNumber": 0,
+            "GasTime": 866,
+            "Pressure": 5264062,
+            "Ventilation": 0.000203
+          },
+          {
+            "GasNumber": 1,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 2,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 3,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 4,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          }
+        ],
+        "Depth": 1,
+        "DeviceInternalAbsPressure": 97770.29,
+        "DeviceInternalTemperature": 296.42,
+        "NoDecTime": 0,
+        "RtGradientFactors": {
+          "gf99": 0,
+          "gtSurface": 0
+        },
+        "TimeToSurface": 0,
+        "TimeISO8601": "2026-04-04T14:39:31.360+02:00"
+      },
+      {
+        "AmbientIlluminance": 3735.77,
+        "BrightnessDisplayIntensity": 0.33,
+        "Ceiling": 0,
+        "Cylinders": [
+          {
+            "GasNumber": 0,
+            "GasTime": 722,
+            "Pressure": 5198437,
+            "Ventilation": 0.000238
+          },
+          {
+            "GasNumber": 1,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 2,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 3,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 4,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          }
+        ],
+        "Depth": 0.88,
+        "DeviceInternalAbsPressure": 97769.21,
+        "DeviceInternalTemperature": 296.45,
+        "NoDecTime": 0,
+        "RtGradientFactors": {
+          "gf99": 0,
+          "gtSurface": 0
+        },
+        "TimeToSurface": 0,
+        "TimeISO8601": "2026-04-04T14:39:51.360+02:00"
+      },
+      {
+        "AmbientIlluminance": 7997.08,
+        "BrightnessDisplayIntensity": 0.35,
+        "Ceiling": 0,
+        "Cylinders": [
+          {
+            "GasNumber": 0,
+            "GasTime": 722,
+            "Pressure": 5185937,
+            "Ventilation": 0.000238
+          },
+          {
+            "GasNumber": 1,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 2,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 3,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 4,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          }
+        ],
+        "Depth": 0.81,
+        "DeviceInternalAbsPressure": 97766.03,
+        "DeviceInternalTemperature": 296.48,
+        "NoDecTime": 0,
+        "RtGradientFactors": {
+          "gf99": 0,
+          "gtSurface": 0
+        },
+        "TimeToSurface": 0,
+        "TimeISO8601": "2026-04-04T14:40:01.360+02:00"
+      },
+      {
+        "DiveEvents": {
+          "Alarm": {
+            "Active": true,
+            "Type": "Tank Pressure"
+          }
+        },
+        "TimeISO8601": "2026-04-04T14:40:06.250+02:00"
+      },
+      {
+        "AmbientIlluminance": 10542.83,
+        "BrightnessDisplayIntensity": 0.62,
+        "Ceiling": 0,
+        "Cylinders": [
+          {
+            "GasNumber": 0,
+            "GasTime": 722,
+            "Pressure": 5067187,
+            "Ventilation": 0.000238
+          },
+          {
+            "GasNumber": 1,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 2,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 3,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 4,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          }
+        ],
+        "Depth": 0.01,
+        "DeviceInternalAbsPressure": 97814.16,
+        "DeviceInternalTemperature": 296.86,
+        "NoDecTime": 0,
+        "RtGradientFactors": {
+          "gf99": 0,
+          "gtSurface": 0
+        },
+        "TimeToSurface": 0,
+        "TimeISO8601": "2026-04-04T14:40:11.360+02:00"
+      },
+      {
+        "AmbientIlluminance": 27459.52,
+        "BrightnessDisplayIntensity": 0.79,
+        "Ceiling": 0,
+        "Cylinders": [
+          {
+            "GasNumber": 0,
+            "GasTime": 722,
+            "Pressure": 5084375,
+            "Ventilation": 0.000238
+          },
+          {
+            "GasNumber": 1,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 2,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 3,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 4,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          }
+        ],
+        "Depth": 0.08,
+        "DeviceInternalAbsPressure": 97821.11,
+        "DeviceInternalTemperature": 296.95,
+        "NoDecTime": 0,
+        "RtGradientFactors": {
+          "gf99": 0,
+          "gtSurface": 0
+        },
+        "TimeToSurface": 0,
+        "TimeISO8601": "2026-04-04T14:40:21.360+02:00"
+      },
+      {
+        "AmbientIlluminance": 28346.56,
+        "BrightnessDisplayIntensity": 0.48,
+        "Ceiling": 0,
+        "Cylinders": [
+          {
+            "GasNumber": 0,
+            "GasTime": 722,
+            "Pressure": 5098437,
+            "Ventilation": 0.000238
+          },
+          {
+            "GasNumber": 1,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 2,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 3,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 4,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          }
+        ],
+        "Depth": 0.14,
+        "DeviceInternalAbsPressure": 97845.66,
+        "DeviceInternalTemperature": 296.8,
+        "NoDecTime": 0,
+        "RtGradientFactors": {
+          "gf99": 0,
+          "gtSurface": 0
+        },
+        "TimeToSurface": 0,
+        "TimeISO8601": "2026-04-04T14:40:31.360+02:00"
+      },
+      {
+        "GPSAltitude": 3.4,
+        "Latitude": 0.49735795449808656,
+        "Longitude": 0.6024345997791819,
+        "UTC": "2026-04-04T12:40:40.000+00:00",
+        "TimeISO8601": "2026-04-04T14:40:40.000+02:00"
+      },
+      {
+        "GPSAltitude": 4.2,
+        "Latitude": 0.4973451839239497,
+        "Longitude": 0.6024237211419543,
+        "UTC": "2026-04-04T12:43:41.000+00:00",
+        "TimeISO8601": "2026-04-04T14:43:41.000+02:00"
+      },
+      {
+        "DiveEvents": {
+          "Alarm": {
+            "Active": true,
+            "Type": "Tank Pressure"
+          }
+        },
+        "TimeISO8601": "2026-04-04T14:44:14.220+02:00"
+      },
+      {
+        "AmbientIlluminance": 4855.48,
+        "BrightnessDisplayIntensity": 0.34,
+        "Ceiling": 0,
+        "Cylinders": [
+          {
+            "GasNumber": 0,
+            "GasTime": 722,
+            "Pressure": 14062,
+            "Ventilation": 0.000238
+          },
+          {
+            "GasNumber": 1,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 2,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 3,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 4,
+            "GasTime": 0,
+            "Pressure": null,
+            "Ventilation": 0
+          }
+        ],
+        "Depth": 0,
+        "DeviceInternalAbsPressure": 98380.05,
+        "DeviceInternalTemperature": 298.05,
+        "NoDecTime": 0,
+        "RtGradientFactors": {
+          "gf99": 0,
+          "gtSurface": 0
+        },
+        "TimeToSurface": 0,
+        "TimeISO8601": "2026-04-04T14:44:41.330+02:00"
+      },
+      {
+        "AbsPressure": 101045,
+        "Altitude": 3,
+        "Cadence": null,
+        "Distance": 528,
+        "Power": null,
+        "SeaLevelPressure": null,
+        "Speed": 0,
+        "Temperature": 297.13,
+        "VerticalSpeed": -0.02,
+        "TimeISO8601": "2026-04-04T14:44:41.440+02:00"
+      },
+      {
+        "Events": [
+          {
+            "ArrayBegin": 0,
+            "Lap": {
+              "Type": "Stop"
+            }
+          }
+        ],
+        "TimeISO8601": "2026-04-04T14:44:42.680+02:00"
+      }
+    ]
+  }
+}

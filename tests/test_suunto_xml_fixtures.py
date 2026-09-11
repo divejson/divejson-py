@@ -95,16 +95,24 @@ def test_the_known_answer() -> None:
     assert dive["started_at"] == "2021-04-06T11:16:42.6"
 
 
-def test_a_freedive_converts_to_a_document_with_no_dives() -> None:
-    """Skipped and reported, and the document is still a conforming logbook.
+def test_a_freedive_is_a_dive_and_says_which_kind_it_is() -> None:
+    """It converted to a logbook with no dives at all until §6.4a gained `mode`.
 
-    Which is what makes a directory of exports importable: a diver's freedives do not fail
-    the archive their scuba dives are in.
+    The reason for skipping it was that the format had no member for the kind of a dive, so
+    a carried freedive would arrive indistinguishable from a scuba dive that recorded no gas
+    and no algorithm. There is a member now, so skipping one would be the data loss this
+    format exists to end rather than the guard against it.
+
+    **No `deco_model` beside it**, though the file states a `<PersonalMode>`: a computer in
+    freedive mode ran no decompression model, and an object carrying only a conservatism
+    would say it had.
     """
     conversion = convert((FIXTURES / "suunto_xml" / "freedive.xml").read_bytes())
-    assert "dives" not in conversion.document
     assert validate_document(conversion.document) == []
-    assert [note.kind for note in conversion.notes] == ["dropped"]
+    recording = conversion.document["dives"][0]["recordings"][0]
+    assert recording["mode"] == "freedive"
+    assert "deco_model" not in recording
+    assert "cylinders" not in conversion.document["dives"][0]
 
 
 def test_the_two_gas_dive_ties_its_channel_and_its_markers_to_the_right_cylinders() -> None:

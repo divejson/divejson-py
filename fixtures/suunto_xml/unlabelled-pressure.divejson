@@ -38,6 +38,9 @@
             "firmware": "3.0.2143",
             "dive_number": 2
           },
+          "deco_model": {
+            "conservatism": 0
+          },
           "profile": {
             "duration": 40,
             "depth": {

@@ -16,6 +16,12 @@ the document it was written from, on every member `docs/uddf-mapping.md`'s eleme
 carries, with one documented exception below. Everything else is named in the report, and
 the report is half the output here exactly as it is on the way in.
 
+The round trip is also **the only thing that checks a scale both directions agree on**.
+`divejson conform` compares a written file with a committed one and never reads it back, so
+a writer and a reader that disagreed about whether `<gradientfactor>` is percent or a
+fraction would produce two green corpora and a value a hundred times wrong. Every member
+scaled below owes that test in this suite, and `test_uddf_writing.py` is where they are.
+
 Five things shape the module.
 
 **One `<divecomputer>` per computer.** UDDF's element is a piece of kit *and* the hardware
@@ -171,8 +177,28 @@ _GEAR_ROUND_TRIPS = frozenset(
 )
 
 # The event types `<setmarker>` carries as themselves, because the reader reads exactly
-# these three back as a type rather than as an `other` labelled with the text.
+# these three back as a type rather than as an unclassified event labelled with the text.
 _MARKER_TYPES = frozenset({"deep_stop", "safety_stop", "bookmark"})
+
+# §6.4a's `mode` in UDDF's spelling, written as `<divemode type>` on the first waypoint.
+# **`apnoe` rather than `apnea`** for a freedive: `divemodeType` spells it twice, and this is
+# the older of the two, which every 3.2.x reader knows — while `uddf.py` reads both. **A
+# `gauge` recording has no row**: `divemodeType`'s five values do not include one, and
+# writing the nearest would be the guess §5.4 forbids, so it is reported instead.
+_DIVE_MODES = {
+    "open_circuit": "opencircuit",
+    "closed_circuit": "closedcircuit",
+    "semi_closed": "semiclosedcircuit",
+    "freedive": "apnoe",
+}
+
+# The scales §6.4 fixes for the three channels this writer converts back out of, as the
+# divisors that undo them: ppO₂ from hundredths of a bar to the bar current writers emit,
+# CNS from tenths of a percent to percent, and a gradient factor from whole percent to the
+# fraction the documentation's examples show. `ndl` needs none — §6.4 and UDDF both count it
+# in seconds.
+HUNDREDTHS_PER_UNIT = Decimal(100)
+PERCENT_PER_FRACTION = Decimal(100)
 
 # What one dive's waypoints are collected into before they are written: a second, and the
 # readings and annotations that landed on it. UDDF's `<waypoint>` is the one instant every
@@ -1325,11 +1351,23 @@ class _Writer:
         numbered = False
         for index, entry in enumerate(recordings):
             here = f"{where}/recordings/{index}"
-            # `device` and `profile` are the two this writer places; `started_at`,
-            # `source_files` and anything §6.4a gains report themselves from the record.
-            self.unmapped(here, entry, frozenset({"device", "profile"}))
+            # `device`, `mode` and `profile` are the three this writer places, and
+            # `deco_model` is in the set because it has a report of its own below rather than
+            # the generic one; `started_at`, `source_files` and anything §6.4a gains report
+            # themselves from the record.
+            self.unmapped(here, entry, frozenset({"device", "mode", "deco_model", "profile"}))
+            if entry.get("deco_model"):
+                self.note(
+                    f"{here}/deco_model",
+                    "UDDF's <decomodel> requires a tissue table — a half-time and its coefficients for every "
+                    "compartment — which §6.4c has no member for, and nothing is invented to satisfy a "
+                    "required element; the decompression model is not written",
+                    "dropped",
+                )
             if index == 0:
-                numbered = self.samples_element(element, entry.get("profile"), here, mix_by_gas_number)
+                numbered = self.samples_element(
+                    element, entry.get("profile"), entry.get("mode"), here, mix_by_gas_number
+                )
             else:
                 self.note(
                     here,
@@ -1419,6 +1457,7 @@ class _Writer:
         self,
         element: ET.Element,
         profile: dict[str, Any] | None,
+        mode: Any,
         where: str,
         mix_by_gas_number: dict[int, str],
     ) -> bool:
@@ -1429,14 +1468,36 @@ class _Writer:
         depth samples becomes its own waypoint, carrying a `<divetime>` and a
         `<temperature>` and no depth.
 
+        The recording's `mode` is written here because UDDF states it on a waypoint: it goes
+        on the **first**, which is what a reader takes it off.
+
         The return value is what `check_numbering` needs: a `<tankpressure ref>` or a
         `<switchmix ref>` is the only thing that makes a reader number the cylinders at all.
         """
+        divemode = self.divemode(mode, where)
         if not profile:
+            self.mode_unplaced(divemode, where)
             return False
         profile_where = f"{where}/profile"
         self.unmapped(
-            profile_where, profile, frozenset({"duration", "depth", "temperature", "pressures", "events"})
+            profile_where,
+            profile,
+            # `tts` and `surface_gradient_factor` are deliberately outside this set: UDDF has
+            # no time-to-surface element and no surface gradient factor, so both take the
+            # report a member the format cannot hold gets.
+            frozenset(
+                {
+                    "duration",
+                    "depth",
+                    "temperature",
+                    "pressures",
+                    "ndl",
+                    "ppo2",
+                    "cns",
+                    "gradient_factor",
+                    "events",
+                }
+            ),
         )
 
         readings: _Readings = {}
@@ -1448,6 +1509,19 @@ class _Writer:
             at(second)["depth"] = _decimal(centimetres) / CENTIMETRES_PER_METRE
         for second, tenths in _series(profile.get("temperature")):
             at(second)["temperature"] = _decimal(tenths) / TENTHS_PER_UNIT + KELVIN_OFFSET
+        for second, seconds in _series(profile.get("ndl")):
+            at(second)["nodecotime"] = _decimal(seconds)
+        for second, hundredths in _series(profile.get("ppo2")):
+            at(second)["calculatedpo2"] = _decimal(hundredths) / HUNDREDTHS_PER_UNIT
+        for second, tenths in _series(profile.get("cns")):
+            at(second)["cns"] = _decimal(tenths) / TENTHS_PER_UNIT
+        # **The documented fraction, not the whole percent §6.4 records.** `uddf-mapping.md`
+        # keys the percent-or-fraction question on the generator, and this writer is not a
+        # generator that table names — it stamps `divejson convert` — so a file it produces
+        # is read back by the fraction branch, and a written `0.67` comes back as `67`.
+        # Writing whole percent would come back as `6700`.
+        for second, percent in _series(profile.get("gradient_factor")):
+            at(second)["gradientfactor"] = _decimal(percent) / PERCENT_PER_FRACTION
 
         for channel in profile.get("pressures") or []:
             mix_id = mix_by_gas_number.get(channel["gas_number"])
@@ -1467,12 +1541,21 @@ class _Writer:
         self.events(profile.get("events") or [], profile_where, mix_by_gas_number, readings)
 
         if not readings:
+            self.mode_unplaced(divemode, where)
             return False
+        first = min(readings)
         samples = _sub(element, "samples")
         for second in sorted(readings):
             reading = readings[second]
-            # `waypointType` is an `xs:sequence`, so these go in exactly this order.
+            # `waypointType` is an `xs:sequence`, so these go in exactly this order. It is
+            # the XSD's and not a preference: `<cns>` comes third in the type and therefore
+            # first in a waypoint carrying no alarm or battery reading, and `<nodecotime>` is
+            # last of all.
             waypoint = _sub(samples, "waypoint")
+            if "cns" in reading:
+                _sub(waypoint, "cns", _num(reading["cns"]))
+            if "calculatedpo2" in reading:
+                _sub(waypoint, "calculatedpo2", _num(reading["calculatedpo2"]))
             if "depth" in reading:
                 _sub(waypoint, "depth", _num(reading["depth"]))
             _sub(waypoint, "divetime", _num(second))
@@ -1484,11 +1567,28 @@ class _Writer:
                 _sub(waypoint, "tankpressure", _num(pascal), ref=mix_id)
             if "temperature" in reading:
                 _sub(waypoint, "temperature", _num(reading["temperature"]))
+            if divemode is not None and second == first:
+                _sub(waypoint, "divemode", type=divemode)
+            if "gradientfactor" in reading:
+                _sub(waypoint, "gradientfactor", _num(reading["gradientfactor"]))
+            if "nodecotime" in reading:
+                _sub(waypoint, "nodecotime", _num(reading["nodecotime"]))
 
+        # Every channel this writer **wrote**, and no others: the span is what a reader takes
+        # off the file produced here, so a `tts` reaching past the last depth sample does not
+        # belong in it — that channel is dropped, and the note above says so.
         span = max(
             (
                 channel["times"][-1]
-                for channel in (profile.get("depth"), profile.get("temperature"), *(profile.get("pressures") or []))
+                for channel in (
+                    profile.get("depth"),
+                    profile.get("temperature"),
+                    profile.get("ndl"),
+                    profile.get("ppo2"),
+                    profile.get("cns"),
+                    profile.get("gradient_factor"),
+                    *(profile.get("pressures") or []),
+                )
                 if channel and channel["times"]
             ),
             default=0,
@@ -1506,6 +1606,40 @@ class _Writer:
             )
         return any(reading["pressures"] or "switchmix" in reading for reading in readings.values())
 
+    def divemode(self, mode: Any, where: str) -> str | None:
+        """§6.4a's `mode` in UDDF's spelling, or nothing where UDDF has no spelling for it.
+
+        `gauge` is the one value with no counterpart: `divemodeType`'s five do not include a
+        computer run as a bottom timer, and writing the nearest would be §5.4's guess. It is
+        reported rather than approximated.
+        """
+        if not isinstance(mode, str):
+            return None
+        written = _DIVE_MODES.get(mode)
+        if written is None:
+            self.note(
+                f"{where}/mode",
+                f"UDDF's <divemode> has no value for a {mode} recording, its five being open, closed and "
+                "semi-closed circuit and two spellings of a freedive; the mode is not written",
+                "dropped",
+            )
+        return written
+
+    def mode_unplaced(self, divemode: str | None, where: str) -> None:
+        """A mode UDDF *can* spell, on a recording with no waypoint to write it on.
+
+        `<divemode>` is a `<waypoint>` child and nothing else, so a recording that kept no
+        sample has nowhere to put one — and that is a loss the report has to name, `mode`
+        being inside `recording_elements`'s carried set and so silent without this.
+        """
+        if divemode is not None:
+            self.note(
+                f"{where}/mode",
+                "UDDF states a dive's mode on a waypoint, and this recording has no samples to carry one; "
+                "the mode is not written",
+                "dropped",
+            )
+
     def events(
         self,
         events: list[dict[str, Any]],
@@ -1519,7 +1653,11 @@ class _Writer:
         has nowhere to go and is dropped rather than joined into the first — the reference
         writer joins simultaneous markers with a separator, which is right for a file being
         read by a human and wrong for one being read back, where the join would return as a
-        single `other` event whose label is two labels.
+        single unclassified event whose label is two labels.
+
+        **`type` is OPTIONAL (§6.6), so `kind` may be nothing at all**, which is the ordinary
+        shape of an alarm: an event with no type and a label goes out as a `<setmarker>`
+        carrying that label, exactly as it arrived. What UDDF can carry is the wording.
         """
 
         def at(second: int) -> dict[str, Any]:
@@ -1529,7 +1667,7 @@ class _Writer:
             event_where = f"{where}/events/{index}"
             self.unmapped(event_where, event, frozenset({"time", "type", "gas_number", "label"}))
             second = event["time"]
-            kind = event["type"]
+            kind = event.get("type")
             if kind == "gas_switch":
                 # A switch the document recorded without saying what to, and one naming a
                 # cylinder this dive has none of, are the same answer here: `<switchmix>`
@@ -1555,25 +1693,39 @@ class _Writer:
                 at(second)["switchmix"] = mix_id
                 continue
 
-            marker = kind if kind in _MARKER_TYPES else event.get("label")
-            if kind in _MARKER_TYPES and event.get("label"):
+            label = event.get("label")
+            marker = kind if kind in _MARKER_TYPES else label
+            if kind in _MARKER_TYPES and label:
                 # `<setmarker>` is one string, and the type has to have it: the three named
                 # types are the only thing this format's own round trip has to go on, so a
                 # labelled safety stop keeps its type and loses its label rather than
-                # arriving as an `other` that nothing recognises.
+                # arriving as an event nothing recognises.
                 self.note(
                     event_where,
                     f"UDDF's <setmarker> carries one string, and the event is a {kind} with a label; the type "
                     "is written and the label is dropped",
                     "dropped",
                 )
-            if not marker:
-                # `<setmarker>` is a bare string with no type beside it, so an unlabelled
-                # `other` has nothing to carry: writing the word "other" would come back as
-                # an event labelled "other", which is a label the document did not have.
+            elif kind is not None and kind not in _MARKER_TYPES and label:
+                # The mirror of it, and that way round because the **label** is the half UDDF
+                # can carry back: `<setmarker>ppo2_high</setmarker>` would return as an
+                # unclassified event labelled `ppo2_high`, where
+                # `<setmarker>PO2 High</setmarker>` returns as the marker the diver saw.
                 self.note(
                     event_where,
-                    "UDDF's <setmarker> carries only text, and the event is an unlabelled 'other'; it is dropped "
+                    f"UDDF's <setmarker> carries one string and has no keyword for a {kind}; the label is "
+                    "written and the type is dropped",
+                    "dropped",
+                )
+            if not marker:
+                # `<setmarker>` is a bare string with no type beside it, so a typed event
+                # with no label has nothing UDDF can carry: writing the word its type spells
+                # would come back as an event labelled `ppo2_high`, which is a label the
+                # document did not have and not the device's wording §6.6's `label` holds.
+                self.note(
+                    event_where,
+                    f"UDDF's <setmarker> carries only text, and the event is "
+                    f"{'an unlabelled ' + kind if kind else 'neither typed nor labelled'}; it is dropped "
                     "rather than written as the word",
                     "dropped",
                 )

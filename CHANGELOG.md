@@ -7,6 +7,60 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Breaking: an event's `type` is OPTIONAL and `other` is gone.** §6.6 froze its
+  vocabulary at five values with `type` REQUIRED, which made every alarm a computer records
+  — a ceiling violation, a fast ascent, a ppO₂ alarm — an `other` carrying a label for the
+  life of 1.x. An absent `type` is what `other` meant, so that is the spelling now, and a
+  `label` is REQUIRED when the type is absent. Anything reading `event["type"]` has to reach
+  for it as an optional member, and an event this package's readers used to emit as
+  `{"type": "other", "label": …}` now arrives as `{"label": …}`.
+
+- **A recording says what mode its computer ran in and what decompression model it ran, and
+  a profile carries that model's readouts.** The members and their units are §6.4a, §6.4c and
+  §6.4 in [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md),
+  and each format's own mapping document says which of them its files state; none of it is
+  enumerated here, a list in two places being a list that disagrees with itself. What is
+  worth knowing at this level is that every one of the five readers fills what its files
+  carry — UDDF from `<divemode>` and the `<decomodel>` a dive links, FIT from
+  `dive_settings`, the Suunto app's JSON from `Header.Diving`, the DM5 XML from `<Mode>` and
+  `<PersonalMode>`, and `.ssrf` from nothing, no save file in hand carrying any of it.
+
+- **A Suunto DM5 freedive is a dive.** `<Mode>3</Mode>` was skipped and reported because the
+  format had no member for the kind of a dive; §6.4a's `mode` is that member, so the
+  recording says `freedive` and the dive is carried. An archive of the reference export
+  directory converts to **384** dives where it used to produce 342. `is_a_scuba_dive` is
+  gone from that reader; the Suunto app JSON reader's `is_a_dive` stays, because a run and a
+  dive really are the same shape there.
+
+- **A Suunto alert carries a §6.6 type as well as the device's wording.** §6.6's vocabulary
+  was seeded from that reader's own alert list — one value per distinct meaning, which is
+  why two wordings of one occurrence share a value — so "Ceiling Broken" arrives classified
+  *and* labelled. An alert outside the table is an event with no type and that wording as
+  its label, and two more `Notify` values are carried where the reason for dropping them was
+  that the format had nowhere to put them.
+
+- **A negative decompression readout is dropped by the channel's own floor, once for every
+  format.** §6.4 floors the new channels at zero, `series.Channel` reads that floor off the
+  schema, and a device's absent-marker — a Suunto Ocean's `gf99: -100`, its `NoDecTime: -1`
+  — is dropped from the channel and reported once per channel rather than once per sample.
+  A value at a device's *display* cap is the opposite case and is carried through: 99
+  minutes of no-decompression time is the number the diver read off their wrist.
+
+- **The UDDF writer sends back what UDDF can hold.** The recording's mode goes out as
+  `<divemode>` on the first waypoint and the readouts as `<nodecotime>`, `<calculatedpo2>`,
+  `<cns>` and `<gradientfactor>` — the last as the documented *fraction*, because this
+  writer is not a generator the reader's percent table names. A `gauge` recording,
+  `deco_model`, `tts` and `surface_gradient_factor` are each reported `dropped`, the model
+  because UDDF's `<decomodel>` requires a tissue table §6.4c has no member for and nothing is
+  invented to satisfy a required element. An event whose type UDDF has no keyword for is
+  written as its **label**, with the type reported; `docs/uddf-writing.md` has the four cases.
+
+- The vendored `schema/`, `fixtures/` and `docs/` move to a `SPEC_REF` carrying all of the
+  above: two new `invalid/` documents — a gradient-factor pair out of order, and an event
+  with neither a type nor a label — beside one retired, `other` no longer being a type a
+  document can fail on; six new reader pairs; and the mapping documents rewritten around
+  what each format now carries.
+
 ## 0.5.0
 
 - **Breaking: a dive's `profile` and `source_file` move into `recordings[]`.** A dive now

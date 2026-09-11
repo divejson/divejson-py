@@ -44,6 +44,12 @@ them; what each covers is in [`fixtures/README.md`](../fixtures/README.md#writeu
 document it was written from, on every member [`uddf-mapping.md`](uddf-mapping.md)'s element
 map carries. This document is the description of what does not come back.
 
+**It is the only thing that checks a scale both directions agree on.** `divejson conform`
+compares a written file with a committed one and never reads it back, so a writer and a
+reader that disagree about whether `<gradientfactor>` is percent or a fraction produce two
+green corpora and a value a hundred times wrong — see *the gradient factors* below. Every
+member this writer scales owes that test in an implementation's own suite, not a fixture.
+
 **`extensions` is the exclusion this direction adds** to the two the corpus already ignores
 (`writing.md`), and UDDF is where it is visible: `<generator>` and `/uddf/@version` describe
 the file in front of a reader, which after a write is the one this writer produced, so the
@@ -72,7 +78,9 @@ else. A round trip through that would hand the diver back a location they never 
 
 `writing.md` has the kinds and what a `where` is. In this format `absent` is an element UDDF
 requires that the document had nothing for, and `dropped` is a member UDDF has nowhere to
-put; the paths are `dives/0`, `dives/0/cylinders/1`, `trips/0/locations/1` and `$`.
+put — or, in the two findings *Devices* below describes, a fact about the order a dive's
+recordings come back in, which the file has nowhere to carry either; the paths are
+`dives/0`, `dives/0/cylinders/1`, `trips/0/locations/1` and `$`.
 
 A member with nowhere to go is reported from the record itself and not from a list
 (`writing.md`), so **the tables below are a description of what a writer does and not the
@@ -300,6 +308,41 @@ the gear item's element and the rest off the `device-<n>` one. This is the one t
 duplicate in a kit list is visible to the diver and correctable in a moment; a device that
 never arrived is neither, which is what makes this the cheaper of the two.
 
+**The links come back in the kit list's order rather than the recordings'**, and where the
+two disagree the dive loses something on the way in. A reader recovers a dive's recordings
+from its `<equipmentused>` links and gives the dive's two once-per-dive facts — its
+`<samples>` and its `<internaldivenumber>` — to the **first** `<divecomputer>` linked, there
+being nothing else in the file to give them to
+([`uddf-mapping.md`](uddf-mapping.md), which also says a reader must not read primacy into
+that order). The links themselves are the dive's `gear_uuids` in the diver's own order, with
+the `device-<n>` elements appended after them. So the sequence is a fact about the gear list
+and not about the recordings, and the two agree only by construction. Rewriting them is not
+open: `<equipmentused>` is the diver's own list and its order is a member of the document, so
+a disagreement is a loss to name rather than a file to rearrange.
+
+Two shapes, each reported against the dive:
+
+- **A `computer` gear item the dive links that no recording's device matches takes the first
+  link**, so the profile and the device counter come back on *that* computer rather than on
+  the one that recorded the dive. The ordinary case is a diver whose kit list still holds an
+  old computer, listed on a dive some other machine recorded.
+- **A dive's own computers reached in another order** — its kit list running through them
+  differently, or one of its devices folding into nothing and taking a `device-<n>` element
+  appended behind the rest — so its recordings come back reordered. §6.4a makes that a fact
+  about the document rather than a presentation detail: a recording has no uuid (§5.3), so
+  its position is the only thing that says it is the primary.
+
+**Neither has a pair**, both writer pairs putting the primary's element first, so both are
+written down here rather than left to the first writer to meet one — the same answer the link
+leg's refusal gets in [`fixtures/README.md`](../fixtures/README.md#writeuddf).
+
+**What is *gained* is not reported, which is the same rule read the other way.** A linked
+computer no recording answers to, anywhere but that first link, comes back as a recording the
+document never had — exactly as it comes back as a gear item the document never had, which is
+the documented exception above. Nothing is lost, so nothing is said. That covers the most
+ordinary two-computer logbook there is, and the hand-logged dive with no recordings at all in
+a logbook whose owner listed their computer in their kit.
+
 **`device.firmware` has no slot**, `equipmentPieceType` carrying no such element, and is
 reported once per device that has one. So is a recording's **`source_files`**: §6.7 is
 metadata about bytes UDDF has nowhere to reference, which is the same answer the dive-level
@@ -425,12 +468,45 @@ consumers and the wrong ones for a file written to be read back, where a dropped
 data loss and a moved timestamp is a reading presented as measured where it was not. See
 *Known consumer artefacts* below.
 
-`waypointType` is an `xs:sequence`, and the children written go in this order: `<depth>`,
-`<divetime>`, `<setmarker>`, `<switchmix>`, `<tankpressure>` (repeatable), `<temperature>`.
+`waypointType` is an `xs:sequence`, and the children written go in this order: `<cns>`,
+`<calculatedpo2>`, `<depth>`, `<divetime>`, `<setmarker>`, `<switchmix>`, `<tankpressure>`
+(repeatable), `<temperature>`, `<divemode>`, `<gradientfactor>`, `<nodecotime>`. That is the
+XSD's own order and not a preference — `<cns>` comes third in the type and therefore first
+in a waypoint that carries no alarm or battery reading, while `<nodecotime>` is last of all.
 
 Channel units: depth centimetres → metres, temperature tenths of °C → Kelvin, pressures
-tenths of a bar → Pascal. Each is a decimal factor, and doing the arithmetic in decimal is
-what makes a round trip through Kelvin land back on the number it started from.
+tenths of a bar → Pascal, ppO₂ hundredths of a bar → bar, CNS tenths of a percent →
+percent, `ndl` seconds → seconds, `gradient_factor` whole percent → the documented fraction,
+÷ 100. Each is a decimal factor, and doing the arithmetic in decimal is what makes a round
+trip through Kelvin land back on the number it started from.
+
+**The per-waypoint `<gradientfactor>` goes out as the documented fraction**: §6.4's whole
+percent divided by 100, so a `gradient_factor` of `67` is
+`<gradientfactor>0.67</gradientfactor>`. It is the **only** gradient factor this writer
+emits — `<gradientfactorlow>` and `<gradientfactorhigh>` exist in UDDF only inside
+`<decomodel><buehlmann>`, and `<decomodel>` is dropped whole for the reason below, so a
+document's `gf_low` and `gf_high` reach the file nowhere at all.
+`uddf-mapping.md` keys the percent-or-fraction
+question on the generator, and **this writer is not a generator that table names** — it
+stamps `<generator><name>divejson convert</name>`, and the table's one row is
+`Shearwater Cloud Desktop`. So a file this writer produces is read back by the *other*
+branch of that rule, the fraction one, and a written `0.67` comes back as `67`. Writing
+whole percent instead would come back as `6700`: the round trip a writing document exists
+to prevent, and one no conformance pair would catch, since the corpus never reads a written
+file back (`CONTRIBUTING.md`, *the checks the corpus cannot make*).
+
+*Rejected:* adding this writer to the generator table so it could write whole percent. The
+table exists to record what a **third party's** files need read differently; a writer that
+has to be in it to be read correctly by its own reader is a writer producing files nobody
+else can read correctly, which is the opposite of the point.
+
+**The recording's `mode` is written as `<divemode type>` on the first waypoint**, in UDDF's
+spelling: `open_circuit` → `opencircuit`, `closed_circuit` → `closedcircuit`, `semi_closed`
+→ `semiclosedcircuit`, `freedive` → **`apnoe`**. `divemodeType` spells a freedive twice,
+`apnoe` and the `apnea` added beside it in 2017; `apnoe` is written because it is the older
+of the two and every 3.2.x reader knows it, while `uddf-mapping.md` reads both. A **`gauge`**
+recording is reported `dropped`: `divemodeType`'s five values do not include one, and
+writing the nearest is the kind of guess §5.4 forbids.
 
 `profile.duration` is not written anywhere: UDDF records no duration for a profile, and
 §6.4 defines the member as the span of the samples, which a reader takes off them. A
@@ -440,21 +516,45 @@ document whose `duration` is not that span is reported.
 `@duration` is `use="required"`, and a ceiling sample says how deep the obligation was and
 never how long the stop should last.
 
+`profile.tts` and `profile.surface_gradient_factor` have no UDDF element at all — there is
+no time-to-surface element in 3.2.1 and no surface gradient factor — so both are reported
+`dropped`, which is what a member outside the carried set gets.
+
+**`deco_model` is reported `dropped`, and that is a fact about UDDF.** The XSD makes
+`<decomodel>` an `xs:all` of `<buehlmann>`, `<rgbm>` and `<vpm>` with none of the three
+optional, and each of those types requires at least one `<tissue>` carrying a half-time and
+its coefficients. A DiveJSON deco model carries a family, a name and a gradient-factor pair
+and no tissue table, so there is no way to write one and stay valid against the schema this
+writer's pairs are held to. Nothing is invented to satisfy a required element — this
+document's own first rule, and §5.4's. Shearwater Cloud Desktop ships
+`<decomodel><buehlmann>` with the pair alone, which is evidence the XSD is stricter than
+practice and not a licence to match it: the XSD assertion is what holds element order right
+across this writer, and exempting one element from it would cost more than the member is
+worth. *Rejected:* writing Shearwater's shape and skipping the assertion for `<decomodel>`.
+
 Events:
 
 | DiveJSON event | UDDF |
 | --- | --- |
 | `deep_stop`, `safety_stop`, `bookmark` | `<setmarker>` carrying the type as its text |
-| `other` with a `label` | `<setmarker>` carrying the label |
+| no `type`, with a `label` | `<setmarker>` carrying the label |
+| any other `type`, with a `label` | `<setmarker>` carrying the **label**; the type is reported `dropped` |
 | `gas_switch` with a `gas_number` | `<switchmix ref>` naming that cylinder's mix |
 
-Three cases lose something, each reported:
+Four cases lose something, each reported:
 
-- **An unlabelled `other`** is dropped rather than written as the word "other", which would
-  come back as an event labelled "other" — a label the document did not have.
+- **A typed event with no label** is dropped rather than written as the word its type spells,
+  which would come back as an event labelled `ppo2_high` — a label the document did not have,
+  and the device's wording is what §6.6's `label` holds.
 - **A named type carrying a label** keeps the type and loses the label. `<setmarker>` is one
   string with no type beside it, and the three named types are the only thing a round trip
   through it has to go on.
+- **A type outside those three, carrying a label**, is the mirror of it: the label is written
+  and the type is lost. That way round because the label is the half UDDF can carry back —
+  `<setmarker>ppo2_high</setmarker>` would return as an unclassified event labelled
+  `ppo2_high`, where `<setmarker>PO2 High</setmarker>` returns as the marker the diver saw.
+  *Rejected:* dropping every such event, which would lose the whole alarm class in the one
+  direction this writer exists to make less lossy.
 - **A gas switch naming a cylinder this dive does not have** is dropped: `<switchmix ref>`
   is an `xs:IDREF` and there is nothing valid to point it at. Pointing it at another dive's
   mix would say the diver breathed a gas they did not carry.

@@ -93,6 +93,12 @@ LOST: dict[str, frozenset[str]] = {
             "dives/1/species_uuids",
             "dives/0/recordings/0/profile/ceiling",
             "dives/0/recordings/0/profile/extensions",
+            # UDDF has no time-to-surface element and no surface gradient factor at all.
+            "dives/0/recordings/0/profile/tts",
+            "dives/0/recordings/0/profile/surface_gradient_factor",
+            # `<decomodel>` requires a tissue table §6.4c has no member for, and nothing is
+            # invented to satisfy a required element (`docs/uddf-writing.md`).
+            "dives/0/recordings/0/deco_model",
             # `equipmentPieceType` carries no firmware element at all (§6.4b).
             "dives/0/recordings/0/device/firmware",
             *(f"dives/0/cylinders/{index}/{member}" for index in range(4) for member in ("role", "usage")),

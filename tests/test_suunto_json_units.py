@@ -233,3 +233,43 @@ def test_a_sample_second_is_elapsed_time_from_the_header_s_own_start() -> None:
     """The axis's origin, which is the instant `started_at` names."""
     dive = _dive({}, [suunto_sample(0, Depth=1.0), suunto_sample(120.49, Depth=2.0)])
     assert profile_of(dive)["depth"]["times"] == [0, 120]
+
+
+# -- the decompression readouts -------------------------------------------------------
+
+
+def test_the_readout_channels_take_no_factor_at_all() -> None:
+    """This export states all four in §6.4's own units, which makes them the trap in reverse.
+
+    `NoDecTime` and `TimeToSurface` are seconds where §6.4's channels are seconds, and
+    `gf99` and `gfSurface` are whole percent where §6.4's are whole percent — so the failure
+    available here is applying one of the factors above out of habit, and a `NoDecTime` of
+    6 000 arriving as 60 000 would validate perfectly.
+    """
+    profile = profile_of(
+        _dive(
+            {},
+            [
+                suunto_sample(
+                    0,
+                    Depth=44.5,
+                    NoDecTime=6000,
+                    TimeToSurface=268,
+                    RtGradientFactors={"gf99": 78, "gfSurface": 116},
+                )
+            ],
+        )
+    )
+    assert profile["ndl"]["values"] == [6000]
+    assert profile["tts"]["values"] == [268]
+    assert profile["gradient_factor"]["values"] == [78]
+    assert profile["surface_gradient_factor"]["values"] == [116]
+
+
+def test_a_fractional_readout_is_rounded_to_the_channels_integer() -> None:
+    """§6.5 makes every channel value an integer, halves away from zero."""
+    profile = profile_of(
+        _dive({}, [suunto_sample(0, Depth=20.0, NoDecTime=59.5, RtGradientFactors={"gf99": 77.4})])
+    )
+    assert profile["ndl"]["values"] == [60]
+    assert profile["gradient_factor"]["values"] == [77]

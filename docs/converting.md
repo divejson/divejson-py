@@ -164,13 +164,28 @@ document. `exported_at` is the moment of conversion, always offset-aware.
   a dangling reference, so the references go with the record. A source that records nothing
   at all about a logbook's owner produces no `diver` member (§6.1): minting an identity for
   one would be §5.4's fabrication applied to people.
-- **A source record that is not a scuba dive is skipped, and reported.** §6.2 has no member
-  for the *kind* of a dive, so a freedive or a swim converted as an ordinary one arrives
-  indistinguishable from a scuba dive that recorded no gas and no decompression algorithm —
-  mislabelled by omission, in a logbook it shares with real ones. Skipping it and saying so
-  is the honest answer; a marker under `extensions` would invent vocabulary the format does
-  not have, in a document that outlives the converter. Each format's mapping document names
-  the element or field its source states the kind in.
+- **A source record that is not a dive at all is skipped, and reported.** A run, a swim, an
+  activity with no depth: a tracker writes them in the same shape as a dive, and §6.2's
+  object is a dive. Skipping it and saying so is the honest answer; a marker under
+  `extensions` would invent vocabulary the format does not have, in a document that outlives
+  the converter. Each format's mapping document names the element or field its source states
+  the activity in.
+
+  **A freedive is a dive, and is carried.** This rule covered it until §6.4a gained `mode`,
+  on the ground that the format had no member for the kind of a dive and a carried freedive
+  would arrive indistinguishable from a scuba dive that recorded no gas and no algorithm.
+  There is a member now: the recording says `freedive` and nothing is mislabelled, so
+  skipping one would be the data loss this format exists to end rather than the guard
+  against it.
+- **A recording's `mode` comes from an explicit value only.** Several source formats
+  document what an absent mode element means — UDDF glosses a first waypoint with no
+  `<divemode>` as open circuit, and Subsurface writes no `dctype` for an open-circuit
+  computer. That is the source *format*'s claim about its own default, not the device's
+  record of how it ran, and §6.4a says outright that a reader must not assume open circuit.
+  So an absence stays absent: a save of a rebreather dive whose importer never set the mode
+  would otherwise arrive labelled open circuit, which is worse than saying nothing. The same
+  rule governs a device's decompression settings — a model the source names is carried, a
+  model it does not name is absent.
 - **An exact `0.000000` / `0.000000` pair is not a position.** Null Island is a place: a
   reader that trusts it pins a Red Sea wreck into the Atlantic. Half a pair is not a
   position either — §6's Position object makes both members REQUIRED, which is §5.4
@@ -313,6 +328,29 @@ readings beside 29 temperatures keeps both, rather than gaining 402 invented one
   logbook. This is the one reading whose zero the member's own constraint cannot settle —
   §6.5's Series puts no floor on a value — so the rule is stated here rather than derived
   the way the zeroes above it are.
+- **A negative decompression readout is the device's absent-marker**, and this one the
+  member's own constraint does settle. §6.4 floors `ndl`, `tts`, `ppo2`, `cns`,
+  `gradient_factor` and `surface_gradient_factor` at zero, because none of those quantities
+  has a negative value, so a source that writes one is signalling *no figure* in the only
+  space it had — a Suunto Ocean writes `gf99: -100` where no tissue leads and `NoDecTime: -1`
+  where it has no no-decompression time to show. The sample is dropped from that channel and
+  the drop is reported, exactly as a zero ceiling is; carrying it would produce a document
+  its own schema rejects. The rule is one place in a converter, not one per format: the
+  floor belongs to the channel, and every reader applies it to every sample it offers.
+- **A value at a device's display cap is a reading, not a ceiling on the truth.** A
+  Shearwater writes `<nodecotime>5940</nodecotime>` — 99 minutes, its display maximum — on
+  most samples of a shallow dive, and a Suunto Ocean writes `NoDecTime: 6000`. Both mean
+  *at least this*, which is the number the diver read off their wrist. A converter writes it
+  through: clamping it or dropping it would delete the only no-decompression reading most
+  recreational dives have. Each format's mapping document records the caps its devices use,
+  so a reader looking at a flat line knows what it is.
+- **A zero is decided per quantity, per format, against the file.** *What the format cannot
+  hold* above settles a zero by the member's own constraint, and these members are all `≥ 0`,
+  so a zero is an answer by that rule — an `ndl` of zero is what a computer shows the moment
+  a dive becomes a decompression dive, and real files carry it at 45 m beside the ceiling
+  that follows. Where a particular device writes zero as its *absent*-marker instead, the
+  file says so and only the file can: the mapping document states the evidence and the
+  resolution together, the way the ceiling rule above was settled.
 
 ## Where a fix belongs
 
@@ -446,6 +484,8 @@ the string it was derived from; its unit factor table, channels included; the di
 writer habits its rules answer to; **where a recording's device comes from and what about
 the hardware it deliberately leaves** (§6.4b), which is the row of the table above spelled
 out against that format's own elements; its own ambiguities and their tests, a generator
-table among them where the format needs one; the kinds its report can emit; and **what it
-deliberately does not map, listed rather than left silent**, because a port needs to know
-those were considered rather than missed.
+table among them where the format needs one; **which sentinels and display caps its devices
+write**, per quantity and with the evidence — a zero that is an absence, a negative that is
+one, a value at a cap that is a reading, each settled against a file rather than against a
+guess; the kinds its report can emit; and **what it deliberately does not map, listed rather
+than left silent**, because a port needs to know those were considered rather than missed.

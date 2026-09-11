@@ -18,12 +18,17 @@ the exports this reader was built against and carries a reading in none of them.
 element is *not recorded*, never zero — which is `converting.md`'s empty-is-absent rule
 meeting the writer that makes it unmissable.
 
-**A `<Mode>3</Mode>` document is a freedive, and it is skipped and reported rather than
-converted.** DiveJSON has no member for the kind of a dive, so a converted freedive would
-be indistinguishable from a scuba dive with no gas and no decompression algorithm.
-Forty-two of the 384 exports in hand are freedives, and they are exactly the 42 that carry
-no `<DiveMixture>` at all. This is the answer the Suunto app JSON reader already gives an
-entry whose `ActivityType` is not 51.
+**A `<Mode>3</Mode>` document is a freedive, and a freedive is a dive.** §6.4a's `mode` is
+what says which kind of dive it is, so the recording carries `freedive` and nothing is
+mislabelled. It was skipped and reported until that member existed, on the ground that a
+carried freedive would be indistinguishable from a scuba dive with no gas and no
+decompression algorithm; an archive of the owner's whole export directory now converts to
+**384** dives where it used to produce 342 and a report saying why the other 42 were
+missing. The 42 are exactly the 42 that carry no `<DiveMixture>` at all — and since they had
+never been read past their mode, carrying them is also what first made the same-second
+collision rule fire on a real file. Nothing here is skipped for its mode, which is where
+this reader and the Suunto app JSON one part company: a run and a dive are the same shape
+there, and `ActivityType` is the only thing that separates them.
 
 **The same three readings are in three different units across this vendor's two exports,
 and only a dive that exists in both makes it visible.** CNS is whole percent here and a 0-1
@@ -69,6 +74,7 @@ from .converter import (
     NoteKind,
     Scope,
     capped,
+    deco_model,
     decimal_of,
     device,
     header,
@@ -114,11 +120,22 @@ SUUNTO_XML_ID_NAMESPACE = uuid_pkg.UUID("cefc9278-1124-5d83-8af6-7f386f03a061")
 # constant carries the reasoning at length.
 SUUNTO = "Suunto"
 
-# The `<Mode>` this reader refuses. 0 and 1 are air and nitrox — the oxygen fractions of the
-# corpus say so, 243 of the 244 `<Mode>0</Mode>` exports carrying a single 21 % mixture —
-# and both are scuba. 3 is a freedive: no mixture element at all, a nil `<Algorithm>` and a
-# nil `<DiveTime>`, durations of 3 to 60 seconds and depths of 1.39 to 15.48 m.
-FREEDIVE_MODE = Decimal(3)
+# `<Mode>` onto §6.4a's `mode`, derived from the corpus rather than from documentation this
+# format has none of. **0 and 1 are air and nitrox, which are both open circuit**: the oxygen
+# fractions say so, 243 of the 244 `<Mode>0</Mode>` exports carrying a single 21 % mixture
+# and every one of the 98 `<Mode>1</Mode>` exports carrying a richer one, up to 52 %. **3 is
+# a freedive**, and the 42 that state it are exactly the 42 with no `<DiveMixture>` at all: a
+# nil `<Algorithm>`, a nil `<DiveTime>`, durations of 3 to 60 seconds and depths of 1.39 to
+# 15.48 m.
+#
+# A freedive is a dive and is carried — §6.4a's `mode` is what says which kind it is — so
+# this reader skips nothing on its mode and has no not-a-dive test at all, where the app's
+# JSON export needs one because a run and a dive are the same shape there.
+DIVE_MODES = {Decimal(0): "open_circuit", Decimal(1): "open_circuit", Decimal(3): "freedive"}
+
+# The `<Mode>` that runs no decompression model, so a `<PersonalMode>` beside it is the
+# watch's standing setting rather than anything this dive ran on.
+FREEDIVE = "freedive"
 
 # The unit factors, each cross-checked against the same dive exported as the Suunto app's
 # JSON. See this module's docstring: the vendor's two exports disagree about all three.
@@ -376,9 +393,6 @@ class _Converter:
 
     def read_dive(self) -> dict[str, Any] | None:
         where = "dive/0"
-        if not self.is_a_scuba_dive(where):
-            return None
-
         started_at = self.read_started_at(where)
         if started_at is None:
             return None
@@ -419,7 +433,13 @@ class _Converter:
         # file's, so `read_device` always has a member to write and §6.4a's "carries at
         # least one" is met before a sample is read. The guard stays because `recording`'s
         # contract is the shared one and a reader that lost that constant would need it.
-        built = recording(device=self.read_device(where), profile=profile)
+        mode = self.read_mode(where)
+        built = recording(
+            device=self.read_device(where),
+            mode=mode,
+            deco_model=self.read_deco_model(mode, where),
+            profile=profile,
+        )
         if built is not None:
             dive["recordings"] = [built]
         return dive
@@ -457,28 +477,58 @@ class _Converter:
             },
         )
 
-    def is_a_scuba_dive(self, where: str) -> bool:
-        """Whether this document is a dive this reader carries, on `<Mode>`'s say-so.
+    def read_mode(self, where: str) -> str | None:
+        """`<Mode>` as §6.4a's `mode`, by the table the corpus derives.
 
-        A `<Mode>3</Mode>` document is a freedive, and DiveJSON has no member for the kind
-        of a dive — so a converted one would arrive indistinguishable from a scuba dive with
-        no gas and no algorithm, mislabelled by omission in a logbook it shares with real
-        scuba dives. It is skipped and reported instead, which is the answer the Suunto app
-        JSON reader gives an activity that is not a dive.
+        Every record this format holds is a dive of some kind, so nothing is skipped for its
+        mode: a `<Mode>3</Mode>` freedive used to be dropped on the ground that the format
+        had no member for the kind of a dive, and there is a member now. An archive of the
+        owner's whole export directory converts to 384 dives where it used to produce 342 and
+        a report saying why the other 42 were missing.
 
-        A document that states **no** `<Mode>` is read on: absence is not a claim, and
-        `converting.md`'s first rule is that schema validity is never a precondition.
+        A document that states **no** `<Mode>`, or one outside the table, leaves the mode
+        absent: absence is not a claim, §6.4a forbids assuming open circuit, and
+        `converting.md`'s first rule is that schema validity is never a precondition. A
+        *stated* value this reader has no table row for is reported, the way an unreadable
+        number is; a nil element is not, for the reason `number` gives.
         """
-        if self.number(self.root, "Mode", where) != FREEDIVE_MODE:
-            return True
-        self.note(
-            where,
-            "the export records dive mode 3, which is a freedive, and this format has no member for the "
-            "kind of a dive; the dive is dropped rather than carried as a scuba dive it could not be told "
-            "apart from",
-            "dropped",
+        stated = self.number(self.root, "Mode", where)
+        if stated is None:
+            return None
+        mode = DIVE_MODES.get(stated)
+        if mode is None:
+            self.note(
+                where,
+                f"the export records dive mode {stated}, which is not one the corpus this reader was built "
+                "against states; the recording's mode is left unrecorded rather than assumed (spec §6.4a)",
+                "dropped",
+            )
+        return mode
+
+    def read_deco_model(self, mode: str | None, where: str) -> dict[str, Any] | None:
+        """`<PersonalMode>` as §6.4c's `conservatism`, which is all this format states.
+
+        Suunto's own P−2 to P2 scale, which is exactly what the member holds: the device's
+        number, meaningful beside the device — so `0` is the P0 setting rather than an
+        absence and `-1` is P−1, and no floor is applied.
+
+        **A freedive record states one too and it is not carried.** §6.4c's object is the
+        model a device ran on *this* dive; a freedive ran none, and a `deco_model` carrying
+        only a conservatism would say otherwise.
+
+        `<Algorithm>` is an undocumented enum reading `0` on every scuba export in hand and
+        nil on every freedive, so nothing in the corpus says what any other value means and
+        §6.4c's `algorithm` takes a family this reader cannot name from a bare `0`. The app's
+        JSON export of the same dives states the model as a string and is mapped there.
+        """
+        if mode == FREEDIVE:
+            return None
+        return deco_model(
+            {"conservatism": integer_of(self.number(self.root, "PersonalMode", where))},
+            note=self.note,
+            where=where,
+            labels={"conservatism": "<PersonalMode>"},
         )
-        return False
 
     def read_started_at(self, where: str) -> str | None:
         """`<StartTime>` as a §5.2 date-time, fraction kept and no offset supplied.
@@ -812,8 +862,10 @@ class _Converter:
         unaffected — so the channels sit on their own axes and none is padded to another's
         length. Two samples on one second are therefore a real collision here rather than
         two sensor streams that were never in competition, and the axis settles them per
-        channel; it fires on 37 of the corpus's exports, every one of them a freedive this
-        reader has already skipped before reaching this method.
+        channel; it fires on 37 of the corpus's exports, every one of them a freedive, where
+        a 1 s sampling interval meets a `<Time>` that is not quite an integer. Those 37 were
+        unreachable while the reader stopped at `<Mode>3</Mode>` before it read a sample, so
+        carrying freedives is what first made this rule fire on a real file.
 
         `<AveragedTemperature>` is deliberately not the temperature channel: it is a
         smoothed reading sitting beside the raw `<Temperature>` in the same element, and
@@ -840,10 +892,10 @@ class _Converter:
             seconds = self.number(sample, "Time", f"{where}/sample/{index}")
             axis.offer(None if seconds is None else rounded(seconds), sample)
 
-        depth = Channel()
-        ceiling = Channel()
-        temperature = Channel()
-        pressure = Channel()
+        depth = Channel("depth")
+        ceiling = Channel("ceiling")
+        temperature = Channel("temperature")
+        pressure = Channel("pressures")
         # Counted rather than reported one at a time: a pod that reports outside §6.3's
         # range usually does it for a run of samples, and one line per reading would be a
         # transmitter fault written out several hundred times.

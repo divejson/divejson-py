@@ -36,6 +36,10 @@
             "model": "Suunto Ocean",
             "dive_number": 3
           },
+          "deco_model": {
+            "gf_low": 50,
+            "gf_high": 85
+          },
           "profile": {
             "duration": 4301,
             "depth": {
