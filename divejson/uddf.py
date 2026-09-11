@@ -1536,8 +1536,8 @@ class _Converter:
         changes mode mid-dive.
 
         A `@type` outside the table, or a `<divemode>` with no `@type`, leaves the mode
-        absent and is reported: §6.4a forbids assuming open circuit, and the element is not
-        schema-valid without one anyway.
+        absent and is reported: §6.4a forbids assuming open circuit, and there is nothing
+        else in the element to read.
         """
         element = _kid(waypoint, "divemode")
         if element is None:
@@ -1545,9 +1545,12 @@ class _Converter:
         stated = _attr(element, "type")
         mode = _DIVE_MODES.get(stated) if stated is not None else None
         if mode is None:
-            # `@type` is `use="required"` on `divemodeType`, so a `<divemode>` without one is
-            # not schema-valid either — and schema validity was never a precondition here, so
-            # it is read and reported like any other value this reader cannot place.
+            # **A bare `<divemode/>` is schema-valid**, whatever the 3.2.1 documentation's
+            # "compulsory" says: `tests/fixtures/uddf_3.2.2.xsd` declares `@type` with no
+            # `use`, which XSD reads as optional. So it is not a malformed file being
+            # reported here — it is an element that states nothing, read and reported like
+            # any other value this reader cannot place, schema validity having never been a
+            # precondition in either direction.
             said = "no dive mode" if stated is None else f"the dive mode {stated!r}"
             self.note(
                 where,
