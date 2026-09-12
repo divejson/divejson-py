@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.6.0
+
 - **Breaking: an event's `type` is OPTIONAL and `other` is gone.** §6.6 froze its
   vocabulary at five values with `type` REQUIRED, which made every alarm a computer records
   — a ceiling violation, a fast ascent, a ppO₂ alarm — an `other` carrying a label for the
