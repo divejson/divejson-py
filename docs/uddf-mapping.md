@@ -83,6 +83,11 @@ in a converter, are in `converting.md`.
 | `profile.temperature` values | tenths of a °C | `<waypoint><temperature>` | Kelvin | (K − 273.15) × 10 |
 | `profile.pressures[]` values | tenths of a bar | `<waypoint><tankpressure>` | Pascal | ÷ 100 000 × 10 |
 | `profile.duration`, `times` | seconds | `<waypoint><divetime>` | seconds | — |
+| `profile.ndl` values | seconds | `<waypoint><nodecotime>` | seconds | — |
+| `profile.ppo2` values | hundredths of a bar | `<waypoint><calculatedpo2>` | bar or Pascal, and see below | × 100, or ÷ 1000 |
+| `profile.cns` values | tenths of a percent | `<waypoint><cns>` | percent | × 10 |
+| `profile.gradient_factor` values | whole percent | `<waypoint><gradientfactor>` | percent or fraction, and see below | — , or × 100 |
+| `deco_model.gf_low`, `.gf_high` | whole percent | `<gradientfactorlow>`, `<gradientfactorhigh>` | fraction, and see below | × 100, or — |
 | `max_depth`, `avg_depth` | metres | `<greatestdepth>`, `<averagedepth>` | metres | — |
 | `bottom_temperature` | °C | `<lowesttemperature>` | Kelvin | K − 273.15 |
 | `cylinders[].start_pressure`, `.end_pressure` | bar | `<tankpressurebegin>`, `<tankpressureend>` | Pascal | ÷ 100 000 |
@@ -226,8 +231,9 @@ duplication.** It is the only string in this format that names the computer at a
 two members it lands in mean different things: §6.12's `name` is the diver's label for a
 thing in their kit list, and §6.4b's `name` is what the device calls itself. UDDF has one
 element for both because it has one element for the whole computer. Reading it only as the
-gear item's name would leave the corpus's only UDDF computer with a device that has no
-string naming it — `opendiving.uddf` below carries a `<name>` and no `<model>` — and reading
+gear item's name would leave a computer stated at this format's usual width with a device
+that has no string naming it — `opendiving.uddf` below carries a `<name>` and no `<model>`,
+where `shearwater-cloud.uddf`'s element states both — and reading
 it into `model` instead would put `Ocean` where the same dive's FIT export puts
 `Suunto Ocean`, conflating two members §6.4b defines separately.
 
@@ -384,21 +390,91 @@ inventing 402 readings.
 | `tankpressure` (`@ref` → a mix → a cylinder) | `profile.pressures[]` |
 | `setmarker` | an event |
 | `switchmix` (`@ref` → a mix → a cylinder) | a `gas_switch` event |
+| `nodecotime` | `profile.ndl` |
+| `calculatedpo2` | `profile.ppo2` |
+| `cns` | `profile.cns` |
+| `gradientfactor` | `profile.gradient_factor` |
+| `divemode` `@type` | the recording's `mode`, from the first waypoint that states one |
 
 - `<divetime>` is optional in the schema and is the only thing that can place a reading, so
   a waypoint without one is the timeless sample `converting.md` drops and reports.
 - `<divetime>` is `xs:float` while §6.5's `times` are integers, which is what makes the
   same-second collision rule fire on real files.
 - A `<setmarker>` whose text is exactly `deep_stop`, `safety_stop` or `bookmark` becomes
-  that event type; anything else becomes an `"other"` event labelled with the text.
-  `<setmarker>` is a bare string with no type beside it, so this is the only thing a round
-  trip through UDDF has to go on.
+  that event type; anything else becomes an event with **no `type`** and the text as its
+  `label`, which §6.6 makes the spelling of an unclassified event. `<setmarker>` is a bare
+  string with no type beside it, so this is the only thing a round trip through UDDF has to
+  go on.
+- **`<divemode>` states the recording's mode.** `divemodeType` enumerates five values and
+  DiveJSON's `mode` five, and they are not the same five:
+
+  | `<divemode @type>` | `mode` |
+  | --- | --- |
+  | `opencircuit` | `open_circuit` |
+  | `closedcircuit` | `closed_circuit` |
+  | `semiclosedcircuit` | `semi_closed` |
+  | `apnoe` | `freedive` |
+  | `apnea` | `freedive` |
+
+  **Two spellings of one mode**, because UDDF has two: `apnoe` is the original and `apnea`
+  was added beside it in 2017 as the English word, both are current in 3.2.x, and a reader
+  that knew only one would drop every freedive from whichever half of the installed base
+  wrote the other. **`gauge` is the value UDDF does not have** — §6.4a's fifth mode has no
+  counterpart here at all, which is a fact about UDDF rather than about this reader, and
+  `uddf-writing.md` is where it costs something. A `@type` outside the table, or a
+  `<divemode>` with no `@type` at all, leaves the recording's `mode` absent and is reported.
+  **§6.4a is the whole of the reason**: it forbids assuming open circuit, so an absence stays
+  an absence. The schema does not back it up — this is one of the places the documentation
+  contradicts it. The documentation stops at 3.2.1 and calls `@type` compulsory there; the
+  3.2.2 XSD declares the attribute with no `use` at all, which defaults to `optional`, so a
+  bare `<divemode/>` validates. The one `use="required"` anywhere near `divemodeType` is on
+  `samplesType`'s `@startdivemode`, inside a block commented out in 2012. A reader that took
+  the documentation's word for it would treat this case as impossible and meet it anyway.
+- **Only a change of value is an event.** The
+  first waypoint that carries one gives the recording its `mode`; a later waypoint stating a
+  *different* value is reported `dropped`, because the only place §6.6 could carry a switch
+  is an event and an event with no type needs a label the file does not supply — writing one
+  would be inventing the device's wording (§5.4). A later waypoint that simply stops stating
+  the mode is not a change: an absence is not a claim. No file in hand changes mode
+  mid-dive; `fixtures/uddf/shearwater-cloud.uddf` states `opencircuit` on its first eight
+  waypoints and nothing on its last four.
+- **A `<nodecotime>` of 5940 is a reading**, not a missing one: 99 minutes is the Shearwater
+  display maximum and it means *at least this*. `converting.md`'s display-cap rule is what
+  carries it through.
 - **Two cylinders on one blend link the same `<mix>`**, so a `@ref` resolves to a *list* of
   cylinders and repeated references on one waypoint take them in order. Collapsing them
   would put two readings on one second, which §6.5 forbids, and would say the diver carried
   one bottle. A `<tankpressure>` with no `@ref` at all — which the documentation permits for
   a linked double measured at one pressure — is taken as the dive's cylinder when there is
   exactly one, and dropped when there is a choice to get wrong.
+
+### The decompression model — `<decomodel>`
+
+`<decomodel>` is a top-level container of `<buehlmann>`, `<vpm>` and `<rgbm>`, each with an
+`@id`, and a dive reaches its own through a `<link>` under `<informationbeforedive>`. That
+link is how the model becomes *this dive's* rather than the file's: a logbook holds one
+`<decomodel>` block and many dives, and nothing says every dive ran the same model.
+
+| UDDF | DiveJSON |
+| --- | --- |
+| `<decomodel><buehlmann @id>` a dive links | `recordings[].deco_model.algorithm: "buhlmann"` |
+| `<buehlmann><gradientfactorlow>`, `<gradientfactorhigh>` | `deco_model.gf_low`, `.gf_high` |
+
+- **`<vpm>` and `<rgbm>` are not mapped**, and they are on the not-mapped list below with
+  that reason: no file in hand carries either, and a mapping no pair exercises is one
+  nothing checks. §6.4c's `algorithm` is OPTIONAL, so each arrives in a minor version with
+  the file that first needs it.
+- **A `<link>` that resolves to a `<decomodel>` child is no longer a dangling reference.**
+  Until this mapping existed it fell through to the "not a site this converter carries"
+  note, which is what `fixtures/uddf/shearwater-cloud.uddf`'s `<link ref="zhl16c" />`
+  produced. It resolves now and is reported nowhere.
+- **The `<tablegeneration><calculateprofile><profile><decomodel>` route is not read.** That
+  element names the model a *recalculation* used, which is the application's arithmetic
+  rather than the device's, and §6.4c's object is what the device ran.
+
+Two of this format's unit ambiguities are the deco model's, and both are below under
+*Where UDDF does not hand over the answer*: `<calculatedpo2>`'s bar-or-Pascal, settled on
+the value, and the gradient factors' percent-or-fraction, settled on the generator.
 
 ## Generators this reader knows
 
@@ -409,7 +485,7 @@ produced — so it gains a row only against real files, and each row says which.
 
 | `<generator><name>` | what is read differently |
 | --- | --- |
-| `Shearwater Cloud Desktop` | a `Z` on a dive's `<datetime>` means **no offset** |
+| `Shearwater Cloud Desktop` | a `Z` on a dive's `<datetime>` means **no offset**; the gradient factors are **whole percent**, not fractions |
 
 **The Shearwater `Z` is the local wall clock, not UTC.** Shearwater Cloud Desktop writes the
 time the diver read off their wrist and suffixes it `Z`, so the instant the file appears to
@@ -439,19 +515,24 @@ files confirms the wall clock; a third-party reader states in its own source tha
 Shearwater's exports carry "a wall-clock reading stored as if it were a UTC epoch";
 Subsurface's import is consistent with it, copying the time part verbatim and ignoring a
 trailing `Z`; and one issue asserts the opposite with no evidence behind it. Three further
-Shearwater Cloud Desktop exports in public repositories carry the same shape. **No
-Shearwater-generated file is in this corpus**, so this rule has no pair of its own and rests
-on the files named above rather than on one this repository carries —
-`converting.md`'s rule about a claim resting on a file that is not here, said in place.
+Shearwater Cloud Desktop exports in public repositories carry the same shape. **The rule now
+has a pair**, `fixtures/uddf/shearwater-cloud.uddf` being a reduction of the Perdix 3 export
+quoted above, so what it is held to is a file this repository carries — while the evidence that
+the reading is the right one is still the record above rather than anything in the corpus,
+which is `converting.md`'s rule about a claim resting on a file that is not here.
 
-## Three places UDDF does not hand over the answer
+## Where UDDF does not hand over the answer
 
-The last two are `converting.md`'s ambiguities of *scale*: a value the source did record,
-whose scale the file cannot settle, so a heuristic reads it at the scale it must have meant
-and reports a finding of kind `resolved` when it fires. The generator table above is the
-same kind of finding settled the other way, on the writer rather than on the value. The
-first below is the opposite shape and no ambiguity at all — a required DiveJSON member with
-no UDDF source — and §6.4 settles it outright, so it guesses nothing and reports nothing.
+Most of what follows is `converting.md`'s ambiguity of *scale*: a value the source did
+record, whose scale the file cannot settle, so a heuristic reads it at the scale it must have
+meant and reports a finding of kind `resolved` when it fires. The generator table above is
+the same kind of finding settled the other way, on the writer rather than on the value — and
+the gradient factors below are the case that has to be settled that way. The first item is
+the opposite shape and no ambiguity at all — a required DiveJSON member with no UDDF source —
+and §6.4 settles it outright, so it guesses nothing and reports nothing.
+
+The heading carries no count on purpose: it had one, and one more ambiguity is exactly the
+sort of thing that arrives without the heading being corrected.
 
 ### `profile.duration` has no UDDF source
 
@@ -490,13 +571,42 @@ where current writers write `0.34`. Both are schema-valid.
 is pure oxygen rather than a 1 % mix, because a 1 % mix is not a breathing gas. Reported as
 `resolved` when the second branch fires.
 
+### `<calculatedpo2>`: bar or Pascal
+
+The documentation states Pascal, and Shearwater Cloud Desktop writes `0.399999976` for a
+ppO₂ of 0.4 bar. The two spellings are three orders of magnitude apart and a breathable ppO₂
+lives between about 0.1 and 2 bar, so nothing overlaps.
+
+**Heuristic: at or below 10, bar; above it, Pascal.** Reported as `resolved` when the
+second branch fires. §6.4's `ppo2` is hundredths of a bar, so the first branch multiplies by
+100 and the second divides by 1 000.
+
+### `<gradientfactor>` and the GF pair: percent or fraction, on the generator
+
+`<gradientfactorlow>` and `<gradientfactorhigh>` are documented as fractions with
+`0.0 ≤ GF Low ≤ GF High ≤ 1.0`; the per-waypoint `<gradientfactor>` is documented as "a
+percentage as a real number" with no range at all, its one example `0.8` glossed as 80 %.
+Shearwater Cloud Desktop writes whole percent in all three — `50` and `85` for the pair,
+`0`, `1` and `3` to `17` per waypoint.
+
+**A magnitude test cannot settle the per-waypoint one**, which is what makes this the
+generator table's case rather than a heuristic's. Nearly every value in hand is `0` or `1`,
+and the `<o2>` shape would read a `1` as 100 %: a leading tissue sitting at its M-value on a
+15 m no-decompression dive, which is not what the file says. So the rule is the writer's: a
+generator the table names writes whole percent, read verbatim and reported `resolved`; any
+other is read as the documented fraction and multiplied by 100. Both the pair and the
+per-waypoint channel follow the one rule, because a file that writes one of them in percent
+writes all three that way.
+
 ## Deliberately not mapped
 
 | UDDF | why not |
 | --- | --- |
 | `<waypoint><decostop>` | a stop *schedule*, not a ceiling sample: `@duration` is required on it and a ceiling has none, several may appear on one waypoint, and no writer in the corpus emits any. `profile.ceiling` waits for a real file to map from. |
-| `<waypoint><cns>`, `<otu>` | per-sample series where DiveJSON holds start/end scalars. Deriving the scalars from the last sample would present a derivation as recorded data, which §5.7 forbids. |
-| `<waypoint><alarm>`, `<divemode>`, `<setpo2>`, `<nodecotime>`, `<heading>`, `<pulserate>` | no core member, and no fixture to map against. |
+| `<waypoint><otu>` | §6.4 has a `cns` channel and no OTU one, and no file in hand carries this element. Deriving the dive's `otu_start`/`otu_end` scalars from the last sample would present a derivation as recorded data, which §5.7 forbids. |
+| `<waypoint><measuredpo2>` | per cell by construction: its `@ref` to an O₂ sensor is mandatory and the element may repeat inside one waypoint, once per sensor. §6.4's `ppo2` is the one figure the computer calculated, which is `<calculatedpo2>`; a per-cell reading has no member yet. |
+| `<waypoint><alarm>`, `<setpo2>`, `<heading>`, `<pulserate>` | no core member, and no fixture to map against. `<setpo2>` is a *maximum tolerated* ppO₂ rather than a rebreather setpoint, which is the member it would otherwise look like. |
+| `<decomodel><vpm>`, `<rgbm>` | no file in hand carries either, so §6.4c's `algorithm` has no value seeded for them yet. |
 | `<informationbeforedive><surfaceintervalbeforedive>` | no core member. |
 | `<informationafterdive><rating>`, `<current>`, `<problems>` | no core member. |
 | `<site><ecology>` | site-level flora and fauna, where §6.11's species are per-dive sightings. |

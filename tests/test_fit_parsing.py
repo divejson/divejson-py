@@ -394,6 +394,59 @@ def test_a_device_that_wrote_no_dive_settings_raises_nothing() -> None:
     assert not any("water" in note.message for note in conversion.notes)
 
 
+# -- the decompression model ------------------------------------------------------------
+
+
+def _recording(data: bytes) -> dict:
+    recordings = _dive(data).get("recordings") or []
+    return recordings[0] if recordings else {}
+
+
+def test_the_gradient_factor_pair_is_already_whole_percent() -> None:
+    """§6.4c's unit is the FIT profile's, so nothing is scaled — which is what makes a factor
+    applied out of habit here invisible to everything downstream."""
+    data = dive_file(message("dive_settings", gf_low=30, gf_high=85))
+    assert _recording(data)["deco_model"] == {"gf_low": 30, "gf_high": 85}
+
+
+def test_a_file_stating_one_gradient_factor_alone_yields_neither() -> None:
+    """§6.4c writes them both or neither, which `dependentRequired` enforces in the schema."""
+    data = dive_file(message("dive_settings", gf_low=30))
+    conversion = _run(data)
+    recordings = conversion.document["dives"][0].get("recordings") or [{}]
+    assert "deco_model" not in recordings[0]
+    assert any("both or neither" in text for text in _messages(conversion, "dropped"))
+
+
+def test_the_tissue_model_is_read_only_where_the_message_states_one() -> None:
+    """`tissue_model_type` has exactly one member in the FIT profile, and reading "there is
+    only one value in the enum" as "the family must be Bühlmann" would be the converter
+    deciding what the device ran.
+
+    The two Suunto recordings in `fixtures/fit/` are exactly that file: a gradient-factor
+    pair with no `model` beside it, from a watch whose own app export names an RGBM model
+    for the same dive.
+    """
+    stated = dive_file(message("dive_settings", model="zhl_16c", gf_low=30, gf_high=85))
+    assert _recording(stated)["deco_model"] == {"algorithm": "buhlmann", "gf_low": 30, "gf_high": 85}
+
+    silent = dive_file(message("dive_settings", gf_low=30, gf_high=85))
+    assert "algorithm" not in _recording(silent)["deco_model"]
+
+
+def test_a_device_that_wrote_no_dive_settings_gets_no_deco_model() -> None:
+    """`suunto-d5.fit` is that file. The message is the computer's configuration rather than
+    a reading of the dive, so its absence raises nothing."""
+    assert "deco_model" not in _recording(dive_file())
+
+
+def test_a_fit_dive_does_not_say_what_kind_of_dive_it_is() -> None:
+    """`session.sub_sport` is the field §6.4a's `mode` would come from and no file in hand
+    writes one, so a FIT dive is carried without saying which kind it is — a freediving one
+    included. The DM5 XML path says which, because its files state it."""
+    assert "mode" not in _recording(dive_file(message("dive_settings", gf_low=30, gf_high=85)))
+
+
 # -- the gas list ---------------------------------------------------------------------
 
 
@@ -650,18 +703,22 @@ def test_a_user_marker_is_a_bookmark() -> None:
     assert profile_of(_dive(data))["events"] == [{"time": 60, "type": "bookmark"}]
 
 
-def test_a_dive_alert_carries_the_devices_own_wording() -> None:
+def test_a_dive_alert_carries_the_devices_own_wording_and_no_type() -> None:
     """`data` renders through the profile's `dive_alert` enum, so this is the device's word
-    rather than a number. §6.5 requires a label on `other`."""
+    rather than a number, and §6.6 requires a label on an event with no type.
+
+    **The wording is not read back onto §6.6's vocabulary**, though this one lines up with
+    `ndl_reached` exactly: no FIT file in hand carries a `dive_alert` at all, and a mapping
+    no pair exercises is one the corpus does not check. The Suunto app JSON reader has that
+    table because its files have the alerts.
+    """
     data = dive_file(
         _at(0, depth=30.0),
         _at(60, depth=6.0),
         _event(60, "dive_alert", data=0),
         session={"total_elapsed_time": 60.0},
     )
-    assert profile_of(_dive(data))["events"] == [
-        {"time": 60, "type": "other", "label": "ndl_reached"}
-    ]
+    assert profile_of(_dive(data))["events"] == [{"time": 60, "label": "ndl_reached"}]
 
 
 def test_an_alert_the_device_gives_no_code_for_is_dropped_rather_than_failing_the_file() -> None:

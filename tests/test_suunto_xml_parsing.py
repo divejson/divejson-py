@@ -15,6 +15,7 @@ from helpers import (
     EXPORTED_AT,
     device_of,
     profile_of,
+    recorded_by,
     suunto_mixtures,
     suunto_xml,
     suunto_xml_sample,
@@ -88,25 +89,33 @@ def test_text_that_is_present_and_unreadable_is_reported() -> None:
 # -- what this reader carries ---------------------------------------------------------
 
 
-def test_a_freedive_is_skipped_and_reported() -> None:
-    """`<Mode>3</Mode>`: DiveJSON has no member for the kind of a dive.
+@pytest.mark.parametrize(
+    ("mode", "expected"),
+    [
+        ("<Mode>0</Mode>", "open_circuit"),
+        ("<Mode>1</Mode>", "open_circuit"),
+        ("<Mode>3</Mode>", "freedive"),
+        ('<Mode i:nil="true" />', None),
+        ("", None),
+    ],
+)
+def test_every_mode_is_a_dive_and_the_recording_says_which_kind(mode: str, expected: str | None) -> None:
+    """0 and 1 are air and nitrox, both open circuit; 3 is a freedive, and a dive.
 
-    Carrying it would put a freedive in a logbook indistinguishable from a scuba dive with
-    no gas and no algorithm — 42 of them, in the corpus this was built against.
+    A document that states none makes no claim at all — `converting.md`'s first rule is that
+    schema validity is never a precondition, and §6.4a forbids assuming open circuit — so a
+    missing `<Mode>` is read on and the member is simply absent.
     """
-    conversion = convert(suunto_xml("<Mode>3</Mode>"))
-    assert "dives" not in conversion.document
-    assert any(note.kind == "dropped" and "freedive" in note.message for note in conversion.notes)
+    found = dives(mode)
+    assert len(found) == 1
+    assert recorded_by(found[0]).get("mode") == expected
 
 
-@pytest.mark.parametrize("mode", ["<Mode>0</Mode>", "<Mode>1</Mode>", '<Mode i:nil="true" />', ""])
-def test_every_other_mode_is_a_dive_this_reader_carries(mode: str) -> None:
-    """0 and 1 are air and nitrox; a document that states none makes no claim at all.
-
-    `converting.md`'s first rule is that schema validity is never a precondition, so a
-    missing `<Mode>` is read on rather than refused.
-    """
-    assert len(dives(mode)) == 1
+def test_a_mode_outside_the_table_is_reported_rather_than_assumed() -> None:
+    """§6.4a: a reader must not assume open circuit, and this format documents nothing."""
+    conversion = convert(suunto_xml("<Mode>7</Mode>"))
+    assert "mode" not in recorded_by(conversion.document["dives"][0])
+    assert any(note.kind == "dropped" and "dive mode 7" in note.message for note in conversion.notes)
 
 
 def test_a_document_with_no_start_time_is_dropped() -> None:
@@ -668,3 +677,31 @@ def test_a_nil_serial_number_is_no_serial() -> None:
     empty member."""
     found = convert(suunto_xml('<SerialNumber i:nil="true" />'))
     assert device_of(found.document["dives"][0]) == {"brand": "Suunto"}
+
+
+# -- the decompression model ------------------------------------------------------------
+
+
+@pytest.mark.parametrize("stated", ["0", "-1"])
+def test_the_personal_mode_is_the_models_conservatism(stated: str) -> None:
+    """Suunto's own P−2 to P2 scale, which is exactly what §6.4c's member holds: the device's
+    number, meaningful beside the device. `0` is the P0 setting rather than an absence."""
+    found = recorded_by(one(f"<PersonalMode>{stated}</PersonalMode>"))
+    assert found["deco_model"] == {"conservatism": int(stated)}
+
+
+def test_a_freedive_states_a_personal_mode_and_it_is_not_carried() -> None:
+    """§6.4c's object is the model a device ran on *this* dive; a freedive ran none, and a
+    `deco_model` carrying only a conservatism would say otherwise."""
+    found = recorded_by(one("<Mode>3</Mode><PersonalMode>0</PersonalMode>"))
+    assert found["mode"] == "freedive"
+    assert "deco_model" not in found
+
+
+def test_the_undocumented_algorithm_enum_is_not_a_family() -> None:
+    """`<Algorithm>` reads `0` on every scuba export in hand and nil on every freedive, so
+    nothing in the corpus says what any other value would mean — and §6.4c's `algorithm`
+    takes a family this reader can name. The app's JSON export of the same dives states the
+    model as a string and *is* mapped."""
+    found = recorded_by(one("<Algorithm>0</Algorithm>"))
+    assert "algorithm" not in found.get("deco_model", {})

@@ -37,6 +37,10 @@
             "firmware": "2.5.1947",
             "dive_number": 5
           },
+          "mode": "open_circuit",
+          "deco_model": {
+            "conservatism": 0
+          },
           "profile": {
             "duration": 2001,
             "depth": {

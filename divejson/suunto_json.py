@@ -7,7 +7,7 @@ of every source format rather than of this one — the note kinds, identity, the
 reads, the number bound, the sample axis — lives in `converter.py` and `series.py`, and
 this module inherits it.
 
-Four things shape what is below, and each of them is a place where reading the file the
+Five things shape what is below, and each of them is a place where reading the file the
 obvious way gives a wrong dive.
 
 **There are three header shapes, and the newest carries no gas block at all.** A D5-era
@@ -44,6 +44,17 @@ not the last reading of the dive. That is `converting.md`'s ordering rule meetin
 that makes it obvious, and it is why the cylinder's extremes are taken over the samples'
 recorded instants rather than off the profile — see `transmitted` for the two ways off the
 profile that lose the answer, neither of which is the merged axis.
+
+**This device spells "no figure" three ways, and each of the three had to be settled against
+the files.** A `gf99` of **−100** and a `NoDecTime` of **−1** are negatives, which §6.4 floors
+out for every format at once; a `TimeToSurface` of **0** is a zero, and only the file could
+settle that one — the Ocean writes it at every depth from 0 to 19 m, including two rows from
+a sample at 14.63 m that says `88`. A `NoDecTime` of **0** is the same shape and the opposite
+answer: it is what a computer shows the moment a dive stops being a no-decompression dive.
+The surface gradient factor beside them arrives under **two names**, `gfSurface` and the
+`gtSurface` of one firmware earlier, and reading only the one this reader met first would
+lose the channel on every dive written by the other. `read_profile` and `sample` carry the
+evidence for each.
 """
 
 from __future__ import annotations
@@ -68,6 +79,7 @@ from .converter import (
     Note,
     NoteKind,
     Scope,
+    deco_model,
     decimal_of,
     device,
     header,
@@ -154,19 +166,67 @@ _TIMESTAMP = re.compile(
 # switch in one generation or the other.
 EVENT_KEYS = ("Events", "DiveEvents")
 
-# `Notify[].Type` onto the two §6.5 stop types, matched case-insensitively. A table rather
-# than a cast: this vocabulary is Suunto's, and a value not listed here has to come out as
-# nothing rather than be forced into the nearest type this format happens to have.
+# `Notify[].Type` onto the §6.6 types, matched case-insensitively. A table rather than a
+# cast: this vocabulary is Suunto's, and a value not listed here has to come out as nothing
+# rather than be forced into the nearest type this format happens to have.
 #
-# Only the two the diver is being told to *do*. The corpus also carries "Deep Stop Ahead",
-# "Safety Stop Ahead" and "Stop done", which are the prompt before and the confirmation
-# after; marking all three would put three markers on one stop.
-STOP_TYPES = {"deep stop": "deep_stop", "safety stop": "safety_stop"}
+# **Four of the twelve are carried and none of them carries a label.** A `Notify`'s `Type`
+# is the device's own name for its *state* rather than wording the diver was shown, so
+# writing "Deco" onto a marker would put words on the wrist that were never there. The other
+# eight are dropped for reasons of their own rather than for want of a type: "Deep Stop
+# Ahead", "Safety Stop Ahead" and "Stop done" are the prompt before and the confirmation
+# after a stop this reader already marks, and three ticks on one stop is noise; "Gas Switch"
+# duplicates the `GasSwitch` event in the same sample; and "Deco Window", "NoFly Time",
+# "Dive Time" and "Gas Available" are the computer narrating its own state, which is the
+# reason everything under `State` goes too.
+STOP_TYPES = {
+    "deep stop": "deep_stop",
+    "safety stop": "safety_stop",
+    "deco": "ndl_reached",
+    "safety stop broken": "safety_stop_violation",
+}
 
-# The event families that become an `other` carrying the device's own wording — the ceiling
-# breaks, the ppO2 and ascent-rate alarms. §6.5's `other` exists for exactly this, and
-# re-spelling "Ceiling Broken" into a vocabulary of ours would say less.
+# The two event families that carry an alert, and `Alarm`/`Warning` `Type` onto §6.6's
+# vocabulary, matched case-insensitively. §6.6 was **seeded from this list** — one value per
+# distinct meaning, which is why two wordings of one occurrence share a value — so each alert
+# arrives classified *and* labelled: "Ceiling Broken" is what the diver was shown and no type
+# says it as well, and `docs/suunto-json-mapping.md` names the pair behind every row.
+#
+# A `Type` this table does not name becomes an event with **no `type`** and that wording as
+# its label, which §6.6 makes the spelling of an unclassified event: the vocabulary grows in
+# a minor version when a file names something it has no value for, and nothing is forced into
+# the nearest value in the meantime.
 ALERT_NAMES = ("Alarm", "Warning")
+ALERT_TYPES = {
+    "ascent speed": "ascent_rate",
+    "mandatory safety stop": "safety_stop_mandatory",
+    "safety stop broken": "safety_stop_violation",
+    "mandatory safety stop broken": "safety_stop_violation",
+    "deep stop broken": "deep_stop_violation",
+    "violated deep stop": "deep_stop_violation",
+    "ceiling broken": "ceiling_violation",
+    "nodecotime": "ndl_reached",
+    "po2 high": "ppo2_high",
+    "tank pressure": "pressure_low",
+    "max.depth": "depth_alarm",
+}
+
+# `Header.Diving.DiveMode` onto §6.4a's `mode`. All three are gas modes of an open-circuit
+# computer — the D5 has no rebreather mode — and all three are in the files: `Air` and
+# `Nitrox` on eight exports each, `Mixed` on `fixtures/suunto_json/suunto-d5.json`.
+#
+# **The free and gauge modes are deliberately absent.** The D5 has both and no export in hand
+# writes a `Header.Diving` for either, so there is no string to map; a value outside this
+# table leaves `mode` absent and is reported, §6.4a being explicit that a reader must not
+# assume open circuit.
+DIVE_MODES = {"Air": "open_circuit", "Nitrox": "open_circuit", "Mixed": "open_circuit"}
+
+# `Header.Diving.Algorithm` onto §6.4c's `algorithm`. Two spellings of one family, each
+# sourced separately: the first is what 16 exports in hand carry and the second is
+# `fixtures/suunto_json/suunto-d5.json`'s. A string outside this table still fills
+# `deco_model.name` and leaves `algorithm` absent — a family is a claim about the
+# mathematics, and this reader will not derive one from a product string it has not seen.
+ALGORITHMS = {"Suunto Fused2 RGBM": "rgbm", "Suunto Fused RGBM 2": "rgbm"}
 
 # `Gases[].State` onto §6.3's `role`. Nearly empty on purpose: "Primary" is the only value
 # the 18 gases across the D5 exports in hand carry, and every value this table does not name
@@ -260,12 +320,18 @@ def _number(value: Any) -> Decimal | None:
 SUUNTO = "Suunto"
 
 
-def _counter(value: Any) -> int | None:
-    """`Header.Diving.NumberInSeries` as §6.4b's device counter, or nothing.
+def _whole(value: Any) -> int | None:
+    """A source number that is a whole one, as an `int`, or nothing.
 
-    The export writes its numbers as JSON numbers, and a counter written as `3.0` is still
-    a count — but a fractional one is not a counter at all and is left to `device` to see
-    as no counter rather than rounded into one.
+    The two members this reader takes as integers are `Header.Diving.NumberInSeries`, which
+    §6.4b counts a dive with, and `Header.Diving.Conservatism`, which §6.4c holds on the
+    device's own scale. The export writes its numbers as JSON numbers, so a `3.0` is still
+    a whole one — but a fractional value is not either of these quantities, and is left to
+    the section builder to see as nothing rather than rounded into one.
+
+    The sign is carried through on purpose: §6.4b floors a device counter at zero in
+    `device`, and §6.4c deliberately floors a conservatism nowhere, Suunto's scale running
+    P−2 to P2.
     """
     if isinstance(value, bool):
         return None
@@ -383,6 +449,10 @@ class _Sample:
     depth: Decimal | None = None
     ceiling: Decimal | None = None
     kelvin: Decimal | None = None
+    ndl: Decimal | None = None
+    tts: Decimal | None = None
+    gradient_factor: Decimal | None = None
+    surface_gradient_factor: Decimal | None = None
     latitude: Decimal | None = None
     longitude: Decimal | None = None
     # Source gas number to Pascal, for the slots this sample carried a reading on.
@@ -507,10 +577,59 @@ class _Converter:
         # produces one, carrying the device and no profile. A computer worn is a fact about
         # the dive rather than an empty record, which `fixtures/suunto_json/header-only.json`
         # is the pair for.
-        built = recording(device=self.read_device(diving, where), profile=profile)
+        built = recording(
+            device=self.read_device(diving, where),
+            mode=self.read_mode(diving, where),
+            deco_model=self.read_deco_model(diving, where),
+            profile=profile,
+        )
         if built is not None:
             dive["recordings"] = [built]
         return dive
+
+    def read_mode(self, diving: dict[str, Any], where: str) -> str | None:
+        """`Header.Diving.DiveMode` as §6.4a's `mode`, from the table of what files carry.
+
+        Only the D5 header shape states it. The Ocean shape has no `Header.Diving` at all,
+        so an Ocean file yields the channels and no mode, which is correct rather than a
+        gap — and a value this reader has not seen leaves the member absent and says so,
+        §6.4a being explicit that a reader must not assume open circuit.
+        """
+        stated = _text(diving.get("DiveMode"))
+        if stated is None:
+            return None
+        mode = DIVE_MODES.get(stated)
+        if mode is None:
+            self.note(
+                where,
+                f"the header records the dive mode {stated!r}, which is not one this reader has seen a file "
+                "carry; the recording's mode is left unrecorded rather than assumed (spec §6.4a)",
+                "dropped",
+            )
+        return mode
+
+    def read_deco_model(self, diving: dict[str, Any], where: str) -> dict[str, Any] | None:
+        """`Header.Diving`'s algorithm and conservatism as §6.4c's Deco Model.
+
+        `Algorithm` fills `name` verbatim whatever it says — §6.4c makes that member the
+        device's own name for its model — while `algorithm` comes from a table of the two
+        spellings real files carry. A string outside the table leaves the family absent: it
+        is a claim about the mathematics, not a guess off a product string.
+
+        `Conservatism` passes through as the integer the device stated, negatives included.
+        §6.4c puts no floor on the member because Suunto's own scale runs P−2 to P2.
+        """
+        name = _text(diving.get("Algorithm"))
+        return deco_model(
+            {
+                "algorithm": ALGORITHMS.get(name) if name is not None else None,
+                "name": name,
+                "conservatism": _whole(diving.get("Conservatism")),
+            },
+            note=self.note,
+            where=where,
+            labels={"name": "Header.Diving.Algorithm"},
+        )
 
     def read_device(self, diving: dict[str, Any], where: str) -> dict[str, Any] | None:
         """The same `Device` block `provenance` reads, read as hardware instead (§6.4b).
@@ -545,7 +664,7 @@ class _Converter:
                 "serial": _text(block.get("SerialNumber")),
                 "firmware": _text(info.get("SW")),
                 "name": _text(block.get("Name")),
-                "dive_number": _counter(diving.get("NumberInSeries")),
+                "dive_number": _whole(diving.get("NumberInSeries")),
             },
             note=self.note,
             where=where,
@@ -1072,11 +1191,28 @@ class _Converter:
         return axis
 
     def sample(self, raw: dict[str, Any]) -> _Sample:
-        """One `Samples[]` entry's readings, in the units the file states them in."""
+        """One `Samples[]` entry's readings, in the units the file states them in.
+
+        **`gfSurface` or, one firmware earlier, `gtSurface`.** The Ocean's 2.40.56 export
+        writes `RtGradientFactors: {gf99, gtSurface}` on all 7 194 samples of 19 files in
+        hand and its 2.51.28 export writes `{gf99, gfLeadingTissue, gfSurface}`: the `gt` is
+        a vendor typo fixed in an update, both files are real, and a reader that knew one
+        spelling would lose the surface gradient factor of every dive written by the other.
+        `gfLeadingTissue` is which compartment is leading rather than how loaded it is, and
+        no member holds a compartment number, so it stays unmapped.
+        """
+        factors = raw.get("RtGradientFactors")
+        factors = factors if isinstance(factors, dict) else {}
         sample = _Sample(
             depth=_number(raw.get("Depth")),
             ceiling=_number(raw.get("Ceiling")),
             kelvin=_number(raw.get("Temperature")),
+            ndl=_number(raw.get("NoDecTime")),
+            tts=_number(raw.get("TimeToSurface")),
+            gradient_factor=_number(factors.get("gf99")),
+            surface_gradient_factor=_first(
+                _number(factors.get("gfSurface")), _number(factors.get("gtSurface"))
+            ),
         )
         latitude, longitude = _number(raw.get("Latitude")), _number(raw.get("Longitude"))
         if latitude is not None or longitude is not None:
@@ -1127,11 +1263,29 @@ class _Converter:
         not.** The second sits in the same sample object and reads about 96 400 Pa at the
         surface — it is the computer's own ambient-pressure sensor, and labelling it tank
         pressure on a chart divers plan gas from would be actively wrong.
+
+        **A `NoDecTime` of zero is a reading and a `TimeToSurface` of zero is not**, and only
+        the files could settle either. A computer shows a no-decompression time of zero the
+        moment a dive stops being one: a D5 export in hand writes it on five consecutive
+        samples at 42.6 to 44.5 m, with a time to surface of 256 to 268 s beside it and a
+        ceiling appearing a few samples later. A time to surface of zero is the space this
+        device writes when it has no figure — the Ocean writes it on 199 of the 364 samples
+        of one dive that carry the member, at every depth from 0 to 19 m, including two rows
+        from a sample at 14.63 m that says `88`. The negatives beside them — `NoDecTime: -1`,
+        `gf99: -100` — are the channel's own floor and are dropped by `Channel`, once for
+        every format.
         """
-        depth = Channel()
-        ceiling = Channel()
-        temperature = Channel()
-        pressures = {number: Channel() for number in numbering.values()}
+        depth = Channel("depth")
+        ceiling = Channel("ceiling")
+        temperature = Channel("temperature")
+        ndl = Channel("ndl")
+        tts = Channel("tts")
+        gradient_factor = Channel("gradient_factor")
+        surface_gradient_factor = Channel("surface_gradient_factor")
+        pressures = {number: Channel("pressures") for number in numbering.values()}
+        # Counted rather than reported one at a time, for `axis`'s reason: this device writes
+        # its absent-marker for hundreds of consecutive samples.
+        empty_tts = 0
         for second, sample in samples.ordered():
             if sample.depth is not None:
                 depth.record(second, rounded(sample.depth * CENTIMETRES_PER_METRE))
@@ -1139,15 +1293,48 @@ class _Converter:
                 ceiling.record(second, rounded(sample.ceiling * CENTIMETRES_PER_METRE))
             if sample.kelvin is not None:
                 temperature.record(second, rounded((sample.kelvin - KELVIN_OFFSET) * TENTHS_PER_UNIT))
+            if sample.ndl is not None:
+                ndl.record(second, rounded(sample.ndl))
+            if sample.tts is not None:
+                if sample.tts == 0:
+                    empty_tts += 1
+                else:
+                    # Everything that is not this device's zero goes to the channel,
+                    # negatives included: §6.4 floors `tts` at zero and `Channel` is where
+                    # that floor is applied and reported, once for every format. Refusing a
+                    # negative here instead would drop it silently, which is the one thing
+                    # the shared floor exists to stop.
+                    tts.record(second, rounded(sample.tts))
+            if sample.gradient_factor is not None:
+                gradient_factor.record(second, rounded(sample.gradient_factor))
+            if sample.surface_gradient_factor is not None:
+                surface_gradient_factor.record(second, rounded(sample.surface_gradient_factor))
             for source_number, pascal in sample.pressures.items():
                 bar = pascal / PASCALS_PER_BAR
                 number = numbering.get(source_number)
                 if number in pressures and 0 <= bar <= MAX_CYLINDER_PRESSURE:
                     pressures[number].record(second, rounded(bar * TENTHS_PER_UNIT))
+        if empty_tts:
+            self.note(
+                where,
+                f"{empty_tts} {'sample records' if empty_tts == 1 else 'samples record'} a time to surface of "
+                f"zero, which this export writes where it has no figure rather than as a time; "
+                f"{'that sample is' if empty_tts == 1 else 'those samples are'} dropped from the channel",
+                "dropped",
+            )
 
         events = self.read_events(samples, numbering, where)
         profile = samples.profile(
-            {"depth": depth, "ceiling": ceiling, "temperature": temperature},
+            # §6.4's own member order, so a converted profile reads down the section.
+            {
+                "depth": depth,
+                "ceiling": ceiling,
+                "temperature": temperature,
+                "ndl": ndl,
+                "tts": tts,
+                "gradient_factor": gradient_factor,
+                "surface_gradient_factor": surface_gradient_factor,
+            },
             pressures=tuple(pressures.items()),
             events=events,
         )
@@ -1166,8 +1353,11 @@ class _Converter:
 
         Three families are read and the rest are dropped, which is a decision about noise
         rather than about trust. `GasSwitch` is the dive's gas history; `Notify` is the
-        device prompting the diver, two of whose values are stops; `Alarm` and `Warning` are
-        the things that went wrong, which are the events a diver most wants marked.
+        computer naming its own state, of which `STOP_TYPES` carries the values that name an
+        occurrence §6.6 has a type for — the two stops, the moment a dive became a
+        decompression dive, and a safety stop broken — and drops the rest for the reasons
+        that table gives; `Alarm` and `Warning` are the things that went wrong, which are the
+        events a diver most wants marked.
 
         **Everything under `State` is dropped**: it is the computer narrating its own mode —
         "Below Surface", "Wet Outside", "Dive Active" — which is not an event on a dive, and
@@ -1210,13 +1400,20 @@ class _Converter:
         if reported is None:
             return None
         if name == "Notify":
+            # No label: a `Notify`'s `Type` is the device's own name for its *state* rather
+            # than wording the diver was shown, so carrying it would put "Deco" on a marker
+            # nobody read.
             stop = STOP_TYPES.get(reported.lower())
             return None if stop is None else {"time": second, "type": stop}
         if name in ALERT_NAMES:
-            # The device's wording verbatim, which is what §6.5's `other` is for: "Ceiling
-            # Broken" says more than any type this format could map it onto, and §6.6
-            # requires the label.
-            return {"time": second, "type": "other", "label": reported}
+            # The type its wording earns, **and** that wording as the label: §6.6's
+            # vocabulary was seeded from this list, one value per distinct meaning, and
+            # "Ceiling Broken" is still what the diver was shown. An alert the table does
+            # not name arrives with no type at all rather than forced into the nearest one.
+            kind = ALERT_TYPES.get(reported.lower())
+            event = {"time": second, "type": kind} if kind is not None else {"time": second}
+            event["label"] = reported
+            return event
         return None
 
     # -- numbers -----------------------------------------------------------------
@@ -1234,7 +1431,15 @@ def _merge(standing: _Sample, arriving: _Sample, collisions: dict[str, int]) -> 
     same channel. Events are not a channel and are all kept — a gas switch and an alarm on
     one second are two things that happened.
     """
-    for member, channel in (("depth", "depth"), ("ceiling", "ceiling"), ("kelvin", "temperature")):
+    for member, channel in (
+        ("depth", "depth"),
+        ("ceiling", "ceiling"),
+        ("kelvin", "temperature"),
+        ("ndl", "ndl"),
+        ("tts", "tts"),
+        ("gradient_factor", "gradient_factor"),
+        ("surface_gradient_factor", "surface_gradient_factor"),
+    ):
         arrived = getattr(arriving, member)
         if arrived is None:
             continue

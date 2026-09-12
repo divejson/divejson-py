@@ -517,7 +517,14 @@ def test_two_cylinders_on_one_blend_keep_separate_pressure_channels() -> None:
 
 
 def test_a_marker_naming_an_event_type_comes_back_as_that_type() -> None:
-    """`<setmarker>` is a bare string, so a round trip through UDDF has nothing else to go on."""
+    """`<setmarker>` is a bare string, so a round trip through UDDF has nothing else to go on.
+
+    The second marker is the other half of the rule: a text this format's own vocabulary does
+    not name becomes an event with **no `type`** and that text as its label, which §6.6 makes
+    the spelling of an unclassified event. Guessing a type off the wording is what
+    `suunto-json-mapping.md`'s table does with a file behind every row, and what this reader
+    has no file for.
+    """
     samples = (
         "<waypoint><depth>1.0</depth><divetime>0</divetime><setmarker>safety_stop</setmarker></waypoint>"
         "<waypoint><depth>2.0</depth><divetime>10</divetime><setmarker>NoDecoTime</setmarker></waypoint>"
@@ -525,7 +532,7 @@ def test_a_marker_naming_an_event_type_comes_back_as_that_type() -> None:
     events = profile_of(dive(f"{STARTED_AT}<samples>{samples}</samples>"))["events"]
     assert events == [
         {"time": 0, "type": "safety_stop"},
-        {"time": 10, "type": "other", "label": "NoDecoTime"},
+        {"time": 10, "label": "NoDecoTime"},
     ]
 
 
@@ -670,3 +677,189 @@ def test_the_name_alone_does_not_fire_the_rule() -> None:
     claimed = "<generator><name>Shearwater Cloud Desktop</name></generator>"
     data = one_dive(before(datetime_text="2026-09-08T15:18:10Z"), header=claimed)
     assert convert(data).document["dives"][0]["started_at"] == "2026-09-08T15:18:10Z"
+
+
+# -- the decompression model and the dive mode -------------------------------------------
+
+# `<decomodel>` is a top-level container and a dive reaches its own through a `<link>` under
+# `<informationbeforedive>`: a logbook holds one block and many dives, and nothing says every
+# dive ran the same model.
+BUEHLMANN = (
+    "<decomodel><buehlmann id=\"zhl16c\">"
+    "<gradientfactorhigh>0.85</gradientfactorhigh><gradientfactorlow>0.5</gradientfactorlow>"
+    "</buehlmann></decomodel>"
+)
+
+# The same block as a generator the table names writes it. `PERCENT_GRADIENT_FACTORS` puts
+# all three elements on one row, so the pair off a Shearwater file is whole percent too.
+BUEHLMANN_PERCENT = (
+    "<decomodel><buehlmann id=\"zhl16c\">"
+    "<gradientfactorhigh>85</gradientfactorhigh><gradientfactorlow>50</gradientfactorlow>"
+    "</buehlmann></decomodel>"
+)
+
+# §3's rule 4: a recording carries at least one of `device`, `profile` and `source_files`,
+# and a `mode` or a `deco_model` satisfies none of them. So every test below hangs its model
+# on a dive that kept a sample.
+ONE_SAMPLE = "<samples><waypoint><depth>1</depth><divetime>0</divetime></waypoint></samples>"
+
+
+def _recording(body: str, **kwargs) -> dict:
+    recordings = dive(body, **kwargs).get("recordings") or []
+    return recordings[0] if recordings else {}
+
+
+def test_a_linked_buehlmann_becomes_the_recordings_deco_model() -> None:
+    """The pair is documented as a fraction `0.0 <= GF Low <= GF High <= 1.0`, and §6.4c
+    records whole percent."""
+    found = _recording(before('<link ref="zhl16c" />') + ONE_SAMPLE, header=BUEHLMANN)
+    assert found["deco_model"] == {"algorithm": "buhlmann", "gf_low": 50, "gf_high": 85}
+
+
+def test_a_deco_model_alone_does_not_make_a_recording() -> None:
+    """§3's rule 4 names `device`, `profile` and `source_files`, and neither §6.4a member
+    this plan adds is one of them."""
+    assert _recording(before('<link ref="zhl16c" />'), header=BUEHLMANN) == {}
+
+
+def test_a_link_to_a_deco_model_is_no_longer_a_dangling_site_reference() -> None:
+    """Until this mapping existed it fell through to the "not a site this converter carries"
+    note, which is what `fixtures/uddf/shearwater-cloud.uddf`'s `<link ref="zhl16c" />` did."""
+    data = one_dive(before('<link ref="zhl16c" />') + ONE_SAMPLE, header=BUEHLMANN)
+    assert not any("zhl16c" in message for message in messages(data))
+
+
+def test_a_dive_that_links_no_model_gets_none_of_the_files_model() -> None:
+    """The link is how a model becomes *this dive's*; a file's block is not every dive's."""
+    assert "deco_model" not in _recording(STARTED_AT + ONE_SAMPLE, header=BUEHLMANN)
+
+
+@pytest.mark.parametrize("family", ["vpm", "rgbm"])
+def test_a_model_this_reader_cannot_name_is_reported_rather_than_guessed(family: str) -> None:
+    """No file in hand carries either, so §6.4c has no value seeded for them — and the link
+    still resolves, which is what keeps it off the dangling-reference note."""
+    header = f'<decomodel><{family} id="m"><conservatism>3</conservatism></{family}></decomodel>'
+    data = one_dive(before('<link ref="m" />') + ONE_SAMPLE, header=header)
+    assert "deco_model" not in _recording(before('<link ref="m" />') + ONE_SAMPLE, header=header)
+    assert any(f"is a <{family}>" in message for message in messages(data))
+    assert not any("not a dive site" in message for message in messages(data))
+
+
+def test_the_recalculated_model_under_tablegeneration_is_not_read() -> None:
+    """That element names the model a *recalculation* used, which is an application's
+    arithmetic rather than the device's, and §6.4c's object is what the device ran."""
+    header = f"<tablegeneration><calculateprofile><profile>{BUEHLMANN}</profile></calculateprofile></tablegeneration>"
+    assert "deco_model" not in _recording(before('<link ref="zhl16c" />') + ONE_SAMPLE, header=header)
+
+
+def test_a_gradient_factor_pair_outside_the_range_takes_the_other_half_with_it() -> None:
+    """§6.4c writes the pair both or neither, which `dependentRequired` enforces — so a
+    reading the schema cannot hold cannot leave its partner behind."""
+    header = (
+        '<decomodel><buehlmann id="m"><gradientfactorlow>0.5</gradientfactorlow>'
+        "<gradientfactorhigh>4</gradientfactorhigh></buehlmann></decomodel>"
+    )
+    data = one_dive(before('<link ref="m" />') + ONE_SAMPLE, header=header)
+    # The family survives, being the element's own name; the pair does not survive by halves.
+    assert _recording(before('<link ref="m" />') + ONE_SAMPLE, header=header)["deco_model"] == {
+        "algorithm": "buhlmann"
+    }
+    assert any("whole percent from 0 to 100" in message for message in messages(data))
+    assert any("both or neither" in message for message in messages(data))
+
+
+def test_an_inverted_gradient_factor_pair_costs_the_pair_and_not_the_file() -> None:
+    """UDDF states its own `0.0 <= GF Low <= GF High <= 1.0` and a file may still break it.
+
+    The dive survives: a converter that carried the pair through would fail its own output
+    validation and lose the whole document over one setting.
+    """
+    header = (
+        '<decomodel><buehlmann id="m"><gradientfactorlow>0.85</gradientfactorlow>'
+        "<gradientfactorhigh>0.5</gradientfactorhigh></buehlmann></decomodel>"
+    )
+    body = before('<link ref="m" />') + ONE_SAMPLE
+    assert _recording(body, header=header)["deco_model"] == {"algorithm": "buhlmann"}
+    assert any("§3 rule 7" in message for message in messages(one_dive(body, header=header)))
+
+
+@pytest.mark.parametrize(
+    ("written", "mode"),
+    [
+        ("opencircuit", "open_circuit"),
+        ("closedcircuit", "closed_circuit"),
+        ("semiclosedcircuit", "semi_closed"),
+        ("apnoe", "freedive"),
+        ("apnea", "freedive"),
+    ],
+)
+def test_every_uddf_dive_mode_reaches_the_recording(written: str, mode: str) -> None:
+    """**Two spellings of one mode**, because UDDF has two: `apnoe` is the original and
+    `apnea` was added beside it in 2017, both current in 3.2.x. A reader that knew one would
+    drop every freedive from whichever half of the installed base wrote the other."""
+    samples = f'<waypoint><depth>1</depth><divetime>0</divetime><divemode type="{written}" /></waypoint>'
+    assert _recording(f"{STARTED_AT}<samples>{samples}</samples>")["mode"] == mode
+
+
+def test_the_first_waypoint_that_states_a_mode_gives_the_recording_its_mode() -> None:
+    """And a waypoint that simply stops stating it is not a change: an absence is not a
+    claim. `shearwater-cloud.uddf` states `opencircuit` on eight waypoints and nothing on
+    its last four."""
+    samples = (
+        '<waypoint><depth>1</depth><divetime>0</divetime><divemode type="opencircuit" /></waypoint>'
+        "<waypoint><depth>2</depth><divetime>10</divetime></waypoint>"
+    )
+    assert _recording(f"{STARTED_AT}<samples>{samples}</samples>")["mode"] == "open_circuit"
+
+
+def test_a_mid_dive_mode_change_is_dropped_rather_than_labelled() -> None:
+    """The only place §6.6 could carry a switch is an event, an event with no type needs a
+    `label`, and a label a converter invents is §5.4's fabrication."""
+    samples = (
+        '<waypoint><depth>1</depth><divetime>0</divetime><divemode type="opencircuit" /></waypoint>'
+        '<waypoint><depth>2</depth><divetime>10</divetime><divemode type="closedcircuit" /></waypoint>'
+    )
+    body = f"{STARTED_AT}<samples>{samples}</samples>"
+    assert _recording(body)["mode"] == "open_circuit"
+    assert "events" not in _recording(body)["profile"]
+    assert any("the dive mode changes to" in message for message in messages(one_dive(body)))
+
+
+@pytest.mark.parametrize("attribute", ['type="gauge"', ""])
+def test_a_dive_mode_uddf_does_not_spell_is_reported_rather_than_assumed(attribute: str) -> None:
+    """§6.4a forbids assuming open circuit, and `divemodeType` has no value for a gauge."""
+    samples = f"<waypoint><depth>1</depth><divetime>0</divetime><divemode {attribute}/></waypoint>"
+    body = f"{STARTED_AT}<samples>{samples}</samples>"
+    assert "mode" not in _recording(body)
+    said = "the dive mode 'gauge'" if attribute else "no dive mode"
+    assert any(
+        f"a waypoint records {said}, which is not one of the five UDDF spells" in message
+        for message in messages(one_dive(body))
+    )
+
+
+def test_the_named_generator_writes_gradient_factors_in_whole_percent() -> None:
+    """A magnitude test cannot settle this one: nearly every per-waypoint value in hand is
+    `0` or `1`, and the `<o2>` shape would read that `1` as 100 % — a leading tissue at its
+    M-value on a 15 m no-decompression dive, which is not what the file says."""
+    samples = "<waypoint><depth>1</depth><divetime>0</divetime><gradientfactor>17</gradientfactor></waypoint>"
+    header = SHEARWATER + BUEHLMANN_PERCENT
+    body = f"{STARTED_AT}<samples>{samples}</samples>"
+    found = _recording(body, header=header)
+    assert found["profile"]["gradient_factor"]["values"] == [17]
+    # And the pair off the same file follows the same row: a file that writes one of the
+    # three in percent writes all three that way.
+    assert _recording(before('<link ref="zhl16c" />') + f"<samples>{samples}</samples>", header=header)[
+        "deco_model"
+    ] == {"algorithm": "buhlmann", "gf_low": 50, "gf_high": 85}
+
+
+def test_the_percent_gradient_rule_is_reported_once_per_file() -> None:
+    """A scale is a property of the writer and not of any one reading, so a line per waypoint
+    would be one fact about the file written out a hundred and twenty-eight times."""
+    samples = "".join(
+        f"<waypoint><depth>1</depth><divetime>{second}</divetime><gradientfactor>3</gradientfactor></waypoint>"
+        for second in (0, 10, 20)
+    )
+    data = one_dive(f"{STARTED_AT}<samples>{samples}</samples>", header=SHEARWATER)
+    assert len([note for note in convert(data).notes if "gradient factors in whole percent" in note.message]) == 1

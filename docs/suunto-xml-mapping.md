@@ -61,22 +61,39 @@ in hand on its own. The attribute is checked anyway, because it is the format's 
 `<Ceiling i:nil="true">0</Ceiling>` as a ceiling. No file in hand writes that; the check is
 what makes it not matter.
 
-### A `<Mode>3</Mode>` document is a freedive, and is skipped
+### `<Mode>` is the recording's mode, and a `<Mode>3</Mode>` freedive is carried
 
-`<Mode>` is the element this format states a dive's kind in, and `converting.md`'s rule for
-one that is not a scuba dive applies: skipped and reported, rather than arriving
-indistinguishable from a scuba dive that recorded no gas and no algorithm.
+`<Mode>` is the element this format states a dive's kind in, and §6.4a's `mode` is where it
+goes. Every record this format holds is a dive of some kind, so nothing is skipped for its
+mode and the reader has no not-a-dive test at all — where the app's JSON export needs one,
+because a run and a dive are the same shape there.
 
-Of the 384 exports in hand, **42 are freedives** and they are exactly the 42 that carry no
-`<DiveMixture>` at all: `<Algorithm>`, `<DiveTime>` and `<BottomTime>` nil, durations of 3
-to 60 seconds, depths of 1.39 to 15.48 m. So an archive of the whole directory converts to
-**342 dives**, and the report says why the other 42 are not there.
+| `<Mode>` | `mode` | seen on |
+| --- | --- | --- |
+| `0` | `open_circuit` | 244 exports |
+| `1` | `open_circuit` | 98 exports |
+| `3` | `freedive` | 42 exports |
 
-`<Mode>` 0 and 1 are air and nitrox, and both are carried. The oxygen fractions say so: 243
-of the 244 `<Mode>0</Mode>` exports carry a single 21 % mixture, and every one of the 98
-`<Mode>1</Mode>` exports carries a mixture richer than that, up to 52 %. A document that
-states **no** `<Mode>` is read on — absence is not a claim, and `converting.md`'s first rule
-is that schema validity is never a precondition.
+**0 and 1 are air and nitrox, which are both open circuit.** The oxygen fractions say so:
+243 of the 244 `<Mode>0</Mode>` exports carry a single 21 % mixture, and every one of the 98
+`<Mode>1</Mode>` exports carries a mixture richer than that, up to 52 %. **3 is a freedive**,
+and the 42 that state it are exactly the 42 that carry no `<DiveMixture>` at all:
+`<Algorithm>`, `<DiveTime>` and `<BottomTime>` nil, durations of 3 to 60 seconds, depths of
+1.39 to 15.48 m. So an archive of the whole directory now converts to **384 dives**, where it
+used to produce 342 and a report saying why the other 42 were missing — one member, and the
+data loss goes.
+
+A document that states **no** `<Mode>`, or one outside the table, leaves the recording's
+`mode` absent and is read on: absence is not a claim, §6.4a forbids assuming open circuit,
+and `converting.md`'s first rule is that schema validity is never a precondition.
+`fixtures/suunto_xml/unlabelled-pressure.xml` is the nil case.
+
+**`<PersonalMode>` is the deco model's `conservatism`**, on Suunto's own P−2 to P2 scale,
+which is exactly what §6.4c's member holds: the device's number, meaningful beside the
+device. `0` is the P0 setting rather than an absence, and `-1` is P−1 — the two values in
+the corpus — so no floor is applied. **A freedive record states one too and it is not
+carried**: §6.4c's object is the model a device ran on *this* dive, a freedive ran none, and
+a `deco_model` carrying only a conservatism would say otherwise.
 
 ### A start time is a naive .NET timestamp
 
@@ -166,8 +183,8 @@ that moves if the file's order changes is a fact a diver may need.
 
 Because this format is one dive per file, that stand-in is **prefixed by the archive
 member's name** when a directory is converted as one logbook — `converting.md`, *A container
-is one logbook* — which is what keeps 342 one-dive documents from collapsing onto one
-identity. Converting the owner's whole export directory as a zip yields 342 dives with 342
+is one logbook* — which is what keeps 384 one-dive documents from collapsing onto one
+identity. Converting the owner's whole export directory as a zip yields 384 dives with 384
 distinct UUIDs.
 
 The filename itself is deliberately not read. `Dive_2021-04-06-1116.xml` encodes the start
@@ -352,9 +369,12 @@ That is `converting.md`'s no-padding rule; the reference dive carries 201 depths
 temperatures and no pressures at all.
 
 **Two samples on one second are a real collision here**, unlike a source that appends each
-sensor's stream as its own record. It fires on 37 of the corpus's exports — every one of
-them a freedive this reader skips before it ever reaches the samples — so no scuba dive in
-hand loses a reading to it.
+sensor's stream as its own record. It fires on 37 of the corpus's exports and every one of
+them is a freedive, where a 1 s sampling interval meets a `<Time>` that is not quite an
+integer; no scuba dive in hand loses a reading to it. Those 37 used to be unreachable — the
+reader stopped at `<Mode>3</Mode>` before it read a sample — so carrying freedives is what
+first made this rule fire on a real file. `fixtures/suunto_xml/freedive.xml` is one of them,
+and its expectation carries three sample seconds from five samples.
 
 **A ceiling of zero is not a ceiling** (`converting.md`, *Profiles*). This export writes
 `i:nil` rather than a zero on every no-deco sample — its 1 760 recorded ceilings run 3.0 to
@@ -396,7 +416,7 @@ is `converting.md`'s refuse-rather-than-guess rule, not its ambiguity rule.
   cylinder the export records no gas for; a zero in a member whose schema makes zero a
   placeholder; a duration below a whole second; tank readings no cylinder claims, arriving as
   a cylinder of their own.
-- **`dropped`** — a freedive; a start time that is not one; text in a numeric element;
+- **`dropped`** — a start time that is not one; text in a numeric element;
   `<Visibility>`, `<Weather>` and `<Weight>`; an average depth deeper
   than the maximum; a surface pressure or ppO₂ limit outside what §6 allows; a mix whose
   halves sum above 100 %; an end pressure above its start; a cylinder pressure past 350 bar;
@@ -463,10 +483,20 @@ refusals and the second out of the silently unmapped, both into the device map a
   the mixture's by up to 4.5 bar — so carrying them would need a dive-level member the format
   does not have.
 - **`<DeltaPressure>`** — nil on all 384; a pressure difference has no member either way.
-- **`<Algorithm>`, `<AltitudeMode>`, `<AscentMode>`, `<PersonalMode>`,
-  `<LastDecoStopDepth>`, `<MaxGf>`, `<MinGf>`, `<SetPoint>`, `<HighSwitchPoint>`,
-  `<LowSwitchPoint>`, `<LowSetPoint>`** — the computer's decompression configuration rather
-  than the dive. §6.2 has nowhere for any of it.
+- **`<MaxGf>`, `<MinGf>`, `<SetPoint>`, `<HighSwitchPoint>`, `<LowSwitchPoint>` and
+  `<LowSetPoint>`** — nil on every file in hand, all five fixtures and all 384 exports. §6.4c
+  has members two of them would fill, but a mapping no file exercises is a mapping nothing
+  checks, so they wait for an export that states one.
+- **`<AltitudeMode>`, `<AscentMode>` and `<LastDecoStopDepth>`** — these do carry values, `0`,
+  `0` and `3` on every file, and they are refused for a reason of their own: §6.4c carries a
+  model's family, its name, its gradient factors and its conservatism, and has no member for
+  an altitude band, an ascent rule or a last-stop depth.
+- **`<Algorithm>`** — an undocumented enum that reads `0` on every scuba export in hand and
+  nil on every freedive, so nothing in the corpus says what any other value would mean.
+  §6.4c's `algorithm` takes a family this reader can name, and a bare `0` is not one. The
+  app's JSON export of the same dives states the model as a string and *is* mapped
+  (`suunto-json-mapping.md`), which is where a D5's model comes from.
+- **`<PersonalMode>`** — **no longer refused**; it is `deco_model.conservatism`, above.
 - **`<AscentTime>`, `<DesaturationTime>`, `<SurfaceTime>`, `<DivingDaysInRow>`,
   `<PreviousMaxDepth>`, `<TimeFromReset>`** — the device's own derived figures, several of
   them about a *series* of dives rather than this one. §6.2 has no member for any.

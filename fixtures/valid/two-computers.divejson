@@ -42,6 +42,12 @@
             "name": "Porvoo",
             "dive_number": 3
           },
+          "mode": "open_circuit",
+          "deco_model": {
+            "algorithm": "rgbm",
+            "name": "Suunto Fused RGBM 2",
+            "conservatism": -1
+          },
           "source_files": [
             {
               "uuid": "0198a6f0-2222-7120-8000-000000000120",
@@ -130,6 +136,7 @@
             "model": "Perdix 3",
             "serial": "D9000042"
           },
+          "mode": "gauge",
           "started_at": "2026-09-08T15:18:10.000+03:00",
           "profile": {
             "duration": 2940,

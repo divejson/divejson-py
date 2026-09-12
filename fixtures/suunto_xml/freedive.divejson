@@ -6,6 +6,56 @@
     "name": "divejson convert",
     "version": "0.3.0"
   },
+  "dives": [
+    {
+      "uuid": "c4b3ed00-9b9e-5374-9280-13b157ad8761",
+      "started_at": "2023-02-25T11:14:55.19",
+      "duration": 33,
+      "max_depth": 8.53,
+      "avg_depth": 4.89,
+      "bottom_temperature": 29.0,
+      "surface_pressure": 1.058,
+      "recordings": [
+        {
+          "device": {
+            "brand": "Suunto",
+            "model": "Suunto D5",
+            "serial": "192410004212",
+            "firmware": "3.0.2143",
+            "dive_number": 1
+          },
+          "mode": "freedive",
+          "profile": {
+            "duration": 33,
+            "depth": {
+              "times": [
+                1,
+                20,
+                33
+              ],
+              "values": [
+                127,
+                853,
+                2
+              ]
+            },
+            "temperature": {
+              "times": [
+                1,
+                20,
+                33
+              ],
+              "values": [
+                299,
+                291,
+                287
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
   "extensions": {
     "divejson": {
       "converted_from": "suunto_xml",

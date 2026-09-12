@@ -507,13 +507,70 @@ def test_a_notify_this_reader_does_not_map_is_no_marker_at_all() -> None:
     assert "events" not in profile_of(dive)
 
 
-def test_an_alarm_carries_the_device_s_own_wording() -> None:
-    """§6.5's `other` exists for this, and §6.6 requires the label it carries."""
+def test_an_alarm_carries_the_type_its_wording_earns_and_the_wording() -> None:
+    """§6.6's vocabulary was seeded from this list, so an alert is classified *and* labelled."""
     dive = _dive(
         {},
         [suunto_sample(0, Depth=1.0, Events=[{"Alarm": {"Active": True, "Type": "Ceiling Broken"}}])],
     )
-    assert profile_of(dive)["events"] == [{"time": 0, "type": "other", "label": "Ceiling Broken"}]
+    assert profile_of(dive)["events"] == [
+        {"time": 0, "type": "ceiling_violation", "label": "Ceiling Broken"}
+    ]
+
+
+def test_two_wordings_of_one_occurrence_share_one_type() -> None:
+    """`safety_stop_violation` is one value rather than two because the device has two names
+    for the same thing, and §6.6 keeps one spelling per meaning (§5.4)."""
+    dive = _dive(
+        {},
+        [
+            suunto_sample(0, Depth=1.0, Events=[{"Alarm": {"Active": True, "Type": "Safety Stop Broken"}}]),
+            suunto_sample(
+                30, Depth=1.0, Events=[{"Alarm": {"Active": True, "Type": "Mandatory Safety Stop Broken"}}]
+            ),
+        ],
+    )
+    assert [event["type"] for event in profile_of(dive)["events"]] == [
+        "safety_stop_violation",
+        "safety_stop_violation",
+    ]
+    assert [event["label"] for event in profile_of(dive)["events"]] == [
+        "Safety Stop Broken",
+        "Mandatory Safety Stop Broken",
+    ]
+
+
+def test_an_alert_the_table_does_not_name_arrives_with_no_type() -> None:
+    """§6.6 makes an event with a label and no type the spelling of an unclassified one, so
+    the vocabulary grows in a minor version rather than a wording being forced into it."""
+    dive = _dive(
+        {},
+        [suunto_sample(0, Depth=1.0, Events=[{"Warning": {"Active": True, "Type": "Battery Low"}}])],
+    )
+    assert profile_of(dive)["events"] == [{"time": 0, "label": "Battery Low"}]
+
+
+def test_a_notify_beyond_the_stops_is_typed_and_unlabelled() -> None:
+    """A `Notify`'s `Type` names the computer's state rather than wording the diver was shown,
+    so writing it as a label would put "Deco" on a marker nobody read.
+
+    The two here are the pair `STOP_TYPES` grew by — the moment a dive became a
+    decompression dive, and a safety stop broken — which were dropped for want of a §6.6
+    type until `type` became OPTIONAL and the vocabulary grew.
+    """
+    dive = _dive(
+        {},
+        [
+            suunto_sample(0, Depth=1.0, DiveEvents=[{"Notify": {"Active": True, "Type": "Deco"}}]),
+            suunto_sample(
+                30, Depth=1.0, DiveEvents=[{"Notify": {"Active": True, "Type": "Safety Stop Broken"}}]
+            ),
+        ],
+    )
+    assert profile_of(dive)["events"] == [
+        {"time": 0, "type": "ndl_reached"},
+        {"time": 30, "type": "safety_stop_violation"},
+    ]
 
 
 def test_a_gas_switch_arrives_under_either_member_name() -> None:
@@ -620,3 +677,171 @@ def test_a_header_naming_a_device_above_no_samples_is_a_device_only_recording() 
 def test_a_header_naming_no_device_and_holding_no_samples_has_no_recording() -> None:
     """§6.4a forbids a recording that carries nothing at all."""
     assert "recordings" not in convert(suunto_json({})).document["dives"][0]
+
+
+# -- the mode and the decompression model ------------------------------------------------
+
+
+def _recording(header: dict, samples: list[dict] | None = None) -> dict:
+    """The dive's one recording, on a file that kept a sample.
+
+    The sample is not decoration: §3's rule 4 says a recording carries at least one of
+    `device`, `profile` and `source_files`, and neither §6.4a member this plan adds is one of
+    them — so a header stating a mode and nothing else produces no recording to put it in.
+    """
+    recordings = _dive(header, samples or [suunto_sample(0, Depth=20.0)]).get("recordings") or []
+    return recordings[0] if recordings else {}
+
+
+def test_a_mode_and_a_model_alone_do_not_make_a_recording() -> None:
+    """§3's rule 4 names `device`, `profile` and `source_files`, and these are neither."""
+    assert "recordings" not in _dive({"Diving": {"DiveMode": "Air", "Conservatism": 0}})
+
+
+@pytest.mark.parametrize("stated", ["Air", "Nitrox", "Mixed"])
+def test_every_dive_mode_a_file_in_hand_carries_is_open_circuit(stated: str) -> None:
+    """All three are gas modes of an open-circuit computer; the D5 has no rebreather mode."""
+    assert _recording({"Diving": {"DiveMode": stated}})["mode"] == "open_circuit"
+
+
+@pytest.mark.parametrize("stated", ["Gauge", "Free", "CCR", "air"])
+def test_a_dive_mode_this_reader_has_not_seen_is_reported_rather_than_guessed(stated: str) -> None:
+    """§6.4a is explicit that a reader must not assume open circuit, and the D5's free and
+    gauge modes write no `Header.Diving` this reader has ever seen — so there is no string to
+    map and nothing to guess from."""
+    conversion = _conversion({"Diving": {"DiveMode": stated}})
+    recordings = conversion.document["dives"][0].get("recordings") or [{}]
+    assert "mode" not in recordings[0]
+    assert any(f"dive mode {stated!r}" in message for message in _messages(conversion, "dropped"))
+
+
+def test_an_ocean_file_states_no_mode_and_that_is_correct() -> None:
+    """The Ocean header shape has no `Header.Diving` at all, so a file of it yields the
+    channels and no mode — an absence rather than a gap."""
+    assert "mode" not in _recording({}, [suunto_sample(0, Depth=1.0)])
+
+
+@pytest.mark.parametrize("stated", ["Suunto Fused2 RGBM", "Suunto Fused RGBM 2"])
+def test_both_algorithm_spellings_are_the_same_family(stated: str) -> None:
+    """Each is sourced separately: the first is what 16 exports in hand carry and the second
+    is `fixtures/suunto_json/suunto-d5.json`'s. `name` keeps whichever the file used."""
+    assert _recording({"Diving": {"Algorithm": stated}})["deco_model"] == {
+        "algorithm": "rgbm",
+        "name": stated,
+    }
+
+
+def test_an_algorithm_outside_the_table_still_names_itself() -> None:
+    """A family is a claim about the mathematics, and this reader will not derive one from a
+    product string it has not seen — but §6.4c's `name` is the device's own name for its
+    model, whatever that name is."""
+    assert _recording({"Diving": {"Algorithm": "Suunto Fused RGBM"}})["deco_model"] == {
+        "name": "Suunto Fused RGBM"
+    }
+
+
+@pytest.mark.parametrize("stated", [0, -1, -2, 2])
+def test_a_conservatism_is_carried_with_its_sign(stated: int) -> None:
+    """§6.4c puts no floor on the member because Suunto's own scale runs P−2 to P2, so a `0`
+    is the P0 setting and a `-1` is P−1 — this reader's one member where a negative is a
+    reading."""
+    assert _recording({"Diving": {"Conservatism": stated}})["deco_model"] == {"conservatism": stated}
+
+
+# -- the decompression readouts ----------------------------------------------------------
+
+
+def _channels(*samples: dict) -> dict:
+    return profile_of(_dive({}, list(samples))) or {}
+
+
+def test_a_no_decompression_time_of_zero_is_a_reading() -> None:
+    """It is what a computer shows the moment a dive stops being a no-decompression dive: a
+    D5 export in hand writes it at 42.6 to 44.5 m with a time to surface beside it."""
+    found = _channels(
+        suunto_sample(0, Depth=44.5, NoDecTime=0, TimeToSurface=256),
+        suunto_sample(10, Depth=42.6, NoDecTime=6000),
+    )
+    assert found["ndl"] == {"times": [0, 10], "values": [0, 6000]}
+
+
+def test_a_time_to_surface_of_zero_is_the_absent_marker_and_is_reported() -> None:
+    """Only the file could settle this one: the Ocean writes it at every depth from 0 to
+    19 m, including two rows from a sample at 14.63 m that says `88`."""
+    conversion = _conversion(
+        {},
+        [
+            suunto_sample(0, Depth=14.63, TimeToSurface=0),
+            suunto_sample(10, Depth=14.63, TimeToSurface=88),
+        ],
+    )
+    profile = profile_of(conversion.document["dives"][0])
+    assert profile["tts"] == {"times": [10], "values": [88]}
+    assert any("time to surface of zero" in message for message in _messages(conversion, "dropped"))
+
+
+def test_a_negative_readout_is_dropped_by_the_channels_own_floor_and_reported() -> None:
+    """`NoDecTime: -1` and `gf99: -100` are this device's absent-markers, and §6.4 floors
+    every one of these channels at zero — so the drop is the channel's rule rather than this
+    reader's, and nothing reaches it by a route that skips the floor.
+
+    `tts` is in here because it is the one channel this reader judges before offering it:
+    its *zero* is the absent-marker and its negative is not, so the negative has to go to
+    `Channel` like every other readout or it would be dropped with nothing said.
+    """
+    conversion = _conversion(
+        {},
+        [
+            suunto_sample(
+                0,
+                Depth=20.0,
+                NoDecTime=-1,
+                TimeToSurface=-1,
+                RtGradientFactors={"gf99": -100, "gfSurface": 0},
+            ),
+            suunto_sample(
+                10,
+                Depth=20.0,
+                NoDecTime=600,
+                TimeToSurface=120,
+                RtGradientFactors={"gf99": 42, "gfSurface": 30},
+            ),
+        ],
+    )
+    profile = profile_of(conversion.document["dives"][0])
+    assert profile["ndl"] == {"times": [10], "values": [600]}
+    assert profile["tts"] == {"times": [10], "values": [120]}
+    assert profile["gradient_factor"] == {"times": [10], "values": [42]}
+    # A zero surface gradient factor is a reading, and stays.
+    assert profile["surface_gradient_factor"] == {"times": [0, 10], "values": [0, 30]}
+    dropped = _messages(conversion, "dropped")
+    for channel in ("ndl", "tts", "gradient_factor"):
+        assert any(f"{channel} readings" in message and "negative" in message for message in dropped)
+
+
+@pytest.mark.parametrize("spelling", ["gfSurface", "gtSurface"])
+def test_both_firmware_spellings_reach_the_surface_gradient_factor(spelling: str) -> None:
+    """The Ocean's 2.40.56 export writes `gtSurface` and its 2.51.28 export `gfSurface` — a
+    vendor typo fixed in an update — and both files are real, so a reader that knew one would
+    lose the channel on every dive written by the other."""
+    found = _channels(suunto_sample(0, Depth=20.0, RtGradientFactors={"gf99": 42, spelling: 77}))
+    assert found["surface_gradient_factor"] == {"times": [0], "values": [77]}
+
+
+def test_the_leading_tissue_number_is_not_a_loading_and_is_not_mapped() -> None:
+    """`gfLeadingTissue` is which compartment is leading rather than how loaded it is, and no
+    member holds a compartment number."""
+    found = _channels(
+        suunto_sample(0, Depth=20.0, RtGradientFactors={"gf99": 42, "gfLeadingTissue": 3, "gfSurface": 77})
+    )
+    assert found["gradient_factor"]["values"] == [42]
+    assert found["surface_gradient_factor"]["values"] == [77]
+
+
+def test_a_four_figure_gradient_factor_is_carried_as_written() -> None:
+    """The Ocean's `gf99` reaches 12 575 on a decompression ascent and Suunto publishes no
+    definition of the field, so the converter writes the reading and explains nothing — §6.4
+    puts no ceiling on the channel for the same reason, and a cap is §5.4's forbidden guess
+    wearing a plausible number."""
+    found = _channels(suunto_sample(0, Depth=7.62, RtGradientFactors={"gf99": 12575}))
+    assert found["gradient_factor"]["values"] == [12575]

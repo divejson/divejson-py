@@ -45,6 +45,11 @@
             "firmware": "3.0.2143",
             "name": "Suunto D5"
           },
+          "mode": "open_circuit",
+          "deco_model": {
+            "algorithm": "rgbm",
+            "name": "Suunto Fused RGBM 2"
+          },
           "profile": {
             "duration": 4683,
             "depth": {
@@ -107,7 +112,7 @@
               },
               {
                 "time": 4000,
-                "type": "other",
+                "type": "ascent_rate",
                 "label": "Ascent Speed"
               },
               {

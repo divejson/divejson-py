@@ -148,6 +148,24 @@ def _schema_issues(doc: dict[str, Any]) -> list[Issue]:
     return issues
 
 
+# Every single-series channel §6.4's Profile defines, in the section's own order.
+# `pressures` is the one that is a list rather than a series and is walked separately.
+# §3's rule 3 is quantified over *every* series in a recording, so a channel missing from
+# this tuple is one whose times nothing checks are strictly increasing and whose samples
+# nothing checks `duration` covers.
+CHANNELS = (
+    "depth",
+    "ceiling",
+    "temperature",
+    "ndl",
+    "tts",
+    "ppo2",
+    "cns",
+    "gradient_factor",
+    "surface_gradient_factor",
+)
+
+
 def _present(obj: dict[str, Any], member: str) -> bool:
     return obj.get(member) is not None
 
@@ -244,6 +262,19 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
                         "(spec §3, §6.4a)",
                     )
                 )
+            # §3 rule 7. The schema makes the pair both-or-neither and puts each on 0-100,
+            # and neither of those can say that one is not above the other — which is UDDF's
+            # own constraint on the same pair, and the reason a low above a high is a
+            # decompression model nothing ran.
+            model = recording.get("deco_model")
+            if isinstance(model, dict) and _present(model, "gf_low") and _present(model, "gf_high"):
+                try:
+                    if model["gf_low"] > model["gf_high"]:
+                        issues.append(
+                            Issue(f"{rec_path}/deco_model", "gf_low exceeds gf_high (spec §3, §6.4c)")
+                        )
+                except TypeError:
+                    pass
             _check_profile(recording.get("profile"), f"{rec_path}/profile", issues)
 
     for index, trip in enumerate(collections["trips"]):
@@ -361,7 +392,7 @@ def _check_profile(profile: Any, path: str, issues: list[Issue]) -> None:
     if not isinstance(profile, dict):
         return
     latest = 0
-    for channel in ("depth", "ceiling", "temperature"):
+    for channel in CHANNELS:
         series = profile.get(channel)
         if isinstance(series, dict):
             latest = max(latest, _check_series(series, f"{path}/{channel}", issues))

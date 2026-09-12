@@ -85,6 +85,7 @@ __all__ = [
     "DEVICE_CAPS",
     "INFERRED",
     "MAX_MAGNITUDE",
+    "MAX_MODEL_NAME",
     "MAX_NAME",
     "MAX_NOTES",
     "PRODUCER_KEY",
@@ -105,12 +106,15 @@ __all__ = [
     "UnsupportedSourceError",
     "Written",
     "capped",
+    "channel_floor",
+    "deco_model",
     "decimal_of",
     "device",
     "grouped",
     "header",
     "integer_of",
     "position",
+    "profile_members",
     "record_inferred",
     "recorded",
     "recording",
@@ -356,6 +360,62 @@ def _floor(record: str, member: str) -> tuple[Decimal, bool] | None:
     return None
 
 
+@cache
+def _cap(record: str, member: str) -> Decimal | None:
+    """One member's upper bound from the schema, or nothing where it has none.
+
+    The mirror of `_floor`, and here for the same reason: §6.4c's gradient factors are a
+    whole percent from 0 to 100, and a converter carrying that 100 as a constant of its own
+    would be a second place for the range to be wrong. `recorded` deliberately asks only
+    about the floor — a value above a ceiling is a different report line from one below a
+    floor — so a member with both keeps its own range check and reads the ceiling here.
+    """
+    definition = load_schema()["$defs"][record]["properties"][member]
+    if "maximum" in definition:
+        return Decimal(str(definition["maximum"]))
+    return None
+
+
+@cache
+def profile_members() -> tuple[str, ...]:
+    """§6.4's Profile members in the section's own order, off the schema.
+
+    A converted profile reads down the section the way a converted dive does, and which
+    member comes where is the schema's to say. The alternative is each adapter listing its
+    channels in the order it happens to build them, which was harmless while there were
+    three of them and is a reordered corpus the day a fourth lands between two of them.
+    """
+    return tuple(load_schema()["$defs"]["profile"]["properties"])
+
+
+@cache
+def channel_floor(member: str) -> int | None:
+    """The floor §6.5 puts on one profile channel's values, or nothing where it puts none.
+
+    A channel is a `$ref` to a series definition rather than a member carrying constraints
+    of its own, so `recorded` is not the question to ask about one — every call site it has
+    passes `record="dive"` or `record="cylinder"`, and `_floor` finds nothing under a
+    reference. This resolves the reference instead: the six decompression readouts share a
+    definition whose `values` floor at zero, because no-decompression time, time to surface,
+    ppO₂, CNS and a gradient factor have no negative reading and a source that writes one is
+    spelling absence in the only space it had. Depth, ceiling and temperature share the
+    signed definition and floor at nothing.
+
+    `series.Channel` asks this once per channel, which is what keeps the rule one place in
+    this package rather than one per format.
+    """
+    schema = load_schema()
+    reference = schema["$defs"]["profile"]["properties"][member].get("$ref")
+    if reference is None:
+        # `pressures` is an array of series rather than one, and carries no floor either:
+        # §6.3 records a cylinder pressure from zero up, and the readers bound that
+        # themselves against §6.3's own maximum.
+        return None
+    values = schema["$defs"][reference.rsplit("/", 1)[-1]]["properties"]["values"]
+    minimum = values.get("items", {}).get("minimum")
+    return None if minimum is None else int(minimum)
+
+
 def zero_is_an_answer(record: str, member: str) -> bool:
     """Whether a source zero is a reading for this member, or a placeholder.
 
@@ -543,9 +603,113 @@ def device(
     return built or None
 
 
+# §6.4c's own cap on the device's name for its model — `"Suunto Fused RGBM 2"`,
+# `"ZHL-16C"`. Narrower than §6's REQUIRED names for the reason §6.4b's device strings
+# are: this is a product string a manufacturer chose, not free text a diver typed.
+MAX_MODEL_NAME = 64
+
+
+def deco_model(
+    members: dict[str, Any],
+    *,
+    note: Reporter,
+    where: str,
+    labels: dict[str, str] | None = None,
+) -> dict[str, Any] | None:
+    """§6.4c's Deco Model from what a reader read about the algorithm, or nothing at all.
+
+    Four sources reach this section from four different subsets — UDDF's
+    `<decomodel><buehlmann>`, FIT's `dive_settings`, the Suunto app's `Header.Diving` and
+    the DM5 XML's `<PersonalMode>` — so the rules that hold across all four are here rather
+    than four times over: §6.4c's member order, the name trimmed and capped with an empty
+    one read as absence (§5.4), the schema's range on a gradient factor, **both or neither**
+    on the pair, **§3 rule 7's ordering**, and §6.4b's rule that an object with no members is
+    not written at all.
+
+    Every one of those is the same argument: a reading the format cannot hold resolves to an
+    omission and a note here, because the alternative is `validate_document` refusing this
+    converter's own output and taking the whole file — or, under an archive, every dive in
+    it — with it. `docs/converting.md` states the rule and calls a converter that reaches a
+    validation failure a bug rather than a file that was unusual.
+
+    `conservatism` passes through whatever integer it was handed, and that is deliberate:
+    §6.4c puts no floor on the member because Suunto's scale runs P−2 to P2, so a `-1` is a
+    setting and a `0` is the P0 setting. It is the one member here where a negative is a
+    reading, and the schema is what says so.
+
+    `labels` names the source's own spelling of a member for the report —
+    `<gradientfactorlow>`, `dive_settings.gf_high` — the way `device`'s does.
+    """
+    labels = labels or {}
+    built: dict[str, Any] = {}
+
+    algorithm = members.get("algorithm")
+    if isinstance(algorithm, str):
+        built["algorithm"] = algorithm
+
+    name = members.get("name")
+    if isinstance(name, str) and name.strip():
+        built["name"] = capped(
+            name.strip(), MAX_MODEL_NAME, note=note, where=where,
+            member=labels.get("name", "the model's name"),
+        )
+
+    # §6.4c writes the pair both or neither, which `dependentRequired` enforces in the
+    # schema, so a reading that fails its own range takes the other half with it rather than
+    # producing a document this package's own validation would reject.
+    pair: dict[str, int] = {}
+    for member in ("gf_low", "gf_high"):
+        value = members.get(member)
+        if not isinstance(value, int) or isinstance(value, bool):
+            continue
+        ceiling = _cap("deco_model", member)
+        if recorded(value, record="deco_model", member=member) and (ceiling is None or value <= ceiling):
+            pair[member] = value
+        else:
+            note(
+                where,
+                f"{labels.get(member, member)} is {value}, and §6.4c records a gradient factor as a whole "
+                f"percent from 0 to {ceiling}; dropped",
+                "dropped",
+            )
+    if len(pair) == 2 and pair["gf_low"] > pair["gf_high"]:
+        # §3's rule 7, which the schema cannot express and this converter's own output is
+        # held to: a low above a high is a model nothing ran. **Both go**, because the file
+        # does not say which of the two is the wrong one and choosing would be §5.4's guess.
+        # It is dropped here rather than left to `validate_document`, which raises and takes
+        # the whole file — or the whole archive — with it: every way a source can be wrong
+        # is supposed to resolve to an omission and a note (`docs/converting.md`).
+        note(
+            where,
+            f"{labels.get('gf_low', 'gf_low')} is {pair['gf_low']} and "
+            f"{labels.get('gf_high', 'gf_high')} is {pair['gf_high']}, and §3 rule 7 records a low no higher "
+            "than its high; both are dropped, the source not saying which of the two is wrong",
+            "dropped",
+        )
+    elif len(pair) == 2:
+        built.update(pair)
+    elif pair:
+        member, value = next(iter(pair.items()))
+        missing = "gf_high" if member == "gf_low" else "gf_low"
+        note(
+            where,
+            f"{labels.get(member, member)} is {value} and {labels.get(missing, missing)} is not recorded; "
+            "§6.4c carries the two gradient factors both or neither, so the one is dropped",
+            "dropped",
+        )
+
+    conservatism = members.get("conservatism")
+    if isinstance(conservatism, int) and not isinstance(conservatism, bool):
+        built["conservatism"] = conservatism
+
+    return built or None
+
+
 def recording(
     *,
     device: dict[str, Any] | None = None,
+    mode: str | None = None,
+    deco_model: dict[str, Any] | None = None,
     started_at: str | None = None,
     source_files: list[dict[str, Any]] | None = None,
     profile: dict[str, Any] | None = None,
@@ -558,13 +722,19 @@ def recording(
     recording — and every adapter that built one anyway would emit `recordings: [{}]` and
     fail its own output validation. `started_at` alone does not qualify: §6.4a reads an
     absent one as the dive's, so a recording carrying only a start describes nothing the
-    dive does not already say.
+    dive does not already say. **`mode` and `deco_model` do not qualify either**, for the
+    same reason and for one of their own: both describe how a computer was running rather
+    than anything it recorded, and §3's rule 4 names the three members it names.
     """
     if not (device or profile or source_files):
         return None
     built: dict[str, Any] = {}
     if device:
         built["device"] = device
+    if mode:
+        built["mode"] = mode
+    if deco_model:
+        built["deco_model"] = deco_model
     if started_at:
         built["started_at"] = started_at
     if source_files:

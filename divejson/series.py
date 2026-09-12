@@ -27,6 +27,12 @@ them:
   did not make. That is reported, unlike a dive that recorded no samples in the first
   place: there the source said nothing, here it said something this converter could not
   carry.
+* **A reading below its channel's floor is dropped, and the channel says so once.** §6.4
+  floors `ndl`, `tts`, `ppo2`, `cns` and the two gradient factors at zero — none of those
+  quantities has a negative value — so a source that writes one is spelling *no figure* in
+  the only space it had, and every format does it: a Suunto Ocean writes `gf99: -100` where
+  no tissue leads and `NoDecTime: -1` where it has no clock to show. The floor comes off the
+  schema rather than out of an adapter, which is what keeps it one rule instead of five.
 
 `noun` and `time_member` exist so the report keeps speaking the source's language — a UDDF
 report says "the waypoint records no `<divetime>`" where a FIT report says "the record
@@ -38,7 +44,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from .converter import Reporter
+from .converter import Reporter, channel_floor, profile_members
 
 __all__ = ["Channel", "SampleAxis"]
 
@@ -47,29 +53,51 @@ class Channel:
     """One sampled quantity: the seconds it has readings at, and the readings.
 
     Values are integers in the units §6.5 fixes for each channel — centimetres of depth,
-    tenths of a degree, tenths of a bar — so the scaling is the adapter's and the ordering
-    is this class's.
+    tenths of a degree, tenths of a bar, hundredths of a bar of ppO₂ — so the scaling is the
+    adapter's and the ordering is this class's.
+
+    The channel is named at construction because its **floor** follows from the name:
+    `channel_floor` reads it off the schema, so an adapter cannot add a channel and forget
+    the rule, and cannot get it differently from the next adapter.
     """
 
-    __slots__ = ("times", "values")
+    __slots__ = ("name", "times", "values", "refused", "_floor")
 
-    def __init__(self) -> None:
+    def __init__(self, name: str) -> None:
+        self.name = name
         self.times: list[int] = []
         self.values: list[int] = []
+        # Counted rather than reported one reading at a time: a device writes its
+        # absent-marker for a run of samples — 5 531 of one export's 7 194 `gf99` readings —
+        # and a line apiece would bury every other finding in the report.
+        self.refused = 0
+        self._floor = channel_floor(name)
 
     def record(self, second: int, value: int) -> bool:
-        """Take one reading, unless this channel already has one at that second.
+        """Take one reading, unless the floor refuses it or the channel has one already.
 
-        The axis has already deduplicated the samples, so a repeat here means two readings
-        of one channel inside one sample — two tank pressures resolving to one cylinder,
-        say. The first wins and the caller reports the second, because the caller is what
-        knows which reading it was.
+        Two refusals and one return value, reported in two different places on purpose.
+        **A value below the channel's floor is refused here**, because that floor is §6.5's
+        and the sentence is the same in every format; the count is reported once, by
+        `SampleAxis.profile`. A repeat on one second is two readings of one channel inside
+        one sample — two tank pressures resolving to one cylinder — and only the caller
+        knows which reading it was, so that one returns silently for the caller to report.
+
+        A caller that reports its own `False` therefore has to be sure which refusal it
+        saw; `taken` is how it asks, and the one such caller uses it.
         """
-        if self.times and self.times[-1] == second:
+        if self._floor is not None and value < self._floor:
+            self.refused += 1
+            return False
+        if self.taken(second):
             return False
         self.times.append(second)
         self.values.append(value)
         return True
+
+    def taken(self, second: int) -> bool:
+        """Whether this channel already holds a reading at that second."""
+        return bool(self.times) and self.times[-1] == second
 
     def __len__(self) -> int:
         return len(self.times)
@@ -160,7 +188,22 @@ class SampleAxis:
         themselves, which §6.4 defines it as: the largest sample time across every channel,
         a structural member rather than a reading the source failed to record, so it
         carries no note and is never listed as inferred.
+
+        This is also where a channel's refused readings are reported, one line per channel
+        rather than one per sample — see `Channel.record`. It happens before every early
+        return below: a dive whose readouts were all absent-markers is a dive whose report
+        still has to say so.
         """
+        for channel in (*channels.values(), *(channel for _, channel in pressures)):
+            if channel.refused:
+                self._note(
+                    self._where,
+                    f"{channel.refused} of the dive's {channel.name} readings "
+                    f"{'is' if channel.refused == 1 else 'are'} negative, which is how a device spells a "
+                    f"readout it does not have; {'that sample is' if channel.refused == 1 else 'those samples are'} "
+                    "dropped from the channel, §6.4 recording it from zero up",
+                    "dropped",
+                )
         filled: list[tuple[str, Channel]] = [(name, channel) for name, channel in channels.items() if len(channel)]
         pressed = sorted(((number, channel) for number, channel in pressures if len(channel)), key=lambda pair: pair[0])
         if not self.ordered():
@@ -192,4 +235,8 @@ class SampleAxis:
             ]
         if events:
             profile["events"] = sorted(events, key=lambda event: event["time"])
-        return profile
+        # Put back into §6.4's own order rather than the order the members were built in:
+        # `pressures` sits between `temperature` and `ndl` in the section, and an adapter
+        # that listed its channels in any other order would otherwise emit a profile that
+        # reads down nothing.
+        return {member: profile[member] for member in profile_members() if member in profile}

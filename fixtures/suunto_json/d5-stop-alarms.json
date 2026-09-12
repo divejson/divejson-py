@@ -1,0 +1,579 @@
+{
+  "DeviceLog": {
+    "Header": {
+      "ActivityType": 51,
+      "DateTime": "2021-04-06T12:31:34.450+02:00",
+      "Depth": {
+        "Avg": 14.54,
+        "Max": 25.37
+      },
+      "Device": {
+        "Info": {
+          "BSL": "2.5.1947",
+          "BatteryAtEnd": "Charge: 43%, Voltage: 3.795V",
+          "BatteryAtStart": "Charge: 50%, Voltage: 3.845V",
+          "HW": "68.6.0",
+          "SW": "2.5.1947"
+        },
+        "Name": "Suunto D5",
+        "SerialNumber": "192410004212"
+      },
+      "Diving": {
+        "Algorithm": "Suunto Fused2 RGBM",
+        "AlgorithmAscentTime": 454,
+        "AlgorithmBottomMixture": {
+          "Helium": 0,
+          "Oxygen": 0.21
+        },
+        "AlgorithmBottomTime": 2048,
+        "Altitude": 0,
+        "AscentMode": "Follow ceiling",
+        "Conservatism": 0,
+        "DaysInSeries": 3,
+        "DeepStopEnabled": true,
+        "DesaturationTime": 97200,
+        "DiveMode": "Air",
+        "EndTissue": {
+          "CNS": 0.071,
+          "Helium": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "Nitrogen": [
+            108717,
+            114082,
+            129890,
+            149906,
+            157854,
+            149941,
+            131757,
+            120007,
+            112390,
+            103491,
+            98634,
+            95674,
+            93694,
+            92285,
+            90422
+          ],
+          "OLF": 0.071,
+          "OTU": 11.986471176147461,
+          "RgbmHelium": 0.982,
+          "RgbmNitrogen": 0.859
+        },
+        "Gases": [
+          {
+            "Helium": 0,
+            "Oxygen": 0.21,
+            "PO2": 140000,
+            "State": "Primary",
+            "TankFillPressure": 20000000,
+            "TankSize": 0.012
+          }
+        ],
+        "LastDecoStopDepth": 3,
+        "MiniLock": false,
+        "NoFlyTime": 45493,
+        "NumberInSeries": 6,
+        "PreviousDiveDepth": 32.41,
+        "SafetyStopTime": 180,
+        "StartTissue": {
+          "CNS": 0.03,
+          "Helium": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "Nitrogen": [
+            79000,
+            79000,
+            79443,
+            86200,
+            102135,
+            109240,
+            103632,
+            98348,
+            94800,
+            90738,
+            88668,
+            87506,
+            86787,
+            86307,
+            85711
+          ],
+          "OLF": 0.03,
+          "OTU": 3.5761935710906982,
+          "RgbmHelium": 0.982,
+          "RgbmNitrogen": 0.859
+        },
+        "SurfacePressure": 104600,
+        "SurfaceTime": 2499
+      },
+      "Duration": 2831
+    },
+    "Samples": [
+      {
+        "Events": [
+          {
+            "GasSwitch": {
+              "GasNumber": 1
+            }
+          },
+          {
+            "Notify": {
+              "Active": true,
+              "Type": "NoFly Time"
+            }
+          },
+          {
+            "State": {
+              "Active": true,
+              "Type": "Dive Active"
+            }
+          },
+          {
+            "State": {
+              "Active": true,
+              "Type": "Wet Outside"
+            }
+          },
+          {
+            "State": {
+              "Active": true,
+              "Type": "Below Wet Activation Depth"
+            }
+          },
+          {
+            "State": {
+              "Active": true,
+              "Type": "Below Surface"
+            }
+          }
+        ],
+        "TimeISO8601": "2021-04-06T12:31:34.450+02:00"
+      },
+      {
+        "Ceiling": 0,
+        "Depth": 1.29,
+        "DeviceInternalAbsPressure": null,
+        "NoDecTime": 6000,
+        "Temperature": 298.25,
+        "TimeToSurface": 0,
+        "TimeISO8601": "2021-04-06T12:31:34.920+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Active": true,
+              "Type": "Safety Stop Ahead"
+            }
+          }
+        ],
+        "TimeISO8601": "2021-04-06T12:32:19.380+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Active": true,
+              "Type": "Deep Stop Ahead"
+            }
+          }
+        ],
+        "TimeISO8601": "2021-04-06T12:33:09.420+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Alarm": {
+              "Active": true,
+              "Type": "Ascent Speed"
+            }
+          },
+          {
+            "Warning": {
+              "Active": true,
+              "Type": "Mandatory Safety Stop"
+            }
+          }
+        ],
+        "TimeISO8601": "2021-04-06T12:35:00.420+02:00"
+      },
+      {
+        "Ceiling": 0,
+        "Depth": 20.8,
+        "DeviceInternalAbsPressure": 98700,
+        "NoDecTime": 840,
+        "Temperature": 295.05,
+        "TimeToSurface": 188,
+        "TimeISO8601": "2021-04-06T12:39:24.980+02:00"
+      },
+      {
+        "Ceiling": 0,
+        "Depth": 22.94,
+        "DeviceInternalAbsPressure": 98700,
+        "NoDecTime": 240,
+        "Temperature": 295.05,
+        "TimeToSurface": 200,
+        "TimeISO8601": "2021-04-06T12:47:15.190+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Active": true,
+              "Type": "Deep Stop"
+            }
+          }
+        ],
+        "TimeISO8601": "2021-04-06T12:49:48.390+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Alarm": {
+              "Active": true,
+              "Type": "Ascent Speed"
+            }
+          }
+        ],
+        "TimeISO8601": "2021-04-06T12:53:11.420+02:00"
+      },
+      {
+        "Ceiling": 0,
+        "Depth": 18,
+        "DeviceInternalAbsPressure": 98500,
+        "NoDecTime": 0,
+        "Temperature": 295.05,
+        "TimeToSurface": 136,
+        "TimeISO8601": "2021-04-06T12:54:45.400+02:00"
+      },
+      {
+        "Ceiling": 0,
+        "Depth": 17.26,
+        "DeviceInternalAbsPressure": 98400,
+        "NoDecTime": 0,
+        "Temperature": 295.15,
+        "TimeToSurface": 132,
+        "TimeISO8601": "2021-04-06T12:54:55.400+02:00"
+      },
+      {
+        "Ceiling": 0,
+        "Depth": 16.4,
+        "DeviceInternalAbsPressure": 98400,
+        "NoDecTime": 0,
+        "Temperature": 295.15,
+        "TimeToSurface": 124,
+        "TimeISO8601": "2021-04-06T12:55:05.390+02:00"
+      },
+      {
+        "Ceiling": 0,
+        "Depth": 16.11,
+        "DeviceInternalAbsPressure": 98300,
+        "NoDecTime": 0,
+        "Temperature": 295.05,
+        "TimeToSurface": 124,
+        "TimeISO8601": "2021-04-06T12:55:15.400+02:00"
+      },
+      {
+        "Ceiling": 0,
+        "Depth": 16.13,
+        "DeviceInternalAbsPressure": 98400,
+        "NoDecTime": 0,
+        "Temperature": 295.05,
+        "TimeToSurface": 124,
+        "TimeISO8601": "2021-04-06T12:55:25.400+02:00"
+      },
+      {
+        "Ceiling": 0,
+        "Depth": 17.25,
+        "DeviceInternalAbsPressure": 98400,
+        "NoDecTime": 0,
+        "Temperature": 295.05,
+        "TimeToSurface": 128,
+        "TimeISO8601": "2021-04-06T12:55:35.400+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Active": true,
+              "Type": "Deco"
+            }
+          }
+        ],
+        "TimeISO8601": "2021-04-06T12:55:45.460+02:00"
+      },
+      {
+        "Ceiling": 3,
+        "Depth": 19.3,
+        "DeviceInternalAbsPressure": 98500,
+        "NoDecTime": null,
+        "Temperature": 295.05,
+        "TimeToSurface": 188,
+        "TimeISO8601": "2021-04-06T12:55:55.410+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Active": true,
+              "Type": "Deep Stop"
+            }
+          }
+        ],
+        "TimeISO8601": "2021-04-06T13:00:55.400+02:00"
+      },
+      {
+        "Ceiling": 3,
+        "Depth": 12.91,
+        "DeviceInternalAbsPressure": 98100,
+        "NoDecTime": null,
+        "Temperature": 294.95,
+        "TimeToSurface": 446,
+        "TimeISO8601": "2021-04-06T13:03:05.610+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Alarm": {
+              "Active": true,
+              "Type": "Ascent Speed"
+            }
+          }
+        ],
+        "TimeISO8601": "2021-04-06T13:03:50.400+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Active": true,
+              "Type": "Deco Window"
+            }
+          }
+        ],
+        "TimeISO8601": "2021-04-06T13:05:30.490+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Active": true,
+              "Type": "Deco Window"
+            }
+          }
+        ],
+        "TimeISO8601": "2021-04-06T13:06:40.500+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Active": true,
+              "Type": "Deco Window"
+            }
+          }
+        ],
+        "TimeISO8601": "2021-04-06T13:07:19.500+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Alarm": {
+              "Active": true,
+              "Type": "Ascent Speed"
+            }
+          }
+        ],
+        "TimeISO8601": "2021-04-06T13:07:23.400+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Active": true,
+              "Type": "Deco Window"
+            }
+          }
+        ],
+        "TimeISO8601": "2021-04-06T13:07:49.510+02:00"
+      },
+      {
+        "Ceiling": 3,
+        "Depth": 5.39,
+        "DeviceInternalAbsPressure": 97700,
+        "NoDecTime": null,
+        "Temperature": 295.15,
+        "TimeToSurface": 192,
+        "TimeISO8601": "2021-04-06T13:10:55.690+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Active": true,
+              "Type": "Deco Window"
+            }
+          }
+        ],
+        "TimeISO8601": "2021-04-06T13:12:46.480+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Active": true,
+              "Type": "Deco Window"
+            }
+          }
+        ],
+        "TimeISO8601": "2021-04-06T13:14:00.460+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Active": true,
+              "Type": "Deco Window"
+            }
+          }
+        ],
+        "TimeISO8601": "2021-04-06T13:14:17.440+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Notify": {
+              "Active": true,
+              "Type": "Safety Stop"
+            }
+          }
+        ],
+        "TimeISO8601": "2021-04-06T13:15:23.410+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Alarm": {
+              "Active": true,
+              "Type": "Ascent Speed"
+            }
+          },
+          {
+            "Notify": {
+              "Active": true,
+              "Type": "Safety Stop Ahead"
+            }
+          },
+          {
+            "Notify": {
+              "Active": true,
+              "Type": "Safety Stop"
+            }
+          },
+          {
+            "Warning": {
+              "Active": true,
+              "Type": "Mandatory Safety Stop"
+            }
+          },
+          {
+            "Warning": {
+              "Active": true,
+              "Type": "Safety Stop Broken"
+            }
+          }
+        ],
+        "TimeISO8601": "2021-04-06T13:17:13.420+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Alarm": {
+              "Active": false,
+              "Type": "Ascent Speed"
+            }
+          },
+          {
+            "Alarm": {
+              "Active": true,
+              "Type": "Mandatory Safety Stop Broken"
+            }
+          },
+          {
+            "Notify": {
+              "Active": false,
+              "Type": "Safety Stop"
+            }
+          },
+          {
+            "Warning": {
+              "Active": false,
+              "Type": "Safety Stop Broken"
+            }
+          }
+        ],
+        "TimeISO8601": "2021-04-06T13:17:14.420+02:00"
+      },
+      {
+        "Events": [
+          {
+            "Alarm": {
+              "Active": false,
+              "Type": "Mandatory Safety Stop Broken"
+            }
+          },
+          {
+            "Notify": {
+              "Active": true,
+              "Type": "Safety Stop"
+            }
+          },
+          {
+            "Warning": {
+              "Active": true,
+              "Type": "Safety Stop Broken"
+            }
+          }
+        ],
+        "TimeISO8601": "2021-04-06T13:17:49.440+02:00"
+      },
+      {
+        "Ceiling": 0,
+        "Depth": 0,
+        "DeviceInternalAbsPressure": 97400,
+        "NoDecTime": 6000,
+        "Temperature": 295.15,
+        "TimeToSurface": 8,
+        "TimeISO8601": "2021-04-06T13:18:45.760+02:00"
+      }
+    ]
+  }
+}

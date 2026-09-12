@@ -46,6 +46,10 @@
             "firmware": "3.0.2143",
             "dive_number": 1
           },
+          "mode": "open_circuit",
+          "deco_model": {
+            "conservatism": -1
+          },
           "profile": {
             "duration": 3485,
             "depth": {

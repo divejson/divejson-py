@@ -73,9 +73,11 @@ from .converter import (
     NoteKind,
     Scope,
     SourceTooLargeError,
+    deco_model,
     decimal_of,
     device,
     header,
+    integer_of,
     position,
     record_inferred,
     recorded,
@@ -179,11 +181,26 @@ WATER_TYPES = {"fresh": "fresh", "salt": "salt", "en13319": "en13319"}
 # `timer` is the deliberate omission. It is the only `event` any file in hand writes, and
 # its start/stop pair says where the dive begins and ends, which §6.4's `started_at` and
 # the profile's own axis already say twice over.
-EVENT_TYPES = {
+#
+# **`dive_alert` maps to `None`**, which here means an event with no `type` at all and the
+# device's wording as its `label` — §6.6's spelling of an unclassified event. The alert
+# names are deliberately *not* mapped onto §6.6's vocabulary, though several of them plainly
+# line up with it: no FIT file in hand carries a `dive_alert` of any kind, and this corpus
+# does not adopt a mapping no pair exercises. The Suunto app JSON reader has that table
+# because its files have the alerts.
+EVENT_TYPES: dict[str, str | None] = {
     "dive_gas_switched": "gas_switch",
     "user_marker": "bookmark",
-    "dive_alert": "other",
+    "dive_alert": None,
 }
+
+# `dive_settings.model`, whose `tissue_model_type` enum has exactly one member in the FIT
+# profile, onto §6.4c's `algorithm`. **Read only where the message states a value.** Taking
+# "there is only one value in the enum" for "the family must be Bühlmann" would be the
+# converter deciding what the device ran, and a Suunto watch writing Garmin's format is
+# exactly the file that would get it wrong: the same computer's app export names an RGBM
+# model for the same dive.
+TISSUE_MODELS = {"zhl_16c": "buhlmann"}
 
 
 class FitError(ConverterError):
@@ -691,10 +708,38 @@ class _Converter:
         # A FIT file is one dive written by one computer, so a converted document has
         # exactly one recording (§6.4a) — and none at all where the file names no computer
         # and kept no usable sample, §6.4a forbidding a recording that carries nothing.
-        built = recording(device=self.read_device(session, where), profile=profile)
+        built = recording(
+            device=self.read_device(session, where),
+            deco_model=self.read_deco_model(where),
+            profile=profile,
+        )
         if built is not None:
             dive["recordings"] = [built]
         return dive
+
+    def read_deco_model(self, where: str) -> dict[str, Any] | None:
+        """`dive_settings`'s gradient factors and tissue model as §6.4c's Deco Model.
+
+        Both gradient factors are already whole percent in the FIT profile, which is §6.4c's
+        unit, so nothing is scaled. They are written both or neither, which `deco_model`
+        holds to; two of the three recordings in `fixtures/fit/` state a pair with no `model`
+        beside it and produce a pair and no family, which is the honest shape.
+
+        **§6.4a's `mode` has no source here.** `session.sub_sport` is the field that would
+        carry it and no file in hand writes one, so a FIT dive does not say what kind it is —
+        a freediving one included. The DM5 XML path says which, because its files state it.
+        """
+        model = _native(self.scan.settings, "model")
+        return deco_model(
+            {
+                "algorithm": TISSUE_MODELS.get(model) if isinstance(model, str) else None,
+                "gf_low": integer_of(_number(_native(self.scan.settings, "gf_low"))),
+                "gf_high": integer_of(_number(_native(self.scan.settings, "gf_high"))),
+            },
+            note=self.note,
+            where=where,
+            labels={"gf_low": "dive_settings.gf_low", "gf_high": "dive_settings.gf_high"},
+        )
 
     def session(self, where: str) -> fitdecode.FitDataMessage:
         """The `session` this file's dive is described by.
@@ -1290,10 +1335,10 @@ class _Converter:
         than an obligation at 0 m. Reading it as a reading would draw a flat line along
         the surface across every no-deco dive in a logbook.
         """
-        depth = Channel()
-        ceiling = Channel()
-        temperature = Channel()
-        pressures = {sensor: Channel() for sensor in sensors}
+        depth = Channel("depth")
+        ceiling = Channel("ceiling")
+        temperature = Channel("temperature")
+        pressures = {sensor: Channel("pressures") for sensor in sensors}
         for second, point in samples.ordered():
             if point.depth is not None:
                 depth.record(second, rounded(point.depth * CENTIMETRES_PER_METRE))
@@ -1353,9 +1398,13 @@ class _Converter:
         events: list[dict[str, Any]] = []
         for frame in self.scan.events:
             name = _native(frame, "event")
-            kind = EVENT_TYPES.get(name) if isinstance(name, str) else None
+            # `in` rather than `get`, because `None` is a value in this table and not its
+            # miss: `dive_alert` maps onto an event with no `type` at all.
+            if not isinstance(name, str) or name not in EVENT_TYPES:
+                continue
+            kind = EVENT_TYPES[name]
             at = _native(frame, "timestamp")
-            if kind is None or not isinstance(at, datetime):
+            if not isinstance(at, datetime):
                 continue
             point = self.scan.points.get(at)
             second = seconds.get(point) if point is not None else None
@@ -1367,18 +1416,19 @@ class _Converter:
                     "dropped",
                 )
                 continue
-            event: dict[str, Any] = {"time": second, "type": kind}
+            event: dict[str, Any] = {"time": second, "type": kind} if kind else {"time": second}
             data = _native(frame, "data")
             if kind == "gas_switch" and isinstance(data, int) and not isinstance(data, bool):
                 number = positions.get(data & MESSAGE_INDEX_MASK)
                 if number is not None:
                     event["gas_number"] = number
-            if kind == "other":
+            if kind is None:
                 # `data` renders through the profile's own `dive_alert` enum, so this is
                 # the device's wording — `deco_ceiling_broken`, not a number — and an
                 # alert outside the enum decodes to the bare integer, which is still more
-                # than "something happened". §6.5 requires a label on `other`, so an event
-                # with nothing to say is dropped rather than failing the whole conversion.
+                # than "something happened". §6.6 requires a label on an event with no type,
+                # so an alert with nothing at all to say is dropped rather than failing the
+                # whole conversion.
                 if data is None:
                     self.note(where, "the device records an alert it gives no code for; dropped", "dropped")
                     continue

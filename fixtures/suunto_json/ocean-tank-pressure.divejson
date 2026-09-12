@@ -1,0 +1,249 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-11T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.5.0"
+  },
+  "dives": [
+    {
+      "uuid": "29e7c994-34d6-5135-940d-1ec2b3a7e42d",
+      "started_at": "2026-04-04T13:34:11.360+02:00",
+      "duration": 3888,
+      "max_depth": 16.96,
+      "avg_depth": 9.4,
+      "entry_position": {
+        "latitude": 28.498851776123047,
+        "longitude": 34.5198860168457
+      },
+      "exit_position": {
+        "latitude": 28.496512,
+        "longitude": 34.51696
+      },
+      "cylinders": [
+        {
+          "start_pressure": 204.6875,
+          "end_pressure": 62.1875,
+          "gas_number": 0
+        }
+      ],
+      "recordings": [
+        {
+          "device": {
+            "brand": "Suunto",
+            "serial": "253810000400",
+            "firmware": "2.40.56",
+            "name": "Porvoo"
+          },
+          "profile": {
+            "duration": 4230,
+            "depth": {
+              "times": [
+                0,
+                700,
+                1410,
+                2120,
+                2820,
+                3530,
+                3920,
+                3940,
+                3950,
+                3960,
+                3970,
+                3980,
+                4230
+              ],
+              "values": [
+                122,
+                1185,
+                1234,
+                1444,
+                767,
+                333,
+                100,
+                88,
+                81,
+                1,
+                8,
+                14,
+                0
+              ]
+            },
+            "temperature": {
+              "times": [
+                8,
+                4230
+              ],
+              "values": [
+                235,
+                240
+              ]
+            },
+            "pressures": [
+              {
+                "times": [
+                  0,
+                  700,
+                  1410,
+                  2120,
+                  2820,
+                  3530,
+                  3920,
+                  3940,
+                  3950,
+                  3960,
+                  3970,
+                  3980,
+                  4230
+                ],
+                "values": [
+                  2047,
+                  1792,
+                  1539,
+                  1210,
+                  861,
+                  622,
+                  526,
+                  520,
+                  519,
+                  507,
+                  508,
+                  510,
+                  1
+                ],
+                "gas_number": 0
+              }
+            ],
+            "ndl": {
+              "times": [
+                0,
+                700,
+                1410,
+                2120,
+                2820,
+                3530,
+                3920,
+                3940,
+                3950,
+                3960,
+                3970,
+                3980,
+                4230
+              ],
+              "values": [
+                6000,
+                6000,
+                6000,
+                6000,
+                6000,
+                6000,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            "tts": {
+              "times": [
+                0,
+                700,
+                2120,
+                2820,
+                3530
+              ],
+              "values": [
+                8,
+                72,
+                88,
+                48,
+                24
+              ]
+            },
+            "gradient_factor": {
+              "times": [
+                3920,
+                3940,
+                3950,
+                3960,
+                3970,
+                3980,
+                4230
+              ],
+              "values": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            "surface_gradient_factor": {
+              "times": [
+                0,
+                700,
+                1410,
+                2120,
+                2820,
+                3530,
+                3920,
+                3940,
+                3950,
+                3960,
+                3970,
+                3980,
+                4230
+              ],
+              "values": [
+                7,
+                21,
+                29,
+                39,
+                45,
+                38,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            },
+            "events": [
+              {
+                "time": 0,
+                "type": "gas_switch",
+                "gas_number": 0
+              },
+              {
+                "time": 3955,
+                "type": "pressure_low",
+                "label": "Tank Pressure"
+              },
+              {
+                "time": 4203,
+                "type": "pressure_low",
+                "label": "Tank Pressure"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "suunto_json",
+      "source_generator": {
+        "name": "Porvoo",
+        "version": "2.40.56"
+      }
+    }
+  }
+}

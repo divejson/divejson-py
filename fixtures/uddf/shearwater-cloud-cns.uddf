@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="utf-8"?>
+<uddf xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="3.2.3" xmlns="http://www.streit.cc/uddf/3.2/">
+  <generator>
+    <name>Shearwater Cloud Desktop</name>
+    <type>logbook</type>
+    <manufacturer id="Shearwater_Research_Inc">
+      <name>Shearwater Research, Inc</name>
+      <address>
+        <street>Suite 100, 10200 Shellbridge Way</street>
+        <city>Richmond</city>
+        <postcode>V6X 2W7</postcode>
+        <country>Canada</country>
+        <province>British Columbia</province>
+      </address>
+      <contact>
+        <language>English</language>
+        <phone>604-669-9958</phone>
+        <fax>604-681-4982</fax>
+        <email>info@shearwater.com</email>
+        <homepage>https://shearwater.com</homepage>
+      </contact>
+    </manufacturer>
+    <version>2.12.10</version>
+    <datetime>2026-09-08T15:36:24Z</datetime>
+  </generator>
+  <diver>
+    <owner>
+      <equipment>
+        <divecomputer id="Perdix 3_D9772626">
+          <name>Perdix 3</name>
+          <manufacturer id="Shearwater_Research_Inc">
+            <name>Shearwater Research, Inc</name>
+            <address>
+              <street>Suite 100, 10200 Shellbridge Way</street>
+              <city>Richmond</city>
+              <postcode>V6X 2W7</postcode>
+              <country>Canada</country>
+              <province>British Columbia</province>
+            </address>
+            <contact>
+              <language>English</language>
+              <phone>604-669-9958</phone>
+              <fax>604-681-4982</fax>
+              <email>info@shearwater.com</email>
+              <homepage>https://shearwater.com</homepage>
+            </contact>
+          </manufacturer>
+          <model>Perdix 3</model>
+          <serialnumber>D9772626</serialnumber>
+          <notes>
+            <para>FirmV:39:</para>
+            <para>LogV:17:</para>
+            <para>BatType:2:</para>
+            <para>IBat:150:</para>
+            <para>DBV:12:</para>
+            <para>OEM:0:</para>
+            <para>Language:0:</para>
+            <para>Product:14:</para>
+          </notes>
+        </divecomputer>
+      </equipment>
+    </owner>
+    <buddy>
+      <personal />
+    </buddy>
+  </diver>
+  <divesite />
+  <gasdefinitions>
+    <mix id="OC1:33/00">
+      <name>OC1</name>
+      <o2>0.33</o2>
+      <he>0</he>
+      <maximumpo2>1</maximumpo2>
+    </mix>
+  </gasdefinitions>
+  <decomodel>
+    <buehlmann id="zhl16c">
+      <gradientfactorhigh>85</gradientfactorhigh>
+      <gradientfactorlow>50</gradientfactorlow>
+    </buehlmann>
+  </decomodel>
+  <profiledata>
+    <repetitiongroup>
+      <dive id="1588035071788880913">
+        <applicationdata />
+        <informationbeforedive>
+          <link ref="profile_1588035071788880913" />
+          <link ref="" />
+          <link ref=" : " />
+          <link ref="zhl16c" />
+          <divenumber>2</divenumber>
+          <datetime>2026-09-08T15:21:53Z</datetime>
+          <surfaceintervalbeforedive>
+            <passedtime>60</passedtime>
+          </surfaceintervalbeforedive>
+          <equipmentused>
+            <link ref="Perdix 3_D9772626" />
+          </equipmentused>
+          <surfacepressure>101900</surfacepressure>
+        </informationbeforedive>
+        <tankdata>
+          <tankpressurebegin>0</tankpressurebegin>
+          <tankpressureend>0</tankpressureend>
+        </tankdata>
+        <tankdata>
+          <tankpressurebegin>0</tankpressurebegin>
+          <tankpressureend>0</tankpressureend>
+        </tankdata>
+        <tankdata>
+          <tankpressurebegin>0</tankpressurebegin>
+          <tankpressureend>0</tankpressureend>
+        </tankdata>
+        <tankdata>
+          <tankpressurebegin>0</tankpressurebegin>
+          <tankpressureend>0</tankpressureend>
+        </tankdata>
+        <tankdata>
+          <tankpressurebegin>0</tankpressurebegin>
+          <tankpressureend>0</tankpressureend>
+        </tankdata>
+        <tankdata>
+          <tankpressurebegin>0</tankpressurebegin>
+          <tankpressureend>0</tankpressureend>
+        </tankdata>
+        <samples>
+          <waypoint>
+            <batterychargecondition>1.53</batterychargecondition>
+            <calculatedpo2>0.399999976</calculatedpo2>
+            <depth>2.3</depth>
+            <divetime>0</divetime>
+            <switchmix ref="OC1:33/00" />
+            <temperature>303.15</temperature>
+            <divemode type="opencircuit" />
+            <gradientfactor>0</gradientfactor>
+            <nodecotime>5940</nodecotime>
+          </waypoint>
+          <waypoint>
+            <calculatedpo2>0.39</calculatedpo2>
+            <depth>1.7</depth>
+            <divetime>30</divetime>
+            <temperature>303.15</temperature>
+            <divemode type="opencircuit" />
+            <gradientfactor>1</gradientfactor>
+            <nodecotime>5940</nodecotime>
+          </waypoint>
+          <waypoint>
+            <cns>1</cns>
+            <calculatedpo2>0.74</calculatedpo2>
+            <depth>12.5</depth>
+            <divetime>310</divetime>
+            <temperature>302.15</temperature>
+            <nodecotime>5940</nodecotime>
+          </waypoint>
+          <waypoint>
+            <cns>2</cns>
+            <calculatedpo2>0.9</calculatedpo2>
+            <depth>17.4</depth>
+            <divetime>790</divetime>
+            <temperature>302.15</temperature>
+            <nodecotime>4920</nodecotime>
+          </waypoint>
+          <waypoint>
+            <batterychargecondition>1.52</batterychargecondition>
+            <cns>2</cns>
+            <calculatedpo2>0.89</calculatedpo2>
+            <depth>17.1</depth>
+            <divetime>840</divetime>
+            <temperature>302.15</temperature>
+            <nodecotime>5100</nodecotime>
+          </waypoint>
+          <waypoint>
+            <cns>3</cns>
+            <calculatedpo2>0.96</calculatedpo2>
+            <depth>19</depth>
+            <divetime>900</divetime>
+            <temperature>302.15</temperature>
+            <nodecotime>3720</nodecotime>
+          </waypoint>
+          <waypoint>
+            <cns>5</cns>
+            <calculatedpo2>0.81</calculatedpo2>
+            <depth>14.6</depth>
+            <divetime>1500</divetime>
+            <temperature>302.15</temperature>
+            <nodecotime>5940</nodecotime>
+          </waypoint>
+          <waypoint>
+            <cns>7</cns>
+            <calculatedpo2>0.799999952</calculatedpo2>
+            <depth>14.1</depth>
+            <divetime>2000</divetime>
+            <temperature>302.15</temperature>
+            <nodecotime>5940</nodecotime>
+          </waypoint>
+          <waypoint>
+            <cns>8</cns>
+            <calculatedpo2>0.39</calculatedpo2>
+            <depth>1.80000007</depth>
+            <divetime>2780</divetime>
+            <temperature>302.15</temperature>
+            <gradientfactor>4</gradientfactor>
+            <nodecotime>5940</nodecotime>
+          </waypoint>
+          <waypoint>
+            <cns>8</cns>
+            <calculatedpo2>0.38</calculatedpo2>
+            <depth>1.30000007</depth>
+            <divetime>2840</divetime>
+            <temperature>302.15</temperature>
+            <gradientfactor>5</gradientfactor>
+            <nodecotime>5940</nodecotime>
+          </waypoint>
+          <waypoint>
+            <cns>8</cns>
+            <calculatedpo2>0.37</calculatedpo2>
+            <depth>1.2</depth>
+            <divetime>2850</divetime>
+            <temperature>302.15</temperature>
+            <gradientfactor>7</gradientfactor>
+            <nodecotime>5940</nodecotime>
+          </waypoint>
+          <waypoint>
+            <cns>8</cns>
+            <depth>1.2</depth>
+            <divetime>2860</divetime>
+            <temperature>302.15</temperature>
+            <gradientfactor>11</gradientfactor>
+            <nodecotime>5940</nodecotime>
+          </waypoint>
+          <waypoint>
+            <cns>8</cns>
+            <calculatedpo2>0.359999985</calculatedpo2>
+            <depth>0.900000036</depth>
+            <divetime>2870</divetime>
+            <temperature>302.15</temperature>
+            <gradientfactor>10</gradientfactor>
+            <nodecotime>5940</nodecotime>
+          </waypoint>
+          <waypoint>
+            <cns>8</cns>
+            <depth>1</depth>
+            <divetime>2920</divetime>
+            <temperature>302.15</temperature>
+            <gradientfactor>6</gradientfactor>
+            <nodecotime>5940</nodecotime>
+          </waypoint>
+          <waypoint>
+            <cns>8</cns>
+            <calculatedpo2>0.34</calculatedpo2>
+            <depth>0</depth>
+            <divetime>2930</divetime>
+            <temperature>302.15</temperature>
+            <gradientfactor>17</gradientfactor>
+            <nodecotime>5940</nodecotime>
+          </waypoint>
+          <waypoint>
+            <cns>8</cns>
+            <depth>0</depth>
+            <divetime>2940</divetime>
+            <temperature>302.15</temperature>
+            <gradientfactor>17</gradientfactor>
+            <nodecotime>5940</nodecotime>
+          </waypoint>
+        </samples>
+        <informationafterdive>
+          <greatestdepth>19.1</greatestdepth>
+          <notes>
+            <para>Summary:  
+</para>
+            <para>Environment:  
+</para>
+            <para>Gas:  
+</para>
+            <para>Gear:  
+</para>
+            <para>Issues:  
+</para>
+          </notes>
+          <anysymptoms>
+            <notes />
+          </anysymptoms>
+          <diveduration>2921</diveduration>
+          <observations>
+            <notes>
+              <para>-ShearwaterDiveModeType:6-</para>
+              <para>-ShearwaterOCRecSubModeType:2-</para>
+            </notes>
+          </observations>
+          <averagedepth>11.0477839</averagedepth>
+        </informationafterdive>
+      </dive>
+    </repetitiongroup>
+  </profiledata>
+  <tablegeneration>
+    <calculateprofile>
+      <profile id="profile_1588035071788880913">
+        <density>1030</density>
+        <decomodel>zhl16c</decomodel>
+      </profile>
+    </calculateprofile>
+  </tablegeneration>
+</uddf>

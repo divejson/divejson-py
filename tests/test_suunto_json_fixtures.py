@@ -204,7 +204,7 @@ def test_the_ocean_events_name_the_cylinder_they_switched_to() -> None:
     events = profile_of(_dive(OCEAN))["events"]
     assert events == [
         {"time": 0, "type": "gas_switch", "gas_number": 0},
-        {"time": 1230, "type": "other", "label": "Ceiling Broken"},
+        {"time": 1230, "type": "ceiling_violation", "label": "Ceiling Broken"},
         {"time": 2075, "type": "gas_switch", "gas_number": 1},
         {"time": 3840, "type": "safety_stop"},
     ]

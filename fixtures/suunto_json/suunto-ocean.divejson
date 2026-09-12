@@ -94,7 +94,7 @@
               },
               {
                 "time": 1230,
-                "type": "other",
+                "type": "ceiling_violation",
                 "label": "Ceiling Broken"
               },
               {

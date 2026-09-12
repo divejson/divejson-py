@@ -52,8 +52,11 @@ The app writes one file per activity in this same shape — a run, a swim and a 
 only in `Header.ActivityType`, which reads **51** for a dive on all 35 files in hand.
 Nothing else in the file distinguishes a run from a dive whose computer recorded no depth,
 so an activity that states some other type is skipped and reported — `converting.md`'s rule
-for a record that is not a scuba dive, and this is the format that shows it at its plainest,
-since a run and a dive here are the same shape.
+for a source record that is not a dive at all, and this is the format that shows it at its
+plainest, since a run and a dive here are the same shape. A **freedive** is not one of those:
+§6.4a's `mode` is what says which kind of dive it is, and the DM5 XML reader carries one.
+No file in hand has a freedive in this shape — every one of the 35 states `51` — so nothing
+here says how the app would mark it.
 
 A header that states **no** `ActivityType` is read on. Absence is not a claim, and
 [`converting.md`](converting.md)'s first rule is that schema validity is never a
@@ -102,6 +105,8 @@ validates perfectly and describes a dive nobody took.
 | `Samples[].Latitude` / `Longitude` | **radians** | decimal degrees at six places | × 180/π |
 | `DiveRouteOrigin.Latitude` / `Longitude` | **degrees** | decimal degrees, exactly as recorded | — |
 | `DiveTime`, `Duration` | seconds, fractional | whole seconds, halves away from zero | — |
+| `NoDecTime`, `TimeToSurface` | seconds | **seconds** on a §6.5 channel | — |
+| `RtGradientFactors.gf99`, `.gfSurface` | whole percent | **whole percent** on a §6.5 channel | — |
 
 **The channel conversions carry a scale the scalar ones do not**, and the three rows that
 say so are the most-executed arithmetic in this reader.
@@ -198,6 +203,39 @@ than an empty record (§6.4a). `fixtures/suunto_json/header-only.json` is that s
 | `Diving.StartTissue.OTU` | | `otu_start` |
 | `Diving.EndTissue.OTU` | | `otu_end` |
 | `Diving.SurfacePressure` ÷ 100 000 | | `surface_pressure` |
+| `Diving.DiveMode` | | the recording's `mode`, by the table below |
+| `Diving.Algorithm` | | `deco_model.name` verbatim, and `deco_model.algorithm` by the table below |
+| `Diving.Conservatism` | | `deco_model.conservatism` |
+
+**The mode and the model are the recording's, not the dive's** (§6.4a), and only the D5
+header shape states them: the Ocean shape has no `Header.Diving` at all, so an Ocean file
+yields the channels below and no `deco_model`, which is correct rather than a gap.
+
+| `Diving.DiveMode` | `mode` | seen on |
+| --- | --- | --- |
+| `Air` | `open_circuit` | 8 D5 exports |
+| `Nitrox` | `open_circuit` | 8 D5 exports |
+| `Mixed` | `open_circuit` | `fixtures/suunto_json/suunto-d5.json` |
+
+All three are gas modes of an open-circuit computer; the D5 has no rebreather mode and its
+free and gauge modes write no `Header.Diving` this reader has ever seen. A value outside the
+table leaves `mode` absent and is reported — §6.4a is explicit that a reader must not assume
+open circuit, so guessing at an unseen string would be the one thing the member forbids.
+
+| `Diving.Algorithm` | `algorithm` |
+| --- | --- |
+| `Suunto Fused2 RGBM` | `rgbm` |
+| `Suunto Fused RGBM 2` | `rgbm` |
+
+Both spellings are real — the first is what 16 exports in hand carry and the second is
+`fixtures/suunto_json/suunto-d5.json` — and `name` carries whichever the file used, verbatim,
+because §6.4c makes it the device's own name for its model. A string outside the table still
+fills `name` and leaves `algorithm` absent: a family is a claim about the mathematics and
+this reader will not derive one from a product string it has not seen.
+
+`Conservatism` is `≥ 0`-free on purpose: §6.4c puts no floor on it, so a `0` is the P0 setting
+and a negative is Suunto's P−1 or P−2 rather than an absent-marker. That is the one member
+this reader carries where a negative is a reading.
 
 **`DiveTime` before `Duration`, and the order is the mapping.** They are different
 quantities: `DiveTime` is the time in the water and `Duration` is the whole period the
@@ -296,7 +334,7 @@ its own full length is not a bound.
 **The profile's pressure channel is deliberately not bounded.** It is telemetry the device
 really recorded, and truncating it would drop surface readings the depth and temperature
 channels keep. So a converted dive's last channel value and its cylinder's `end_pressure`
-disagree, on purpose, and both fixtures encode that.
+disagree, on purpose, and every fixture with a `DiveTime` and a pressure channel encodes that.
 
 **The extremes are taken over the samples' own recorded instants, not off the profile.**
 The merged axis is not what loses them — it folds an entry into a second another channel's
@@ -340,6 +378,10 @@ switch that happened, and saying so is honest where guessing a position would no
 | `Ceiling` | | the `ceiling` channel, centimetres, **where it is above zero** |
 | `Temperature` | | the `temperature` channel, tenths of a degree Celsius |
 | `Cylinders[].Pressure` | | a `pressures` channel, tenths of a bar, per cylinder |
+| `NoDecTime` | | the `ndl` channel, seconds |
+| `TimeToSurface` | | the `tts` channel, seconds, **where it is above zero** |
+| `RtGradientFactors.gf99` | | the `gradient_factor` channel, whole percent |
+| `RtGradientFactors.gfSurface`, else `.gtSurface` | | the `surface_gradient_factor` channel, whole percent |
 | `DiveEvents` / `Events` | | §6.5 events, below |
 | `Latitude` / `Longitude`, `DiveRouteOrigin` | | `entry_position` and `exit_position` |
 
@@ -356,6 +398,61 @@ timestamps is not monotonic: adjacent entries go backwards by up to a second —
 the worst step across these 35 files — because the separate sensor streams are appended out
 of order. The last entry in the file is not the
 last reading of the dive.
+
+**`gtSurface` is `gfSurface`, one firmware earlier.** The Ocean's 2.40.56 export writes
+`RtGradientFactors: {gf99, gtSurface}` on all 7 194 samples of 19 files in hand; its 2.51.28
+export writes `{gf99, gfLeadingTissue, gfSurface}`. The `gt` is a vendor typo fixed in a
+firmware update, and both files are real, so both spellings read into
+`surface_gradient_factor`. `gfLeadingTissue` is the compartment's *number* rather than a
+loading and stays unmapped.
+
+**Three zeros and two negatives, each decided against the file** — `converting.md` says the
+decision is per quantity, per format, and this format needs all five:
+
+- **`NoDecTime: 0` is a reading.** It is what a computer shows the moment a dive stops being
+  a no-decompression dive, and the files prove it: a D5 export in hand writes it on five
+  consecutive samples at 42.6 to 44.5 m, with a time to surface of 256 to 268 s beside it
+  and a ceiling appearing a few samples later. Reading it as an absence would delete the one
+  reading a decompression dive most needs.
+- **`NoDecTime: -1` is the absent-marker**, on 1 031 samples across the 19 Ocean exports in
+  hand, 916 of them with a ceiling above zero — the device showing a stop depth in place of
+  a no-decompression clock it no longer has. A negative no-decompression time is not a
+  quantity, which is why §6.4 floors the channel at zero; `converting.md`'s negative rule
+  drops the sample and reports it.
+- **`NoDecTime: 6000` is a reading at the display cap**, the Ocean's 100 minutes, and
+  `converting.md`'s cap rule carries it through.
+- **`TimeToSurface: 0` is the absent-marker**, and this one only the file could settle. The
+  Ocean writes it on 199 of the 364 samples of one dive that carry the member, at every
+  depth from 0 to 19 m — including two rows from a sample at 14.63 m that says `88`. A time
+  to surface that is zero at 14 m and 88 s at 14 m seconds later is not a time; it is the
+  space the device writes when it has no figure. The D5 shapes write exactly one per file,
+  always on the first sample, where a real ascent from 1.24 m would take the 8 to 12 s the
+  next sample states. So a zero is dropped and reported on both shapes.
+- **`gf99: -100` is the absent-marker** and `gf99: 0` is a reading: the export writes `-100`
+  on 5 531 of 7 194 samples, which is where no compartment leads, and `0` on 585, which is a
+  leading tissue at ambient. `gfSurface` is never negative in any file in hand.
+
+**`gf99` runs into four figures on a decompression ascent, and this reader does not explain
+it.** On the no-decompression dives in hand the two members behave as a GF99 and a surface
+GF must: a tissue is always further from its M-value at the surface than at depth, so `gf99`
+is the smaller of the pair on **all 803** samples of those dives that state both, with no
+exception. On the decompression dives it stops holding. Over one contiguous stretch of a
+5 to 8 m stop `gfSurface` falls from 116 to 90 without once rising, exactly as a surfacing
+figure off-gassing should, while `gf99` beside it ranges from 25 to 732 and jumps from 193 to
+732 between two adjacent samples 27 cm apart; earlier in the same ascent it reaches 12 575,
+and 114 of that dive's samples are above 100.
+
+Two things follow, and the second is the rule. **The member is still `gradient_factor`**: the
+field is named `gf99`, it is whole-numbered, it is never negative except for the `-100`
+sentinel, it agrees in magnitude with Shearwater's `<gradientfactor>` on comparable dives,
+and it meets `gfSurface` where a GF99 and a surface GF must meet. **And the number is carried
+as written.** What the large values mean is not something this document can say — Suunto
+publishes no definition of the field, and nothing in the file accounts for the size — so the
+converter writes the reading and explains nothing, which is §5.4 rather than a gap: deciding
+what the device should have written is the one thing a converter may not do, and a cap is
+that decision wearing a plausible number. §6.4 puts no ceiling on the channel for the same
+reason. `ocean-deco-ppo2.json` keeps two of those samples, `398` at 7.62 m and `192` at
+5.70 m, so a reader that clamps fails a pair rather than passing quietly.
 
 **A zero ceiling is `converting.md`'s rule, and this is the export that showed it.** It
 writes `"Ceiling": 0` on every no-deco sample where the same vendor's desktop export writes
@@ -379,25 +476,64 @@ Reading only one of them loses every gas switch in one generation or the other.
 | `GasSwitch.GasNumber` | | `gas_switch`, with the cylinder's position |
 | `Notify` `Deep Stop`, `Active: true` | | `deep_stop` |
 | `Notify` `Safety Stop`, `Active: true` | | `safety_stop` |
-| `Alarm` / `Warning`, `Active: true` | | `other`, labelled with the device's own `Type` |
+| `Alarm` / `Warning`, `Active: true` | | the §6.6 type its `Type` names, **and** that `Type` as the `label` |
+| `Notify` `Deco`, `Active: true` | | `ndl_reached` |
+| `Notify` `Safety Stop Broken`, `Active: true` | | `safety_stop_violation` |
 
-An alert carries the device's wording verbatim, which is what §6.5's `other` is for:
-"Ceiling Broken" says more than any type this format could map it onto, and §6.6 requires
-the label. The corpus's alerts are `Ascent Speed`, `Mandatory Safety Stop`,
-`Safety Stop Broken`, `PO2 High`, `Ceiling Broken`, `NoDecoTime`, `Deep Stop Broken`,
-`Tank Pressure`, `Max.Depth`, `Mandatory Safety Stop Broken` and `Violated Deep Stop` — 79
-markers across 35 dives once the inactive edges are dropped, rare enough to render.
+**An alert carries a type and the device's wording, and it is the wording that earns the
+type.** §6.6's vocabulary was seeded from this list, one value per distinct meaning, so each
+alert this format names maps onto a value rather than arriving unclassified — and the label
+travels beside it because "Ceiling Broken" is what the diver was shown and no type can say
+it as well. The whole table, matched case-insensitively:
+
+| `Type` | §6.6 `type` | exercised by |
+| --- | --- | --- |
+| `Ascent Speed` | `ascent_rate` | `suunto-d5.json`, `d5-stop-alarms.json`, and two more |
+| `Mandatory Safety Stop` | `safety_stop_mandatory` | `d5-stop-alarms.json`, and two more |
+| `Safety Stop Broken` | `safety_stop_violation` | `d5-stop-alarms.json`, `d5-deep-stop-broken.json` |
+| `Mandatory Safety Stop Broken` | `safety_stop_violation` | `d5-stop-alarms.json` |
+| `Deep Stop Broken` | `deep_stop_violation` | `d5-deep-stop-broken.json` |
+| `Violated Deep Stop` | `deep_stop_violation` | `d5-deep-stop-broken.json` |
+| `Ceiling Broken` | `ceiling_violation` | `suunto-ocean.json`, `d5-deco-max-depth.json` |
+| `NoDecoTime` | `ndl_reached` | `ocean-deco-ppo2.json` |
+| `PO2 High` | `ppo2_high` | `ocean-deco-ppo2.json` |
+| `Tank Pressure` | `pressure_low` | `ocean-tank-pressure.json` |
+| `Max.Depth` | `depth_alarm` | `d5-deco-max-depth.json` |
+
+Every row has a pair behind it, which is the bar this corpus holds a mapping to; five of the
+pairs exist for no other reason. **A `Type` outside the table is an event with no `type` and
+that wording as its `label`**, which §6.6 makes the spelling of an unclassified event — the
+vocabulary grows in a minor version when a file names something it has no value for, and
+nothing has to be forced into the nearest one in the meantime. Across the 35 dives in hand
+these are 79 markers once the inactive edges are dropped, rare enough to render.
 
 **Only the `Active: true` edge is emitted.** These arrive in pairs — a `Deep Stop` true at
 1 424 s and false at 1 454 s is one 30-second stop — and a marker has no way to show which
 half of a pair it is, so the marker is the start and the other half would only double it. A
 `GasSwitch` has no `Active` and is not a pair.
 
-**Two `Notify` values become stops and the other ten do not.** The corpus also carries
-`Deep Stop Ahead`, `Safety Stop Ahead` and `Stop done`, which are the prompt before and the
-confirmation after; marking all three would put three ticks on one stop. `Deco Window`,
-`Gas Switch`, `NoFly Time`, `Dive Time`, `Safety Stop Broken`, `Deco` and `Gas Available`
-have no §6.5 type and are dropped rather than forced into the nearest one.
+**Four `Notify` values are carried and the other eight are not.** `Deep Stop` and
+`Safety Stop` are the stops themselves; `Deco` is the moment the dive became a
+decompression dive, which is `ndl_reached`, and `Safety Stop Broken` is
+`safety_stop_violation`. Neither of the last two carries a `label`: a `Notify`'s `Type` is
+the device's own name for its *state*, and writing it as the wording of an occurrence would
+put "Deco" on a marker the diver never read.
+
+The eight that stay dropped each have a reason of its own. "The format has no value for
+this" is not among them any more: §6.6 makes an event with a label and no type conforming,
+so nothing is dropped for want of somewhere to put it.
+
+- `Deep Stop Ahead`, `Safety Stop Ahead` and `Stop done` are the prompt before and the
+  confirmation after a stop this reader already marks; carrying all three would put three
+  ticks on one stop.
+- `Gas Switch` duplicates the `GasSwitch` event in the same sample.
+- `Deco Window`, `NoFly Time`, `Dive Time` and `Gas Available` are the computer narrating
+  its own state rather than something that happened on the dive — the reason everything
+  under `State` is dropped, applied to the four `Notify` values that are the same thing.
+
+*Rejected:* carrying all eight as unclassified labelled events. It is a marker cloud on
+every dive — `Deco Window` alone fires seven times on each of three files in hand — for
+narration that is not an occurrence.
 
 ### Positions
 
@@ -418,9 +554,11 @@ and on `0, 0` ones alike across the corpus, so treating it as one would drop rea
 and keep junk. The `0.000000` pair is already rejected by the rule in
 [`converting.md`](converting.md), which is where two of these files' origins go.
 
-The exit position this reader gives for the Ocean dive in `fixtures/suunto_json/` is the
-same position `fixtures/fit/suunto-ocean.divejson` carries for that dive — two files, two
-readers, two coordinate encodings, one answer at six decimal places.
+Every Ocean dive in `fixtures/suunto_json/` that a FIT input here also carries comes back
+with the exit position that file gives it — `suunto-ocean.divejson` against
+`fixtures/fit/suunto-ocean.divejson`, `suunto-ocean-2026.divejson` against
+`fixtures/fit/suunto-ocean-2026.divejson` — two files, two readers, two coordinate
+encodings, one answer at six decimal places on each dive.
 
 ## This format settles no ambiguity
 
@@ -477,10 +615,12 @@ Read as a list of what was considered, not of what was missed.
   `RecoveryTime`, `TraingingLoadPeak` (the vendor's spelling), `StepCount`,
   `StepCountSupervised`, `PoolLength`, `PoolLengths`, and the eight `Downhill*` members** —
   an activity tracker's, in a header shared with every sport the watch records.
-- **`Diving.Algorithm`, `AlgorithmAscentTime`, `AlgorithmBottomMixture`,
-  `AlgorithmBottomTime`, `AscentMode`, `Conservatism`, `DeepStopEnabled`, `DiveMode`,
-  `LastDecoStopDepth`, `MiniLock`, `SafetyStopTime`** — the computer's decompression
-  configuration, not the dive.
+- **`Diving.AlgorithmAscentTime`, `AlgorithmBottomMixture`, `AlgorithmBottomTime`,
+  `AscentMode`, `DeepStopEnabled`, `LastDecoStopDepth`, `MiniLock`, `SafetyStopTime`** —
+  §6.4c carries a model's family, its name, its gradient factors and its conservatism, and
+  has no member for an ascent rule, a last-stop depth, a deep-stop switch or a stop length.
+  `Algorithm`, `Conservatism` and `DiveMode` left this list when it did; they are carried
+  under *The dive* above.
 - **`Diving.DaysInSeries`, `DesaturationTime`, `NoFlyTime`, `PreviousDiveDepth`,
   `SurfaceTime`** — properties of a *series* of dives rather than of this one.
   `NumberInSeries` was refused alongside them until §6.4b gave a device's counter a home;
@@ -506,12 +646,15 @@ Read as a list of what was considered, not of what was missed.
   two records of one dive needs to tell one wrist's computer from the other's, and the
   serial is the only thing that does it reliably. It is carried under *Device* above, and
   §9 covers what publishing a document with one in it means.
-- **`Samples[].NoDecTime`, `TimeToSurface`, `RtGradientFactors`, `AbsPressure`,
-  `SeaLevelPressure`, `SurfacePressure`, `MinSurfacePressure`, `MaxSurfacePressure`,
-  `DeviceInternalAbsPressure`, `DeviceInternalTemperature`, `Altitude`, `VerticalSpeed`,
-  `Speed`, `Distance`, `Cadence`, `Power`, `AmbientIlluminance`,
-  `BrightnessDisplayIntensity`, `GasTime`, `Ventilation`** — §6.5 fixes the channels a
-  profile carries and none of these is one of them.
+- **`Samples[].AbsPressure`, `SeaLevelPressure`, `SurfacePressure`, `MinSurfacePressure`,
+  `MaxSurfacePressure`, `DeviceInternalAbsPressure`, `DeviceInternalTemperature`,
+  `Altitude`, `VerticalSpeed`, `Speed`, `Distance`, `Cadence`, `Power`,
+  `AmbientIlluminance`, `BrightnessDisplayIntensity`, `GasTime`, `Ventilation`** — §6.5
+  fixes the channels a profile carries and none of these is one of them. `NoDecTime`,
+  `TimeToSurface` and `RtGradientFactors.gf99`/`.gfSurface` were on this list until §6.4
+  gained channels for them; they are carried under *The profile* above.
+  `RtGradientFactors.gfLeadingTissue` stays here: it is which compartment is leading, not
+  how loaded it is, and no member holds a compartment number.
 - **`Samples[].BatteryCharge`, `BatteryCurrent`, `BatteryVoltage`** — the watch's battery,
   logged every few seconds.
 - **`Samples[].DiveRoute`, `DiveRouteDistance`, `EHPE`, `EVPE`, `NumberOfSatellites`,

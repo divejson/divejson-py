@@ -159,6 +159,79 @@ def test_reinterpreting_a_gas_fraction_is_reported_as_resolved() -> None:
     assert [note.kind for note in resolved] == ["resolved"]
 
 
+@pytest.mark.parametrize(
+    ("written", "seconds"),
+    [
+        ("5940", 5940),  # 99 minutes, a Shearwater's display cap: a reading, not an absence
+        ("3720", 3720),
+        ("0", 0),  # what a computer shows the moment a dive becomes a decompression dive
+    ],
+)
+def test_no_decompression_time_is_already_seconds(written: str, seconds: int) -> None:
+    """UDDF counts `<nodecotime>` in seconds and so does §6.4, so this is the one channel
+    here with no factor at all — which is exactly why a wrong one would be invisible."""
+    samples = f"<waypoint><depth>1</depth><divetime>0</divetime><nodecotime>{written}</nodecotime></waypoint>"
+    assert profile(samples)["ndl"]["values"] == [seconds]
+
+
+@pytest.mark.parametrize(
+    ("written", "hundredths"),
+    [
+        ("0.399999976", 40),  # what Shearwater Cloud Desktop writes for 0.4 bar, x 100
+        ("1.28", 128),  # 1.28 bar x 100
+        ("0.34", 34),
+        ("40000", 40),  # the Pascal the documentation states: 40 000 / 1 000
+        ("130000", 130),  # 1.3 bar in Pascal
+    ],
+)
+def test_calculated_po2_is_hundredths_of_a_bar_from_either_spelling(written: str, hundredths: int) -> None:
+    """Three orders of magnitude separate bar from Pascal and a breathable ppO₂ lives between
+    about 0.1 and 2 bar, so the value settles it: at or below 10 it is bar."""
+    samples = (
+        f"<waypoint><depth>1</depth><divetime>0</divetime><calculatedpo2>{written}</calculatedpo2></waypoint>"
+    )
+    assert profile(samples)["ppo2"]["values"] == [hundredths]
+
+
+def test_reading_a_po2_as_pascal_is_reported_as_resolved() -> None:
+    """`resolved` rather than `inferred`: the digits are the source's own and only their
+    scale was decided, so nothing goes under `extensions.divejson.inferred`."""
+    samples = "<waypoint><depth>1</depth><divetime>0</divetime><calculatedpo2>40000</calculatedpo2></waypoint>"
+    conversion = convert(one_dive(f"{STARTED_AT}<samples>{samples}</samples>"))
+    resolved = [note for note in conversion.notes if "the Pascal the documentation states" in note.message]
+    assert [note.kind for note in resolved] == ["resolved"]
+
+
+@pytest.mark.parametrize(
+    ("written", "tenths"),
+    [
+        ("1", 10),  # 1 % x 10
+        ("8", 80),
+        ("4.5", 45),  # the export writes a fraction of a percent and §6.4 keeps it
+    ],
+)
+def test_cns_samples_are_tenths_of_a_percent(written: str, tenths: int) -> None:
+    samples = f"<waypoint><depth>1</depth><divetime>0</divetime><cns>{written}</cns></waypoint>"
+    assert profile(samples)["cns"]["values"] == [tenths]
+
+
+@pytest.mark.parametrize(
+    ("written", "percent"),
+    [
+        ("0.8", 80),  # the documentation's one example, glossed as 80 %
+        ("0.67", 67),
+        ("1", 100),  # the fraction's own maximum
+        ("0", 0),
+    ],
+)
+def test_a_gradient_factor_is_the_documented_fraction_by_default(written: str, percent: int) -> None:
+    """Any generator the table does not name writes the fraction its examples show."""
+    samples = (
+        f"<waypoint><depth>1</depth><divetime>0</divetime><gradientfactor>{written}</gradientfactor></waypoint>"
+    )
+    assert profile(samples)["gradient_factor"]["values"] == [percent]
+
+
 def test_depths_and_temperatures_match_the_reference_export() -> None:
     """The known answer, on a reduced slice of a real Subsurface export.
 
