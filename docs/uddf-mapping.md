@@ -422,8 +422,14 @@ inventing 402 readings.
   wrote the other. **`gauge` is the value UDDF does not have** — §6.4a's fifth mode has no
   counterpart here at all, which is a fact about UDDF rather than about this reader, and
   `uddf-writing.md` is where it costs something. A `@type` outside the table, or a
-  `<divemode>` with no `@type`, leaves the recording's `mode` absent and is reported: §6.4a
-  forbids assuming open circuit, and the element is not schema-valid without one anyway.
+  `<divemode>` with no `@type` at all, leaves the recording's `mode` absent and is reported.
+  **§6.4a is the whole of the reason**: it forbids assuming open circuit, so an absence stays
+  an absence. The schema does not back it up — this is one of the places the documentation
+  contradicts it. The documentation stops at 3.2.1 and calls `@type` compulsory there; the
+  3.2.2 XSD declares the attribute with no `use` at all, which defaults to `optional`, so a
+  bare `<divemode/>` validates. The one `use="required"` anywhere near `divemodeType` is on
+  `samplesType`'s `@startdivemode`, inside a block commented out in 2012. A reader that took
+  the documentation's word for it would treat this case as impossible and meet it anyway.
 - **Only a change of value is an event.** The
   first waypoint that carries one gives the recording its `mode`; a later waypoint stating a
   *different* value is reported `dropped`, because the only place §6.6 could carry a switch
