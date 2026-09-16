@@ -538,7 +538,7 @@ which the `extensions.divejson.inferred` list is ever written.
 - **`session.surface_interval`** — the gap before the dive, derivable from two dives' start
   times and a property of a pair rather than of one file. `session.dive_number` was refused
   beside it until §6.4b gave a device's counter a home; it is carried now, under *Device*
-  above, and §6.2's `dive_number` is still the diver's and still not this.
+  above, and a dive's `number` is still the diver's and still not this.
 - **`dive_summary.dive_number` (10)** — the same counter in a second place, **untested**:
   no file in hand carries a `dive_summary` at all, so nothing says whether the two ever
   disagree. libdivecomputer declares the field and ignores it, which is the answer here too

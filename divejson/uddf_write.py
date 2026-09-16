@@ -1094,7 +1094,7 @@ class _Writer:
             frozenset(
                 {
                     "uuid",
-                    "dive_number",
+                    "number",
                     "started_at",
                     "duration",
                     "notes",
@@ -1123,13 +1123,13 @@ class _Writer:
         before = _sub(element, "informationbeforedive")
         for site_uuid in dive.get("site_uuids") or []:
             _sub(before, "link", ref=_uddf_id("site", site_uuid))
-        number = dive.get("dive_number")
+        number = dive.get("number")
         if number is not None:
             if number > 0:
                 _sub(before, "divenumber", str(number))
             else:
                 # `xs:positiveInteger`. A zero would make the whole document invalid rather
-                # than one element wrong, and §6.2 leaves `dive_number` unbounded below.
+                # than one element wrong, and §6.2 leaves `number` unbounded below.
                 self.note(
                     where,
                     f"the dive is numbered {number}, and UDDF's <divenumber> is a positive integer; the "

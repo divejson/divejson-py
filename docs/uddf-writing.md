@@ -387,7 +387,7 @@ spelling for an open one.
 
 ### Dives
 
-`<divenumber>` is an `xs:positiveInteger` where §6.2 puts no floor under `dive_number`, so a
+`<divenumber>` is an `xs:positiveInteger` where §6.2 puts no floor under `number`, so a
 dive numbered 0 or below is written **without** one and reported. A zero there would make
 the whole document invalid, which is a file nobody can open rather than a dive nobody can
 number.

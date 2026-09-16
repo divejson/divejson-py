@@ -452,7 +452,7 @@ class _Converter:
         `<SerialNumber>` and `<DiveNumberInSerie>` were each read and refused until §6.4b
         existed: the first identifies a piece of hardware, which is exactly what a device
         is, and the second counts this dive within the computer's own series, which is
-        §6.4b's `dive_number` in as many words. §6.2's `dive_number` is still the diver's
+        the device's `dive_number` in as many words. A dive's `number` is still the diver's
         own numbering and still not this, which is why the two are different members.
 
         The brand is the format's rather than the file's, for the reason

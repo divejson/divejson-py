@@ -13,7 +13,7 @@
   "dives": [
     {
       "uuid": "0198a6f0-5555-7001-8000-000000000001",
-      "dive_number": 46,
+      "number": 46,
       "started_at": "2026-04-19T08:12:00+02:00",
       "duration": 2880,
       "notes": "Wreck penetration on the second pass; deco gas staged on the shot line.",

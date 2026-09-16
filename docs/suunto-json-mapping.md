@@ -624,7 +624,7 @@ Read as a list of what was considered, not of what was missed.
 - **`Diving.DaysInSeries`, `DesaturationTime`, `NoFlyTime`, `PreviousDiveDepth`,
   `SurfaceTime`** — properties of a *series* of dives rather than of this one.
   `NumberInSeries` was refused alongside them until §6.4b gave a device's counter a home;
-  it is carried now, under *Device* above. §6.2's `dive_number` is still the diver's own
+  it is carried now, under *Device* above. A dive's `number` is still the diver's own
   numbering and a device's counter is still not reliably it — which is why the two are
   different members rather than one. **Untested**: no file in hand carries a
   `Header.Diving.NumberInSeries`. Only the D5 shapes have a `Header.Diving` at all — the

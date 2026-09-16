@@ -9,7 +9,7 @@
   "dives": [
     {
       "uuid": "76bdb612-a42f-5a1c-a271-d521b1935ab3",
-      "dive_number": 1,
+      "number": 1,
       "started_at": "2026-04-17T11:49:00",
       "duration": 4001,
       "notes": "Every other sample reads zero: divelogs.de stores a waypoint with no recorded depth as a depth of zero, and its own profile chart draws the comb that produces.",
@@ -62,7 +62,7 @@
     },
     {
       "uuid": "6306fa65-83db-5858-911e-69b17ce5089a",
-      "dive_number": 2,
+      "number": 2,
       "started_at": "2026-04-19T08:12:00",
       "duration": 2880,
       "notes": "Its only site has no name, so the dive arrives with no site at all rather than one this converter invented a name for.",

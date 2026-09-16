@@ -634,7 +634,7 @@ def test_the_dives_own_divenumber_is_the_divers_and_stays_there() -> None:
     computers = _equipment(_computer("c1", "<name>Ocean</name>"))
     found = dive(before(f"<divenumber>412</divenumber><internaldivenumber>87</internaldivenumber>{_uses('c1')}"),
                  header=computers)
-    assert found["dive_number"] == 412
+    assert found["number"] == 412
     assert device_of(found)["dive_number"] == 87
 
 

@@ -9,7 +9,7 @@
   "dives": [
     {
       "uuid": "99ca578d-a074-52d2-9216-e98057a33dcb",
-      "dive_number": 42,
+      "number": 42,
       "started_at": "2026-07-07T10:05:00",
       "duration": 3660,
       "notes": "Relaxed bay dive. Three green turtles, one very curious.",
@@ -48,7 +48,7 @@
     },
     {
       "uuid": "a27d7fb1-89c9-52aa-9531-4d33de232b2e",
-      "dive_number": 43,
+      "number": 43,
       "started_at": "2026-07-09T11:20:00",
       "duration": 2640,
       "site_uuids": [
@@ -59,7 +59,7 @@
     },
     {
       "uuid": "d51dfcdf-e98d-5027-9652-7a5a8a4b5224",
-      "dive_number": 44,
+      "number": 44,
       "started_at": "2026-07-11T09:45:00",
       "duration": 3480,
       "max_depth": 14.9,

@@ -436,10 +436,10 @@ refusals and the second out of the silently unmapped, both into the device map a
 
 - **`<DiveNumberInSerie>`** — **no longer refused.** It is the *computer's* counter rather
   than the diver's lifetime dive number: it starts at 1 on a new or factory-reset device and
-  starts again on the next one, so carrying it as §6.2's `dive_number` would stamp a dive #1
+  starts again on the next one, so carrying it as the dive's `number` would stamp a dive #1
   onto somebody's three-hundredth dive. That reasoning is unchanged and is now the reason it
-  has a member of its own — §6.4b's `dive_number`, defined as the device's counter — so it is
-  carried under *Device* above and the finding is gone. §6.2's `dive_number` is still the
+  has a member of its own — the device's `dive_number` (§6.4b), defined as that counter — so
+  it is carried under *Device* above and the finding is gone. A dive's `number` is still the
   diver's, and this reader still writes nothing into it.
 - **`<Visibility>`, `<Weather>`, `<Weight>`** — read and refused, each with a finding. They
   are the desktop application's dive-conditions panel and arrive as a block: 25 of the 384

@@ -7,6 +7,15 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Breaking: a dive's number is `number`, and so is a certification's.** §5.2 of
+  [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) states
+  the rule those two were the only members breaking: a member is never prefixed with the name
+  of the object that carries it. The UDDF and `.ssrf` readers set `dive["number"]` and the
+  UDDF writer reads it, so anything reaching into a converted document for
+  `dive["dive_number"]` finds nothing; `divejson validate` refuses either old spelling as an
+  undefined member. A device's `dive_number` is untouched and is now the only one in the
+  format, which is what its prefix was always for.
+
 ## 0.6.0
 
 - **Breaking: an event's `type` is OPTIONAL and `other` is gone.** §6.6 froze its

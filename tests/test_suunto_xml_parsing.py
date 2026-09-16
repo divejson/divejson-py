@@ -217,13 +217,13 @@ def test_a_surface_pressure_outside_the_barometric_range_is_dropped() -> None:
 def test_the_computers_own_dive_counter_is_the_devices_and_not_the_divers() -> None:
     """`<DiveNumberInSerie>` restarts on a new or reset device.
 
-    Mapping it onto §6.2's `dive_number` would stamp a dive #1 onto somebody's
-    three-hundredth dive, which is why the two are different members: it is §6.4b's
-    `dive_number`, the device's own counter, and it lands there.
+    Mapping it onto a dive's `number` would stamp a dive #1 onto somebody's
+    three-hundredth dive, which is why the two are different members: it is the device's
+    `dive_number`, that computer's own counter, and it lands there.
     """
     found = convert(suunto_xml("<DiveNumberInSerie>5</DiveNumberInSerie>"))
     dive = found.document["dives"][0]
-    assert "dive_number" not in dive
+    assert "number" not in dive
     assert device_of(dive)["dive_number"] == 5
 
 

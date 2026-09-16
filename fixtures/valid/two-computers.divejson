@@ -12,7 +12,7 @@
   "dives": [
     {
       "uuid": "0198a6f0-2222-7110-8000-000000000110",
-      "dive_number": 431,
+      "number": 431,
       "started_at": "2026-09-08T15:17:38.670+03:00",
       "duration": 3051,
       "notes": "Two computers, and the app exported the Ocean's dive twice.",

@@ -13,7 +13,7 @@
   "dives": [
     {
       "uuid": "0198a6f0-1111-7010-8000-000000000010",
-      "dive_number": 412,
+      "number": 412,
       "started_at": "2026-07-03T09:14:00+12:45",
       "duration": 5520,
       "notes": "Trimix wall dive; two deco gases staged on the line.",
@@ -428,7 +428,7 @@
       "agency": "other",
       "agency_other": "NZ Tech Diving Society",
       "name": "Normoxic Trimix Diver",
-      "certification_number": "NZT-2044",
+      "number": "NZT-2044",
       "certified_on": "2025-03-14",
       "instructor_name": "J. Harbord",
       "training_center": "Deep South Divers",

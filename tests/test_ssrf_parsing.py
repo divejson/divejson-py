@@ -440,7 +440,7 @@ def test_a_trips_dives_are_carried_and_the_grouping_is_not() -> None:
         "</dives>"
     )
     conversion = convert(ssrf(body))
-    assert [found["dive_number"] for found in conversion.document["dives"]] == [42, 44]
+    assert [found["number"] for found in conversion.document["dives"]] == [42, 44]
     assert "trips" not in conversion.document
     dropped = [note for note in conversion.notes if "groups these dives into a trip" in note.message]
     assert [(note.kind, note.where) for note in dropped] == [("dropped", "trip/0")]

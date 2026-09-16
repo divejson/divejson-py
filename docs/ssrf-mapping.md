@@ -86,7 +86,7 @@ in a converter, are in `converting.md`.
 | `cylinders[].oxygen`, `.helium` | percent | `<cylinder @o2>`, `@he` | `'32.0%'` | — |
 | `cns_end` | CNS % | `<dive @cns>` | `'11%'` | — |
 | `otu_end` | OTU | `<dive @otu>` | `'31'` | — |
-| `dive_number` | — | `<dive @number>` | `'45'` | — |
+| `number` | — | `<dive @number>` | `'45'` | — |
 
 **The two channel rows are the trap**, exactly as `converting.md` says: they carry a scale
 the scalar rows beside them do not, and the most-executed conversion in this module is the
@@ -151,7 +151,7 @@ and no version.
 | `.ssrf` | DiveJSON |
 | --- | --- |
 | `@date` + `@time` | `started_at` |
-| `@number` | `dive_number` |
+| `@number` | `number` |
 | `@duration` | `duration` |
 | `@divesiteid` | `site_uuids`, one entry |
 | `@cns` | `cns_end` |

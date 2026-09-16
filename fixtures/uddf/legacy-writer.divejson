@@ -9,7 +9,7 @@
   "dives": [
     {
       "uuid": "2d15ba8f-aad9-59bb-ba1a-9aa35a26adde",
-      "dive_number": 12,
+      "number": 12,
       "started_at": "2002-06-18T00:00:00",
       "duration": 2400,
       "notes": "Four writer habits in one dive: element names in upper case, a whole-percent oxygen fraction, a tank volume in litres where UDDF specifies cubic metres, and a midnight dive whose time of day the exporter never wrote.",
