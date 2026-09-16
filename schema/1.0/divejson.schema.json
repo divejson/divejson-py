@@ -337,7 +337,7 @@
         "created_at": { "$ref": "#/$defs/date_time" },
         "extensions": { "$ref": "#/$defs/extensions" }
       },
-      "required": ["uuid", "name", "agency"],
+      "required": ["uuid", "name"],
       "additionalProperties": false,
       "if": {
         "properties": { "agency": { "const": "other" } },
