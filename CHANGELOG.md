@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.7.0
+
 - **Breaking: a dive's number is `number`, and so is a certification's.** §5.2 of
   [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) states
   the rule those two were the only members breaking: a member is never prefixed with the name
