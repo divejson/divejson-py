@@ -9,7 +9,7 @@
   "dives": [
     {
       "uuid": "99ca578d-a074-52d2-9216-e98057a33dcb",
-      "dive_number": 118,
+      "number": 118,
       "started_at": "2026-09-08T15:17:38",
       "duration": 3051,
       "notes": "Both computers on the same wrist; the Perdix went in a few seconds late.",

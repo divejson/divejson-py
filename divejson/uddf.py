@@ -1009,7 +1009,7 @@ class _Converter:
         dive: dict[str, Any] = {"uuid": claimed}
         number = integer_of(decimal_of(_text_of(before, "divenumber")))
         if number is not None:
-            dive["dive_number"] = number
+            dive["number"] = number
         dive["started_at"] = started_at
 
         duration = integer_of(decimal_of(_text_of(after, "diveduration")))

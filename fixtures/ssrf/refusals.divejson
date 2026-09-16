@@ -9,7 +9,7 @@
   "dives": [
     {
       "uuid": "99ca578d-a074-52d2-9216-e98057a33dcb",
-      "dive_number": 1,
+      "number": 1,
       "started_at": "2026-05-01T09:15:00",
       "duration": 2480,
       "cylinders": [
@@ -47,7 +47,7 @@
     },
     {
       "uuid": "d51dfcdf-e98d-5027-9652-7a5a8a4b5224",
-      "dive_number": 3,
+      "number": 3,
       "started_at": "2026-05-02T10:00:00",
       "site_uuids": [
         "5508e90d-683a-5d1f-8d82-b3214e43d495"
@@ -69,7 +69,7 @@
     },
     {
       "uuid": "6f6041b4-d396-5a30-8e03-db3e210e8c0c",
-      "dive_number": 4,
+      "number": 4,
       "started_at": "2026-05-03T08:40:00",
       "cylinders": [
         {

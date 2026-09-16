@@ -177,14 +177,14 @@ def test_a_site_with_a_location_carries_its_coordinates(schema) -> None:
 
 
 def test_a_dive_numbered_zero_is_not_written(schema) -> None:
-    """`<divenumber>` is an `xs:positiveInteger`; §6.2 puts no floor under `dive_number`.
+    """`<divenumber>` is an `xs:positiveInteger`; §6.2 puts no floor under `number`.
 
     One element wrong would be a cheap price. A zero there makes the whole document
     invalid, which is a file nobody can open rather than a dive nobody can number.
     """
-    source = one_dive(dive_number=0)
+    source = one_dive(number=0)
     assert "<divenumber>" not in written(source, schema)
-    assert "dive_number" not in read_back(source)["dives"][0]
+    assert "number" not in read_back(source)["dives"][0]
     assert "is a positive integer" in messages(source, "dives/0")[0]
 
 

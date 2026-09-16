@@ -95,7 +95,7 @@ def test_the_two_readings_of_one_subsurface_logbook_agree_where_they_can() -> No
     """
     ssrf = convert((FIXTURES / "ssrf" / "subsurface.ssrf").read_bytes()).document["dives"][0]
     uddf = convert((FIXTURES / "uddf" / "subsurface.uddf").read_bytes()).document["dives"][0]
-    for member in ("started_at", "dive_number", "duration", "max_depth", "avg_depth", "notes"):
+    for member in ("started_at", "number", "duration", "max_depth", "avg_depth", "notes"):
         assert ssrf[member] == uddf[member], member
     assert profile_of(ssrf) == profile_of(uddf)
     assert ssrf["cylinders"][0]["volume"] == uddf["cylinders"][0]["volume"] == 12.0

@@ -290,7 +290,7 @@ OURS = FIXTURES / "write" / "uddf" / "opendiving.uddf"
 # diver would notice, and nothing about how either file was laid out.
 IDENTITY = ("uuid", "name", "brand", "type", "location", "position", "notes", "starts_on", "ends_on")
 SCALARS = (
-    "dive_number",
+    "number",
     "started_at",
     "duration",
     "max_depth",

@@ -294,9 +294,9 @@ FIT line reads a field instead.
 
 **A device counter is not the diver's dive number**, and this is where the three formats
 that carry one stop being refusals. `session.dive_number`, `<DiveNumberInSerie>` and
-`Header.Diving.NumberInSeries` were each read and dropped with a finding, because §6.2's
-`dive_number` is the diver's own numbering and a counter that restarts on a new device is
-not it. §6.4b's `dive_number` is that counter, in as many words, so each now lands there
+`Header.Diving.NumberInSeries` were each read and dropped with a finding, because a dive's
+`number` is the diver's own numbering and a counter that restarts on a new device is not
+it. The device's `dive_number` is that counter, in as many words, so each now lands there
 and the finding goes with it. UDDF's `<internaldivenumber>` is the same member and had no
 reader at all.
 

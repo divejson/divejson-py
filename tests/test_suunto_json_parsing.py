@@ -660,11 +660,11 @@ def test_the_device_name_is_a_name_and_never_a_model() -> None:
 
 
 def test_the_series_number_is_the_devices_counter() -> None:
-    """§6.2's `dive_number` is the diver's own numbering and a counter that restarts on a
+    """A dive's `number` is the diver's own numbering and a counter that restarts on a
     new device is not it, which is why the two are different members."""
     data = suunto_json({"Device": {"Name": "Porvoo"}, "Diving": {"NumberInSeries": 3}})
     dive = convert(data).document["dives"][0]
-    assert "dive_number" not in dive
+    assert "number" not in dive
     assert device_of(dive)["dive_number"] == 3
 
 

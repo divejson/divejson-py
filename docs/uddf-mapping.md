@@ -244,7 +244,7 @@ has no name, `<name>` being mandatory on the element.
 
 `<internaldivenumber>` is on the dive rather than on the element, which is where UDDF puts
 it, and it is why a device read from a shared element still differs between two dives that
-link it. It is the counter §6.2's `dive_number` is explicitly not — `<divenumber>` is the
+link it. It is the counter a dive's `number` is explicitly not — `<divenumber>` is the
 diver's and stays there.
 
 **A device whose every member is absent is not written at all** (§6.4b). With `<name>` on
@@ -321,7 +321,7 @@ carries nothing this format records.
 | UDDF | DiveJSON |
 | --- | --- |
 | `informationbeforedive/datetime` | `started_at` |
-| `informationbeforedive/divenumber` | `dive_number` |
+| `informationbeforedive/divenumber` | `number` |
 | `informationbeforedive/link/@ref` | `site_uuids`, in source order, the first being the primary site |
 | `informationbeforedive/altitude` | `altitude` |
 | `informationbeforedive/surfacepressure` | `surface_pressure` |

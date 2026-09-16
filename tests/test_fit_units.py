@@ -120,7 +120,7 @@ def test_a_developer_field_under_a_name_no_profile_field_has_is_ignored() -> Non
     assert set(dive) <= {"uuid", "started_at", "duration", "max_depth", "avg_depth", "recordings"}
     # `recordings` is there because the `file_id` names a manufacturer, which is §6.4b's
     # `brand`. What it must not carry is a counter off `dive_number_in_series`: that is a
-    # developer field, and §6.4b's `dive_number` comes from the native `session.dive_number`.
+    # developer field, and the device's `dive_number` comes from the native `session.dive_number`.
     assert device_of(dive) == {"brand": "suunto"}
 
 

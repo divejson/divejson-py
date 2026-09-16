@@ -9,7 +9,7 @@
   "dives": [
     {
       "uuid": "edcffec6-a81e-59a1-8699-f18db44c7245",
-      "dive_number": 1,
+      "number": 1,
       "started_at": "2026-09-08T15:18:10",
       "duration": 163,
       "notes": "Summary:\n\nEnvironment:\n\nGas:\n\nGear:\n\nIssues:",

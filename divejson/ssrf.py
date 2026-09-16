@@ -407,7 +407,7 @@ class _Converter:
         dive: dict[str, Any] = {"uuid": claimed}
         number = integer_of(self.measure(attribute(element, "number"), "", where, "<dive number>"))
         if number is not None:
-            dive["dive_number"] = number
+            dive["number"] = number
         dive["started_at"] = started_at
 
         duration = integer_of(self.measure(attribute(element, "duration"), "min", where, "<dive duration>"))

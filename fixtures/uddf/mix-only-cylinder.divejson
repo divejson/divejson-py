@@ -13,7 +13,7 @@
   "dives": [
     {
       "uuid": "6ba5d47c-aeac-5754-ac67-c28c73e7981e",
-      "dive_number": 1,
+      "number": 1,
       "started_at": "2026-05-02T09:30:00+01:00",
       "duration": 2760,
       "notes": "A rental cylinder whose size nobody wrote down. The gas, both pressures and a real drop between them are recorded, so the size is the only input a gas-consumption figure lacks.",
@@ -33,7 +33,7 @@
     },
     {
       "uuid": "abef6704-789a-5048-b078-ba21af60f74b",
-      "dive_number": 2,
+      "number": 2,
       "started_at": "2026-05-02T14:05:00+01:00",
       "duration": 3180,
       "notes": "No tankdata at all, which is what APD DiveSight exports for every dive. The dive arrives with no cylinder rather than with an invented one.",

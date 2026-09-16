@@ -22,7 +22,7 @@
   "dives": [
     {
       "uuid": "019fec36-b9ec-71c6-a03e-64f59b8b92b1",
-      "dive_number": 45,
+      "number": 45,
       "duration": 4001,
       "notes": "Imported from the Suunto Ocean. House-reef checkout dive - profile, temperature and tank pressure pulled straight from the export.",
       "max_depth": 45.91,
@@ -3762,7 +3762,7 @@
     },
     {
       "uuid": "019fec36-b930-7040-9441-cc30beb094e5",
-      "dive_number": 38,
+      "number": 38,
       "duration": 2880,
       "notes": "First dive on the Thistlegorm. Huge schools of batfish over the deck; swam through hold no. 2 past the Norton motorbikes.",
       "max_depth": 29.6,
@@ -3794,7 +3794,7 @@
     },
     {
       "uuid": "019fec36-b956-794d-aa9d-12b5e8df4cf3",
-      "dive_number": 39,
+      "number": 39,
       "duration": 3120,
       "notes": "Second run over the stern gun and the locomotives on the seabed. Mild current.",
       "max_depth": 24.8,
@@ -3826,7 +3826,7 @@
     },
     {
       "uuid": "019fec36-b96f-7248-9ef9-9ad4ac4a77df",
-      "dive_number": 40,
+      "number": 40,
       "duration": 3300,
       "notes": "Classic Shark & Yolanda drift. Napoleon wrasse followed us half the dive.",
       "max_depth": 26.3,
@@ -3858,7 +3858,7 @@
     },
     {
       "uuid": "019fec36-b986-7201-82ed-334a6909fc06",
-      "dive_number": 41,
+      "number": 41,
       "duration": 2820,
       "notes": "Wall dive at Small Brother. Grey reef sharks patrolling at depth; gorgonian fans everywhere.",
       "max_depth": 31.4,
@@ -3890,7 +3890,7 @@
     },
     {
       "uuid": "019fec36-b99e-7336-bc70-62b71cb857cf",
-      "dive_number": 42,
+      "number": 42,
       "duration": 3660,
       "notes": "Relaxed bay dive at El Puertito. Three green turtles, one very curious.",
       "max_depth": 12.4,
@@ -3922,7 +3922,7 @@
     },
     {
       "uuid": "019fec36-b9b8-7e1d-b28c-901d314c6140",
-      "dive_number": 43,
+      "number": 43,
       "duration": 2640,
       "notes": "Condesito cargo wreck, plenty of trumpetfish and a ray under the plates.",
       "max_depth": 21.2,
@@ -3954,7 +3954,7 @@
     },
     {
       "uuid": "019fec36-b9ce-7324-a6a6-59a478a3aa11",
-      "dive_number": 44,
+      "number": 44,
       "duration": 3480,
       "notes": "Turtle bay again for the last day. Practiced buoyancy runs along the sand.",
       "max_depth": 14.9,
@@ -4146,7 +4146,7 @@
       "uuid": "019fec36-b918-7a7b-84c3-3e02a70abdba",
       "agency": "padi",
       "name": "Open Water Diver",
-      "certification_number": "2206140042",
+      "number": "2206140042",
       "certified_on": "2022-06-14",
       "training_center": "Blue Lagoon Divers",
       "notes": "",
@@ -4156,7 +4156,7 @@
       "uuid": "019fec36-b920-735c-a1d6-7d3a6a8dab5a",
       "agency": "padi",
       "name": "Advanced Open Water Diver",
-      "certification_number": "2305020017",
+      "number": "2305020017",
       "certified_on": "2023-05-02",
       "training_center": "Blue Lagoon Divers",
       "notes": "",

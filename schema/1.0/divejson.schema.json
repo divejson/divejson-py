@@ -105,7 +105,7 @@
       "type": "object",
       "properties": {
         "uuid": { "$ref": "#/$defs/uuid" },
-        "dive_number": { "type": "integer" },
+        "number": { "type": "integer" },
         "started_at": { "$ref": "#/$defs/date_time" },
         "duration": { "type": "integer", "exclusiveMinimum": 0 },
         "notes": { "$ref": "#/$defs/notes" },
@@ -483,7 +483,7 @@
         },
         "agency_other": { "type": "string", "minLength": 1, "maxLength": 64 },
         "name": { "type": "string", "minLength": 1, "maxLength": 255 },
-        "certification_number": { "type": "string", "maxLength": 64 },
+        "number": { "type": "string", "maxLength": 64 },
         "certified_on": { "$ref": "#/$defs/date" },
         "expires_on": { "$ref": "#/$defs/date" },
         "instructor_name": { "type": "string", "maxLength": 255 },
