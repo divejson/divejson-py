@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.8.0
+
 - **Breaking: a course's `agency` is OPTIONAL.** §6.17 of
   [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) leaves
   the member out for a course a private instructor taught, rather than inventing an agency for
