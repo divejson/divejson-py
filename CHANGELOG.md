@@ -7,6 +7,14 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Breaking: a course's `agency` is OPTIONAL.** §6.17 of
+  [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) leaves
+  the member out for a course a private instructor taught, rather than inventing an agency for
+  it, so `divejson validate` accepts a course that omits `agency` where the previous release
+  refused it, and anything reaching into a document for `course["agency"]` has to reach for it
+  as an optional member. A course naming `agency_other` without an `agency` is still invalid.
+  A **certification**'s `agency` is untouched and stays REQUIRED.
+
 ## 0.7.0
 
 - **Breaking: a dive's number is `number`, and so is a certification's.** §5.2 of

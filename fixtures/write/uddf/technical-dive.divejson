@@ -510,6 +510,15 @@
       "agency": "gue",
       "status": "planned",
       "notes": "Booked for the southern winter; no dates confirmed yet."
+    },
+    {
+      "uuid": "0198a6f0-1111-7092-8000-000000000092",
+      "name": "Underwater Videography",
+      "status": "completed",
+      "starts_on": "2026-08-14",
+      "ends_on": "2026-08-16",
+      "instructor_name": "T. Mahuta",
+      "notes": "Taught privately over two weekends; no agency issued it."
     }
   ],
   "sites": [
