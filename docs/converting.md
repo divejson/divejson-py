@@ -159,11 +159,11 @@ document. `exported_at` is the moment of conversion, always offset-aware.
   logbook. Any mapping added later that lands a source string on a constrained member owes
   the same guard.
 - **A record whose format-required member the source never recorded goes, along with every
-  reference to it** — a trip with no dates (§6.8 makes `starts_on` REQUIRED), a site or a
-  gear item with no name (§6.10, §6.12) — rather than gaining an invented one. §5.3 forbids
-  a dangling reference, so the references go with the record. A source that records nothing
-  at all about a logbook's owner produces no `diver` member (§6.1): minting an identity for
-  one would be §5.4's fabrication applied to people.
+  reference to it** — a trip, a site or a gear item with no name (§6.8, §6.10, §6.12) —
+  rather than gaining an invented one. §5.3 forbids a dangling reference, so the references
+  go with the record. A source that records nothing at all about a logbook's owner produces
+  no `diver` member (§6.1): minting an identity for one would be §5.4's fabrication applied
+  to people.
 - **A source record that is not a dive at all is skipped, and reported.** A run, a swim, an
   activity with no depth: a tracker writes them in the same shape as a dive, and §6.2's
   object is a dive. Skipping it and saying so is the honest answer; a marker under

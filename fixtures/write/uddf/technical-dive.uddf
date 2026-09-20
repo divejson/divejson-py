@@ -58,7 +58,7 @@
       <name>Fiordland tech week</name>
       <trippart>
         <name>Milford Sound</name>
-        <dateoftrip startdate="2026-07-01T00:00:00" enddate="2026-07-09T00:00:00" />
+        <dateoftrip startdate="2026-07-01T00:00:00" enddate="2026-07-04T00:00:00" />
         <geography>
           <location>Milford Sound / Piopiotahi, Southland, New Zealand</location>
           <latitude>-44.6414</latitude>
@@ -67,6 +67,10 @@
       </trippart>
       <trippart>
         <name>Chatham Rise crossing</name>
+      </trippart>
+      <trippart>
+        <name />
+        <dateoftrip startdate="2026-07-08T00:00:00" enddate="2026-07-09T00:00:00" />
       </trippart>
     </trip>
   </divetrip>

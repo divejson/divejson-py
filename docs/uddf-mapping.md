@@ -160,16 +160,31 @@ which is the file that taught `converting.md`'s rule that such a pair is not a p
 | UDDF | DiveJSON |
 | --- | --- |
 | `name` | `trips[].name` |
-| `trippart/name` | `trips[].locations[].name` |
-| `trippart/geography/location` | `trips[].locations[].display_name`, when it differs from the name |
-| `trippart/geography/latitude` + `longitude` | `trips[].locations[].position` |
-| `trippart/dateoftrip/@startdate`, earliest | `trips[].starts_on` |
-| `trippart/dateoftrip/@enddate`, latest | `trips[].ends_on` |
-| `trippart/notes/para` | `trips[].notes` |
+| `trippart` | `trips[].parts[]`, in file order |
+| `trippart/name` | `trips[].parts[].location.name` |
+| `trippart/geography/location` | `trips[].parts[].location.display_name`, when it differs from the name |
+| `trippart/geography/latitude` + `longitude` | `trips[].parts[].location.position` |
+| `trippart/dateoftrip/@startdate` | `trips[].parts[].starts_on` |
+| `trippart/dateoftrip/@enddate` | `trips[].parts[].ends_on` |
+| `trippart/notes/para` | `trips[].notes`, every part's joined |
 | dive's `informationbeforedive/tripmembership/@ref` | `dives[].trip_uuid` |
 
-`tripType` records no dates of its own, so a trip's span is the span of its parts — and a
-trip whose parts carry none has nothing to put in `starts_on`.
+**A `<trippart>` is a part**, which is as close to an identity as this table gets: both
+formats model a trip as a sequence of stretches each carrying its own dates and its own
+place, so the dates stay where the file put them instead of being collapsed into a span.
+`tripType` records no dates of its own and §6.8 records none either — a trip's span is the
+span of its parts in both, and a trip whose parts carry none has no span in either.
+
+A `<trippart>` with a `<name>` becomes a part with a location; one without becomes a part
+with dates and no location, which §6.9a allows and which is what a `<trippart>` carrying
+only a `<dateoftrip>` says. A `<geography>` on a nameless part has no `name` to hang off
+and is dropped and reported (§6.9 makes `name` REQUIRED of a location) — the part survives
+with its dates, where before the whole element did nothing but widen the trip's span.
+
+**A `<trippart>` carrying neither a name nor a date produces no part at all**, and that is
+what closes the round trip in the other direction: `tripType` requires at least one
+`<trippart>`, so [`uddf-writing.md`](uddf-writing.md) emits a nameless empty one for a trip
+with no parts, and a trip with no parts is what comes back.
 
 UDDF also allows the opposite direction — `trippart/relateddives/link` pointing from the
 trip at its dives. It is not read, because no writer in the corpus emits it.
@@ -611,6 +626,7 @@ writes all three that way.
 | `<informationafterdive><rating>`, `<current>`, `<problems>` | no core member. |
 | `<site><ecology>` | site-level flora and fauna, where §6.11's species are per-dive sightings. |
 | `<trippart><relateddives>` | the reverse of `<tripmembership>`; no writer in the corpus emits it. |
+| `<trippart @type>` | `boat`, `hotel`, `individual` or `organized` — the liveaboard-then-hotel distinction §6.9a's part exists to record, and the one member a part might plausibly gain next. There is nowhere to read it into: a core field arrives when an implementation stores it (`CONTRIBUTING.md`), and none does. A reader that wants it has `extensions`. |
 | `<mix><n2>`, `<ar>`, `<h2>` | §6.3 models the remainder as nitrogen and does not model argon or trace gases. |
 | `courses`, `certifications`, `gear_sets`, `gear service` | UDDF has no slot for any of them. |
 

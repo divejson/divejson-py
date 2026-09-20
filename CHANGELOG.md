@@ -7,6 +7,27 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Breaking: a trip is a sequence of parts, and records no dates of its own.** §6.8 and the
+  new §6.9a of
+  [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) replace
+  a trip's `locations` with `parts`, each part carrying its own OPTIONAL `starts_on`, `ends_on`
+  and nested `location`. A trip's own `starts_on` and `ends_on` are gone, so anything reaching
+  into a document for them finds nothing and `divejson validate` refuses either as an undefined
+  member; a trip's span is the earliest `starts_on` among its parts and the latest `ends_on`,
+  and a trip whose parts carry none has no span. §3's `ends_on ≥ starts_on` reads on a part, so
+  that issue is now reported at `trips/<i>/parts/<j>` and a bounding box's at
+  `trips/<i>/parts/<j>/location/bbox`.
+
+- **The UDDF reader keeps each `<trippart>`'s own dates and place**, where it returned the
+  earliest start, the latest end and a flat list of names. A trip whose parts carry no dates is
+  carried rather than dropped, the REQUIRED `starts_on` that forced that being gone; a
+  `<trippart>` with a `<geography>` and no `<name>` keeps its dates and loses the place, §6.9
+  still requiring a location's name; and one carrying neither a name nor a date produces no part
+  at all, which is what lets a trip with no parts come back as one. The writer emits one
+  `<trippart>` per part with its own `<dateoftrip>`, omits that element for a part with neither
+  date, and writes a part's single date into both of its attributes — both are required there,
+  and dropping the element would lose the date the document held.
+
 ## 0.8.0
 
 - **Breaking: a course's `agency` is OPTIONAL.** §6.17 of

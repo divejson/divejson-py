@@ -3989,28 +3989,32 @@
     {
       "uuid": "019fec36-b882-7e23-97fa-9e297e8c9701",
       "name": "Red Sea Liveaboard",
-      "locations": [
+      "parts": [
         {
-          "name": "Northern Red Sea, Egypt"
+          "starts_on": "2026-04-18",
+          "ends_on": "2026-04-25",
+          "location": {
+            "name": "Northern Red Sea, Egypt"
+          }
         }
       ],
       "notes": "Wrecks & reefs itinerary aboard MV Coral Queen.",
-      "created_at": "2026-08-10T15:07:16.994206Z",
-      "starts_on": "2026-04-18",
-      "ends_on": "2026-04-25"
+      "created_at": "2026-08-10T15:07:16.994206Z"
     },
     {
       "uuid": "019fec36-b88f-714d-a52f-2360218753b8",
       "name": "Tenerife Week",
-      "locations": [
+      "parts": [
         {
-          "name": "Costa Adeje, Tenerife"
+          "starts_on": "2026-07-06",
+          "ends_on": "2026-07-12",
+          "location": {
+            "name": "Costa Adeje, Tenerife"
+          }
         }
       ],
       "notes": "Shore and boat diving with the local club.",
-      "created_at": "2026-08-10T15:07:17.007783Z",
-      "starts_on": "2026-07-06",
-      "ends_on": "2026-07-12"
+      "created_at": "2026-08-10T15:07:17.007783Z"
     }
   ],
   "courses": [],

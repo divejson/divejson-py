@@ -694,10 +694,10 @@ class _Converter:
     def read_trips(self) -> list[dict[str, Any]]:
         """`<divetrip><trip>` as Trip records.
 
-        A `<trippart>` becomes a Trip Location: UDDF models a trip as a sequence of parts,
-        each with its own place and dates, and §6.9's location list is the nearest thing
-        this format has. The trip's own dates are the span of its parts, because `tripType`
-        records none of its own.
+        A `<trippart>` is a §6.9a part, which is as close to an identity as this mapping
+        gets: both formats model a trip as a sequence of stretches each carrying its own
+        dates and its own place. Neither records dates on the trip itself, so a trip whose
+        parts carry none has no span in either and is still a trip.
         """
         trips: list[dict[str, Any]] = []
         for index, element in enumerate(_kids(_kid(self.root, "divetrip"), "trip")):
@@ -707,15 +707,7 @@ class _Converter:
                 self.note(where, "the trip has no name, which the format requires of one; it is dropped (spec §6.8)", "dropped")
                 continue
 
-            starts, ends, locations, notes = self.read_trip_parts(element, where)
-            if starts is None:
-                self.note(
-                    where,
-                    "the trip records no dates, and the format requires a start date; it is dropped along with "
-                    "the dives' membership of it (spec §6.8)",
-                    "dropped",
-                )
-                continue
+            parts, notes = self.read_trip_parts(element, where)
             claimed, carried = self.uuid_for("trip", _attr(element, "id"), where, index)
             if claimed is None:
                 continue
@@ -729,31 +721,31 @@ class _Converter:
                 continue
 
             trip: dict[str, Any] = {"uuid": claimed, "name": self.capped(name, MAX_NAME, where, "the trip name")}
-            if locations:
-                trip["locations"] = locations
-            trip["starts_on"] = starts
-            if ends is not None and ends >= starts:
-                trip["ends_on"] = ends
-            elif ends is not None:
-                self.note(where, f"the trip ends on {ends}, before it starts on {starts}; the end date is dropped", "dropped")
+            if parts:
+                trip["parts"] = parts
             if notes:
                 trip["notes"] = notes
 
             trips.append(trip)
         return trips
 
-    def read_trip_parts(
-        self, element: ET.Element, where: str
-    ) -> tuple[str | None, str | None, list[dict[str, Any]], str | None]:
-        starts: list[str] = []
-        ends: list[str] = []
-        locations: list[dict[str, Any]] = []
+    def read_trip_parts(self, element: ET.Element, where: str) -> tuple[list[dict[str, Any]], str | None]:
+        """Every `<trippart>` as a part, in file order, and the trip's note.
+
+        A part with neither a name nor a date is **no part at all**, which is what lets a
+        trip with no parts survive a round trip: `tripType` requires at least one
+        `<trippart>`, so a writer with nothing to put in one emits exactly this element
+        (`docs/uddf-writing.md`), and reading it back as nothing is what closes the circle.
+        Its note is still collected — a note belongs to the trip (§6.9a gives a part none).
+        """
+        parts: list[dict[str, Any]] = []
         paragraphs: list[str] = []
 
         for part_index, part in enumerate(_kids(element, "trippart")):
             part_where = f"{where}/trippart/{part_index}"
             date_of_trip = _kid(part, "dateoftrip")
-            for attribute, collected in (("startdate", starts), ("enddate", ends)):
+            dates: dict[str, str] = {}
+            for attribute, member in (("startdate", "starts_on"), ("enddate", "ends_on")):
                 raw = _attr(date_of_trip, attribute)
                 if raw is None:
                     continue
@@ -761,24 +753,32 @@ class _Converter:
                 if value is None:
                     self.note(part_where, f"{attribute} is {raw!r}, which is not a date; dropped", "dropped")
                 else:
-                    collected.append(value[:10])
+                    dates[member] = value[:10]
+            starts, ends = dates.get("starts_on"), dates.get("ends_on")
+            if starts is not None and ends is not None and ends < starts:
+                self.note(
+                    part_where,
+                    f"the part ends on {ends}, before it starts on {starts}; the end date is dropped",
+                    "dropped",
+                )
+                ends = None
 
             geography = _kid(part, "geography")
             part_name = _text_of(part, "name")
             display_name = _text_of(geography, "location")
+            location: dict[str, Any] | None = None
             if part_name:
-                location: dict[str, Any] = {"name": self.capped(part_name, MAX_NAME, part_where, "the trip part's name")}
+                location = {"name": self.capped(part_name, MAX_NAME, part_where, "the trip part's name")}
                 if display_name and display_name != part_name:
                     location["display_name"] = self.capped(display_name, MAX_DISPLAY_NAME, part_where, "the location")
                 position = self.position(geography, part_where)
                 if position:
                     location["position"] = position
-                locations.append(location)
             elif geography is not None:
                 self.note(
                     part_where,
                     "the trip part has no name, which the format requires of a location; the place is dropped "
-                    "(spec §6.9)",
+                    "and the part keeps its dates (spec §6.9)",
                     "dropped",
                 )
 
@@ -786,8 +786,18 @@ class _Converter:
             if part_notes:
                 paragraphs.append(part_notes)
 
+            record: dict[str, Any] = {}
+            if starts is not None:
+                record["starts_on"] = starts
+            if ends is not None:
+                record["ends_on"] = ends
+            if location is not None:
+                record["location"] = location
+            if record:
+                parts.append(record)
+
         joined = self.capped("\n\n".join(paragraphs), MAX_NOTES, where, "the trip note") if paragraphs else None
-        return (min(starts) if starts else None), (max(ends) if ends else None), locations, joined
+        return parts, joined
 
     # -- gear --------------------------------------------------------------------
 
