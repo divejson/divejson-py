@@ -66,6 +66,14 @@ jobs:
           done < <(git -C "$RUNNER_TEMP/spec" ls-files -- schema fixtures docs)
           exit $differing
 
+      # Mid-flight, with the pin at a specification branch's head, neither check either
+      # side of this one can see that branch move: the byte check compares against
+      # whatever commit the pin names, so it stays green against a superseded one. Before
+      # the ancestor check rather than after it, because that one is red for the whole of
+      # the window this covers and a step after a failing step never runs.
+      - name: Nothing the specification owns has moved past SPEC_REF
+        run: python3 .github/scripts/spec_pin.py --spec "$RUNNER_TEMP/spec"
+
       # A pin on a commit that never landed — a branch someone force-pushed away, a PR
       # head that was rewritten — would leave this implementing a specification nobody
       # else has, and the byte check above would pass happily.
