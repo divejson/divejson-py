@@ -775,10 +775,18 @@ class _Converter:
                 if position:
                     location["position"] = position
             elif geography is not None:
+                # What the finding has to say is what survives, and that turns on the dates
+                # — a dateless nameless part is nothing at all once the place goes, which is
+                # the same split `uddf_write.nameless_part` makes from the other side.
+                kept = (
+                    "the part keeps its dates"
+                    if starts is not None or ends is not None
+                    else "the part records no dates either, so nothing of it is carried"
+                )
                 self.note(
                     part_where,
-                    "the trip part has no name, which the format requires of a location; the place is dropped "
-                    "and the part keeps its dates (spec §6.9)",
+                    f"the trip part has no name, which the format requires of a location; the place is "
+                    f"dropped and {kept} (spec §6.9)",
                     "dropped",
                 )
 

@@ -343,53 +343,66 @@ def test_hostile_source_strings_still_produce_a_conforming_document() -> None:
 # -- trips -----------------------------------------------------------------------------
 
 
-def trips_of(trip_body: str) -> tuple[list[dict], list[str]]:
-    """The trips a document holding one `<trip>` converts to, and its report's messages."""
+def trip_of(trip_body: str) -> tuple[dict, list[str]]:
+    """The one trip a document holding one `<trip>` converts to, and the report's messages."""
     header = f'<divetrip><trip id="t"><name>Egypt, spring</name>{trip_body}</trip></divetrip>'
     conversion = convert(one_dive(STARTED_AT, header=header))
     assert validate_document(conversion.document) == []
-    return conversion.document.get("trips", []), [note.message for note in conversion.notes]
+    return conversion.document["trips"][0], [note.message for note in conversion.notes]
 
 
 def test_each_trippart_keeps_its_own_dates_rather_than_widening_a_span() -> None:
-    """§6.9a is the member UDDF always had and this format did not.
+    """A `<trippart>` is a §6.9a part, and its dates stay where the file put them.
 
-    The dates stay where the file put them: two parts a fortnight apart used to collapse
-    into one range with the places listed beside it, which said nothing about which dives
-    happened where.
+    Collapsing two parts a fortnight apart into one range with the places listed beside it
+    says nothing about which dives happened where, which is the whole of what §6.9a fixes.
     """
-    parts, _ = trips_of(
+    trip, _ = trip_of(
         '<trippart><name>Hurghada</name><dateoftrip startdate="2026-04-18T00:00:00" '
         'enddate="2026-04-22T00:00:00"/></trippart>'
         '<trippart><name>Marsa Alam</name><dateoftrip startdate="2026-04-22T00:00:00" '
         'enddate="2026-04-25T00:00:00"/></trippart>'
     )
-    assert parts[0]["parts"] == [
+    assert trip["parts"] == [
         {"starts_on": "2026-04-18", "ends_on": "2026-04-22", "location": {"name": "Hurghada"}},
         {"starts_on": "2026-04-22", "ends_on": "2026-04-25", "location": {"name": "Marsa Alam"}},
     ]
 
 
 def test_a_trip_whose_parts_carry_no_dates_is_carried() -> None:
-    """It used to be dropped, along with its dives' membership, for want of a `starts_on`.
+    """§6.8 records no dates, so a trip whose parts carry none has no span and is still a trip.
 
-    §6.8 records no dates at all now, so a trip whose parts carry none has no span — which
-    is a record rather than the defect the REQUIRED member made it.
+    Nothing is dropped for want of one: a place the diver named and never dated is a
+    record, and the dives' membership of it is worth as much as any other trip's.
     """
-    parts, messages = trips_of("<trippart><name>Hurghada</name></trippart>")
-    assert parts[0]["parts"] == [{"location": {"name": "Hurghada"}}]
+    trip, messages = trip_of("<trippart><name>Hurghada</name></trippart>")
+    assert trip["parts"] == [{"location": {"name": "Hurghada"}}]
     assert not [message for message in messages if "records no dates" in message]
 
 
 def test_a_nameless_trippart_keeps_its_dates_and_loses_its_place() -> None:
     """§6.9 makes a location's `name` REQUIRED, and §6.9a lets the part live without one."""
-    parts, messages = trips_of(
+    trip, messages = trip_of(
         '<trippart><dateoftrip startdate="2026-04-25T00:00:00" enddate="2026-04-26T00:00:00"/>'
         "<geography><location>Cairo, Egypt</location><latitude>30.04</latitude>"
         "<longitude>31.24</longitude></geography></trippart>"
     )
-    assert parts[0]["parts"] == [{"starts_on": "2026-04-25", "ends_on": "2026-04-26"}]
-    assert [message for message in messages if "the place is dropped" in message]
+    assert trip["parts"] == [{"starts_on": "2026-04-25", "ends_on": "2026-04-26"}]
+    assert "the place is dropped and the part keeps its dates" in "\n".join(messages)
+
+
+def test_a_nameless_undated_trippart_says_that_nothing_of_it_is_carried() -> None:
+    """The place goes for want of a name, and with no dates behind it the part goes too.
+
+    The report has to say which of the two happened, because a diver reading "the place is
+    dropped" beside a part that is not there has been told the smaller half of it.
+    """
+    trip, messages = trip_of(
+        "<trippart><geography><location>Cairo, Egypt</location>"
+        "<latitude>30.04</latitude><longitude>31.24</longitude></geography></trippart>"
+    )
+    assert "parts" not in trip
+    assert "the part records no dates either, so nothing of it is carried" in "\n".join(messages)
 
 
 def test_a_trippart_with_neither_a_name_nor_a_date_produces_no_part() -> None:
@@ -399,23 +412,23 @@ def test_a_trippart_with_neither_a_name_nor_a_date_produces_no_part() -> None:
     emits exactly this (`docs/uddf-writing.md`) — and a reader that produced an empty part
     from it would hand back a stretch of a trip nobody recorded.
     """
-    parts, _ = trips_of("<trippart><name/></trippart>")
-    assert "parts" not in parts[0]
+    trip, _ = trip_of("<trippart><name/></trippart>")
+    assert "parts" not in trip
 
 
 def test_a_partless_trippart_still_gives_its_note_to_the_trip() -> None:
     """A part carries no note of its own (§6.9a), so the note is the trip's wherever it sat."""
-    parts, _ = trips_of("<trippart><notes><para>Booked late.</para></notes></trippart>")
-    assert parts[0]["notes"] == "Booked late." and "parts" not in parts[0]
+    trip, _ = trip_of("<trippart><notes><para>Booked late.</para></notes></trippart>")
+    assert trip["notes"] == "Booked late." and "parts" not in trip
 
 
 def test_a_parts_end_before_its_start_is_dropped_from_that_part() -> None:
-    """§3 rule 2 reads on a part now, and the guard went down with it."""
-    parts, messages = trips_of(
+    """§3 rule 2 reads on a part, so the guard that enforces it sits on the part too."""
+    trip, messages = trip_of(
         '<trippart><name>Hurghada</name><dateoftrip startdate="2026-04-18T00:00:00" '
         'enddate="2026-04-11T00:00:00"/></trippart>'
     )
-    assert parts[0]["parts"] == [{"starts_on": "2026-04-18", "location": {"name": "Hurghada"}}]
+    assert trip["parts"] == [{"starts_on": "2026-04-18", "location": {"name": "Hurghada"}}]
     assert [message for message in messages if "before it starts on 2026-04-18" in message]
 
 

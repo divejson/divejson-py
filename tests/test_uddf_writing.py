@@ -143,9 +143,10 @@ def trip_of(*parts: Any) -> dict[str, Any]:
 def test_a_part_with_one_date_writes_it_into_both_attributes(schema, part, written_date) -> None:
     """`<dateoftrip>`'s two attributes are both required, and §6.9a's dates are each optional.
 
-    Symmetric because the format is: an end with no start became reachable when §6.9a
-    stopped requiring `starts_on`, and the alternative to repeating the one date — dropping
-    the element, which `minOccurs="0"` allows — would lose the date the document did carry.
+    Symmetric because the format is: §6.9a makes each date independently optional, so an
+    end with no start is as reachable as a start with no end, and the alternative to
+    repeating the one date — dropping the element, which `minOccurs="0"` allows — would
+    lose the date the document did carry.
     No fixture reaches either branch: the written corpus's three parts carry both dates,
     neither and both.
     """
