@@ -15,8 +15,9 @@ who decides and whose `CONTRIBUTING.md` says how a change to the format lands.
 | `SPEC_REF` | that commit, on one line — a tag once the format has one |
 
 The vendored three are not editable here. CI checks out the specification at `SPEC_REF`
-and asserts that every file it owns is byte-identical in this tree, and that `SPEC_REF`
-is an ancestor of its `main`. What the copy *may* do is run ahead: it can carry pairs and
+and asserts that every file it owns is byte-identical in this tree, that nothing it owns
+has moved on the branch the pin sits on while the pin is not on `main` yet, and that
+`SPEC_REF` is an ancestor of its `main`. What the copy *may* do is run ahead: it can carry pairs and
 mapping documents the specification has not adopted yet, which is what lets a new reader
 land here self-contained, with the expected documents it produces and the document that
 explains them. It can never carry a different version of a file the specification already
@@ -30,7 +31,9 @@ says what is missing. The change here then sets `SPEC_REF` to that pull request'
 which passes the byte check and fails only the ancestor one; the specification's pull
 request points its own pin at this one and goes green; it merges; this one re-pins
 `SPEC_REF` to the merged commit, merges, and is released. `main` here never pins a commit
-that is not on the specification's `main`.
+that is not on the specification's `main`. While that window lasts, a commit added to the
+specification's branch is re-vendored here and the pin moved to it in one step: the branch
+moving under the pin is the one thing the byte check cannot see.
 
 **A new reader, or a change to a mapping** goes the other way: it lands here first,
 self-contained and green, then a release, and then the specification adopts the pairs and
