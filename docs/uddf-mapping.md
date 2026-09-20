@@ -180,6 +180,8 @@ with dates and no location, which §6.9a allows and which is what a `<trippart>`
 only a `<dateoftrip>` says. A `<geography>` on a nameless part has no `name` to hang off
 and is dropped and reported (§6.9 makes `name` REQUIRED of a location) — the part survives
 with its dates, where before the whole element did nothing but widen the trip's span.
+**Where it carries no dates either, the rule below reaches the same element**: nothing comes
+back at all, and the finding says that rather than saying the part survived.
 
 **A `<trippart>` carrying neither a name nor a date produces no part at all**, and that is
 what closes the round trip in the other direction: `tripType` requires at least one
