@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.9.0
+
 - **Breaking: a trip is a sequence of parts, and records no dates of its own.** §6.8 and the
   new §6.9a of
   [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) replace
