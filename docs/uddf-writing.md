@@ -80,7 +80,7 @@ else. A round trip through that would hand the diver back a location they never 
 requires that the document had nothing for, and `dropped` is a member UDDF has nowhere to
 put — or, in the two findings *Devices* below describes, a fact about the order a dive's
 recordings come back in, which the file has nowhere to carry either; the paths are
-`dives/0`, `dives/0/cylinders/1`, `trips/0/locations/1` and `$`.
+`dives/0`, `dives/0/cylinders/1`, `trips/0/parts/1` and `$`.
 
 A member with nowhere to go is reported from the record itself and not from a list
 (`writing.md`), so **the tables below are a description of what a writer does and not the
@@ -360,7 +360,7 @@ UDDF file expects to find there.
 ### Sites and trips
 
 `geographyType` makes `<location>` mandatory, so **coordinates are written only where the
-record has a place name**: a site with a `position` and no `location`, or a trip location
+record has a place name**: a site with a `position` and no `location`, or a part's location
 with a `position` and no `display_name`, keeps its name and loses its coordinates, reported.
 
 **Differs from the reference writer**: it puts the record's own **name** in `<location>` and
@@ -369,21 +369,42 @@ for and wrong for a converter — a round trip through it hands the diver back a
 they never wrote. This is the same trade *The three answers* describes, and it is the one
 place in the document where the reference writer takes the third of them.
 
-A trip becomes one `<trippart>` **per §6.9 location**, which is the only shape a list of
-places fits: a reader takes a trip's span as the span of its parts and its locations from
-their names, so a part per location comes back as the list it was written from. A trip with
-no locations still needs one part — `tripType` requires at least one — and gets a nameless
-one, an empty `<name>` being a valid `xs:string` that reads back as no location rather than
-as one. The trip's dates and its note go on the **first** part, since a reader takes the
-span of every part's dates and joins every part's notes.
+A trip becomes one `<trippart>` **per §6.9a part**, which is as close to an identity as
+this document gets: both formats model a trip as a sequence of stretches, each carrying its
+own dates and its own place, so a part goes out whole instead of having its dates lifted to
+the trip. A part's `location.name` is the `<name>`, its `location.display_name` the
+`<geography><location>`, and its own dates the `<dateoftrip>`.
+
+**A trip with no parts still needs one `<trippart>`** — `tripType` requires at least one —
+and gets a nameless, dateless one, an empty `<name>` being a valid `xs:string` that reads
+back as no part rather than as an empty one. Nothing is reported for it: the document held
+no part, and no part is what comes back.
+
+**A part with no `location` gets that same empty `<name>`, and it is reported `absent`**,
+`simpleNamedType` making `<name>` mandatory where the part has nothing for it. The finding
+says what a reader will take the placeholder as, and that turns on the part's dates: one
+that has them comes back as the dated placeless part it was, and one carrying **neither** a
+location nor a date does not come back at all, being indistinguishable from the floor above.
+That second case is the one shape of part the self round trip loses, and naming it in the
+report is what `writing.md` asks of a loss.
+
+The trip's **note** goes on the first `<trippart>` and nowhere else, since a reader joins
+every part's notes: writing it on each would hand back a note repeated once per part. A
+part carries no note of its own (§6.9a), so nothing is displaced by it.
 
 `<dateoftrip>`'s `startdate` and `enddate` are both `use="required"` and both `xs:dateTime`
 where DiveJSON holds plain dates, so each is widened to midnight and a reader takes the date
-back off the front. A trip with no `ends_on` has nothing for `enddate`: **the start date is
-repeated**, reported, and a reader sees a trip that ended the day it began. UDDF has no
-spelling for an open one.
+back off the front. The rules below are **per part**, where they were per trip while a trip
+held the dates:
 
-`trips[].locations[].bbox` has no UDDF slot at all.
+- A part with **neither** date gets **no `<dateoftrip>`** at all, the element being
+  `minOccurs="0"`. Nothing is lost and nothing is reported.
+- A part with **one** of the two has nothing for the other attribute, so **the date it has
+  is written into both** and the finding says so: a reader sees a stretch that began and
+  ended on one day. UDDF has no spelling for an open one, and the alternative — dropping
+  the element — would lose the date the source did record.
+
+`trips[].parts[].location.bbox` has no UDDF slot at all.
 
 ### Dives
 
@@ -582,7 +603,7 @@ once per record that carries it, and none of them has anywhere in UDDF to go:
 | `gear` `rented`, `archived`, `archived_at`, `dive_count` | no slot |
 | `diver.username` | `<owner id>` is an XML id and not a handle |
 | a recording's `source_files`, `started_at` and its device's `firmware`, and every recording after the first | UDDF gives a dive one `<samples>`, and `equipmentPieceType` no firmware element — *Devices* above has each answer and why the device of a dropped recording is kept even so |
-| `trips[].locations[].bbox` | `geographyType` carries a point, not a box |
+| `trips[].parts[].location.bbox` | `geographyType` carries a point, not a box |
 | a record's `extensions` | producer-defined members (§5.5) |
 
 An **empty** note — `notes: ""` — is not written either: `<para></para>` and no `<notes>` at

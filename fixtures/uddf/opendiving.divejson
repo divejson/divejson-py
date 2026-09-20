@@ -148,14 +148,16 @@
     {
       "uuid": "0198a6f0-4444-7001-8000-000000000001",
       "name": "Red Sea Liveaboard",
-      "locations": [
+      "parts": [
         {
-          "name": "Red Sea Liveaboard",
-          "display_name": "Sha'ab Ali, Egypt"
+          "starts_on": "2026-04-18",
+          "ends_on": "2026-04-25",
+          "location": {
+            "name": "Red Sea Liveaboard",
+            "display_name": "Sha'ab Ali, Egypt"
+          }
         }
       ],
-      "starts_on": "2026-04-18",
-      "ends_on": "2026-04-25",
       "notes": "Northern wrecks itinerary out of Hurghada."
     }
   ],

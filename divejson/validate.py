@@ -279,22 +279,24 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
 
     for index, trip in enumerate(collections["trips"]):
         here = f"trips/{index}"
-        if _present(trip, "starts_on") and _present(trip, "ends_on"):
-            try:
-                if trip["ends_on"] < trip["starts_on"]:
-                    issues.append(Issue(here, "ends_on precedes starts_on"))
-            except TypeError:
-                pass
-        for loc_index, location in enumerate(trip.get("locations") or []):
+        for part_index, part in enumerate(trip.get("parts") or []):
+            if not isinstance(part, dict):
+                continue
+            part_path = f"{here}/parts/{part_index}"
+            if _present(part, "starts_on") and _present(part, "ends_on"):
+                try:
+                    if part["ends_on"] < part["starts_on"]:
+                        issues.append(Issue(part_path, "ends_on precedes starts_on"))
+                except TypeError:
+                    pass
+            location = part.get("location")
             if not isinstance(location, dict):
                 continue
             bbox = location.get("bbox")
             if isinstance(bbox, dict):
                 try:
                     if bbox["south"] > bbox["north"]:
-                        issues.append(
-                            Issue(f"{here}/locations/{loc_index}/bbox", "south exceeds north")
-                        )
+                        issues.append(Issue(f"{part_path}/location/bbox", "south exceeds north"))
                 except (KeyError, TypeError):
                     pass
 

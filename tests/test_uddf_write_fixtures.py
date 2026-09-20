@@ -78,8 +78,8 @@ LOST: dict[str, frozenset[str]] = {
             "diver/created_at",
             "sites/0/created_at",
             "trips/0/created_at",
-            "trips/0/locations/0/bbox",
-            "trips/0/locations/1/bbox",
+            "trips/0/parts/0/location/bbox",
+            "trips/0/parts/1/location/bbox",
             "dives/0/water_type",
             "dives/0/cns_start",
             "dives/0/cns_end",
@@ -102,8 +102,8 @@ LOST: dict[str, frozenset[str]] = {
             # `equipmentPieceType` carries no firmware element at all (§6.4b).
             "dives/0/recordings/0/device/firmware",
             *(f"dives/0/cylinders/{index}/{member}" for index in range(4) for member in ("role", "usage")),
-            # A place UDDF will not record without a name for it.
-            "trips/0/locations/1/position",
+            # A place UDDF will not record without a display name for it.
+            "trips/0/parts/1/location/position",
             # An empty note, which reads back as no note: `<para></para>` and no `<notes>`
             # at all are the same file to every reader here.
             "trips/0/notes",
@@ -288,7 +288,7 @@ OURS = FIXTURES / "write" / "uddf" / "opendiving.uddf"
 
 # What is compared record by record. Identity and the dive-level scalars: everything a
 # diver would notice, and nothing about how either file was laid out.
-IDENTITY = ("uuid", "name", "brand", "type", "location", "position", "notes", "starts_on", "ends_on")
+IDENTITY = ("uuid", "name", "brand", "type", "location", "position", "notes", "parts")
 SCALARS = (
     "number",
     "started_at",

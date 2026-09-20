@@ -127,14 +127,97 @@ def test_a_cylinder_with_no_start_pressure_keeps_everything_else(schema) -> None
     assert [kind for kind, where, _ in notes(source) if where == "dives/0/cylinders/0"] == ["absent"]
 
 
-def test_a_trip_with_no_end_date_repeats_the_start(schema) -> None:
-    """`<dateoftrip>`'s two attributes are both required, and an open trip has one date."""
-    source = document(trips=[{"uuid": TRIP_UUID, "name": "Weekend", "starts_on": "2026-05-01"}])
-    text = written(source, schema)
-    assert 'startdate="2026-05-01T00:00:00" enddate="2026-05-01T00:00:00"' in text
+def trip_of(*parts: Any) -> dict[str, Any]:
+    """A document whose only trip is `parts`, which is every trip test's whole subject."""
+    return document(trips=[{"uuid": TRIP_UUID, "name": "Weekend", "parts": list(parts)}])
 
-    assert read_back(source)["trips"][0]["ends_on"] == "2026-05-01"
-    assert [kind for kind, where, _ in notes(source) if where == "trips/0"] == ["absent"]
+
+@pytest.mark.parametrize(
+    ("part", "written_date"),
+    [
+        ({"starts_on": "2026-05-01"}, "2026-05-01"),
+        ({"ends_on": "2026-05-03"}, "2026-05-03"),
+    ],
+    ids=["start-only", "end-only"],
+)
+def test_a_part_with_one_date_writes_it_into_both_attributes(schema, part, written_date) -> None:
+    """`<dateoftrip>`'s two attributes are both required, and §6.9a's dates are each optional.
+
+    Symmetric because the format is: §6.9a makes each date independently optional, so an
+    end with no start is as reachable as a start with no end, and the alternative to
+    repeating the one date — dropping the element, which `minOccurs="0"` allows — would
+    lose the date the document did carry.
+    No fixture reaches either branch: the written corpus's three parts carry both dates,
+    neither and both.
+    """
+    source = trip_of(part)
+    assert f'startdate="{written_date}T00:00:00" enddate="{written_date}T00:00:00"' in written(source, schema)
+
+    read = read_back(source)["trips"][0]["parts"][0]
+    assert read == {"starts_on": written_date, "ends_on": written_date}
+    assert [kind for kind, where, _ in notes(source) if where == "trips/0/parts/0"] == ["absent", "absent"]
+
+
+def test_a_part_with_no_dates_gets_no_dateoftrip_at_all(schema) -> None:
+    """The element is `minOccurs="0"`, so an undated part loses nothing and reports nothing."""
+    source = trip_of({"location": {"name": "Sha'ab Ali"}})
+    assert "<dateoftrip" not in written(source, schema)
+
+    assert read_back(source)["trips"][0]["parts"] == [{"location": {"name": "Sha'ab Ali"}}]
+    assert messages(source, "trips/0/parts/0") == []
+
+
+def test_a_trip_with_no_parts_is_written_as_the_element_it_reads_back_from(schema) -> None:
+    """`tripType` requires one `<trippart>`, and a partless trip has nothing to put in it.
+
+    An empty `<name>` is a valid `xs:string` that the reader takes as no part at all, so
+    the floor element round-trips to the partless trip it was written from — which is why
+    nothing is reported for it.
+    """
+    source = document(trips=[{"uuid": TRIP_UUID, "name": "Weekend"}])
+    text = written(source, schema)
+    assert "<name />" in text and "<dateoftrip" not in text
+
+    assert read_back(source)["trips"][0] == {"uuid": TRIP_UUID, "name": "Weekend"}
+    assert messages(source, "trips/0/parts/0") == []
+
+
+def test_a_placeless_part_says_what_a_reader_will_make_of_its_empty_name(schema) -> None:
+    """`simpleNamedType` makes `<name>` mandatory, and the finding turns on the dates.
+
+    A dated placeless part comes back as itself; one carrying neither a place nor a date is
+    the same element as the floor above, so it does not come back at all — and that is the
+    one shape of part the self round trip loses.
+    """
+    dated = trip_of({"starts_on": "2026-05-01", "ends_on": "2026-05-03"})
+    assert read_back(dated)["trips"][0]["parts"] == [{"starts_on": "2026-05-01", "ends_on": "2026-05-03"}]
+    assert "reads back as the dated placeless part it is" in messages(dated, "trips/0/parts/0")[0]
+
+    empty = trip_of({})
+    written(empty, schema)
+    assert "parts" not in read_back(empty)["trips"][0]
+    assert "reads back as no part at all" in messages(empty, "trips/0/parts/0")[0]
+
+
+def test_parts_keep_the_divers_order_rather_than_date_order(schema) -> None:
+    """§6.9a makes the array's order recorded data, and an undated part has no date order.
+
+    Written in file order and read back in it, which is the whole of the mapping: UDDF's
+    `<trippart>` sequence carries the order and neither side re-sorts.
+    """
+    source = trip_of(
+        {"starts_on": "2026-05-08", "location": {"name": "Marsa Alam"}},
+        {"location": {"name": "Hurghada"}},
+        {"starts_on": "2026-05-01", "ends_on": "2026-05-03"},
+    )
+    divetrip = written(source, schema).partition("<divetrip>")[2]
+    assert re.findall(r"<name>([^<]*)</name>", divetrip) == ["Weekend", "Marsa Alam", "Hurghada"]
+
+    assert [part.get("location", {}).get("name") for part in read_back(source)["trips"][0]["parts"]] == [
+        "Marsa Alam",
+        "Hurghada",
+        None,
+    ]
 
 
 # -- what is dropped rather than invented ----------------------------------------------

@@ -956,14 +956,16 @@ class _Writer:
     # -- trips -------------------------------------------------------------------
 
     def divetrip_element(self) -> ET.Element | None:
-        """`<divetrip>`, one `<trippart>` per §6.9 location.
+        """`<divetrip>`, one `<trippart>` per §6.9a part.
 
-        UDDF models a trip as a sequence of parts, each with its own place, and that is the
-        only shape a list of locations fits: the reader takes a trip's span as the span of
-        its parts and its locations from their names, so a part per location comes back as
-        the list it was written from. A trip with no locations still needs one part —
-        `tripType` requires at least one — and it gets a nameless one, an empty `<name>`
-        being a valid `xs:string` that reads back as no location rather than as one.
+        Both formats model a trip as a sequence of stretches each carrying its own dates
+        and its own place, so a part goes out whole rather than having its dates lifted to
+        the trip. A trip with **no** parts still needs one `<trippart>` — `tripType`
+        requires at least one — and gets a nameless, dateless one, which reads back as no
+        part rather than as an empty one and so is reported as nothing lost.
+
+        The trip's note goes on the first part and nowhere else: a reader joins every
+        part's notes, so writing it on each would hand back one copy per part.
         """
         trips = self.document.get("trips")
         if not trips:
@@ -971,26 +973,26 @@ class _Writer:
         divetrip = ET.Element("divetrip")
         for index, trip in enumerate(trips):
             where = f"trips/{index}"
-            self.unmapped(
-                where, trip, frozenset({"uuid", "name", "locations", "starts_on", "ends_on", "notes"})
-            )
+            self.unmapped(where, trip, frozenset({"uuid", "name", "parts", "notes"}))
             element = _sub(divetrip, "trip", id=_uddf_id("trip", trip["uuid"]))
             _sub(element, "name", str(trip.get("name") or ""))
-            locations = trip.get("locations") or [None]
-            for part_index, location in enumerate(locations):
-                part_where = f"{where}/locations/{part_index}"
+            parts = trip.get("parts") or [None]
+            for part_index, record in enumerate(parts):
+                part_where = f"{where}/parts/{part_index}"
+                location = None if record is None else record.get("location")
                 # `trippartType` is an `xs:sequence`: name, dateoftrip, geography, notes.
                 part = _sub(element, "trippart")
+                if record is not None:
+                    self.unmapped(part_where, record, frozenset({"starts_on", "ends_on", "location"}))
                 if location is None:
                     _sub(part, "name", "")
+                    if record is not None:
+                        self.nameless_part(part_where, record)
                 else:
                     self.unmapped(part_where, location, frozenset({"name", "display_name", "position"}))
                     _sub(part, "name", str(location.get("name") or ""))
-                # The dates and the note belong to the trip and not to any one part, so they
-                # go on the first: the reader takes the span of every part's dates and joins
-                # every part's notes, both of which return what one part carried.
-                if part_index == 0:
-                    self.date_of_trip(part, where, trip)
+                if record is not None:
+                    self.date_of_trip(part, part_where, record)
                 if location is not None:
                     # `display_name` and nothing else: the reader takes a part's
                     # `<geography><location>` as the display name and only where it differs
@@ -1003,25 +1005,60 @@ class _Writer:
                     self.notes_of(part, where, trip)
         return divetrip
 
-    def date_of_trip(self, part: ET.Element, where: str, trip: dict[str, Any]) -> None:
+    def nameless_part(self, where: str, record: dict[str, Any]) -> None:
+        """The empty `<name>` a placeless part is written with, reported.
+
+        `simpleNamedType` makes `<name>` mandatory and the part has nothing for it, so what
+        the finding has to say is what a reader will take the placeholder as — and that
+        turns on the part's dates. A dated one comes back as the placeless part it was; one
+        carrying neither a place nor a date does not come back at all, being the same
+        element as the floor a partless trip is written with.
+        """
+        if record.get("starts_on") or record.get("ends_on"):
+            self.note(
+                where,
+                "the part records no place, and UDDF's <trippart> requires a <name>; an empty one is "
+                "written, which reads back as the dated placeless part it is",
+                "absent",
+            )
+        else:
+            self.note(
+                where,
+                "the part records neither a place nor a date, and UDDF's <trippart> requires a <name>; an "
+                "empty one is written, which is the element a trip with no parts is written as and reads "
+                "back as no part at all",
+                "absent",
+            )
+
+    def date_of_trip(self, part: ET.Element, where: str, record: dict[str, Any]) -> None:
         """`<dateoftrip>`, whose two attributes are both `use="required"`.
 
-        A trip with no end date has nothing to put in `enddate`, and UDDF has no spelling
-        for an open one — so the start date is repeated and the report says what a reader
-        will make of it, which is a trip that ended the day it began.
+        The element itself is `minOccurs="0"`, so a part with neither date gets none of it
+        and loses nothing. A part with **one** of the two has nothing for the other
+        attribute, and UDDF has no spelling for an open stretch — so the date it does have
+        is written into both and the report says what a reader will make of that, which is
+        a stretch that began and ended on one day. Dropping the element instead would lose
+        the date the source did record.
         """
-        starts = trip.get("starts_on")
-        if not starts:
+        starts, ends = record.get("starts_on"), record.get("ends_on")
+        if not starts and not ends:
             return
-        ends = trip.get("ends_on")
         if not ends:
             self.note(
                 where,
-                "the trip records no end date, and UDDF's <dateoftrip> requires one; the start date is "
-                "written there, so a reader sees a trip that ended the day it began",
+                "the part records no end date, and UDDF's <dateoftrip> requires both; the start date is "
+                "written into both, so a reader sees a stretch that began and ended on one day",
                 "absent",
             )
             ends = starts
+        elif not starts:
+            self.note(
+                where,
+                "the part records no start date, and UDDF's <dateoftrip> requires both; the end date is "
+                "written into both, so a reader sees a stretch that began and ended on one day",
+                "absent",
+            )
+            starts = ends
         # `xs:dateTime` where DiveJSON holds a plain date, so each is widened to midnight —
         # and the reader takes the date back off the front, which is what makes it exact.
         _sub(part, "dateoftrip", startdate=f"{starts}T00:00:00", enddate=f"{ends}T00:00:00")

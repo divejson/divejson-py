@@ -289,14 +289,22 @@
       "properties": {
         "uuid": { "$ref": "#/$defs/uuid" },
         "name": { "type": "string", "minLength": 1, "maxLength": 255 },
-        "locations": { "type": "array", "items": { "$ref": "#/$defs/trip_location" } },
-        "starts_on": { "$ref": "#/$defs/date" },
-        "ends_on": { "$ref": "#/$defs/date" },
+        "parts": { "type": "array", "items": { "$ref": "#/$defs/trip_part" } },
         "notes": { "$ref": "#/$defs/notes" },
         "created_at": { "$ref": "#/$defs/date_time" },
         "extensions": { "$ref": "#/$defs/extensions" }
       },
-      "required": ["uuid", "name", "starts_on"],
+      "required": ["uuid", "name"],
+      "additionalProperties": false
+    },
+    "trip_part": {
+      "type": "object",
+      "properties": {
+        "starts_on": { "$ref": "#/$defs/date" },
+        "ends_on": { "$ref": "#/$defs/date" },
+        "location": { "$ref": "#/$defs/trip_location" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
       "additionalProperties": false
     },
     "trip_location": {

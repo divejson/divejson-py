@@ -292,37 +292,45 @@
     {
       "uuid": "0198a6f0-1111-7030-8000-000000000030",
       "name": "Fiordland tech week",
-      "locations": [
+      "parts": [
         {
-          "name": "Milford Sound",
-          "display_name": "Milford Sound / Piopiotahi, Southland, New Zealand",
-          "position": {
-            "latitude": -44.6414,
-            "longitude": 167.8974
-          },
-          "bbox": {
-            "south": -44.7,
-            "north": -44.58,
-            "west": 167.8,
-            "east": 167.99
+          "starts_on": "2026-07-01",
+          "ends_on": "2026-07-04",
+          "location": {
+            "name": "Milford Sound",
+            "display_name": "Milford Sound / Piopiotahi, Southland, New Zealand",
+            "position": {
+              "latitude": -44.6414,
+              "longitude": 167.8974
+            },
+            "bbox": {
+              "south": -44.7,
+              "north": -44.58,
+              "west": 167.8,
+              "east": 167.99
+            }
           }
         },
         {
-          "name": "Chatham Rise crossing",
-          "position": {
-            "latitude": -43.9,
-            "longitude": 179.9
-          },
-          "bbox": {
-            "south": -44.2,
-            "north": -43.6,
-            "west": 179.5,
-            "east": -179.6
+          "location": {
+            "name": "Chatham Rise crossing",
+            "position": {
+              "latitude": -43.9,
+              "longitude": 179.9
+            },
+            "bbox": {
+              "south": -44.2,
+              "north": -43.6,
+              "west": 179.5,
+              "east": -179.6
+            }
           }
+        },
+        {
+          "starts_on": "2026-07-08",
+          "ends_on": "2026-07-09"
         }
       ],
-      "starts_on": "2026-07-01",
-      "ends_on": "2026-07-09",
       "notes": "",
       "created_at": "2026-06-01T08:00:00+12:00"
     }

@@ -322,7 +322,7 @@ one, so nothing about it could be checked against output Subsurface actually pro
 
 | `.ssrf` | why not |
 | --- | --- |
-| `<trip>`'s own attributes | §6.8 makes a trip's `starts_on` REQUIRED, and no file in hand carries a `<trip>` to read its dates and place from — so the dives inside one are carried and the grouping is reported as dropped. The element is still walked *through*, or a trip's dives would disappear with it. This is the first thing to map when such a file arrives. |
+| `<trip>`'s own attributes | No real export in hand carries a `<trip>` to read its `@date` and `@location` from — so the dives inside one are carried and the grouping is reported as dropped. The element is still walked *through*, or a trip's dives would disappear with it. §6.8's `starts_on` was a second reason and is no longer one: a trip records no dates now, and §6.9a's part is the shape `@date` and `@location` together make. What is left to settle is a trip's `name`, which §6.8 still REQUIRES and which no attribute here states. This is the first thing to map when such a file arrives. |
 | `<site @gps>` | site coordinates, and the highest-value entry in this table. No file in hand carries one, so neither the separator nor the coordinate order can be checked; `converting.md`'s Null Island and half-a-pair rules are already shared and waiting for it. |
 | `<site><geo>` | Subsurface's country/region taxonomy, whose `@cat` codes are not documented in any file here. `sites[].location` is where it would land. |
 | `<weightsystem>` | `dive.weight` is the member, and the unit spelling and the multiple-system summing rule are both unchecked against a real file. |
