@@ -249,14 +249,59 @@ def test_a_site_with_a_location_carries_its_coordinates(schema) -> None:
             {
                 "uuid": SITE_UUID,
                 "name": "The Chimney",
-                "location": "Milford Sound",
+                "location": {"name": "Milford Sound"},
                 "position": {"latitude": -44.6301, "longitude": 167.8901},
             }
         ]
     )
     written(source, schema)
     assert read_back(source)["sites"][0]["position"] == {"latitude": -44.6301, "longitude": 167.8901}
+    assert messages(source, "sites/0") == [] and messages(source, "sites/0/location") == []
+
+
+def test_a_sites_locality_loses_everything_but_its_name_and_says_so(schema) -> None:
+    """Three members with nowhere to go, each named at the locality's own path.
+
+    A site's `<name>` is the site's own, so `<geography><location>` is the only slot the
+    place has and `location.name` takes it. The rest of §6.9 has none: `<geography>`'s
+    coordinates are the **site's** pin and not the locality's centre (§6.10), and UDDF has
+    no box element anywhere.
+
+    **Where each note sits is half the assertion.** The trip part's own call reports at the
+    part's path, which is safe only because a part has no position of its own; mirrored onto
+    a site, a dropped locality centre would say "no slot for position" beside the
+    `<latitude>` this writer just wrote from the site's pin — the confusion §6.10 forbids in
+    as many words.
+    """
+    source = document(
+        sites=[
+            {
+                "uuid": SITE_UUID,
+                "name": "Harrys Wall",
+                "location": {
+                    "name": "Milford Sound, New Zealand",
+                    "full_name": "Milford Sound / Piopiotahi, Southland, New Zealand",
+                    "position": {"latitude": -44.6414, "longitude": 167.8974},
+                    "bbox": {"south": -44.7, "north": -44.58, "west": 167.8, "east": 167.99},
+                },
+                "position": {"latitude": -44.6301, "longitude": 167.8901},
+            }
+        ]
+    )
+    text = written(source, schema)
+    assert "<location>Milford Sound, New Zealand</location>" in text
+    assert "<latitude>-44.6301</latitude>" in text and "167.8974" not in text
+
     assert messages(source, "sites/0") == []
+    assert sorted(messages(source, "sites/0/location")) == [
+        "UDDF has no slot for bbox; it is not written",
+        "UDDF has no slot for full_name; it is not written",
+        "UDDF has no slot for position; it is not written",
+    ]
+
+    site = read_back(source)["sites"][0]
+    assert site["location"] == {"name": "Milford Sound, New Zealand"}
+    assert site["position"] == {"latitude": -44.6301, "longitude": 167.8901}
 
 
 def test_a_dive_numbered_zero_is_not_written(schema) -> None:

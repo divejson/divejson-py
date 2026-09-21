@@ -151,7 +151,7 @@ def test_where_the_two_readings_differ_it_is_the_exporters_doing() -> None:
         "dives[]/bottom_temperature",
         "dives[]/cns_end",
         "dives[]/otu_end",
-        "sites[]/location",
+        "sites[]/location/name",
         "dives[]/recordings[]/device/model",
     }
 
@@ -163,7 +163,8 @@ def test_where_the_two_readings_differ_it_is_the_exporters_doing() -> None:
     assert first_ssrf["bottom_temperature"] == 22.4 and "bottom_temperature" not in first_uddf
     assert first_ssrf["cns_end"] == 11.0 and "cns_end" not in first_uddf
     assert first_ssrf["otu_end"] == 31.0 and "otu_end" not in first_uddf
-    assert "location" not in ssrf["sites"][0] and uddf["sites"][0]["location"] == uddf["sites"][0]["name"]
+    assert "location" not in ssrf["sites"][0]
+    assert uddf["sites"][0]["location"] == {"name": uddf["sites"][0]["name"]}
     assert (ssrf["dives"][0]["recordings"][0]["device"] or {}).get("model") == "Open Diving"
     assert "device" not in uddf["dives"][0]["recordings"][0]
 

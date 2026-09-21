@@ -144,7 +144,7 @@ holding `n/a`, a dash or a person's name is read as no email recorded, and repor
 | UDDF | DiveJSON |
 | --- | --- |
 | `name` | `sites[].name` — REQUIRED, so a nameless site is dropped |
-| `geography/location` | `sites[].location` |
+| `geography/location` | `sites[].location.name` — the only slot UDDF has for a locality, so nothing else of the place is filled in |
 | `geography/latitude` + `longitude` | `sites[].position` |
 | `notes/para` | `sites[].notes`, paragraphs joined with blank lines |
 
@@ -162,12 +162,18 @@ which is the file that taught `converting.md`'s rule that such a pair is not a p
 | `name` | `trips[].name` |
 | `trippart` | `trips[].parts[]`, in file order |
 | `trippart/name` | `trips[].parts[].location.name` |
-| `trippart/geography/location` | `trips[].parts[].location.display_name`, when it differs from the name |
+| `trippart/geography/location` | `trips[].parts[].location.full_name`, when it differs from the name |
 | `trippart/geography/latitude` + `longitude` | `trips[].parts[].location.position` |
 | `trippart/dateoftrip/@startdate` | `trips[].parts[].starts_on` |
 | `trippart/dateoftrip/@enddate` | `trips[].parts[].ends_on` |
 | `trippart/notes/para` | `trips[].notes`, every part's joined |
 | dive's `informationbeforedive/tripmembership/@ref` | `dives[].trip_uuid` |
+
+**`<geography><location>` lands in a different member on each host**, and the asymmetry is
+UDDF's rather than this reader's. A `<trippart>`'s `<name>` *is* its place's name, so the
+element beside it is free to carry the fuller form; a `<site>`'s `<name>` is the site's own,
+which leaves `<location>` as the only slot the locality has at all — and a site read from
+UDDF therefore never arrives with a `full_name`, a locality position or a box.
 
 **A `<trippart>` is a part**, which is as close to an identity as this table gets: both
 formats model a trip as a sequence of stretches each carrying its own dates and its own

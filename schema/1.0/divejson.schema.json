@@ -302,16 +302,16 @@
       "properties": {
         "starts_on": { "$ref": "#/$defs/date" },
         "ends_on": { "$ref": "#/$defs/date" },
-        "location": { "$ref": "#/$defs/trip_location" },
+        "location": { "$ref": "#/$defs/location" },
         "extensions": { "$ref": "#/$defs/extensions" }
       },
       "additionalProperties": false
     },
-    "trip_location": {
+    "location": {
       "type": "object",
       "properties": {
         "name": { "type": "string", "minLength": 1, "maxLength": 255 },
-        "display_name": { "type": "string", "maxLength": 512 },
+        "full_name": { "type": "string", "maxLength": 512 },
         "position": { "$ref": "#/$defs/position" },
         "bbox": { "$ref": "#/$defs/bounding_box" },
         "extensions": { "$ref": "#/$defs/extensions" }
@@ -363,7 +363,7 @@
       "properties": {
         "uuid": { "$ref": "#/$defs/uuid" },
         "name": { "type": "string", "minLength": 1, "maxLength": 255 },
-        "location": { "type": "string", "maxLength": 255 },
+        "location": { "$ref": "#/$defs/location" },
         "position": { "$ref": "#/$defs/position" },
         "notes": { "$ref": "#/$defs/notes" },
         "created_at": { "$ref": "#/$defs/date_time" },

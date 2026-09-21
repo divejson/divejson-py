@@ -48,7 +48,9 @@
     {
       "uuid": "b46b2efb-112c-5fc3-8566-50aee4c46ce8",
       "name": "Condesito Wreck",
-      "location": "Las Galletas, Tenerife",
+      "location": {
+        "name": "Las Galletas, Tenerife"
+      },
       "position": {
         "latitude": 28.001389,
         "longitude": -16.653611

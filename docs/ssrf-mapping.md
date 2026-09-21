@@ -324,7 +324,7 @@ one, so nothing about it could be checked against output Subsurface actually pro
 | --- | --- |
 | `<trip>`'s own attributes | No real export in hand carries a `<trip>` to read its `@date` and `@location` from — so the dives inside one are carried and the grouping is reported as dropped. The element is still walked *through*, or a trip's dives would disappear with it. §6.8's `starts_on` was a second reason and is no longer one: a trip records no dates now, and §6.9a's part is the shape `@date` and `@location` together make. What is left to settle is a trip's `name`, which §6.8 still REQUIRES and which no attribute here states. This is the first thing to map when such a file arrives. |
 | `<site @gps>` | site coordinates, and the highest-value entry in this table. No file in hand carries one, so neither the separator nor the coordinate order can be checked; `converting.md`'s Null Island and half-a-pair rules are already shared and waiting for it. |
-| `<site><geo>` | Subsurface's country/region taxonomy, whose `@cat` codes are not documented in any file here. `sites[].location` is where it would land. |
+| `<site><geo>` | Subsurface's country/region taxonomy, whose `@cat` codes are not documented in any file here. `sites[].location.name` is where it would land — the tags say what the place is called and nothing about where it sits, so the rest of §6.9's members would stay empty. |
 | `<weightsystem>` | `dive.weight` is the member, and the unit spelling and the multiple-system summing rule are both unchecked against a real file. |
 | `<sample @pressure>`, `@sensor` | `profile.pressures[]` and the cylinder numbering it needs. No file in hand carries a sample pressure, and a channel tied to the wrong cylinder is worse than no channel. |
 | `<sample @ndl>`, `@tts`, `@cns`, `@dc_supplied_ppo2` | §6.4's `ndl`, `tts`, `cns` and `ppo2` channels. Nothing in this table is closer to landing: the members exist and Subsurface writes all four. No `.ssrf` in hand carries one — every `<sample>` in the four fixtures states depth, temperature and nothing else — and this corpus does not adopt a mapping no pair exercises. Named here as Subsurface writes them so the reader that maps them starts from the right list. |
@@ -387,11 +387,11 @@ exporter's doing. Everything else in both documents is equal.
   does carry these two they are per-waypoint series rather than the dive's end scalar, and
   `uddf-mapping.md` records this reader declining to derive a scalar from them; that policy
   never comes into play here, because there is nothing in the export to derive from.
-- **`sites[].location`** — the site's own name there, absent here, on all five sites. The
-  exporter writes a `<geography><location>` holding exactly what `<name>` holds, and the
-  UDDF reader carries it because §6.10's `location` is a real member and a reader cannot
-  know that a writer filled it by copying. The save file's `<site>` has one name and no
-  second field to copy it into. This is the one difference `dives` cannot see: the other
+- **`sites[].location`** — a place named after the site itself there, absent here, on all
+  five sites. The exporter writes a `<geography><location>` holding exactly what `<name>`
+  holds, and the UDDF reader carries it into `location.name` because §6.10's `location` is a
+  real member and a reader cannot know that a writer filled it by copying. The save file's
+  `<site>` has one name and no second field to copy it into. This is the one difference `dives` cannot see: the other
   seven all live on a dive.
 
 The record UUIDs differ too, and always will: each format has its own frozen identity

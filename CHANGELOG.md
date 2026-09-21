@@ -7,6 +7,25 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Breaking: a place is one object, and a dive site carries it.** §6.9 of
+  [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) is
+  *Location* rather than *Trip Location* and both a trip part and a dive site reference it, so
+  `sites[].location` is an object where it was a free-text string and anything reading it as
+  text reads `location.name`. Its second text member is `full_name`, the fullest written form
+  the source held for the place; `display_name` is removed rather than re-pointed, so a
+  document still carrying it is refused as an undefined member rather than read as something
+  it no longer means. §3's `south ≤ north` reads on either host now, and a dive site's
+  reversed bounding box is reported at `sites/<i>/location/bbox`.
+
+- **The UDDF reader fills a site's locality with its name and nothing else.**
+  `<geography>`'s own coordinates are the site's pin and not the locality's centre (§6.10),
+  and UDDF has no element for a fuller form of a place or for its extent. The writer spends
+  the one `<location>` element each host has the same way it is read — a site's on
+  `location.name`, a trip part's on `location.full_name`, the part's own `<name>` already
+  holding the name — and reports a site's `full_name`, `position` and `bbox` dropped at
+  `sites/<i>/location`, where a note at the site's own path would read as a claim about the
+  coordinates the same element just carried.
+
 ## 0.9.0
 
 - **Breaking: a trip is a sequence of parts, and records no dates of its own.** §6.8 and the

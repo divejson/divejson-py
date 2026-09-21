@@ -361,7 +361,7 @@ UDDF file expects to find there.
 
 `geographyType` makes `<location>` mandatory, so **coordinates are written only where the
 record has a place name**: a site with a `position` and no `location`, or a part's location
-with a `position` and no `display_name`, keeps its name and loses its coordinates, reported.
+with a `position` and no `full_name`, keeps its name and loses its coordinates, reported.
 
 **Differs from the reference writer**: it puts the record's own **name** in `<location>` and
 keeps the coordinates, which is defensible for an application exporting data it holds a name
@@ -372,7 +372,7 @@ place in the document where the reference writer takes the third of them.
 A trip becomes one `<trippart>` **per §6.9a part**, which is as close to an identity as
 this document gets: both formats model a trip as a sequence of stretches, each carrying its
 own dates and its own place, so a part goes out whole instead of having its dates lifted to
-the trip. A part's `location.name` is the `<name>`, its `location.display_name` the
+the trip. A part's `location.name` is the `<name>`, its `location.full_name` the
 `<geography><location>`, and its own dates the `<dateoftrip>`.
 
 **A trip with no parts still needs one `<trippart>`** — `tripType` requires at least one —
@@ -405,6 +405,15 @@ held the dates:
   the element — would lose the date the source did record.
 
 `trips[].parts[].location.bbox` has no UDDF slot at all.
+
+**A dive site's locality loses three members rather than one**, and the reason is the
+element it has to share. A site's `<name>` is the site's own, so the locality has only
+`<geography><location>` to live in and that one slot takes `location.name` — which leaves
+`sites[].location.full_name` with nowhere to go, and `sites[].location.position` and
+`sites[].location.bbox` with nowhere either, `<geography>`'s own `<latitude>` and
+`<longitude>` being the **site's** pin and not the locality's. All three are reported
+dropped. A part gives the same element to its `full_name` and so loses only its box, which
+is the asymmetry [`uddf-mapping.md`](uddf-mapping.md) describes from the reading side.
 
 ### Dives
 
@@ -604,6 +613,7 @@ once per record that carries it, and none of them has anywhere in UDDF to go:
 | `diver.username` | `<owner id>` is an XML id and not a handle |
 | a recording's `source_files`, `started_at` and its device's `firmware`, and every recording after the first | UDDF gives a dive one `<samples>`, and `equipmentPieceType` no firmware element — *Devices* above has each answer and why the device of a dropped recording is kept even so |
 | `trips[].parts[].location.bbox` | `geographyType` carries a point, not a box |
+| `sites[].location.full_name`, `position` and `bbox` | a site's `<name>` is its own, so the locality gets only `<geography><location>` and that slot holds `location.name`; `<geography>`'s coordinates are the site's pin, and the box has nowhere either — *Sites and trips* above has the asymmetry with a part |
 | a record's `extensions` | producer-defined members (§5.5) |
 
 An **empty** note — `notes: ""` — is not written either: `<para></para>` and no `<notes>` at

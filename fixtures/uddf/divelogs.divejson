@@ -84,7 +84,9 @@
     {
       "uuid": "3c7a70ee-b290-560b-8be1-d4919397c58d",
       "name": "El Puertito",
-      "location": "Tenerife"
+      "location": {
+        "name": "Tenerife"
+      }
     }
   ],
   "extensions": {
