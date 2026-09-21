@@ -139,7 +139,7 @@ def test_an_empty_element_is_absent_rather_than_zero() -> None:
     header = "<divesite><site id='s'><name>Small Brother</name><geography><location>Egypt</location><latitude/><longitude/></geography></site></divesite>"
     site = convert(one_dive(STARTED_AT, header=header)).document["sites"][0]
     assert "position" not in site
-    assert site["location"] == "Egypt"
+    assert site["location"] == {"name": "Egypt"}
 
 
 # -- nothing invented ----------------------------------------------------------------

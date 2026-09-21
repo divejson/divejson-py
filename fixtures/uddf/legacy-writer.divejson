@@ -48,7 +48,9 @@
     {
       "uuid": "ea58bb9e-dd47-5727-8360-47261cb768bd",
       "name": "Um El Faroud",
-      "location": "Wied iz-Zurrieq, Malta",
+      "location": {
+        "name": "Wied iz-Zurrieq, Malta"
+      },
       "position": {
         "latitude": 35.8225,
         "longitude": 14.4392

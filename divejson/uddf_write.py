@@ -916,7 +916,22 @@ class _Writer:
             self.unmapped(where, site, frozenset({"uuid", "name", "location", "position", "notes"}))
             element = _sub(divesite, "site", id=_uddf_id("site", site["uuid"]))
             _sub(element, "name", str(site.get("name") or ""))
-            self.geography(element, where, site.get("location"), site.get("position"), noun="site")
+            location = site.get("location")
+            if location:
+                # The locality's own members report here or nowhere: `unmapped` is flat, and
+                # the call above carries `location` as a member *name* rather than walking
+                # into it. At the locality's path and not the site's, which is not cosmetic
+                # — `geography` writes the **site's** pin two lines down, so a note saying
+                # UDDF has no slot for `position` at `sites/<i>` would read as a claim about
+                # the coordinates this same call just wrote (§6.10).
+                self.unmapped(f"{where}/location", location, frozenset({"name"}))
+            self.geography(
+                element,
+                where,
+                location.get("name") if location else None,
+                site.get("position"),
+                noun="site",
+            )
             self.notes_of(element, where, site)
         return divesite
 
@@ -924,12 +939,17 @@ class _Writer:
         self,
         parent: ET.Element,
         where: str,
-        location: Any,
+        place: Any,
         position: Any,
         *,
         noun: str,
     ) -> None:
         """`<geography>`, which UDDF will not let carry coordinates without a place name.
+
+        `place` is the text the one `<location>` element gets, and each host spends that
+        element on a different member of §6.9's location — a site on the place's `name`, a
+        trip part on its `full_name`, the part's own `<name>` already holding the name.
+        `docs/uddf-mapping.md` has the asymmetry and why UDDF forces it.
 
         `<location>` is mandatory in `geographyType`, and there is nothing honest to put
         there for a record that has none: copying the record's own **name** in — which is
@@ -938,7 +958,7 @@ class _Writer:
         coordinates are dropped and reported, which is the loss this format actually
         imposes.
         """
-        if not location:
+        if not place:
             if position:
                 self.note(
                     where,
@@ -948,7 +968,7 @@ class _Writer:
                 )
             return
         geography = _sub(parent, "geography")
-        _sub(geography, "location", str(location))
+        _sub(geography, "location", str(place))
         if position:
             _sub(geography, "latitude", _num(position["latitude"]))
             _sub(geography, "longitude", _num(position["longitude"]))
@@ -989,17 +1009,17 @@ class _Writer:
                     if record is not None:
                         self.nameless_part(part_where, record)
                 else:
-                    self.unmapped(part_where, location, frozenset({"name", "display_name", "position"}))
+                    self.unmapped(part_where, location, frozenset({"name", "full_name", "position"}))
                     _sub(part, "name", str(location.get("name") or ""))
                 if record is not None:
                     self.date_of_trip(part, part_where, record)
                 if location is not None:
-                    # `display_name` and nothing else: the reader takes a part's
-                    # `<geography><location>` as the display name and only where it differs
+                    # `full_name` and nothing else: the reader takes a part's
+                    # `<geography><location>` as the fuller form and only where it differs
                     # from the part's own name, so writing the name here would round-trip as
-                    # no display name at all.
+                    # no full name at all.
                     self.geography(
-                        part, part_where, location.get("display_name"), location.get("position"), noun="location"
+                        part, part_where, location.get("full_name"), location.get("position"), noun="location"
                     )
                 if part_index == 0:
                     self.notes_of(part, where, trip)

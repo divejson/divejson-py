@@ -116,12 +116,16 @@
     {
       "uuid": "a2f279fa-7d08-5be8-b6a0-8360779ca203",
       "name": "Small Brother",
-      "location": "Small Brother"
+      "location": {
+        "name": "Small Brother"
+      }
     },
     {
       "uuid": "0e7d38f0-c092-5f6e-a0d9-e89514563f95",
       "name": "SS Thistlegorm",
-      "location": "SS Thistlegorm"
+      "location": {
+        "name": "SS Thistlegorm"
+      }
     }
   ],
   "extensions": {

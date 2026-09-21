@@ -128,13 +128,13 @@ LITRES_PER_CUBIC_METRE = Decimal(1000)
 # specifies — see `_volume_litres`.
 LITRES_THRESHOLD = Decimal(1)
 
-# `MAX_NOTES` and `MAX_NAME` are `converter.py`'s: every adapter meets those two. The three
-# below are UDDF's own, being the only reader that fills the members they cap. §6.12's
-# `serial` is 1-64 rather than the 255 its neighbours share, and the reason is worth
+# `MAX_NOTES` and `MAX_NAME` are `converter.py`'s: every adapter meets those two, and
+# §6.9's `name` is one of them — a place's name shares the 255 every name in the format
+# has. The two below are UDDF's own, being the only reader that fills the members they cap.
+# §6.12's `serial` is 1-64 rather than the 255 its neighbours share, and the reason is worth
 # knowing: a gear serial longer than a device's (§6.4b) could never equal one, and equality
 # between the two is what says a kit item and a device are one machine.
-MAX_LOCATION = 255
-MAX_DISPLAY_NAME = 512
+MAX_FULL_NAME = 512
 MAX_SERIAL = 64
 MIN_PO2_LIMIT = Decimal("0.4")
 MAX_PO2_LIMIT = Decimal("2.0")
@@ -678,7 +678,11 @@ class _Converter:
             geography = _kid(element, "geography")
             location = _text_of(geography, "location")
             if location:
-                site["location"] = self.capped(location, MAX_LOCATION, where, "the site location")
+                # The place's name and nothing else. `<geography>`'s own coordinates are the
+                # **site's** pin, not the locality's centre (§6.10), and UDDF has no element
+                # for a fuller form of the place or for its extent — so a site read from
+                # here never arrives with a `full_name`, a `location.position` or a `bbox`.
+                site["location"] = {"name": self.capped(location, MAX_NAME, where, "the site's locality")}
             position = self.position(geography, where)
             if position:
                 site["position"] = position
@@ -765,12 +769,12 @@ class _Converter:
 
             geography = _kid(part, "geography")
             part_name = _text_of(part, "name")
-            display_name = _text_of(geography, "location")
+            full_name = _text_of(geography, "location")
             location: dict[str, Any] | None = None
             if part_name:
                 location = {"name": self.capped(part_name, MAX_NAME, part_where, "the trip part's name")}
-                if display_name and display_name != part_name:
-                    location["display_name"] = self.capped(display_name, MAX_DISPLAY_NAME, part_where, "the location")
+                if full_name and full_name != part_name:
+                    location["full_name"] = self.capped(full_name, MAX_FULL_NAME, part_where, "the location")
                 position = self.position(geography, part_where)
                 if position:
                     location["position"] = position

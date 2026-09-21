@@ -170,6 +170,27 @@ def _present(obj: dict[str, Any], member: str) -> bool:
     return obj.get(member) is not None
 
 
+def _check_location_bbox(record: dict[str, Any], path: str, issues: list[Issue]) -> None:
+    """§3's `south ≤ north`, on whichever record carries the location.
+
+    §6.9's box has two hosts — a trip part and a dive site — so a check that walked trips
+    alone would pass a site's reversed box perfectly, the schema bounding each corner and
+    saying nothing about the pair. `fixtures/invalid/site-bbox-south-exceeds-north.divejson`
+    is the document that fails only for a validator reaching both.
+    """
+    location = record.get("location")
+    if not isinstance(location, dict):
+        return
+    bbox = location.get("bbox")
+    if not isinstance(bbox, dict):
+        return
+    try:
+        if bbox["south"] > bbox["north"]:
+            issues.append(Issue(f"{path}/location/bbox", "south exceeds north"))
+    except (KeyError, TypeError):
+        pass
+
+
 def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
     issues: list[Issue] = []
 
@@ -289,16 +310,10 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
                         issues.append(Issue(part_path, "ends_on precedes starts_on"))
                 except TypeError:
                     pass
-            location = part.get("location")
-            if not isinstance(location, dict):
-                continue
-            bbox = location.get("bbox")
-            if isinstance(bbox, dict):
-                try:
-                    if bbox["south"] > bbox["north"]:
-                        issues.append(Issue(f"{part_path}/location/bbox", "south exceeds north"))
-                except (KeyError, TypeError):
-                    pass
+            _check_location_bbox(part, part_path, issues)
+
+    for index, site in enumerate(collections["sites"]):
+        _check_location_bbox(site, f"sites/{index}", issues)
 
     for index, gear_set in enumerate(collections["gear_sets"]):
         _check_reference_list(

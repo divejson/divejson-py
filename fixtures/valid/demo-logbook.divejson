@@ -4022,35 +4022,45 @@
     {
       "uuid": "019fec36-b8bf-7289-9959-05cd3316f256",
       "name": "Condesito Wreck",
-      "location": "Las Galletas, Tenerife",
+      "location": {
+        "name": "Las Galletas, Tenerife"
+      },
       "notes": "Broken cargo wreck at 18-21 m.",
       "created_at": "2026-08-10T15:07:17.055390Z"
     },
     {
       "uuid": "019fec36-b8b8-7cc9-a4b9-ede85f907c94",
       "name": "El Puertito",
-      "location": "Tenerife",
+      "location": {
+        "name": "Tenerife"
+      },
       "notes": "Shallow bay, resident green turtles.",
       "created_at": "2026-08-10T15:07:17.048128Z"
     },
     {
       "uuid": "019fec36-b8a8-734b-84c1-66963865e729",
       "name": "Ras Mohammed - Shark & Yolanda",
-      "location": "Sinai, Red Sea",
+      "location": {
+        "name": "Sinai, Red Sea"
+      },
       "notes": "Drift along two pinnacles, toilets at the Yolanda wreck.",
       "created_at": "2026-08-10T15:07:17.032718Z"
     },
     {
       "uuid": "019fec36-b8b1-7af6-936f-d40e7cc3cf36",
       "name": "Small Brother",
-      "location": "Brothers Islands, Red Sea",
+      "location": {
+        "name": "Brothers Islands, Red Sea"
+      },
       "notes": "Steep walls, chance of thresher sharks.",
       "created_at": "2026-08-10T15:07:17.041073Z"
     },
     {
       "uuid": "019fec36-b89a-773e-b886-44717fc4d19f",
       "name": "SS Thistlegorm",
-      "location": "Sha'ab Ali, Red Sea",
+      "location": {
+        "name": "Sha'ab Ali, Red Sea"
+      },
       "notes": "WWII wreck at ~30 m. Motorbikes in hold no. 2.",
       "created_at": "2026-08-10T15:07:17.018941Z"
     }

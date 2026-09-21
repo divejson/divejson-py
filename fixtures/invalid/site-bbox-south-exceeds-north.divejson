@@ -1,7 +1,7 @@
 {
   "format": "divejson",
   "version": "1.0",
-  "exported_at": "2026-08-28T12:00:00",
+  "exported_at": "2026-08-28T12:00:00Z",
   "generator": {
     "name": "DiveJSON fixtures"
   },
@@ -342,7 +342,18 @@
       "uuid": "0198a6f0-1111-7040-8000-000000000040",
       "name": "Harrys Wall",
       "location": {
-        "name": "Milford Sound, New Zealand"
+        "name": "Milford Sound, New Zealand",
+        "full_name": "Milford Sound / Piopiotahi, Southland, New Zealand",
+        "position": {
+          "latitude": -44.6414,
+          "longitude": 167.8974
+        },
+        "bbox": {
+          "south": -44.58,
+          "north": -44.7,
+          "west": 167.8,
+          "east": 167.99
+        }
       },
       "position": {
         "latitude": -44.6301,

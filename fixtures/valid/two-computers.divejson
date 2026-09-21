@@ -175,7 +175,9 @@
     {
       "uuid": "0198a6f0-2222-7140-8000-000000000140",
       "name": "House Reef",
-      "location": "Dahab, Egypt",
+      "location": {
+        "name": "Dahab, Egypt"
+      },
       "position": {
         "latitude": 28.4965,
         "longitude": 34.5168
