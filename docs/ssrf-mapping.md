@@ -391,8 +391,8 @@ exporter's doing. Everything else in both documents is equal.
   five sites. The exporter writes a `<geography><location>` holding exactly what `<name>`
   holds, and the UDDF reader carries it into `location.name` because §6.10's `location` is a
   real member and a reader cannot know that a writer filled it by copying. The save file's
-  `<site>` has one name and no second field to copy it into. This is the one difference `dives` cannot see: the other
-  seven all live on a dive.
+  `<site>` has one name and no second field to copy it into. This is the one difference
+  `dives` cannot see: the other seven all live on a dive.
 
 The record UUIDs differ too, and always will: each format has its own frozen identity
 namespace, so the same site converted through both paths is two records. `converting.md`
