@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.10.0
+
 - **Breaking: a place is one object, and a dive site carries it.** §6.9 of
   [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) is
   *Location* rather than *Trip Location* and both a trip part and a dive site reference it, so
