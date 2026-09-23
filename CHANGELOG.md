@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.11.0
+
 - **Breaking: a diver carries a date of birth, a phone, emergency contacts and insurances,
   and the Diver's strings are bounded.** §6.1 of
   [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) adds
