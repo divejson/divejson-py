@@ -274,6 +274,155 @@ def test_an_email_that_is_not_an_address_costs_one_member_and_not_the_logbook(wr
     assert any("is not an address" in note.message for note in conversion.notes)
 
 
+def owner(personal: str = "<firstname>Sam</firstname><lastname>Reef</lastname>", rest: str = "") -> str:
+    """A `<diver>` header whose owner carries `personal`'s children and then `rest`."""
+    return f"<diver><owner id='owner'><personal>{personal}</personal>{rest}</owner></diver>"
+
+
+def read_owner(header: str) -> tuple[dict | None, list[tuple[str, str, str]]]:
+    """The diver a header reads as, and the report's lines about the owner."""
+    conversion = convert(one_dive(STARTED_AT, header=header))
+    assert validate_document(conversion.document) == []
+    notes = [(note.kind, note.where, note.message) for note in conversion.notes if note.where.startswith("diver")]
+    return conversion.document.get("diver"), notes
+
+
+def test_an_owner_with_only_a_birthdate_is_a_nameless_diver() -> None:
+    """The loss the check-in members exist to stop: the guard used to ask for a name or an
+    email, and an owner recording anything else read as nobody at all."""
+    birthdate = "<birthdate><datetime>1979-11-02T00:00:00</datetime></birthdate>"
+    diver, notes = read_owner(owner(f"<firstname/><lastname/>{birthdate}"))
+    assert diver is not None
+    assert {member: value for member, value in diver.items() if member != "uuid"} == {"born_on": "1979-11-02"}
+    assert notes == []
+
+
+@pytest.mark.parametrize("written", ["1988-03-14T00:00:00", "1988-03-14", "1988-03-14T23:30:00+02:00"])
+def test_a_birthdate_is_the_date_off_the_front_of_its_datetime(written: str) -> None:
+    """The slot is an `xs:dateTime` and the member a date, so the time of day is the slot's
+    and not the diver's; a bare date is the spelling UDDF's own examples use."""
+    diver, notes = read_owner(owner(f"<firstname/><lastname/><birthdate><datetime>{written}</datetime></birthdate>"))
+    assert diver is not None and diver["born_on"] == "1988-03-14"
+    assert notes == []
+
+
+def test_a_birthdate_that_is_not_a_date_is_dropped_and_reported() -> None:
+    """`1919-02-30` is on UDDF's own documentation page for `<personal>`."""
+    birthdate = "<birthdate><datetime>1919-02-30</datetime></birthdate>"
+    diver, notes = read_owner(owner(f"<firstname>Sam</firstname><lastname>Reef</lastname>{birthdate}"))
+    assert diver is not None and "born_on" not in diver
+    assert notes == [("dropped", "diver", "the date of birth is '1919-02-30', which is not a date; dropped")]
+
+
+def test_the_first_phone_is_read_and_every_other_is_reported() -> None:
+    """§6.1 carries one number, the way it carries one email."""
+    contact = (
+        "<contact><phone>+44 7700 900123</phone><phone>+44 20 7946 0000</phone>"
+        "<mobilephone>+44 7700 900999</mobilephone></contact>"
+    )
+    diver, notes = read_owner(owner(rest=contact))
+    assert diver is not None and diver["phone"] == "+44 7700 900123"
+    assert [message for _, _, message in notes] == [
+        "§6.1 carries one phone, the first the owner records; <phone> '+44 20 7946 0000' is not read",
+        "§6.1 carries one phone, the first the owner records; <mobilephone> '+44 7700 900999' is not read",
+    ]
+
+
+def test_a_mobile_phone_is_read_where_there_is_no_phone() -> None:
+    diver, notes = read_owner(owner(rest="<contact><phone/><mobilephone>+44 7700 900999</mobilephone></contact>"))
+    assert diver is not None and diver["phone"] == "+44 7700 900999"
+    assert notes == []
+
+
+def test_a_phone_past_the_bound_is_dropped_rather_than_cut() -> None:
+    """A number with its end missing is a wrong number, and §6.1 bounds `phone` at 32."""
+    diver, notes = read_owner(owner(rest=f"<contact><phone>{'4' * 33}</phone></contact>"))
+    assert diver is not None and "phone" not in diver
+    assert notes == [
+        (
+            "dropped",
+            "diver",
+            (
+                "the recorded phone is 33 characters and the format allows 32; a number cut short is a wrong "
+                "one, so it is dropped"
+            ),
+        )
+    ]
+
+
+def test_an_email_past_the_bound_is_dropped_rather_than_cut() -> None:
+    address = f"{'a' * 250}@example.org"
+    diver, notes = read_owner(owner(rest=f"<contact><email>{address}</email></contact>"))
+    assert diver is not None and "email" not in diver
+    assert notes == [
+        (
+            "dropped",
+            "diver",
+            (
+                f"the recorded email is {len(address)} characters and the format allows 255; an address cut "
+                "short is a wrong one, so it is dropped"
+            ),
+        )
+    ]
+
+
+def test_each_insurance_is_read_in_file_order() -> None:
+    rest = (
+        "<diveinsurances>"
+        "<insurance><name>DAN Europe</name><validdate><datetime>2027-03-31T00:00:00</datetime></validdate></insurance>"
+        "<insurance><name>Aqua Med</name></insurance>"
+        "</diveinsurances>"
+    )
+    diver, notes = read_owner(owner(rest=rest))
+    assert diver is not None
+    assert diver["insurances"] == [{"provider": "DAN Europe", "expires_on": "2027-03-31"}, {"provider": "Aqua Med"}]
+    assert notes == []
+
+
+def test_an_insurance_with_no_name_is_dropped_and_reported() -> None:
+    """`insuranceType` requires `<name>` and types it as nothing, so `<name/>` is valid UDDF —
+    and §6.1's `provider` is REQUIRED, so mapping it would fail the whole file."""
+    rest = (
+        "<diveinsurances><insurance><name/><validdate><datetime>2027-03-31T00:00:00</datetime></validdate></insurance>"
+        "<insurance><name>DAN Europe</name></insurance></diveinsurances>"
+    )
+    diver, notes = read_owner(owner(rest=rest))
+    assert diver is not None and diver["insurances"] == [{"provider": "DAN Europe"}]
+    assert notes == [
+        (
+            "dropped",
+            "diver/insurance/0",
+            "the insurance has no name, which the format requires of one as its insurer; it is dropped (spec §6.1)",
+        )
+    ]
+
+
+def test_an_insurers_name_past_the_bound_is_capped_and_reported() -> None:
+    """The same 255 as the diver's own name, and cut the same way: a name is still the name
+    with its end missing, where a number is not."""
+    insurance = f"<insurance><name>{'D' * 300}</name></insurance>"
+    diver, notes = read_owner(owner(rest=f"<diveinsurances>{insurance}</diveinsurances>"))
+    assert diver is not None and diver["insurances"] == [{"provider": "D" * 255}]
+    assert [(kind, where) for kind, where, _ in notes] == [("dropped", "diver/insurance/0")]
+    assert "the insurer's name is 300 characters" in notes[0][2]
+
+
+def test_what_an_insurance_carries_beyond_its_three_members_is_reported() -> None:
+    rest = (
+        "<diveinsurances><insurance><name>DAN Europe</name><aliasname>DAN</aliasname>"
+        "<issuedate><datetime>2026-04-01T00:00:00</datetime></issuedate>"
+        "<validdate><datetime>2027-03-31T00:00:00</datetime></validdate>"
+        "<notes><para>Gold cover</para></notes></insurance></diveinsurances>"
+    )
+    diver, notes = read_owner(owner(rest=rest))
+    assert diver is not None and diver["insurances"] == [{"provider": "DAN Europe", "expires_on": "2027-03-31"}]
+    assert [message for _, _, message in notes] == [
+        "§6.1's Insurance has no member for <aliasname> 'DAN'; it is not read",
+        "§6.1's Insurance has no member for <issuedate>; it is not read",
+        "§6.1's Insurance has no member for <notes>; it is not read",
+    ]
+
+
 @pytest.mark.parametrize("written", ["1e999", "1e999999999", "-1e999", "NaN", "Infinity", "-Infinity"])
 def test_a_number_too_large_to_carry_is_not_a_number(written: str) -> None:
     """`Decimal` parses all of these and calls the first three finite. Neither survives.
@@ -315,11 +464,14 @@ def test_hostile_source_strings_still_produce_a_conforming_document() -> None:
     long_name = "N" * 400
     long_note = "note. " * 3000
     header = (
-        f"<diver><owner id='owner'><personal><firstname>{long_name}</firstname></personal>"
-        "<contact><email>whatever they typed</email></contact>"
+        f"<diver><owner id='owner'><personal><firstname>{long_name}</firstname>"
+        "<birthdate><datetime>whenever</datetime></birthdate></personal>"
+        f"<contact><phone>{long_name}</phone><email>whatever they typed</email></contact>"
         f"<equipment><mask id='g'><name>{long_name}</name>"
         f"<manufacturer id='m'><name>{long_name}</name></manufacturer>"
-        f"<notes><para>{long_note}</para></notes></mask></equipment></owner></diver>"
+        f"<notes><para>{long_note}</para></notes></mask></equipment>"
+        f"<diveinsurances><insurance><name>{long_name}</name>"
+        "<validdate><datetime>never</datetime></validdate></insurance></diveinsurances></owner></diver>"
         f"<divesite><site id='s'><name>{long_name}</name>"
         f"<geography><location>{long_name}</location></geography>"
         f"<notes><para>{long_note}</para></notes></site></divesite>"
@@ -336,6 +488,8 @@ def test_hostile_source_strings_still_produce_a_conforming_document() -> None:
     conversion = convert(one_dive(body, header=header))
     assert validate_document(conversion.document) == []
     assert "email" not in conversion.document["diver"]
+    assert "phone" not in conversion.document["diver"]
+    assert len(conversion.document["diver"]["insurances"][0]["provider"]) == 255
     assert len(conversion.document["dives"][0]["notes"]) == 10_000
     assert len(conversion.document["sites"][0]["name"]) == 255
 
