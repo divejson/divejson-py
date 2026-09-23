@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<uddf xmlns="http://www.streit.cc/uddf/3.2/" version="3.2.2">
+  <generator>
+    <name>DiveJSON fixtures</name>
+  </generator>
+  <diver>
+    <owner id="diver-0198a6f0-6666-7001-8000-000000000001">
+      <personal>
+        <firstname/>
+        <lastname/>
+        <birthdate>
+          <datetime>1979-11-02T00:00:00</datetime>
+        </birthdate>
+      </personal>
+    </owner>
+  </diver>
+</uddf>

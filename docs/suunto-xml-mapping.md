@@ -1,6 +1,6 @@
 # Reading Suunto's DM5 XML into DiveJSON
 
-**Non-normative.** The specification is [`spec/divejson.md`](../spec/divejson.md); nothing
+**Non-normative.** The specification is [`spec/divejson.md`](https://github.com/divejson/divejson/blob/main/spec/divejson.md); nothing
 here changes what a conforming document is. The rules every converter follows whatever it
 is reading are in [`converting.md`](converting.md) and are **not repeated here** — the note
 kinds, identity, the way a zero reads, the representability bound, sample ordering, the

@@ -1,6 +1,6 @@
 # Reading UDDF into DiveJSON
 
-**Non-normative.** The specification is [`spec/divejson.md`](../spec/divejson.md); nothing
+**Non-normative.** The specification is [`spec/divejson.md`](https://github.com/divejson/divejson/blob/main/spec/divejson.md); nothing
 here changes what a conforming document is.
 
 **The rules that hold for every source format are in
@@ -131,13 +131,37 @@ mapped* below.
 | --- | --- |
 | `personal/firstname` + `middlename` + `lastname` | `diver.name`, joined with spaces |
 | `contact/email` | `diver.email` |
+| `contact/phone`, else `contact/mobilephone` | `diver.phone` — the first `<phone>`, or the first `<mobilephone>` where there is none |
+| `personal/birthdate/datetime` | `diver.born_on` |
+| `diveinsurances/insurance` | `diver.insurances[]`, in file order |
+| `diveinsurances/insurance/name` | `diver.insurances[].provider` — REQUIRED, so an insurance whose `<name>` holds no text is dropped |
+| `diveinsurances/insurance/validdate/datetime` | `diver.insurances[].expires_on` |
 | `@id` | `diver.uuid` |
+
+**An owner is a diver when it records anything this table maps**, `@id` aside. An
+`<owner>` whose names are empty and which carries a `<birthdate>` reads to a diver with a
+`born_on` and no `name`; one carrying nothing the table maps reads to no diver at all
+(§6.1). Nothing fills `diver.emergency_contacts` or an insurance's `number`: UDDF has no
+element for either.
 
 **`@id` is never read as a name or a handle.** It is an XML id, and Subsurface's is the
 literal string `owner`.
 
 `<contact><email>` is UDDF's instance of `converting.md`'s constrained-member guard: one
 holding `n/a`, a dash or a person's name is read as no email recorded, and reported.
+
+**`<birthdate>` and `<validdate>` hold a date in a date-time slot** — each is
+`encapsulatedDateTimeType`, whose one child is an `xs:dateTime` — and §6.1's members are
+dates, so the date is taken off the front of the `<datetime>` and the time of day, which a
+writer supplies only because the slot demands one, is discarded without a finding. A bare
+date, the spelling UDDF's own documentation uses in its examples, reads the same way. Text
+that is not a date is dropped and reported.
+
+**What is read stays within §6.1's bounds**, since a converter's output that fails
+validation fails the whole file. A provider longer than 255 characters is cut to 255 and
+reported, the way a diver's name is; a phone longer than 32, or an email longer than 255,
+is dropped and reported instead, a number or an address with its end cut off being a wrong
+one rather than a short one.
 
 ### Dive sites — `/uddf/divesite/site`
 
@@ -634,9 +658,12 @@ writes all three that way.
 | `<informationafterdive><rating>`, `<current>`, `<problems>` | no core member. |
 | `<site><ecology>` | site-level flora and fauna, where §6.11's species are per-dive sightings. |
 | `<trippart><relateddives>` | the reverse of `<tripmembership>`; no writer in the corpus emits it. |
-| `<trippart @type>` | `boat`, `hotel`, `individual` or `organized` — the liveaboard-then-hotel distinction §6.9a's part exists to record, and the one member a part might plausibly gain next. There is nowhere to read it into: a core field arrives when an implementation stores it (`CONTRIBUTING.md`), and none does. A reader that wants it has `extensions`. |
+| `<trippart @type>` | `boat`, `hotel`, `individual` or `organized` — the liveaboard-then-hotel distinction §6.9a's part exists to record, and the one member a part might plausibly gain next. There is nowhere to read it into: a core field arrives when an implementation stores it ([divejson/divejson's CONTRIBUTING.md](https://github.com/divejson/divejson/blob/main/CONTRIBUTING.md#proposing-additions-to-the-data-model)), and none does. A reader that wants it has `extensions`. |
 | `<mix><n2>`, `<ar>`, `<h2>` | §6.3 models the remainder as nitrogen and does not model argon or trace gases. |
 | `courses`, `certifications`, `gear_sets`, `gear service` | UDDF has no slot for any of them. |
+| `<insurance><aliasname>`, `<issuedate>`, `<notes>` | §6.1's Insurance holds the insurer, the diver's identifier with it and the last day of cover, and none of these is any of the three. Each is reported. |
+| `<personal><membership>` | an organisation and a member id, which may be a club, a federation or an insurer, and nothing in the element says which: UDDF's own sample document gives it a diving federation. Read as an insurance, a club membership would come back as a policy nobody holds. |
+| every `<phone>` and `<mobilephone>` but the one read | §6.1 carries one phone, the way it carries one email. Each other is reported. |
 
 ## Known writer artefacts
 

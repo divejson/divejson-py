@@ -1,6 +1,6 @@
 # Reading ANT/Garmin FIT into DiveJSON
 
-**Non-normative.** The specification is [`spec/divejson.md`](../spec/divejson.md); nothing
+**Non-normative.** The specification is [`spec/divejson.md`](https://github.com/divejson/divejson/blob/main/spec/divejson.md); nothing
 here changes what a conforming document is.
 
 **Several of the messages below have never been read from a device that wrote them.**
@@ -170,7 +170,7 @@ dive, and a watch that writes one file per dive gives an archive its order.
 
 Every number below was read off real files and off the MIT-licensed global FIT profile that
 open decoders carry. **Nothing here comes from Garmin's `Profile.xlsx`** — see the notice in
-[`README.md`](../README.md#notices).
+[divejson/divejson's `README.md`](https://github.com/divejson/divejson/blob/main/README.md#notices).
 
 ### Provenance — `file_id` (0), `device_info` (23), and the file header
 

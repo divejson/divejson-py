@@ -1,6 +1,6 @@
 # Writing DiveJSON as UDDF
 
-**Non-normative.** The specification is [`spec/divejson.md`](../spec/divejson.md); nothing
+**Non-normative.** The specification is [`spec/divejson.md`](https://github.com/divejson/divejson/blob/main/spec/divejson.md); nothing
 here changes what a conforming document is. [`uddf-mapping.md`](uddf-mapping.md) is the
 other direction — every element a reader takes into DiveJSON — and this document is what a
 writer does with a DiveJSON document that has to become a UDDF file: which member lands in
@@ -117,21 +117,52 @@ this way returns as the UUID it was and a logbook that went out through UDDF com
 the identities it left with. The prefixes are `dive`, `site`, `trip`, `gear`, `diver` and
 `mfr`.
 
-`<owner id>` is `diver-<uuid>` where the document names a person and the bare string `owner`
-otherwise — the latter being what every UDDF writer in the corpus emits and what a reader is
-careful never to read as an identity.
+`<owner id>` is `diver-<uuid>` where the document records anything about the person this
+direction maps, and the bare string `owner` otherwise — the latter being what every UDDF
+writer in the corpus emits and what a reader is careful never to read as an identity.
 
 ### Diver and gear
 
 A document's gear lives inside `<diver><owner><equipment>`, so `<diver>` is written whenever
-there is either an owner to describe **or** a piece of kit to hang on one. An owner the
-document says nothing about gets empty `<firstname>`/`<lastname>` elements, which are valid
-`xs:string`s that a reader takes as no diver at all.
+there is either an owner to describe — any member the table below maps, `uuid` aside —
+**or** a piece of kit to hang on one. A diver recording only what UDDF has no element for,
+such as `emergency_contacts`, therefore gets no `<diver>`, and the report says so.
+
+| DiveJSON | UDDF |
+| --- | --- |
+| `name` | `personal/firstname` + `lastname`, split as below |
+| `email` | `contact/email` — see the note below |
+| `phone` | `contact/phone` |
+| `born_on` | `personal/birthdate/datetime` |
+| `insurances[]` | `diveinsurances/insurance`, one per element, in document order |
+| `insurances[].provider` | `diveinsurances/insurance/name` |
+| `insurances[].expires_on` | `diveinsurances/insurance/validdate/datetime` |
 
 `personalType` requires a first and last name where DiveJSON holds one string: the first
 whitespace-separated token becomes the given name and the remainder the family name, and a
 one-token name leaves `<lastname>` **empty** rather than repeating the given name. A reader
-joins them back with a space, so any split survives.
+joins them back with a space, so any split survives. A diver with no `name` gets both
+elements empty, `personalType` requiring them whatever else the owner carries; they are
+valid `xs:string`s, which a reader takes as a nameless diver beside anything else the table
+maps and as no diver at all beside nothing but a kit list.
+
+**The owner's children run in the XSD's order**, which a reader taking children by name
+never checks. `<owner>`'s type extends the one UDDF gives every person, so they run
+`personal`, `address`, `contact`, then `equipment`, `medical`, `education`,
+`divepermissions`, `diveinsurances`, `notes`: a `<contact>` sits between `<personal>` and
+`<equipment>`, and `<diveinsurances>` after the kit list. Inside `<contact>`, `<phone>`
+comes before `<email>`, `contactType` being a sequence. `personalType` is an `xs:all`, so
+`<birthdate>` may sit anywhere among the names.
+
+**A date goes out widened to midnight, `YYYY-MM-DDT00:00:00`.** `<birthdate>` and
+`<validdate>` are `encapsulatedDateTimeType`, whose one child `<datetime>` is an
+`xs:dateTime`, and a bare date fails the XSD — though UDDF's own documentation writes one in
+its examples. It is `<dateoftrip>`'s answer (*Sites and trips* below) and it invents nothing:
+the member is a date, so a reader takes the date back off the front and the midnight never
+reaches a document.
+
+An insurance's `number` and the diver's `emergency_contacts` have no element, and each is
+reported — *What is never written* has why.
 
 **Differs from the reference writer**: `diver.email` is written to
 `<contact><email>`. The reference writer deliberately omits it — a UDDF file is the thing a
@@ -332,9 +363,9 @@ Two shapes, each reported against the dive:
   about the document rather than a presentation detail: a recording has no uuid (§5.3), so
   its position is the only thing that says it is the primary.
 
-**Neither has a pair**, both writer pairs putting the primary's element first, so both are
-written down here rather than left to the first writer to meet one — the same answer the link
-leg's refusal gets in [`fixtures/README.md`](../fixtures/README.md#writeuddf).
+**Neither has a pair**, every writer pair with a dive putting the primary's element first, so
+both are written down here rather than left to the first writer to meet one — the same answer
+the link leg's refusal gets in [`fixtures/README.md`](../fixtures/README.md#writeuddf).
 
 **What is *gained* is not reported, which is the same rule read the other way.** A linked
 computer no recording answers to, anywhere but that first link, comes back as a recording the
@@ -523,7 +554,8 @@ stamps `<generator><name>divejson convert</name>`, and the table's one row is
 branch of that rule, the fraction one, and a written `0.67` comes back as `67`. Writing
 whole percent instead would come back as `6700`: the round trip a writing document exists
 to prevent, and one no conformance pair would catch, since the corpus never reads a written
-file back (`CONTRIBUTING.md`, *the checks the corpus cannot make*).
+file back ([divejson/divejson's CONTRIBUTING.md](https://github.com/divejson/divejson/blob/main/CONTRIBUTING.md#adding-an-adapter),
+*the checks the corpus cannot make*).
 
 *Rejected:* adding this writer to the generator table so it could write whole percent. The
 table exists to record what a **third party's** files need read differently; a writer that
@@ -611,6 +643,8 @@ once per record that carries it, and none of them has anywhere in UDDF to go:
 | a record's `created_at` | no slot on any of them |
 | `gear` `rented`, `archived`, `archived_at`, `dive_count` | no slot |
 | `diver.username` | `<owner id>` is an XML id and not a handle |
+| `diver.emergency_contacts` | UDDF has no element for one, and `<owner>` describes the logbook's owner and nobody else |
+| `diver.insurances[].number` | `insuranceType` holds a `name`, `aliasname`, `issuedate`, `validdate` and `notes`, with nothing for the identifier the insurer knows the diver by. `<notes>` would read back as a remark, and `<personal><membership memberid>` as a membership, which a reader cannot tell from a club's |
 | a recording's `source_files`, `started_at` and its device's `firmware`, and every recording after the first | UDDF gives a dive one `<samples>`, and `equipmentPieceType` no firmware element — *Devices* above has each answer and why the device of a dropped recording is kept even so |
 | `trips[].parts[].location.bbox` | `geographyType` carries a point, not a box |
 | `sites[].location.full_name`, `position` and `bbox` | a site's `<name>` is its own, so the locality gets only `<geography><location>` and that slot holds `location.name`; `<geography>`'s coordinates are the site's pin, and the box has nowhere either — *Sites and trips* above has the asymmetry with a part |
