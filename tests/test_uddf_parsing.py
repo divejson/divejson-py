@@ -288,8 +288,8 @@ def read_owner(header: str) -> tuple[dict | None, list[tuple[str, str, str]]]:
 
 
 def test_an_owner_with_only_a_birthdate_is_a_nameless_diver() -> None:
-    """The loss the check-in members exist to stop: the guard used to ask for a name or an
-    email, and an owner recording anything else read as nobody at all."""
+    """An owner is a diver when it records anything the mapping reads, not only a name or an
+    email — otherwise a date of birth with nobody named beside it would be lost unreported."""
     birthdate = "<birthdate><datetime>1979-11-02T00:00:00</datetime></birthdate>"
     diver, notes = read_owner(owner(f"<firstname/><lastname/>{birthdate}"))
     assert diver is not None
