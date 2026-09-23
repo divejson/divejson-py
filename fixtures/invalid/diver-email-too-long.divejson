@@ -8,6 +8,7 @@
   "diver": {
     "uuid": "0198a6f0-1111-7001-8000-000000000001",
     "name": "Alex Trim",
+    "email": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc.ddddddddddddddddddddddddddddddddddddddddddddddddddddddd.example",
     "emergency_contacts": [
       {
         "name": "Robin Trim",

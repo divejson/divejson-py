@@ -594,41 +594,65 @@ class _Writer:
     def diver_element(self) -> ET.Element | None:
         """`<diver><owner>`, which is also the only place a logbook's gear can live.
 
-        So the element is written whenever there is either an owner to describe or a piece
-        of kit to hang on one, and the two are independent: `<equipment>` sits inside
-        `<owner>`, and a logbook with gear and no diver would otherwise lose the whole list
-        to a member it has nothing to do with. An owner with nothing recorded about the
-        person gets empty names — a valid `xs:string`, which the reader reads back as no
-        diver at all rather than as a nameless one — and a note saying so.
+        So the element is written whenever there is either an owner to describe — any member
+        this maps, `uuid` aside — or a piece of kit to hang on one, and the two are
+        independent: `<equipment>` sits inside `<owner>`, and a logbook with gear and no
+        diver would otherwise lose the whole list to a member it has nothing to do with. A
+        diver with no `name` gets both names empty, `personalType` requiring them whatever
+        else the owner carries — valid `xs:string`s, which the reader reads back as a
+        nameless diver beside anything else this maps and as no diver at all beside a kit
+        list alone.
+
+        The owner's children go in the XSD's order, `<owner>`'s type extending the one UDDF
+        gives every person: `personal`, then `contact`, then `equipment`, then
+        `diveinsurances`. A date goes out widened to midnight, as `date_of_trip`'s do.
         """
         diver = self.document.get("diver") or {}
-        name, email = diver.get("name"), diver.get("email")
+        name, email, phone, born_on = (diver.get(member) for member in ("name", "email", "phone", "born_on"))
+        insurances = diver.get("insurances") or []
         gear = self.equipment_element()
-        if not (name or email or gear is not None):
+        described = bool(name or email or phone or born_on or insurances)
+        if not (described or gear is not None):
             if diver:
                 self.note(
                     "diver",
-                    "the document records no name and no email for the logbook's owner, and UDDF's <owner> "
-                    "carries nothing else about a person; no diver is written",
+                    "the document records nothing about the logbook's owner that UDDF's <owner> has an element "
+                    "for; no diver is written",
                     "dropped",
                 )
             return None
         if diver:
-            self.unmapped("diver", diver, frozenset({"uuid", "name", "email"}))
+            self.unmapped("diver", diver, frozenset({"uuid", "name", "email", "phone", "born_on", "insurances"}))
 
         element = ET.Element("diver")
         uuid = diver.get("uuid")
-        # A plain `owner` where the document names nobody, which is what every UDDF writer
-        # in the corpus emits and what the reader is careful never to read as an identity.
-        owner = _sub(element, "owner", id=_uddf_id("diver", uuid) if uuid and (name or email) else "owner")
+        # A plain `owner` where the document records nothing about the person this maps,
+        # which is what every UDDF writer in the corpus emits and what the reader is careful
+        # never to read as an identity.
+        owner = _sub(element, "owner", id=_uddf_id("diver", uuid) if uuid and described else "owner")
         personal = _sub(owner, "personal")
         first, last = _person_names(str(name or ""))
         _sub(personal, "firstname", first)
         _sub(personal, "lastname", last)
-        if email:
-            _sub(_sub(owner, "contact"), "email", str(email))
+        if born_on:
+            _sub(_sub(personal, "birthdate"), "datetime", f"{born_on}T00:00:00")
+        if phone or email:
+            contact = _sub(owner, "contact")
+            # `contactType` is a sequence, and `<phone>` comes before `<email>` in it.
+            if phone:
+                _sub(contact, "phone", str(phone))
+            if email:
+                _sub(contact, "email", str(email))
         if gear is not None:
             owner.append(gear)
+        if insurances:
+            policies = _sub(owner, "diveinsurances")
+            for index, insurance in enumerate(insurances):
+                self.unmapped(f"diver/insurances/{index}", insurance, frozenset({"provider", "expires_on"}))
+                policy = _sub(policies, "insurance")
+                _sub(policy, "name", str(insurance["provider"]))
+                if insurance.get("expires_on"):
+                    _sub(_sub(policy, "validdate"), "datetime", f"{insurance['expires_on']}T00:00:00")
         return element
 
     # -- computers ---------------------------------------------------------------

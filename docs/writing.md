@@ -1,6 +1,6 @@
 # Writing DiveJSON out again
 
-**Non-normative.** The specification is [`spec/divejson.md`](../spec/divejson.md); nothing
+**Non-normative.** The specification is [`spec/divejson.md`](https://github.com/divejson/divejson/blob/main/spec/divejson.md); nothing
 here changes what a conforming document is. This document records the rules a converter
 follows whatever format it is **writing**, so that they survive being reimplemented: the
 mirror of [`converting.md`](converting.md), which records the rules it follows whatever it

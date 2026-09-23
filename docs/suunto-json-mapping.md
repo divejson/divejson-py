@@ -1,6 +1,6 @@
 # Reading the Suunto app's JSON into DiveJSON
 
-**Non-normative.** The specification is [`spec/divejson.md`](../spec/divejson.md); nothing
+**Non-normative.** The specification is [`spec/divejson.md`](https://github.com/divejson/divejson/blob/main/spec/divejson.md); nothing
 here changes what a conforming document is.
 
 **The rules that hold for every source format are in

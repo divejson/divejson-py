@@ -130,12 +130,16 @@ LITRES_THRESHOLD = Decimal(1)
 
 # `MAX_NOTES` and `MAX_NAME` are `converter.py`'s: every adapter meets those two, and
 # §6.9's `name` is one of them — a place's name shares the 255 every name in the format
-# has. The two below are UDDF's own, being the only reader that fills the members they cap.
-# §6.12's `serial` is 1-64 rather than the 255 its neighbours share, and the reason is worth
-# knowing: a gear serial longer than a device's (§6.4b) could never equal one, and equality
-# between the two is what says a kit item and a device are one machine.
+# has, and so does an insurer's. The caps below are UDDF's own, being the only reader that
+# fills the members they cap. §6.12's `serial` is 1-64 rather than the 255 its neighbours
+# share, and the reason is worth knowing: a gear serial longer than a device's (§6.4b) could
+# never equal one, and equality between the two is what says a kit item and a device are
+# one machine. §6.1's phone and email are never cut to theirs, only dropped past them — a
+# number or an address with its end missing is a wrong one rather than a short one.
 MAX_FULL_NAME = 512
 MAX_SERIAL = 64
+MAX_PHONE = 32
+MAX_EMAIL = 255
 MIN_PO2_LIMIT = Decimal("0.4")
 MAX_PO2_LIMIT = Decimal("2.0")
 MIN_SURFACE_PRESSURE = Decimal("0.4")
@@ -501,19 +505,76 @@ class _Converter:
         return capped(value, limit, note=self.note, where=where, member=member)
 
     def email(self, value: str | None, where: str) -> str | None:
-        """`<contact><email>` when it is an address, and nothing when it is not.
+        """`<contact><email>` when it is an address §6.1 can hold, and nothing when it is not.
 
         Every other source string reaches a member the format types as free text, where the
-        only limit is a length this converter caps. `email` is the exception — the schema
-        types it as an email address, so a `-` or an `n/a` is a value the member cannot
-        hold. Without this the whole conversion fails on it: the output would not validate,
-        which this module treats as its own bug, so one unusable header field would discard
-        an entire logbook instead of costing it one member and a line in the report.
+        only limit is a length. `email` is the exception — the schema types it as an email
+        address, so a `-` or an `n/a` is a value the member cannot hold. Without this the
+        whole conversion fails on it: the output would not validate, which this module
+        treats as its own bug, so one unusable header field would discard an entire logbook
+        instead of costing it one member and a line in the report. An address past §6.1's
+        bound is the same case.
         """
-        if value is None or _EMAIL.match(value):
-            return value
-        self.note(where, f"the recorded email {value!r} is not an address; read as no email recorded", "dropped")
-        return None
+        if value is None:
+            return None
+        if not _EMAIL.match(value):
+            self.note(where, f"the recorded email {value!r} is not an address; read as no email recorded", "dropped")
+            return None
+        if len(value) > MAX_EMAIL:
+            self.note(
+                where,
+                f"the recorded email is {len(value)} characters and the format allows {MAX_EMAIL}; an address "
+                "cut short is a wrong one, so it is dropped",
+                "dropped",
+            )
+            return None
+        return value
+
+    def phone(self, contact: ET.Element | None, where: str) -> str | None:
+        """The first `<phone>`, else the first `<mobilephone>`, reporting every other one.
+
+        §6.1 carries one number the way it carries one address, and `contactType` holds any
+        number of each. A first number past §6.1's bound is dropped rather than cut, for the
+        reason `MAX_PHONE` gives, and the next is not read in its place.
+        """
+        recorded = [
+            (tag, value)
+            for tag in ("phone", "mobilephone")
+            for value in (_text(kid) for kid in _kids(contact, tag))
+            if value
+        ]
+        if not recorded:
+            return None
+        for tag, value in recorded[1:]:
+            self.note(
+                where, f"§6.1 carries one phone, the first the owner records; <{tag}> {value!r} is not read", "dropped"
+            )
+        _, value = recorded[0]
+        if len(value) > MAX_PHONE:
+            self.note(
+                where,
+                f"the recorded phone is {len(value)} characters and the format allows {MAX_PHONE}; a number cut "
+                "short is a wrong one, so it is dropped",
+                "dropped",
+            )
+            return None
+        return value
+
+    def date_of(self, element: ET.Element | None, where: str, member: str) -> str | None:
+        """The date an `encapsulatedDateTimeType` holds, taken off the front of its `<datetime>`.
+
+        The slot is an `xs:dateTime` and §6.1's members are dates, so a time of day is one a
+        writer supplied only because the slot demands one and is discarded without a finding;
+        a bare date, which UDDF's own examples write, reads the same way.
+        """
+        raw = _text_of(element, "datetime")
+        if raw is None:
+            return None
+        value, _ = _date_time(raw)
+        if value is None:
+            self.note(where, f"{member} is {raw!r}, which is not a date; dropped", "dropped")
+            return None
+        return value[:10]
 
     def notes_text(self, parent: ET.Element | None, where: str) -> str | None:
         """A `<notes>` block as one string. Its `<link>` children carry no note text."""
@@ -621,19 +682,28 @@ class _Converter:
         than an identity and every UDDF writer in the corpus spells it `owner`. So a second
         member's diver is written out — without the identity that is not its own — and the
         merge is where a logbook's one owner is chosen and the rest reported. Collapsing it
-        here would discard a second person's name and email in silence.
+        here would discard what a second person's file records about them in silence.
+
+        **An owner is a diver when it records anything this maps**, the id aside: an
+        `<owner>` with empty names and a `<birthdate>` is a nameless diver with a date of
+        birth, and one whose only content is a kit list is no diver at all.
         """
         owner = _dig(self.root, "diver", "owner")
         if owner is None:
             return None
         where = "diver"
+        personal = _kid(owner, "personal")
+        contact = _kid(owner, "contact")
         names = [
-            text
-            for text in (_text_of(owner, "personal", part) for part in ("firstname", "middlename", "lastname"))
-            if text
+            text for text in (_text_of(personal, part) for part in ("firstname", "middlename", "lastname")) if text
         ]
-        email = self.email(_text_of(owner, "contact", "email"), where)
-        if not names and not email:
+        recorded: dict[str, Any] = {
+            "email": self.email(_text_of(contact, "email"), where),
+            "phone": self.phone(contact, where),
+            "born_on": self.date_of(_kid(personal, "birthdate"), where, "the date of birth"),
+            "insurances": self.read_insurances(owner, where),
+        }
+        if not names and not any(recorded.values()):
             self.note(where, "the source records nothing about the logbook's owner; no diver is written (spec §6.1)", "absent")
             return None
 
@@ -643,9 +713,44 @@ class _Converter:
             diver["uuid"] = claimed
         if names:
             diver["name"] = self.capped(" ".join(names), MAX_NAME, where, "the diver's name")
-        if email:
-            diver["email"] = email
+        diver.update((member, value) for member, value in recorded.items() if value)
         return diver
+
+    def read_insurances(self, owner: ET.Element, where: str) -> list[dict[str, Any]]:
+        """`<diveinsurances><insurance>` as §6.1's Insurance objects, in file order.
+
+        `<name>` is the insurer and REQUIRED of one, so an insurance whose `<name>` holds no
+        text is dropped rather than carried without it. The XSD requires the element and
+        types it as nothing, so `<name/>` is valid UDDF; mapped without a `provider` it would
+        fail the schema, and the whole file with it. What §6.1's Insurance has no member for
+        is reported, and nothing fills its `number`: `insuranceType` has no element for one.
+        """
+        insurances: list[dict[str, Any]] = []
+        for index, element in enumerate(_kids(_kid(owner, "diveinsurances"), "insurance")):
+            here = f"{where}/insurance/{index}"
+            provider = _text_of(element, "name")
+            if not provider:
+                self.note(
+                    here,
+                    "the insurance has no name, which the format requires of one as its insurer; it is dropped "
+                    "(spec §6.1)",
+                    "dropped",
+                )
+                continue
+            insurance: dict[str, Any] = {"provider": self.capped(provider, MAX_NAME, here, "the insurer's name")}
+            expires_on = self.date_of(_kid(element, "validdate"), here, "the insurance's validdate")
+            if expires_on:
+                insurance["expires_on"] = expires_on
+            aliases = (_text(kid) for kid in _kids(element, "aliasname"))
+            unread = [f"<aliasname> {alias!r}" for alias in aliases if alias]
+            if _text_of(element, "issuedate", "datetime"):
+                unread.append("<issuedate>")
+            if any(_text(para) for para in _kids(_kid(element, "notes"), "para")):
+                unread.append("<notes>")
+            for what in unread:
+                self.note(here, f"§6.1's Insurance has no member for {what}; it is not read", "dropped")
+            insurances.append(insurance)
+        return insurances
 
     # -- sites -------------------------------------------------------------------
 

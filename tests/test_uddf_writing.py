@@ -790,6 +790,87 @@ def test_a_one_token_name_leaves_the_surname_empty(schema) -> None:
     assert read_back(source)["diver"]["name"] == "Cousteau"
 
 
+DIVER_UUID = "0198a6f0-9999-7009-8000-000000000009"
+
+
+def test_the_owners_children_go_in_the_schemas_order(schema) -> None:
+    """`<owner>`'s type extends the one UDDF gives every person, so the sequence runs
+    `personal`, `contact`, `equipment` and on to `diveinsurances` — and inside `<contact>`,
+    `<phone>` before `<email>`. The reader takes children by name, so only the XSD sees it."""
+    source = document(
+        diver={
+            "uuid": DIVER_UUID,
+            "name": "Sam Reef",
+            "email": "sam@example.org",
+            "phone": "+44 7700 900123",
+            "born_on": "1988-03-14",
+            "insurances": [{"provider": "DAN Europe", "expires_on": "2027-03-31"}],
+        },
+        gear=[{"uuid": GEAR_UUID, "name": "Fins", "type": "fins"}],
+    )
+    text = written(source, schema)
+    assert (
+        text.index("<personal>")
+        < text.index("<birthdate>")
+        < text.index("<contact>")
+        < text.index("<phone>")
+        < text.index("<email>")
+        < text.index("<equipment>")
+        < text.index("<diveinsurances>")
+    )
+    assert read_back(source)["diver"] == source["diver"]
+    assert notes(source) == []
+
+
+def test_a_date_goes_out_widened_to_midnight_and_comes_back_a_date(schema) -> None:
+    """`<birthdate>` and `<validdate>` hold an `xs:dateTime`, which a bare date fails."""
+    source = document(
+        diver={"born_on": "1988-03-14", "insurances": [{"provider": "DAN Europe", "expires_on": "2027-03-31"}]}
+    )
+    text = written(source, schema)
+    assert re.search(r"<birthdate>\s*<datetime>1988-03-14T00:00:00</datetime>", text)
+    assert re.search(r"<validdate>\s*<datetime>2027-03-31T00:00:00</datetime>", text)
+    back = read_back(source)["diver"]
+    assert back["born_on"] == "1988-03-14"
+    assert back["insurances"] == [{"provider": "DAN Europe", "expires_on": "2027-03-31"}]
+
+
+def test_an_owner_recorded_by_anything_this_maps_keeps_its_identity(schema) -> None:
+    """The owner id follows the guard: a diver the document records by a phone alone is still
+    that diver, and the id is what brings its uuid back."""
+    source = document(diver={"uuid": DIVER_UUID, "phone": "+44 7700 900123"})
+    assert f'<owner id="diver-{DIVER_UUID}">' in written(source, schema)
+    assert read_back(source)["diver"] == source["diver"]
+
+
+def test_an_insurances_number_has_no_element_and_is_reported(schema) -> None:
+    source = document(diver={"name": "Sam Reef", "insurances": [{"provider": "DAN World", "number": "DW-88213"}]})
+    assert "DW-88213" not in written(source, schema)
+    assert messages(source, "diver/insurances/0") == ["UDDF has no slot for number; it is not written"]
+    assert read_back(source)["diver"]["insurances"] == [{"provider": "DAN World"}]
+
+
+def test_emergency_contacts_have_no_element_and_are_reported(schema) -> None:
+    source = document(diver={"name": "Sam Reef", "emergency_contacts": [{"name": "Robin Reef"}]})
+    assert "Robin" not in written(source, schema)
+    assert messages(source, "diver") == ["UDDF has no slot for emergency_contacts; it is not written"]
+
+
+def test_a_diver_recording_only_what_uddf_cannot_hold_writes_no_diver(schema) -> None:
+    """Nothing in it maps, so an `<owner>` would be empty names that read back as nobody."""
+    source = document(
+        diver={"uuid": DIVER_UUID, "emergency_contacts": [{"name": "Robin Reef", "phone": "+44 7700 900456"}]},
+        dives=[{"uuid": DIVE_UUID, "started_at": STARTED_AT}],
+    )
+    assert "<diver>" not in written(source, schema)
+    assert messages(source, "diver") == [
+        (
+            "the document records nothing about the logbook's owner that UDDF's <owner> has an element for; "
+            "no diver is written"
+        )
+    ]
+
+
 # -- the file itself -------------------------------------------------------------------
 
 

@@ -401,9 +401,9 @@ def _recorded_owner(diver: dict[str, Any]) -> dict[str, Any]:
     Without the UUID, which for this one record says nothing: it is derived from an
     `<owner id>` that every UDDF writer spells `owner`, so it is the same for two different
     people and different for one person whose two exports spell it differently. What is
-    left is the name and the email — and comparing those is what separates an archive of
-    one diver's dives, where every file repeats the same owner and nothing is lost, from
-    one where something is.
+    left is every member the file recorded about the person — and comparing those is what
+    separates an archive of one diver's dives, where every file repeats the same owner and
+    nothing is lost, from one where something is.
 
     Any difference is a drop, and the report says only that. Two people's exports in one
     zip and one person's two files where the later adds an email the first omitted are both

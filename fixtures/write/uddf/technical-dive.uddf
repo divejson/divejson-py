@@ -35,6 +35,11 @@
           <name>EMT shears</name>
         </variouspieces>
       </equipment>
+      <diveinsurances>
+        <insurance>
+          <name>DAN World</name>
+        </insurance>
+      </diveinsurances>
     </owner>
   </diver>
   <divesite>

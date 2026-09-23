@@ -66,6 +66,8 @@ WRITE_FIXTURES = sorted((FIXTURES / "write" / "uddf").glob("*.divejson"))
 # this set used to hold are inside that one line now.
 LOST: dict[str, frozenset[str]] = {
     "opendiving": frozenset(),
+    # An owner recorded by a date of birth alone, which comes back with its identity.
+    "owner-profile-only": frozenset(),
     "technical-dive": frozenset(
         {
             # No slot anywhere in UDDF.
@@ -76,6 +78,10 @@ LOST: dict[str, frozenset[str]] = {
             "gear_service_records",
             "certifications",
             "diver/created_at",
+            # `<owner>` describes the logbook's owner and nobody else, and `insuranceType`
+            # has no element for the identifier the insurer knows the diver by.
+            "diver/emergency_contacts",
+            "diver/insurances/0/number",
             "sites/0/created_at",
             "trips/0/created_at",
             "trips/0/parts/0/location/bbox",
@@ -141,6 +147,7 @@ LOST: dict[str, frozenset[str]] = {
 # did not produce.
 RETURNED: dict[str, frozenset[str]] = {
     "opendiving": frozenset(),
+    "owner-profile-only": frozenset(),
     "technical-dive": frozenset({"gear", "dives/0/gear_uuids"}),
 }
 

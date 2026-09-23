@@ -8,7 +8,15 @@
   },
   "diver": {
     "uuid": "d8b9bbd3-c66e-52c1-b8e8-d908f921af7e",
-    "name": "Sam Reef"
+    "name": "Sam Reef",
+    "phone": "+44 7700 900123",
+    "born_on": "1988-03-14",
+    "insurances": [
+      {
+        "provider": "DAN Europe",
+        "expires_on": "2027-03-31"
+      }
+    ]
   },
   "dives": [
     {

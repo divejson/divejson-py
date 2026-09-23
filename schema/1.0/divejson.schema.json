@@ -93,12 +93,38 @@
       "type": "object",
       "properties": {
         "uuid": { "$ref": "#/$defs/uuid" },
-        "name": { "type": "string" },
-        "username": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
+        "name": { "type": "string", "maxLength": 255 },
+        "username": { "type": "string", "maxLength": 64 },
+        "email": { "type": "string", "format": "email", "maxLength": 255 },
+        "phone": { "type": "string", "maxLength": 32 },
+        "born_on": { "$ref": "#/$defs/date" },
+        "emergency_contacts": { "type": "array", "items": { "$ref": "#/$defs/emergency_contact" } },
+        "insurances": { "type": "array", "items": { "$ref": "#/$defs/insurance" } },
         "created_at": { "$ref": "#/$defs/date_time" },
         "extensions": { "$ref": "#/$defs/extensions" }
       },
+      "additionalProperties": false
+    },
+    "emergency_contact": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "phone": { "type": "string", "maxLength": 32 },
+        "relationship": { "type": "string", "maxLength": 64 },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "insurance": {
+      "type": "object",
+      "properties": {
+        "provider": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "number": { "type": "string", "maxLength": 64 },
+        "expires_on": { "$ref": "#/$defs/date" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["provider"],
       "additionalProperties": false
     },
     "dive": {

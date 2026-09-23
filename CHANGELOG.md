@@ -7,6 +7,19 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Breaking: a diver carries a date of birth, a phone, emergency contacts and insurances,
+  and the Diver's strings are bounded.** §6.1 of
+  [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) adds
+  `born_on`, `phone`, `emergency_contacts` and `insurances`, and bounds `name` at 255,
+  `username` at 64 and `email` at 255, so `divejson validate` refuses a document it accepted
+  before if one of those is longer. The UDDF reader takes `born_on` from `<birthdate>`,
+  `phone` from the first `<phone>` or else the first `<mobilephone>`, and one insurance per
+  `<insurance>`, and an owner recording any of them is a diver even with no name. An
+  insurance with no `<name>` is dropped, a phone or an email past its bound is dropped rather
+  than cut and an insurer's name is capped at 255, each with a report line. The writer puts
+  the same three into `<owner>` in the XSD's order, dates widened to midnight, and reports
+  `emergency_contacts` and an insurance's `number`, which UDDF has no element for.
+
 ## 0.10.0
 
 - **Breaking: a place is one object, and a dive site carries it.** §6.9 of

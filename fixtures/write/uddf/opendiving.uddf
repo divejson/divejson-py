@@ -11,7 +11,13 @@
       <personal>
         <firstname>Sam</firstname>
         <lastname>Reef</lastname>
+        <birthdate>
+          <datetime>1988-03-14T00:00:00</datetime>
+        </birthdate>
       </personal>
+      <contact>
+        <phone>+44 7700 900123</phone>
+      </contact>
       <equipment>
         <buoyancycontroldevice id="gear-0198a6f0-2222-7001-8000-000000000001">
           <name>Hydros Pro</name>
@@ -35,6 +41,14 @@
           <suittype>dry-suit</suittype>
         </suit>
       </equipment>
+      <diveinsurances>
+        <insurance>
+          <name>DAN Europe</name>
+          <validdate>
+            <datetime>2027-03-31T00:00:00</datetime>
+          </validdate>
+        </insurance>
+      </diveinsurances>
     </owner>
   </diver>
   <divesite>

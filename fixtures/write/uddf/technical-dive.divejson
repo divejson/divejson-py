@@ -8,6 +8,19 @@
   "diver": {
     "uuid": "0198a6f0-1111-7001-8000-000000000001",
     "name": "Alex Trim",
+    "emergency_contacts": [
+      {
+        "name": "Robin Trim",
+        "phone": "+64 3 555 0142",
+        "relationship": "brother"
+      }
+    ],
+    "insurances": [
+      {
+        "provider": "DAN World",
+        "number": "DW-88213"
+      }
+    ],
     "created_at": "2024-01-05T09:00:00+00:00"
   },
   "dives": [
