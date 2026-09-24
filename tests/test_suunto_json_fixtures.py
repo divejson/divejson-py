@@ -174,8 +174,7 @@ def test_the_ocean_profile_takes_each_channel_only_where_it_was_recorded() -> No
     """No channel is padded to another's length, and each entry keeps its own instant.
 
     This exporter appends its sensor streams as separate entries, and stamps each to the
-    millisecond: the first depth is 160 ms after the header's own instant, where a
-    whole-second axis put it at 0 beside two other entries.
+    millisecond: the first depth is 160 ms after the header's own instant, and sits there.
     """
     profile = profile_of(_dive(OCEAN))
     assert profile["duration"] == 4_299_990

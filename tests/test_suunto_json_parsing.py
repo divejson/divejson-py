@@ -167,8 +167,8 @@ def test_samples_are_ordered_by_their_own_time_and_not_by_position() -> None:
 
 
 def test_entries_inside_one_second_keep_their_own_instants() -> None:
-    """The axis is milliseconds (§5.1), so the fractions this exporter stamps are kept — and
-    what a whole-second axis made two readings compete for is two places on it."""
+    """The axis is milliseconds (§5.1), so each fraction this exporter stamps is a place of
+    its own on it, however many share one second."""
     dive = _dive(
         {},
         [

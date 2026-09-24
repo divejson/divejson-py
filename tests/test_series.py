@@ -101,8 +101,8 @@ def test_two_samples_on_one_millisecond_keep_the_first_and_report_the_second() -
 
 
 def test_two_samples_inside_one_second_are_two_places_on_the_axis() -> None:
-    """The collision is at the millisecond (§5.1), so a fraction a source states keeps the
-    reading a whole-second axis would have dropped."""
+    """The collision is at the millisecond (§5.1), so two readings a source stamps inside
+    one second are two places on the axis."""
     report = Reported()
     axis = _axis(report)
     axis.offer(30_000, "first")

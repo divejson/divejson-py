@@ -146,7 +146,7 @@ def test_members_of_one_archive_share_what_has_been_claimed() -> None:
 # -- the document header --------------------------------------------------------------
 
 
-def test_the_header_opens_with_the_two_members_section_4_requires_first() -> None:
+def test_the_header_opens_with_the_two_members_section_4_asks_for_first() -> None:
     written = header(datetime(2026, 9, 5, tzinfo=timezone.utc))
     assert list(written)[:2] == ["format", "version"]
     assert written["exported_at"] == "2026-09-05T00:00:00+00:00"

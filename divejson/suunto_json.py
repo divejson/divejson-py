@@ -1163,13 +1163,10 @@ class _Converter:
         **Entries that land on one millisecond are merged rather than one of them being
         dropped.** This exporter appends its sensor streams as separate entries: on the file
         this reader is measured against, 7 477 entries carry a depth, a temperature, a
-        satellite fix or a battery reading, almost never two of those at once. On a
-        whole-second axis they collided, and offering them one at a time kept 345 of the
-        dive's 431 depths where merging kept all 431 — the count the same dive's FIT reading
-        gives. The millisecond places each at its own instant, and merging is what still
-        decides two entries of different channels stamped the same one: each of §6.5's
-        channels carries its own times, and two different channels at one instant were never
-        in competition.
+        satellite fix or a battery reading, almost never two of those at once. Each of §6.5's
+        channels carries its own times, so two entries of different channels stamped the same
+        millisecond were never in competition, and merging them keeps every depth the dive
+        recorded — 431, the count the same dive's FIT reading gives.
 
         What is still a collision is one **channel** twice on a millisecond, and that is
         reported per channel rather than per sample: a file whose streams overlap throughout

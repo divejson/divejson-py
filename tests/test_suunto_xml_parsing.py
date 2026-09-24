@@ -430,7 +430,7 @@ def test_two_samples_on_one_instant_keep_the_first_and_report_the_second() -> No
 
 def test_a_fractional_time_keeps_its_place_to_the_millisecond() -> None:
     """`<Time>` is decimal seconds, and two samples inside one second are two readings on
-    §6.5's millisecond axis where a whole-second one had them compete."""
+    §6.5's millisecond axis, each at its own place."""
     found = convert(
         suunto_xml(
             suunto_xml_samples(suunto_xml_sample(1, Depth="1.86"), suunto_xml_sample(1.6, Depth="2.14"))

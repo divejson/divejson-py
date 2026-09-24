@@ -866,12 +866,9 @@ class _Converter:
         unaffected — so the channels sit on their own axes and none is padded to another's
         length. Two samples on one instant are therefore a real collision here rather than
         two sensor streams that were never in competition, and the axis settles them per
-        channel. On a whole-second axis it fired on 37 of the corpus's exports, every one of
-        them a freedive, where a 1 s sampling interval meets a `<Time>` that is not quite an
-        integer; `<Time>`'s decimal seconds reach the millisecond axis whole, so what still
-        collides is a `<Time>` the file repeats. Those 37 were unreachable while the reader
-        stopped at `<Mode>3</Mode>` before it read a sample, so carrying freedives is what
-        first made this rule fire on a real file.
+        channel. `<Time>`'s decimal seconds reach the millisecond axis whole, so what collides
+        is a `<Time>` the file repeats — `fixtures/suunto_xml/freedive.xml` writes `1` three
+        times.
 
         `<AveragedTemperature>` is deliberately not the temperature channel: it is a
         smoothed reading sitting beside the raw `<Temperature>` in the same element, and
