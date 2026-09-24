@@ -100,6 +100,7 @@
         "born_on": { "$ref": "#/$defs/date" },
         "emergency_contacts": { "type": "array", "items": { "$ref": "#/$defs/emergency_contact" } },
         "insurances": { "type": "array", "items": { "$ref": "#/$defs/insurance" } },
+        "portrait_file": { "$ref": "#/$defs/stored_file" },
         "created_at": { "$ref": "#/$defs/date_time" },
         "extensions": { "$ref": "#/$defs/extensions" }
       },

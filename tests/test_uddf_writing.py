@@ -871,6 +871,38 @@ def test_a_diver_recording_only_what_uddf_cannot_hold_writes_no_diver(schema) ->
     ]
 
 
+PORTRAIT = {
+    "uuid": "0198a6f0-9999-7010-8000-000000000010",
+    "original_filename": "portrait.jpg",
+    "content_type": "image/jpeg",
+    "byte_size": 1024,
+    "sha256": "0" * 64,
+}
+
+
+def test_a_portrait_beside_an_owner_is_reported_and_not_written(schema) -> None:
+    """UDDF's `<owner>` has no image, and linking one from its notes gives it no role."""
+    source = document(diver={"name": "Sam Reef", "portrait_file": PORTRAIT})
+    assert "portrait.jpg" not in written(source, schema)
+    assert messages(source, "diver") == ["UDDF has no slot for portrait_file; it is not written"]
+    assert "portrait_file" not in read_back(source)["diver"]
+
+
+def test_a_portrait_alone_writes_no_diver_and_the_guards_note_covers_it(schema) -> None:
+    """The guard returns before `unmapped` runs, so its one note at `diver` is the report."""
+    source = document(
+        diver={"uuid": DIVER_UUID, "portrait_file": PORTRAIT},
+        dives=[{"uuid": DIVE_UUID, "started_at": STARTED_AT}],
+    )
+    assert "<diver>" not in written(source, schema)
+    assert messages(source, "diver") == [
+        (
+            "the document records nothing about the logbook's owner that UDDF's <owner> has an element for; "
+            "no diver is written"
+        )
+    ]
+
+
 # -- the file itself -------------------------------------------------------------------
 
 

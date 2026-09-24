@@ -82,6 +82,8 @@ LOST: dict[str, frozenset[str]] = {
             # has no element for the identifier the insurer knows the diver by.
             "diver/emergency_contacts",
             "diver/insurances/0/number",
+            # `<owner>` has no image, and a notes-linked one has no role to read as a face.
+            "diver/portrait_file",
             "sites/0/created_at",
             "trips/0/created_at",
             "trips/0/parts/0/location/bbox",

@@ -144,6 +144,14 @@ mapped* below.
 (§6.1). Nothing fills `diver.emergency_contacts` or an insurance's `number`: UDDF has no
 element for either.
 
+**Nothing fills `diver.portrait_file`, and a linked image is not read as one.** `<owner>`
+has no image of its own. The one route to a picture, a `<notes><link ref>` to a
+`<mediadata><image>`, carries no role: UDDF's own documentation of `<owner>` links an
+equipment photo, a group photo, an audio clip and a video that way, so a reader taking the
+first linked image for a portrait would import a boat photo as the diver's face. The
+`<image>` also names its file by a path whose bytes the UDDF file does not carry, so a Stored
+File's digest and size (§6.7) could only be invented.
+
 **`@id` is never read as a name or a handle.** It is an XML id, and Subsurface's is the
 literal string `owner`.
 

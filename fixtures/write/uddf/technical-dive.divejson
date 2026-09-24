@@ -21,6 +21,13 @@
         "number": "DW-88213"
       }
     ],
+    "portrait_file": {
+      "uuid": "0198a6f0-1111-7002-8000-000000000002",
+      "original_filename": "IMG_4471.jpg",
+      "content_type": "image/jpeg",
+      "byte_size": 2861904,
+      "sha256": "5e0c7a1b9d24f3e6a8b0c2d4e6f80a1b3c5d7e9f0a2b4c6d8e0f1a3b5c7d9e1f"
+    },
     "created_at": "2024-01-05T09:00:00+00:00"
   },
   "dives": [
