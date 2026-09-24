@@ -48,6 +48,11 @@
             "name": "Suunto Fused RGBM 2",
             "conservatism": -1
           },
+          "surface_pressure": 1.012,
+          "cns_start": 0.0,
+          "cns_end": 9.0,
+          "otu_start": 0.0,
+          "otu_end": 22.0,
           "source_files": [
             {
               "uuid": "0198a6f0-2222-7120-8000-000000000120",
@@ -75,16 +80,16 @@
             }
           ],
           "profile": {
-            "duration": 3473,
+            "duration": 3473000,
             "depth": {
               "times": [
                 0,
-                60,
-                210,
-                240,
-                1800,
-                3000,
-                3473
+                60000,
+                210000,
+                240000,
+                1800000,
+                3000000,
+                3473000
               ],
               "values": [
                 0,
@@ -99,7 +104,7 @@
             "temperature": {
               "times": [
                 0,
-                1800
+                1800000
               ],
               "values": [
                 281,
@@ -110,8 +115,8 @@
               {
                 "times": [
                   0,
-                  1800,
-                  3400
+                  1800000,
+                  3400000
                 ],
                 "values": [
                   2073,
@@ -138,15 +143,16 @@
           },
           "mode": "gauge",
           "started_at": "2026-09-08T15:18:10.000+03:00",
+          "surface_pressure": 1.009,
           "profile": {
-            "duration": 2940,
+            "duration": 2940000,
             "depth": {
               "times": [
                 0,
-                60,
-                180,
-                1770,
-                2940
+                60000,
+                180000,
+                1770000,
+                2940000
               ],
               "values": [
                 0,
@@ -159,7 +165,7 @@
             "temperature": {
               "times": [
                 0,
-                1770
+                1770000
               ],
               "values": [
                 280,

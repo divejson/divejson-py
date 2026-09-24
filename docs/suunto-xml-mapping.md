@@ -138,7 +138,7 @@ both makes it visible. Each row below is cross-checked that way.
 trap worth stating twice. Read at the cylinder scale, `104900` would be 104.9 bar — a
 hundred metres of seawater, at the surface. Two things settle it: every one of the 384
 exports lands in 103 100 to 106 700, which is a barometric range only on the Pascal reading,
-and §6.2's own 0.4 to 1.2 bar bound refuses the other one outright.
+and §6.4a's own 0.4 to 1.2 bar bound refuses the other one outright.
 
 ### The factor table
 
@@ -147,18 +147,18 @@ and §6.2's own 0.4 to 1.2 bar bound refuses the other one outright.
 | `<MaxDepth>`, `<AvgDepth>` | `max_depth`, `avg_depth` | metres, ×1 |
 | `<BottomTemperature>` | `bottom_temperature` | °C, ×1 |
 | `<Duration>` | `duration` | seconds, ×1, rounded to a whole one |
-| `<SurfacePressure>` | `surface_pressure` | Pascal ÷ 100 000 |
-| `<CnsStart>`, `<CnsEnd>` | `cns_start`, `cns_end` | percent, ×1 |
-| `<OtuStart>`, `<OtuEnd>` | `otu_start`, `otu_end` | count, ×1 |
+| `<SurfacePressure>` | the recording's `surface_pressure` | Pascal ÷ 100 000 |
+| `<CnsStart>`, `<CnsEnd>` | the recording's `cns_start`, `cns_end` | percent, ×1 |
+| `<OtuStart>`, `<OtuEnd>` | the recording's `otu_start`, `otu_end` | count, ×1 |
 | `<Size>` | `cylinders[].volume` | litres, ×1 |
 | `<StartPressure>`, `<EndPressure>` | `cylinders[].start_pressure`, `end_pressure` | millibar ÷ 1 000 |
 | `<Oxygen>`, `<Helium>` | `cylinders[].oxygen`, `helium` | percent, ×1 |
-| `<PO2>` | `cylinders[].po2_limit` | bar, ×1 |
+| `<PO2>` | `cylinders[].ppo2_limit` | bar, ×1 |
 | `<Depth>` | `profile.depth.values` | metres **× 100** — centimetres |
 | `<Ceiling>` | `profile.ceiling.values` | metres **× 100** — centimetres |
 | `<Temperature>` | `profile.temperature.values` | °C **× 10** — tenths |
 | `<Pressure>` | `profile.pressures[].values` | millibar **÷ 1 000 × 10** — tenths of a bar |
-| `<Time>`, `<GasChangeTime>` | sample and event times | seconds, ×1 |
+| `<Time>`, `<GasChangeTime>` | sample and event times | decimal seconds **× 1 000** — milliseconds, halves away from zero |
 
 **The channel conversions carry a scale the scalar ones do not**, and the tank-pressure
 channel carries two: millibar to bar, then §6.5's tenths. `211391` millibar is `211.391` bar
@@ -241,15 +241,19 @@ place to put them, and §6.4b is that place.
 | --- | --- | --- |
 | `<StartTime>` | `started_at` | wall clock, fraction kept, no offset supplied |
 | `<Duration>` | `duration` | the whole logged period |
-| `<Note>` | `notes` | capped at §6's length, stripped; nil on all 384 in hand |
+| `<Note>` | `notes` | stripped; nil on all 384 in hand |
 | `<MaxDepth>` | `max_depth` | a recorded reading, not a summary of the samples |
 | `<AvgDepth>` | `avg_depth` | dropped if it is deeper than `max_depth` |
 | `<BottomTemperature>` | `bottom_temperature` | recorded directly, unlike the app JSON's |
-| `<CnsStart>`, `<CnsEnd>` | `cns_start`, `cns_end` | zero is a reading: §6.2 gives them `minimum: 0` |
-| `<OtuStart>`, `<OtuEnd>` | `otu_start`, `otu_end` | as above |
-| `<SurfacePressure>` | `surface_pressure` | Pascal; outside 0.4-1.2 bar it is dropped |
+| `<CnsStart>`, `<CnsEnd>` | the recording's `cns_start`, `cns_end` | zero is a reading: §6.4a gives them `minimum: 0` |
+| `<OtuStart>`, `<OtuEnd>` | the recording's `otu_start`, `otu_end` | as above |
+| `<SurfacePressure>` | the recording's `surface_pressure` | Pascal; outside 0.4-1.2 bar it is dropped |
 | `<DiveMixtures>` | `cylinders` | below |
 | `<DiveSamples>` | the recording's `profile` | below; a profile is a member of `recordings[]` (§6.4a), never of the dive |
+
+**The oxygen clocks and the surface pressure are the computer's own figures**, and a file is
+one computer's record of one dive, so they land on its one recording (§6.4a) beside the
+profile rather than on the dive.
 
 `<Duration>` is the whole period the computer logged, and it is the only element in this
 format observed holding a dive's length. `<BottomTime>` is the time spent at depth and runs
@@ -272,7 +276,7 @@ starts on.
 | `<EndPressure>` | `cylinders[].end_pressure` |
 | `<Oxygen>` | `cylinders[].oxygen` |
 | `<Helium>` | `cylinders[].helium` |
-| `<PO2>` | `cylinders[].po2_limit` |
+| `<PO2>` | `cylinders[].ppo2_limit` |
 
 In document order, at most 16 per dive. The corpus has 353 mixtures across 342 exports: 331
 dives with one and 11 with two.
@@ -356,7 +360,7 @@ Three shapes, and only one of them is in the corpus.
 
 | source | channel |
 | --- | --- |
-| `<Time>` | the axis, in seconds |
+| `<Time>` | the axis, its decimal seconds in milliseconds |
 | `<Depth>` | `profile.depth` |
 | `<Ceiling>` | `profile.ceiling` |
 | `<Temperature>` | `profile.temperature` |
@@ -368,13 +372,13 @@ unaffected — so the channels sit on their own axes and none is padded to anoth
 That is `converting.md`'s no-padding rule; the reference dive carries 201 depths, 201
 temperatures and no pressures at all.
 
-**Two samples on one second are a real collision here**, unlike a source that appends each
-sensor's stream as its own record. It fires on 37 of the corpus's exports and every one of
-them is a freedive, where a 1 s sampling interval meets a `<Time>` that is not quite an
-integer; no scuba dive in hand loses a reading to it. Those 37 used to be unreachable — the
-reader stopped at `<Mode>3</Mode>` before it read a sample — so carrying freedives is what
-first made this rule fire on a real file. `fixtures/suunto_xml/freedive.xml` is one of them,
-and its expectation carries three sample seconds from five samples.
+**Two samples on one instant are a real collision here**, unlike a source that appends each
+sensor's stream as its own record. On a whole-second axis it fires on 37 of the corpus's
+exports and every one of them is a freedive, where a 1 s sampling interval meets a `<Time>`
+that is not quite an integer; no scuba dive in hand loses a reading to it. No count has been
+taken at §6.5's millisecond grain. `fixtures/suunto_xml/freedive.xml` is one of the 37, and
+its reduction repeats a whole-number `<Time>` — three samples at `1` — which collide at any
+grain, so its expectation carries three sample times from five samples.
 
 **A ceiling of zero is not a ceiling** (`converting.md`, *Profiles*). This export writes
 `i:nil` rather than a zero on every no-deco sample — its 1 760 recorded ceilings run 3.0 to
@@ -421,8 +425,8 @@ is `converting.md`'s refuse-rather-than-guess rule, not its ambiguity rule.
   than the maximum; a surface pressure or ppO₂ limit outside what §6 allows; a mix whose
   halves sum above 100 %; an end pressure above its start; a cylinder pressure past 350 bar;
   cylinders past the cap; a gas change before the dive began, or one left with no profile to
-  sit on; a sample with no `<Time>`; two samples on one second; samples that carry a time and
-  no reading this format can hold; tank readings two cylinders both claim.
+  sit on; a sample with no `<Time>`; two samples on one millisecond; samples that carry a
+  time and no reading this format can hold; tank readings two cylinders both claim.
 - **`inferred`** — never. This export summarises its own dive, so there is nothing for this
   reader to compute, and `extensions.divejson.inferred` is never written.
 - **`resolved`** — never, as above.
@@ -501,7 +505,7 @@ refusals and the second out of the silently unmapped, both into the device map a
   `<PreviousMaxDepth>`, `<TimeFromReset>`** — the device's own derived figures, several of
   them about a *series* of dives rather than this one. §6.2 has no member for any.
 - **`<OlfEnd>`** — Suunto's oxygen limit fraction, a percentage of whichever of the CNS and
-  OTU clocks is higher. §6.2 carries the two clocks themselves, which are mapped, and a
+  OTU clocks is higher. §6.4a carries the two clocks themselves, which are mapped, and a
   derived maximum of them is not a third reading.
 - **`<StartTemperature>` and `<EndTemperature>`** — §6.2 carries one water temperature,
   `bottom_temperature`, and `<BottomTemperature>` is the element that states it. The full

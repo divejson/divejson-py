@@ -50,8 +50,7 @@
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
     },
     "notes": {
-      "type": "string",
-      "maxLength": 10000
+      "type": "string"
     },
     "extensions": {
       "type": "object",
@@ -133,7 +132,9 @@
       "properties": {
         "uuid": { "$ref": "#/$defs/uuid" },
         "number": { "type": "integer" },
-        "started_at": { "$ref": "#/$defs/date_time" },
+        "started_at": {
+          "anyOf": [{ "$ref": "#/$defs/date_time" }, { "$ref": "#/$defs/date" }]
+        },
         "duration": { "type": "integer", "exclusiveMinimum": 0 },
         "notes": { "$ref": "#/$defs/notes" },
         "max_depth": { "type": "number", "exclusiveMinimum": 0 },
@@ -141,13 +142,8 @@
         "bottom_temperature": { "type": "number" },
         "visibility": { "type": "number", "minimum": 0 },
         "weight": { "type": "number", "minimum": 0 },
-        "water_type": { "enum": ["salt", "fresh", "brackish", "en13319"] },
+        "water_type": { "enum": ["salt", "fresh", "brackish"] },
         "altitude": { "type": "integer", "minimum": -450, "maximum": 6500 },
-        "cns_start": { "type": "number", "minimum": 0 },
-        "cns_end": { "type": "number", "minimum": 0 },
-        "otu_start": { "type": "number", "minimum": 0 },
-        "otu_end": { "type": "number", "minimum": 0 },
-        "surface_pressure": { "type": "number", "minimum": 0.4, "maximum": 1.2 },
         "entry_position": { "$ref": "#/$defs/position" },
         "exit_position": { "$ref": "#/$defs/position" },
         "trip_uuid": { "$ref": "#/$defs/uuid" },
@@ -171,7 +167,7 @@
         "end_pressure": { "type": "number", "minimum": 0, "maximum": 350 },
         "oxygen": { "type": "number", "minimum": 0, "maximum": 100 },
         "helium": { "type": "number", "minimum": 0, "maximum": 100 },
-        "po2_limit": { "type": "number", "minimum": 0.4, "maximum": 2.0 },
+        "ppo2_limit": { "type": "number", "minimum": 0.4, "maximum": 2.0 },
         "gas_number": { "type": "integer", "minimum": 0 },
         "role": { "enum": ["bottom", "deco", "diluent", "oxygen"] },
         "usage": { "enum": ["parallel", "staged"] },
@@ -185,7 +181,13 @@
         "device": { "$ref": "#/$defs/device" },
         "mode": { "enum": ["open_circuit", "closed_circuit", "semi_closed", "gauge", "freedive"] },
         "deco_model": { "$ref": "#/$defs/deco_model" },
+        "salinity": { "enum": ["fresh", "en13319", "salt"] },
         "started_at": { "$ref": "#/$defs/date_time" },
+        "surface_pressure": { "type": "number", "minimum": 0.4, "maximum": 1.2 },
+        "cns_start": { "type": "number", "minimum": 0 },
+        "cns_end": { "type": "number", "minimum": 0 },
+        "otu_start": { "type": "number", "minimum": 0 },
+        "otu_end": { "type": "number", "minimum": 0 },
         "source_files": { "type": "array", "items": { "$ref": "#/$defs/stored_file" } },
         "profile": { "$ref": "#/$defs/profile" },
         "extensions": { "$ref": "#/$defs/extensions" }
@@ -356,7 +358,9 @@
           "enum": [
             "padi", "ssi", "naui", "sdi", "tdi", "cmas", "raid", "bsac",
             "gue", "iantd", "psai", "dan", "efr", "andi", "snsi", "acuc",
-            "pss", "ida", "other"
+            "pss", "ida", "ndl", "utd", "saa", "scotsac", "iac", "protec",
+            "pdic", "nase", "sei", "ymca", "erdi", "aida", "molchanovs", "pfi",
+            "apnea_academy", "fii", "nss_cds", "nacd", "idea", "diwa", "other"
           ]
         },
         "agency_other": { "type": "string", "minLength": 1, "maxLength": 64 },
@@ -513,7 +517,9 @@
           "enum": [
             "padi", "ssi", "naui", "sdi", "tdi", "cmas", "raid", "bsac",
             "gue", "iantd", "psai", "dan", "efr", "andi", "snsi", "acuc",
-            "pss", "ida", "other"
+            "pss", "ida", "ndl", "utd", "saa", "scotsac", "iac", "protec",
+            "pdic", "nase", "sei", "ymca", "erdi", "aida", "molchanovs", "pfi",
+            "apnea_academy", "fii", "nss_cds", "nacd", "idea", "diwa", "other"
           ]
         },
         "agency_other": { "type": "string", "minLength": 1, "maxLength": 64 },

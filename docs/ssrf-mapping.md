@@ -77,19 +77,20 @@ in a converter, are in `converting.md`.
 | --- | --- | --- | --- | --- |
 | `profile.depth` values | centimetres | `<sample @depth>` | `'1.45 m'` | × 100 |
 | `profile.temperature` values | tenths of a °C | `<sample @temp>` | `'24.4 C'` | × 10 |
-| `profile.duration`, `times` | seconds | `<sample @time>` | `'0:10 min'` | `M × 60 + S` |
+| `profile.duration`, `times` | milliseconds | `<sample @time>` | `'0:10 min'` | `(M × 60 + S) × 1 000` |
 | `duration` | seconds | `<dive @duration>` | `'66:50 min'` | `M × 60 + S` |
 | `max_depth`, `avg_depth` | metres | `<depth @max>`, `@mean` | `'45.91 m'` | — |
 | `bottom_temperature` | °C | `<temperature @water>` | `'22.4 C'` | — |
 | `cylinders[].volume` | litres | `<cylinder @size>` | `'12.0 l'` | — |
 | `cylinders[].start_pressure`, `.end_pressure` | bar | `<cylinder @start>`, `@end` | `'200.0 bar'` | — |
 | `cylinders[].oxygen`, `.helium` | percent | `<cylinder @o2>`, `@he` | `'32.0%'` | — |
-| `cns_end` | CNS % | `<dive @cns>` | `'11%'` | — |
-| `otu_end` | OTU | `<dive @otu>` | `'31'` | — |
+| a recording's `cns_end` | CNS % | `<dive @cns>` | `'11%'` | — |
+| a recording's `otu_end` | OTU | `<dive @otu>` | `'31'` | — |
 | `number` | — | `<dive @number>` | `'45'` | — |
 
-**The two channel rows are the trap**, exactly as `converting.md` says: they carry a scale
-the scalar rows beside them do not, and the most-executed conversion in this module is the
+**The three profile rows are the trap**, exactly as `converting.md` says: they carry a
+scale the scalar rows beside them do not — the axis a thousand, where the dive's own
+`duration` beside it takes none — and the most-executed conversion in this module is the
 first of them. The bare-count rows are a unit too — a `%` on an `@otu` is as much a refusal
 as a `ft` on a depth.
 
@@ -154,8 +155,8 @@ and no version.
 | `@number` | `number` |
 | `@duration` | `duration` |
 | `@divesiteid` | `site_uuids`, one entry |
-| `@cns` | `cns_end` |
-| `@otu` | `otu_end` |
+| `@cns` | the primary recording's `cns_end` — see below |
+| `@otu` | the primary recording's `otu_end` |
 | `<notes>` | `notes` |
 | `<cylinder>` | `cylinders[]` |
 | `<divecomputer><depth @max>`, `@mean` | `max_depth`, `avg_depth` — **the first element's only**, see below |
@@ -200,13 +201,19 @@ naming: the same logbook's other exports do carry a time zone, and taking one fr
 would be this converter asserting a zone the file does not. `converting.md` forbids
 supplying one, and §5.2 is what it is protecting.
 
-A dive with no `@date` is dropped, since §6.2 makes `started_at` REQUIRED. A `@time` missing
-its seconds is read as `:00` and reported, which is `converting.md`'s leniency: a
-hand-edited save file writes exactly that, and without it one such dive would fail a
-converter's own output validation and cost the whole logbook.
+A dive with no `@date` is dropped, since §6.2 makes `started_at` REQUIRED. A `@date` with no
+`@time` at all is a date-only start (§5.2), with the time of day reported absent — the rule
+is `converting.md`'s, and no pair here reaches it. A `@time` missing its seconds is read as
+`:00` and reported, which is `converting.md`'s leniency: a hand-edited save file writes
+exactly that, and without it one such dive would fail a converter's own output validation
+and cost the whole logbook.
 
-`@cns` and `@otu` are the dive's *end* figures. Subsurface records no starting pair, so
-`cns_start` and `otu_start` have no source here.
+`@cns` and `@otu` are the *end* figures of the computer that computed them. Subsurface
+records no starting pair, so `cns_start` and `otu_start` have no source here. They sit on the
+`<dive>` rather than on a `<divecomputer>`, so they go where `converting.md` sends a
+dive-level readout: onto the primary recording, reported `resolved` where the dive has more
+than one, and onto a recording of their own where no `<divecomputer>` yields one. No pair
+here carries either figure on a two-computer dive.
 
 Zero is read two different ways, which is `converting.md`'s zero rule meeting two members
 with different constraints. A `<depth @max>` or `@mean` of `0.0 m` is **not recorded** —
@@ -278,8 +285,10 @@ the diver called their computer.
 ## This format settles no ambiguity
 
 `converting.md` defines a `resolved` finding for a value the source recorded whose scale,
-units or *meaning* are genuinely in doubt. **This reader emits none**, and that is a property
-of the format rather than an omission. There is no scale to settle: every measurement states
+units or *meaning* are genuinely in doubt. **This reader emits one, and it is not about a
+scale**: the dive-level `@cns` and `@otu` above, on a dive with more than one recording, where
+the file does not say whose figures they are. Past that the absence is a property of the
+format rather than an omission. There is no scale to settle: every measurement states
 its unit, so there is no fraction-or-percent and no litres-or-cubic-metres for a magnitude
 test to reach. Where UDDF's `<o2>0.32</o2>` and `<o2>34</o2>` are both schema-valid and mean
 the same gas, `.ssrf` writes `o2='32.0%'` and there is nothing left to decide. And there is
@@ -290,12 +299,13 @@ writer needs two writers to tell apart.
 `profile.duration` is the other thing that is not a finding, for `converting.md`'s reason:
 §6.4 defines it as the span of the profile's own samples, so taking the largest sample time
 is structural rather than derived. It is regularly longer than the dive's own `@duration` —
-4300 against 4010 on the reference logbook's first dive — and samples are never trimmed to
-make the two agree.
+a 4300 s span against 4010 s on the reference logbook's first dive — and samples are never
+trimmed to make the two agree.
 
-**So the report this reader produces carries two kinds and only two: `absent` and
-`dropped`.** No pair in `fixtures/ssrf/` expects another, and a `resolved` finding appearing
-there would mean a reader had started guessing at a scale.
+**So the report this reader produces carries `absent` and `dropped`, and `resolved` for
+that one question of where.** No pair in `fixtures/ssrf/` expects a `resolved` finding, and
+one appearing anywhere but on a dive-level readout would mean a reader had started guessing
+at a scale.
 
 ## Two things read and deliberately not carried
 
@@ -378,21 +388,22 @@ exporter's doing. Everything else in both documents is equal.
 - **`bottom_temperature`** — a temperature here (`22.4` on the first dive; each dive has its
   own), absent there, on all eight dives. The UDDF export carries no `<lowesttemperature>`
   for the water temperature the save file keeps.
-- **`cns_end`** — a CNS figure here (`11` on the first dive), absent there, on the seven
-  dives whose `<dive>` carries an `@cns`. The UDDF export writes no CNS anywhere in the
-  document — not on a dive, not on a waypoint — for the figure the save file keeps. The
-  eighth dive carries neither `@cns` nor `@otu`, and there the two readings agree.
-- **`otu_end`** — an OTU figure here (`31` on the first dive), absent there, on the same
-  seven dives, and absent from the UDDF export for the same reason. Where a UDDF document
-  does carry these two they are per-waypoint series rather than the dive's end scalar, and
-  `uddf-mapping.md` records this reader declining to derive a scalar from them; that policy
-  never comes into play here, because there is nothing in the export to derive from.
+- **`cns_end`**, on the recording — a CNS figure here (`11` on the first dive), absent
+  there, on the seven dives whose `<dive>` carries an `@cns`. The UDDF export writes no CNS
+  anywhere in the document — not on a dive, not on a waypoint — for the figure the save file
+  keeps. The eighth dive carries neither `@cns` nor `@otu`, and there the two readings agree.
+- **`otu_end`**, on the recording — an OTU figure here (`31` on the first dive), absent
+  there, on the same seven dives, and absent from the UDDF export for the same reason. Where
+  a UDDF document does carry these two they are per-waypoint series rather than the
+  recording's end scalar, and `uddf-mapping.md` records this reader declining to derive a
+  scalar from them; that policy never comes into play here, because there is nothing in the
+  export to derive from.
 - **`sites[].location`** — a place named after the site itself there, absent here, on all
   five sites. The exporter writes a `<geography><location>` holding exactly what `<name>`
   holds, and the UDDF reader carries it into `location.name` because §6.10's `location` is a
   real member and a reader cannot know that a writer filled it by copying. The save file's
   `<site>` has one name and no second field to copy it into. This is the one difference
-  `dives` cannot see: the other seven all live on a dive.
+  `dives` cannot see: the other seven all live on a dive or its recording.
 
 The record UUIDs differ too, and always will: each format has its own frozen identity
 namespace, so the same site converted through both paths is two records. `converting.md`

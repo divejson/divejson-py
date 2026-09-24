@@ -82,7 +82,7 @@ in a converter, are in `converting.md`.
 | `profile.depth` values | centimetres | `<waypoint><depth>` | metres | × 100 |
 | `profile.temperature` values | tenths of a °C | `<waypoint><temperature>` | Kelvin | (K − 273.15) × 10 |
 | `profile.pressures[]` values | tenths of a bar | `<waypoint><tankpressure>` | Pascal | ÷ 100 000 × 10 |
-| `profile.duration`, `times` | seconds | `<waypoint><divetime>` | seconds | — |
+| `profile.duration`, `times` | milliseconds | `<waypoint><divetime>` | seconds, `xs:float` | × 1 000, to a whole millisecond |
 | `profile.ndl` values | seconds | `<waypoint><nodecotime>` | seconds | — |
 | `profile.ppo2` values | hundredths of a bar | `<waypoint><calculatedpo2>` | bar or Pascal, and see below | × 100, or ÷ 1000 |
 | `profile.cns` values | tenths of a percent | `<waypoint><cns>` | percent | × 10 |
@@ -91,10 +91,10 @@ in a converter, are in `converting.md`.
 | `max_depth`, `avg_depth` | metres | `<greatestdepth>`, `<averagedepth>` | metres | — |
 | `bottom_temperature` | °C | `<lowesttemperature>` | Kelvin | K − 273.15 |
 | `cylinders[].start_pressure`, `.end_pressure` | bar | `<tankpressurebegin>`, `<tankpressureend>` | Pascal | ÷ 100 000 |
-| `surface_pressure` | bar | `<surfacepressure>` | Pascal | ÷ 100 000 |
+| a recording's `surface_pressure` | bar | `<surfacepressure>` | Pascal | ÷ 100 000 |
 | `cylinders[].volume` | litres | `<tankvolume>` | cubic metres | × 1000, and see below |
 | `cylinders[].oxygen`, `.helium` | percent | `<o2>`, `<he>` | fraction | × 100, and see below |
-| `cylinders[].po2_limit` | bar | `<maximumpo2>` | bar | — the one pressure UDDF does not express in Pascal |
+| `cylinders[].ppo2_limit` | bar | `<maximumpo2>` | bar | — the one pressure UDDF does not express in Pascal |
 | `weight` | kilograms | `<leadquantity>` | kilograms | — |
 | `visibility`, `altitude` | metres | `<visibility>`, `<altitude>` | metres | — |
 
@@ -329,20 +329,22 @@ its own repeated element — the carve-out included, and in `converting.md`'s ow
 link that yields **neither a device nor a profile** yields no recording, §6.4a forbidding
 one that carries nothing.
 
-**The first link is where the dive's own once-per-dive facts land**, both of them, because
-UDDF states each once per **dive** and never once per computer:
+**The first link is where the dive's own once-per-dive facts land**, all three of them,
+because UDDF states each once per **dive** and never once per computer:
 
 - **Its `<samples>` become that first recording's profile.** A dive has one `<samples>`
   element, so there is nothing to give the others and nothing to divide, and every recording
-  after the first is device-only. That profile is also the only thing that carries a link
-  past the carve-out without a device, and it reaches exactly one link — so **where the dive
-  has a profile**, the first link is a recording whether or not its element names a device,
-  exactly as a dive linking no computer at all is one recording made of its samples alone,
-  and the carve-out bites only on the *later* links whose elements name none. **Where the
-  dive has no profile** — an absent `<samples>`, or samples `converting.md` found wholly
-  unusable — there is nothing to protect any link, so every one of them is judged on its
-  device alone, the first included, and a dive whose elements all name none has no recordings
-  at all.
+  after the first is device-only. That profile, with the surface pressure below, is the
+  only thing that carries a link past the carve-out without a device, and it reaches exactly
+  one link — so **where the dive has a profile**, the first link is a recording whether or
+  not its element names a device, exactly as a dive linking no computer at all is one
+  recording made of its samples alone, and the carve-out bites only on the *later* links
+  whose elements name none. **Where the dive has neither a profile nor a surface pressure** —
+  an absent `<samples>`, or samples `converting.md` found wholly unusable — there is nothing
+  to protect any link, so every one of them is judged on its device alone, the first
+  included, and a dive whose elements all name none has no recordings at all.
+- **Its `<surfacepressure>` goes to that first link's recording**, a readout being enough to
+  make one (§6.4a) the way a profile is — *Dives* below.
 - **Its `<internaldivenumber>` joins that first link's device**, and only that one's. It is a
   child of the dive (above), so a dive linking two computers has one counter and no way to
   say whose it is; giving it to the first is the only reading that does not put one machine's
@@ -379,7 +381,7 @@ carries nothing this format records.
 | `informationbeforedive/divenumber` | `number` |
 | `informationbeforedive/link/@ref` | `site_uuids`, in source order, the first being the primary site |
 | `informationbeforedive/altitude` | `altitude` |
-| `informationbeforedive/surfacepressure` | `surface_pressure` |
+| `informationbeforedive/surfacepressure` | the primary recording's `surface_pressure` — see below |
 | `informationbeforedive/equipmentused/leadquantity` | `weight` |
 | `informationafterdive/diveduration` | `duration` |
 | `informationafterdive/greatestdepth` | `max_depth` |
@@ -393,9 +395,19 @@ untouched; a dive with no `<datetime>` at all is dropped, since §6.2 makes `sta
 REQUIRED.
 
 Two truncations are forgiven, both real writer output rather than hypotheticals:
-`2002-06-18T` and a bare `2002-06-18` are read as midnight on that date and reported.
-Subsurface emits the first for a midnight dive, its stylesheet building the string with an
-unguarded concatenation. Dropping the dive over it would lose a dive to a writer's typo.
+`2002-06-18T` and a bare `2002-06-18` are read as a **date-only start** (§5.2), with the time
+of day reported absent — `converting.md`'s rule, and not midnight, which neither string
+states. Subsurface emits the first for a midnight dive, its stylesheet building the string
+with an unguarded concatenation; a dive that really began at midnight therefore comes back as
+its date, which is that writer's loss rather than a reading this reader could recover.
+Dropping the dive over either would lose a dive to a writer's typo.
+
+**`<surfacepressure>` is the dive's element and a recording's figure.** §6.4a puts the
+surface pressure a computer used on that computer's recording, and UDDF states one per dive,
+so it goes where `converting.md` sends a dive-level readout: onto the primary recording — the
+first link's, *Device* above — reported `resolved` where the dive has more than one, and onto
+a recording of its own where the dive yields none. No file in this corpus links two
+computers, so the `resolved` case has no pair.
 
 Zero is read two different ways here, which is `converting.md`'s zero rule meeting two
 members with different constraints. A `<greatestdepth>` or `<averagedepth>` of `0` is **not
@@ -420,7 +432,7 @@ and one that resolves to nothing at all is reported as a source defect.
 | `tankpressureend` | `cylinders[].end_pressure` |
 | `link/@ref` → `gasdefinitions/mix/o2` | `cylinders[].oxygen` |
 | `link/@ref` → `gasdefinitions/mix/he` | `cylinders[].helium` |
-| `link/@ref` → `gasdefinitions/mix/maximumpo2` | `cylinders[].po2_limit` |
+| `link/@ref` → `gasdefinitions/mix/maximumpo2` | `cylinders[].ppo2_limit` |
 
 `<gasdefinitions>` is not a collection of its own: DiveJSON carries the blend on the
 cylinder that held it, so a mix nothing links to travels nowhere.
@@ -453,8 +465,11 @@ inventing 402 readings.
 
 - `<divetime>` is optional in the schema and is the only thing that can place a reading, so
   a waypoint without one is the timeless sample `converting.md` drops and reports.
-- `<divetime>` is `xs:float` while §6.5's `times` are integers, which is what makes the
-  same-second collision rule fire on real files.
+- `<divetime>` is `xs:float` seconds while §6.5's `times` are whole milliseconds, so each is
+  multiplied by a thousand and rounded, a fraction the file states is kept, and two waypoints
+  that round to one millisecond are `converting.md`'s collision.
+  `fixtures/uddf/legacy-writer.uddf` writes a `30.4` beside a `30`: one second, two
+  milliseconds, so both readings are kept.
 - A `<setmarker>` whose text is exactly `deep_stop`, `safety_stop` or `bookmark` becomes
   that event type; anything else becomes an event with **no `type`** and the text as its
   `label`, which §6.6 makes the spelling of an unclassified event. `<setmarker>` is a bare
@@ -498,7 +513,7 @@ inventing 402 readings.
   carries it through.
 - **Two cylinders on one blend link the same `<mix>`**, so a `@ref` resolves to a *list* of
   cylinders and repeated references on one waypoint take them in order. Collapsing them
-  would put two readings on one second, which §6.5 forbids, and would say the diver carried
+  would put two readings on one instant, which §6.5 forbids, and would say the diver carried
   one bottle. A `<tankpressure>` with no `@ref` at all — which the documentation permits for
   a linked double measured at one pressure — is taken as the dive's cylinder when there is
   exactly one, and dropped when there is a choice to get wrong.
@@ -594,12 +609,12 @@ sort of thing that arrives without the heading being corrected.
 `<diveduration>` is the dive's *logged* duration and maps to `dive.duration`. §6.4 makes
 `profile.duration` REQUIRED and at least the largest sample time in any channel — a
 different quantity, and in practice a larger one: `<diveduration>` is **shorter** than the
-sample span in both real exports on record, 4010 against 4300 and 4001 against 4288.
+sample span in both real exports on record, 4010 s against 4300 s and 4001 s against 4288 s.
 
 **Take the largest sample time across every channel. Never trim samples to make
 `<diveduration>` fit** — that would delete recorded readings to satisfy a number, which is
 exactly §5.4's violation. DiveJSON's own reference writer produces the same shape, a
-`profile.duration` of 4301 over a logged `duration` of 4001. §6.4 defines the member as the
+profile spanning 4301 s over a logged `duration` of 4001. §6.4 defines the member as the
 span of the samples themselves, so reading it off them is structural rather than derived,
 and it carries no finding of any kind.
 
@@ -658,10 +673,11 @@ writes all three that way.
 | UDDF | why not |
 | --- | --- |
 | `<waypoint><decostop>` | a stop *schedule*, not a ceiling sample: `@duration` is required on it and a ceiling has none, several may appear on one waypoint, and no writer in the corpus emits any. `profile.ceiling` waits for a real file to map from. |
-| `<waypoint><otu>` | §6.4 has a `cns` channel and no OTU one, and no file in hand carries this element. Deriving the dive's `otu_start`/`otu_end` scalars from the last sample would present a derivation as recorded data, which §5.7 forbids. |
+| `<waypoint><otu>` | §6.4 has a `cns` channel and no OTU one, and no file in hand carries this element. Deriving a recording's `otu_start`/`otu_end` from the last sample would present a derivation as recorded data, which §5.7 forbids. |
 | `<waypoint><measuredpo2>` | per cell by construction: its `@ref` to an O₂ sensor is mandatory and the element may repeat inside one waypoint, once per sensor. §6.4's `ppo2` is the one figure the computer calculated, which is `<calculatedpo2>`; a per-cell reading has no member yet. |
 | `<waypoint><alarm>`, `<setpo2>`, `<heading>`, `<pulserate>` | no core member, and no fixture to map against. `<setpo2>` is a *maximum tolerated* ppO₂ rather than a rebreather setpoint, which is the member it would otherwise look like. |
 | `<decomodel><vpm>`, `<rgbm>` | no file in hand carries either, so §6.4c's `algorithm` has no value seeded for them yet. |
+| `<calculateprofile><profile><density>` | a water density in kg/m³ — Shearwater Cloud Desktop writes `1030` — beside the recalculation's model, a route not read for the reason *The decompression model* gives. §6.4a's `salinity` is a named setting and carries no density: the two are different members, neither derivable from the other, and a density arrives in a minor version when a reader maps one. |
 | `<informationbeforedive><surfaceintervalbeforedive>` | no core member. |
 | `<informationafterdive><rating>`, `<current>`, `<problems>` | no core member. |
 | `<site><ecology>` | site-level flora and fauna, where §6.11's species are per-dive sightings. |
