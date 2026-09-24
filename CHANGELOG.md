@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.12.0
+
 - **A diver carries a portrait.** §6.1 of
   [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) adds
   `portrait_file`, a Stored File (§6.7), and `divejson validate` claims its uuid in the
