@@ -25,7 +25,7 @@ carried freedive would be indistinguishable from a scuba dive with no gas and no
 decompression algorithm; an archive of the owner's whole export directory now converts to
 **384** dives where it used to produce 342 and a report saying why the other 42 were
 missing. The 42 are exactly the 42 that carry no `<DiveMixture>` at all — and since they had
-never been read past their mode, carrying them is also what first made the same-second
+never been read past their mode, carrying them is also what first made the sample-time
 collision rule fire on a real file. Nothing here is skipped for its mode, which is where
 this reader and the Suunto app JSON one part company: a run and a dive are the same shape
 there, and `ActivityType` is the only thing that separates them.
@@ -63,7 +63,6 @@ from typing import Any
 
 from .converter import (
     CENTIMETRES_PER_METRE,
-    MAX_NOTES,
     PRODUCER_KEY,
     TENTHS_PER_UNIT,
     Conversion,
@@ -73,12 +72,13 @@ from .converter import (
     Note,
     NoteKind,
     Scope,
-    capped,
     deco_model,
     decimal_of,
     device,
     header,
+    in_seconds,
     integer_of,
+    milliseconds,
     recorded,
     recording,
     rounded,
@@ -154,7 +154,7 @@ PASCALS_PER_BAR = Decimal(100_000)
 # pressure it puts on a cylinder in one unit.
 MAX_CYLINDER_PRESSURE = Decimal(350)
 
-# The bounds §6.2 puts on a surface pressure and §6.3 on a ppO₂ limit, in the units those
+# The bounds §6.4a puts on a surface pressure and §6.3 on a ppO₂ limit, in the units those
 # members hold. Both are wide enough that a reading outside one is a device that recorded
 # something other than what the element claims, which is reported rather than clamped.
 MIN_SURFACE_PRESSURE, MAX_SURFACE_PRESSURE = Decimal("0.4"), Decimal("1.2")
@@ -320,24 +320,26 @@ class _Converter:
             self.note(where, f"<{name}> is not a number this reader can carry; dropped", "dropped")
         return value
 
-    def scalar(self, dive: dict[str, Any], member: str, name: str, where: str) -> None:
-        """One recorded number onto one dive member, by the member's own constraint.
+    def scalar(
+        self, target: dict[str, Any], member: str, name: str, where: str, *, record: str = "dive"
+    ) -> None:
+        """One recorded number onto one member of a record, by the member's own constraint.
 
         Which way a zero reads is the schema's decision rather than this module's, so
         `recorded` is asked with the member the value is headed for: a `<MaxDepth>0</MaxDepth>`
         is a dive whose depth the computer never had, while a zero `<CnsEnd>` is the oxygen
         clock a diver's first dive of the day starts on.
 
-        Every member written through here is one §6.2 types as a `number`, so the reading
-        is carried as a float. `duration`, the one whole-number member this reader maps, has
+        Every member written through here is one §6 types as a `number`, so the reading is
+        carried as a float. `duration`, the one whole-number member this reader maps, has
         `read_duration` of its own — an integer member has to be rounded *before* its
         constraint is asked about, and that ordering is the point of separating them.
         """
         value = self.number(self.root, name, where)
         if value is None:
             return
-        if recorded(value, record="dive", member=member):
-            dive[member] = float(value)
+        if recorded(value, record=record, member=member):
+            target[member] = float(value)
         else:
             self.note(
                 where,
@@ -410,18 +412,20 @@ class _Converter:
         self.read_duration(dive, where)
         notes = _recorded_text(self.root, "Note")
         if notes is not None:
-            dive["notes"] = capped(notes, MAX_NOTES, note=self.note, where=where, member="<Note>")
+            dive["notes"] = notes
         self.read_depths(dive, where)
         self.scalar(dive, "bottom_temperature", "BottomTemperature", where)
         self.read_conditions(where)
+        # The computer's own figures (§6.4a), so they wait for its recording below.
+        readouts: dict[str, float] = {}
         for member, name in (
             ("cns_start", "CnsStart"),
             ("cns_end", "CnsEnd"),
             ("otu_start", "OtuStart"),
             ("otu_end", "OtuEnd"),
         ):
-            self.scalar(dive, member, name, where)
-        self.read_surface_pressure(dive, where)
+            self.scalar(readouts, member, name, where, record="recording")
+        self.read_surface_pressure(readouts, where)
 
         cylinders = self.read_cylinders(where)
         profile = self.read_profile(cylinders, where)
@@ -438,6 +442,7 @@ class _Converter:
             device=self.read_device(where),
             mode=mode,
             deco_model=self.read_deco_model(mode, where),
+            readouts=readouts,
             profile=profile,
         )
         if built is not None:
@@ -648,10 +653,10 @@ class _Converter:
                     "dropped",
                 )
 
-    def read_surface_pressure(self, dive: dict[str, Any], where: str) -> None:
-        """`<SurfacePressure>`, in Pascal where §6.2 holds bar.
+    def read_surface_pressure(self, readouts: dict[str, float], where: str) -> None:
+        """`<SurfacePressure>`, in Pascal where §6.4a holds bar.
 
-        §6.2 bounds the member at 0.4 to 1.2 bar, which is the range a barometer at a dive
+        §6.4a bounds the member at 0.4 to 1.2 bar, which is the range a barometer at a dive
         site can read. That bound is also the backstop for the unit: every one of the 384
         exports in hand lands in 103 100 to 106 700, which is barometric on the Pascal
         reading and a hundred metres of seawater on the millibar one.
@@ -668,7 +673,7 @@ class _Converter:
                 "dropped",
             )
             return
-        dive["surface_pressure"] = float(bar)
+        readouts["surface_pressure"] = float(bar)
 
     # -- cylinders ---------------------------------------------------------------
 
@@ -712,7 +717,7 @@ class _Converter:
             if MIN_PO2_LIMIT <= po2 <= MAX_PO2_LIMIT:
                 # Already bar here (`<PO2>1.4</PO2>`), where the app's JSON export of the
                 # same dive writes the same limit in Pascal.
-                cylinder["po2_limit"] = float(po2)
+                cylinder["ppo2_limit"] = float(po2)
             else:
                 self.note(
                     where,
@@ -842,14 +847,13 @@ class _Converter:
         times: list[int] = []
         for index, change in enumerate(_children(_child(mixture, "DiveGasChanges"), "DiveGasChange")):
             at = f"{where}/gas change/{index}"
-            seconds = self.number(change, "GasChangeTime", at)
-            if seconds is None:
+            placed = milliseconds(self.number(change, "GasChangeTime", at))
+            if placed is None:
                 continue
-            second = rounded(seconds)
-            if second < 0:
-                self.note(at, f"the gas change is at {second} s, before the dive began; dropped", "dropped")
+            if placed < 0:
+                self.note(at, f"the gas change is at {in_seconds(placed)} s, before the dive began; dropped", "dropped")
                 continue
-            times.append(second)
+            times.append(placed)
         return times
 
     # -- the profile -------------------------------------------------------------
@@ -860,12 +864,14 @@ class _Converter:
         Every sample element carries every channel, nil where the sensor had nothing — a
         mid-dive transmitter dropout is a nil `<Pressure>` on a sample whose `<Depth>` is
         unaffected — so the channels sit on their own axes and none is padded to another's
-        length. Two samples on one second are therefore a real collision here rather than
+        length. Two samples on one instant are therefore a real collision here rather than
         two sensor streams that were never in competition, and the axis settles them per
-        channel; it fires on 37 of the corpus's exports, every one of them a freedive, where
-        a 1 s sampling interval meets a `<Time>` that is not quite an integer. Those 37 were
-        unreachable while the reader stopped at `<Mode>3</Mode>` before it read a sample, so
-        carrying freedives is what first made this rule fire on a real file.
+        channel. On a whole-second axis it fired on 37 of the corpus's exports, every one of
+        them a freedive, where a 1 s sampling interval meets a `<Time>` that is not quite an
+        integer; `<Time>`'s decimal seconds reach the millisecond axis whole, so what still
+        collides is a `<Time>` the file repeats. Those 37 were unreachable while the reader
+        stopped at `<Mode>3</Mode>` before it read a sample, so carrying freedives is what
+        first made this rule fire on a real file.
 
         `<AveragedTemperature>` is deliberately not the temperature channel: it is a
         smoothed reading sitting beside the raw `<Temperature>` in the same element, and
@@ -889,8 +895,7 @@ class _Converter:
 
         axis = SampleAxis(self.note, where, noun="sample", time_member="<Time>")
         for index, sample in enumerate(samples):
-            seconds = self.number(sample, "Time", f"{where}/sample/{index}")
-            axis.offer(None if seconds is None else rounded(seconds), sample)
+            axis.offer(milliseconds(self.number(sample, "Time", f"{where}/sample/{index}")), sample)
 
         depth = Channel("depth")
         ceiling = Channel("ceiling")
@@ -900,10 +905,10 @@ class _Converter:
         # range usually does it for a run of samples, and one line per reading would be a
         # transmitter fault written out several hundred times.
         out_of_range = 0
-        for second, sample in axis.ordered():
+        for at, sample in axis.ordered():
             metres = self.number(sample, "Depth", where)
             if metres is not None:
-                depth.record(second, rounded(metres * CENTIMETRES_PER_METRE))
+                depth.record(at, rounded(metres * CENTIMETRES_PER_METRE))
             # A ceiling of zero is not a ceiling — zero says the diver may surface, and a
             # gap in the channel's times is how §6.5 spells no obligation. This export
             # writes `i:nil` rather than a zero on every no-deco sample, its 1 760 recorded
@@ -911,15 +916,15 @@ class _Converter:
             # rather than one this format needs.
             above = self.number(sample, "Ceiling", where)
             if above is not None and above > 0:
-                ceiling.record(second, rounded(above * CENTIMETRES_PER_METRE))
+                ceiling.record(at, rounded(above * CENTIMETRES_PER_METRE))
             celsius = self.number(sample, "Temperature", where)
             if celsius is not None:
-                temperature.record(second, rounded(celsius * TENTHS_PER_UNIT))
+                temperature.record(at, rounded(celsius * TENTHS_PER_UNIT))
             millibar = self.number(sample, "Pressure", where)
             if millibar is not None:
                 bar = millibar / MILLIBAR_PER_BAR
                 if 0 <= bar <= MAX_CYLINDER_PRESSURE:
-                    pressure.record(second, rounded(bar * TENTHS_PER_UNIT))
+                    pressure.record(at, rounded(bar * TENTHS_PER_UNIT))
                 else:
                     out_of_range += 1
         if out_of_range:
@@ -1050,9 +1055,9 @@ class _Converter:
         file that says so.
         """
         return [
-            {"time": second, "type": "gas_switch", "gas_number": cylinder.number}
+            {"time": at, "type": "gas_switch", "gas_number": cylinder.number}
             for cylinder in cylinders
-            for second in cylinder.switches
+            for at in cylinder.switches
         ]
 
 

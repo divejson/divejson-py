@@ -195,12 +195,12 @@ def test_a_duration_below_a_whole_second_is_read_as_not_recorded() -> None:
 def test_a_zero_depth_is_a_placeholder_and_a_zero_oxygen_clock_is_a_reading() -> None:
     """Which way a zero reads follows the member's own constraint, not this module.
 
-    §6.2 gives `max_depth` an exclusive floor and `cns_start` an inclusive one, and the
-    difference is a dive at the surface against a diver's first dive of the day.
+    §6.2 gives `max_depth` an exclusive floor and §6.4a `cns_start` an inclusive one, and
+    the difference is a dive at the surface against a diver's first dive of the day.
     """
     found = one("<MaxDepth>0</MaxDepth><CnsStart>0</CnsStart>")
     assert "max_depth" not in found
-    assert found["cns_start"] == 0.0
+    assert found["recordings"][0]["cns_start"] == 0.0
 
 
 def test_an_average_deeper_than_the_maximum_drops_the_average() -> None:
@@ -327,7 +327,7 @@ def test_a_gas_switch_names_the_cylinder_it_was_found_in() -> None:
     )
     assert profile_of(found)["events"] == [
         {"time": 0, "type": "gas_switch", "gas_number": 0},
-        {"time": 1592, "type": "gas_switch", "gas_number": 1},
+        {"time": 1_592_000, "type": "gas_switch", "gas_number": 1},
     ]
     assert [cylinder["gas_number"] for cylinder in found["cylinders"]] == [0, 1]
 
@@ -382,8 +382,8 @@ def test_each_channel_takes_only_the_samples_that_carried_a_reading_for_it() -> 
             )
         )
     )
-    assert found["depth"]["times"] == [10, 20, 30]
-    assert found["pressures"][0]["times"] == [10, 30]
+    assert found["depth"]["times"] == [10_000, 20_000, 30_000]
+    assert found["pressures"][0]["times"] == [10_000, 30_000]
 
 
 def test_the_averaged_temperature_is_not_the_temperature_channel() -> None:
@@ -408,16 +408,16 @@ def test_a_sample_with_no_time_is_dropped_and_reported() -> None:
             )
         )
     )
-    assert profile_of(found.document["dives"][0])["depth"]["times"] == [20]
+    assert profile_of(found.document["dives"][0])["depth"]["times"] == [20_000]
     assert any(note.kind == "dropped" and "no <Time>" in note.message for note in found.notes)
 
 
-def test_two_samples_on_one_second_keep_the_first_and_report_the_second() -> None:
+def test_two_samples_on_one_instant_keep_the_first_and_report_the_second() -> None:
     """A real collision here, unlike the app JSON's separately appended sensor streams.
 
-    Every `<Dive.Sample>` carries every channel, so two of them on one second are two
-    readings competing for it. It fires on 37 exports in the corpus, all of them freedives
-    this reader skips before it reaches the samples.
+    Every `<Dive.Sample>` carries every channel, so two of them on one instant are two
+    readings competing for it — `fixtures/suunto_xml/freedive.xml` repeats a whole `<Time>`,
+    which collides at any grain.
     """
     found = convert(
         suunto_xml(
@@ -425,7 +425,20 @@ def test_two_samples_on_one_second_keep_the_first_and_report_the_second() -> Non
         )
     )
     assert profile_of(found.document["dives"][0])["depth"]["values"] == [186]
-    assert any(note.kind == "dropped" and "share the second 1" in note.message for note in found.notes)
+    assert any(note.kind == "dropped" and "are both at 1 s" in note.message for note in found.notes)
+
+
+def test_a_fractional_time_keeps_its_place_to_the_millisecond() -> None:
+    """`<Time>` is decimal seconds, and two samples inside one second are two readings on
+    §6.5's millisecond axis where a whole-second one had them compete."""
+    found = convert(
+        suunto_xml(
+            suunto_xml_samples(suunto_xml_sample(1, Depth="1.86"), suunto_xml_sample(1.6, Depth="2.14"))
+        )
+    )
+    depth = profile_of(found.document["dives"][0])["depth"]
+    assert depth == {"times": [1000, 1600], "values": [186, 214]}
+    assert not any("are both at" in note.message for note in found.notes)
 
 
 def test_samples_carrying_a_time_and_nothing_else_produce_no_profile() -> None:
@@ -566,7 +579,7 @@ def test_a_sample_pressure_outside_the_allowed_range_is_dropped_and_counted_once
             )
         )
     )
-    assert profile_of(found.document["dives"][0])["pressures"][0]["times"] == [30]
+    assert profile_of(found.document["dives"][0])["pressures"][0]["times"] == [30_000]
     out_of_range = [note for note in found.notes if "outside the 0 to 350" in note.message]
     assert len(out_of_range) == 1
     assert "2 samples record" in out_of_range[0].message

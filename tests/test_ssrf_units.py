@@ -100,6 +100,13 @@ def test_a_clock_is_minutes_and_seconds(written: str, seconds: int) -> None:
     assert one(f"duration='{written} min'").get("duration", 0) == seconds
 
 
+@pytest.mark.parametrize(("written", "milliseconds"), [("0:10", 10_000), ("1:20", 80_000), ("71:40", 4_300_000)])
+def test_a_samples_clock_is_the_same_seconds_on_a_millisecond_axis(written: str, milliseconds: int) -> None:
+    """The trap this format's three profile rows share: `@duration` beside them takes no
+    factor, and the axis takes a thousand (§5.1)."""
+    assert profile(f"<sample time='{written} min' depth='1.0 m'/>")["depth"]["times"] == [milliseconds]
+
+
 @pytest.mark.parametrize("written", ["66", "66:5", "1:60", "66:50:00", "1.5", "66m50s"])
 def test_something_that_is_not_a_clock_is_refused_rather_than_read_as_minutes(written: str) -> None:
     """A bare `66` is the tempting one, and reading it would be a factor-of-60 guess."""
@@ -138,7 +145,7 @@ def test_a_gas_is_a_percentage_and_says_so() -> None:
 
 def test_the_oxygen_clock_is_a_percentage_and_the_oxygen_dose_is_a_count() -> None:
     """`cns='11%'` and `otu='31'`: the two members whose units differ from each other."""
-    found = one("cns='11%' otu='31'")
+    found = one("cns='11%' otu='31'")["recordings"][0]
     assert found["cns_end"] == 11.0
     assert found["otu_end"] == 31.0
 
@@ -191,8 +198,10 @@ def test_the_reference_export_converts_to_the_same_channels_the_uddf_reader_prod
     """
     ssrf = profile_of(convert((FIXTURES / "ssrf" / "subsurface.ssrf").read_bytes()).document["dives"][0])
     uddf = profile_of(convert((FIXTURES / "uddf" / "subsurface.uddf").read_bytes()).document["dives"][0])
-    assert ssrf["depth"]["times"] == uddf["depth"]["times"] == [0, 10, 20, 30, 40, 80, 170, 4300]
+    assert ssrf["depth"]["times"] == uddf["depth"]["times"] == [
+        0, 10_000, 20_000, 30_000, 40_000, 80_000, 170_000, 4_300_000
+    ]
     assert ssrf["depth"]["values"] == uddf["depth"]["values"] == [145, 183, 222, 257, 260, 332, 911, 0]
-    assert ssrf["temperature"]["times"] == uddf["temperature"]["times"] == [30, 80]
+    assert ssrf["temperature"]["times"] == uddf["temperature"]["times"] == [30_000, 80_000]
     assert ssrf["temperature"]["values"] == uddf["temperature"]["values"] == [244, 240]
-    assert ssrf["duration"] == uddf["duration"] == 4300
+    assert ssrf["duration"] == uddf["duration"] == 4_300_000

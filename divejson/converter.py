@@ -10,7 +10,8 @@ disagree with it.
 
 The sections below the policy classes carry the rest of what an adapter inherits rather
 than rewrites: `decimal_of` and its representability bound, `rounded`'s half-away-from-zero
-convention and the two §6.5 channel scales; `capped`; `Identities`; and `position`. An
+convention, the millisecond axis and the two §6.5 channel scales; `capped`; the recording
+and where a readout stated on the dive goes; `Identities`; and `position`. An
 adapter that reimplements one of these gets it subtly different, which is the failure this
 module exists to prevent — the bound and the Null Island rule were each written once for
 one format and are true of every format.
@@ -75,10 +76,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from functools import cache
-from typing import Any, Literal
+from typing import Any, Literal, overload
 
 from . import SPEC_VERSION, __version__
-from .validate import Issue, load_schema
+from .validate import READOUTS, Issue, load_schema
 
 __all__ = [
     "CENTIMETRES_PER_METRE",
@@ -87,8 +88,9 @@ __all__ = [
     "MAX_MAGNITUDE",
     "MAX_MODEL_NAME",
     "MAX_NAME",
-    "MAX_NOTES",
+    "MILLISECONDS_PER_SECOND",
     "PRODUCER_KEY",
+    "READOUTS",
     "TENTHS_PER_UNIT",
     "Claimed",
     "Conversion",
@@ -112,13 +114,18 @@ __all__ = [
     "device",
     "grouped",
     "header",
+    "in_seconds",
     "integer_of",
+    "milliseconds",
+    "onto_primary",
     "position",
     "profile_members",
     "record_inferred",
     "recorded",
     "recording",
+    "recording_members",
     "rounded",
+    "shared_readout",
     "zero_is_an_answer",
 ]
 
@@ -318,7 +325,8 @@ class Scope:
 def header(exported_at: datetime) -> dict[str, Any]:
     """The four members every converted document opens with, in §4's order.
 
-    `format` and `version` are the two §4 requires first and second. `exported_at` and
+    `format` and `version` are the two §4 asks a writer to put first and second, so that a
+    reader may dispatch before parsing further. `exported_at` and
     `generator` are the two a converted document asserts about its own *run* rather than
     about the source, which is why `divejson.compared` drops exactly those before a
     fixture comparison.
@@ -394,8 +402,7 @@ def channel_floor(member: str) -> int | None:
 
     A channel is a `$ref` to a series definition rather than a member carrying constraints
     of its own, so `recorded` is not the question to ask about one — every call site it has
-    passes `record="dive"` or `record="cylinder"`, and `_floor` finds nothing under a
-    reference. This resolves the reference instead: the six decompression readouts share a
+    names a record's own member, and `_floor` finds nothing under a reference. This resolves the reference instead: the six decompression readouts share a
     definition whose `values` floor at zero, because no-decompression time, time to surface,
     ppO₂, CNS and a gradient factor have no negative reading and a source that writes one is
     spelling absence in the only space it had. Depth, ceiling and temperature share the
@@ -470,9 +477,16 @@ TENTHS_PER_UNIT = Decimal(10)
 # than zero.
 #
 # Divided by 1000, the largest factor any adapter applies to a number it has read — UDDF's
-# cubic metres to litres, and above any channel scale — so that checking the value as the
-# text is read also covers every value derived from it.
+# cubic metres to litres, every source's seconds to the profile axis's milliseconds, and
+# above any channel scale — so that checking the value as the text is read also covers
+# every value derived from it.
 MAX_MAGNITUDE = Decimal(sys.float_info.max) / 1000
+
+# §5.1's grain for elapsed time on a profile axis — a Series' `times`, a profile's
+# `duration`, an event's `time` — where a dive's own `duration` and the `ndl` and `tts`
+# readings stay seconds. Every source this package reads states its sample times in
+# seconds, whole or fractional, so this is the one factor every reader's axis applies.
+MILLISECONDS_PER_SECOND = Decimal(1000)
 
 
 def decimal_of(text: str | None) -> Decimal | None:
@@ -511,7 +525,7 @@ def rounded(value: Decimal) -> int:
     """The nearest integer, halves away from zero.
 
     Python's own `round` is half-to-even, which is the right default for statistics and the
-    wrong one for a reading: 2.5 seconds of elapsed time is 3, not 2.
+    wrong one for a reading: a sample stamped 2.5 ms in is at 3 ms, not 2.
     """
     return int(value.to_integral_value(rounding=ROUND_HALF_UP))
 
@@ -520,13 +534,40 @@ def integer_of(value: Decimal | None) -> int | None:
     return None if value is None else rounded(value)
 
 
+@overload
+def milliseconds(seconds: Decimal) -> int: ...
+@overload
+def milliseconds(seconds: None) -> None: ...
+@overload
+def milliseconds(seconds: Decimal | None) -> int | None: ...
+def milliseconds(seconds: Decimal | None) -> int | None:
+    """A source's elapsed seconds as a place on §6.5's axis, or nothing for no time at all.
+
+    Multiplied before it is rounded, which is the whole point: a fraction the source states
+    is kept to the millisecond rather than rounded away to the second, so a Suunto entry
+    160 ms after the dive began is at 160 and not at 0.
+    """
+    return None if seconds is None else rounded(seconds * MILLISECONDS_PER_SECOND)
+
+
+def in_seconds(milliseconds: int) -> str:
+    """A place on the axis as a diver reads it in a report: `1200.02`, `30`.
+
+    The report speaks seconds because that is what every source format and every dive
+    computer's display does; the document's milliseconds are an encoding, and a note saying
+    a waypoint is "at 1200020" would send a diver looking for a number their file does not
+    contain. A whole second is written as the integer it is, so a report on a file that
+    samples whole seconds reads exactly as it did before the axis moved.
+    """
+    return format((Decimal(milliseconds) / MILLISECONDS_PER_SECOND).normalize(), "f")
+
+
 # -- text ----------------------------------------------------------------------------
 
-# The two length caps every adapter meets, whatever it is reading: §6's `notes` on any
-# record, and the 255 that every REQUIRED name in §6 shares — a site's, a trip's, a gear
-# item's, a diver's. A format whose own members reach further caps them here too, and the
-# caps only that format meets stay with it.
-MAX_NOTES = 10_000
+# The length cap every adapter meets, whatever it is reading: the 255 that every REQUIRED
+# name in §6 shares — a site's, a trip's, a gear item's, a diver's. A format whose own
+# members reach further caps them here too, and the caps only that format meets stay with
+# it. A `notes` member has none: it is prose, and a converter passes it through whole.
 MAX_NAME = 255
 
 
@@ -623,7 +664,7 @@ def deco_model(
     the DM5 XML's `<PersonalMode>` — so the rules that hold across all four are here rather
     than four times over: §6.4c's member order, the name trimmed and capped with an empty
     one read as absence (§5.4), the schema's range on a gradient factor, **both or neither**
-    on the pair, **§3 rule 7's ordering**, and §6.4b's rule that an object with no members is
+    on the pair, **§3 rule 6's ordering**, and §6.4b's rule that an object with no members is
     not written at all.
 
     Every one of those is the same argument: a reading the format cannot hold resolves to an
@@ -673,7 +714,7 @@ def deco_model(
                 "dropped",
             )
     if len(pair) == 2 and pair["gf_low"] > pair["gf_high"]:
-        # §3's rule 7, which the schema cannot express and this converter's own output is
+        # §3's rule 6, which the schema cannot express and this converter's own output is
         # held to: a low above a high is a model nothing ran. **Both go**, because the file
         # does not say which of the two is the wrong one and choosing would be §5.4's guess.
         # It is dropped here rather than left to `validate_document`, which raises and takes
@@ -682,7 +723,7 @@ def deco_model(
         note(
             where,
             f"{labels.get('gf_low', 'gf_low')} is {pair['gf_low']} and "
-            f"{labels.get('gf_high', 'gf_high')} is {pair['gf_high']}, and §3 rule 7 records a low no higher "
+            f"{labels.get('gf_high', 'gf_high')} is {pair['gf_high']}, and §3 rule 6 records a low no higher "
             "than its high; both are dropped, the source not saying which of the two is wrong",
             "dropped",
         )
@@ -705,43 +746,116 @@ def deco_model(
     return built or None
 
 
+@cache
+def recording_members() -> tuple[str, ...]:
+    """§6.4a's Recording members in the section's own order, off the schema.
+
+    `profile_members`'s reason, and one of its own: a readout stated on the dive joins a
+    recording a reader has already built (`onto_primary`), and putting it back in its place
+    is a question of where the section lists it rather than of which order the members
+    happened to arrive in.
+    """
+    return tuple(load_schema()["$defs"]["recording"]["properties"])
+
+
 def recording(
     *,
     device: dict[str, Any] | None = None,
     mode: str | None = None,
     deco_model: dict[str, Any] | None = None,
+    salinity: str | None = None,
     started_at: str | None = None,
+    readouts: dict[str, float] | None = None,
     source_files: list[dict[str, Any]] | None = None,
     profile: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """§6.4a's Recording in the section's member order, or nothing at all.
 
     Nothing at all is the point of the function. §3's rule 4 says a recording carries at
-    least one of `device`, `profile` and `source_files`, so a source that describes a
-    record of a dive without naming a device and without keeping a sample produces no
-    recording — and every adapter that built one anyway would emit `recordings: [{}]` and
-    fail its own output validation. `started_at` alone does not qualify: §6.4a reads an
-    absent one as the dive's, so a recording carrying only a start describes nothing the
-    dive does not already say. **`mode` and `deco_model` do not qualify either**, for the
-    same reason and for one of their own: both describe how a computer was running rather
-    than anything it recorded, and §3's rule 4 names the three members it names.
+    least one of `device`, `profile`, `source_files` and a readout, so a source that
+    describes a record of a dive without naming a device, keeping a sample or stating a
+    figure the device computed produces no recording — and every adapter that built one
+    anyway would emit `recordings: [{}]` and fail its own output validation. `started_at`
+    alone does not qualify: §6.4a reads an absent one as the dive's, so a recording carrying
+    only a start describes nothing the dive does not already say. **`mode`, `deco_model` and
+    `salinity` do not qualify either**, for the same reason and for one of their own: each
+    describes how a computer was set rather than anything it recorded, and a setting nothing
+    recorded a dive with is not a record of one.
+
+    `readouts` are the five `READOUTS` a reader found, keyed by member; a key outside them
+    raises `KeyError` rather than landing on the recording, the way `recorded` refuses a
+    member the schema does not have.
     """
-    if not (device or profile or source_files):
+    for member in readouts or {}:
+        if member not in READOUTS:
+            raise KeyError(member)
+    # `is not None` for a readout and truthiness for the rest, because a zero is a reading
+    # here — the CNS a diver's first dive of the day starts on — where an empty device or
+    # an empty file list is nothing.
+    figures = {member: value for member, value in (readouts or {}).items() if value is not None}
+    if not (device or profile or source_files or figures):
         return None
-    built: dict[str, Any] = {}
-    if device:
-        built["device"] = device
-    if mode:
-        built["mode"] = mode
-    if deco_model:
-        built["deco_model"] = deco_model
-    if started_at:
-        built["started_at"] = started_at
-    if source_files:
-        built["source_files"] = source_files
-    if profile:
-        built["profile"] = profile
-    return built
+    settings = {
+        "device": device,
+        "mode": mode,
+        "deco_model": deco_model,
+        "salinity": salinity,
+        "started_at": started_at,
+        "source_files": source_files,
+        "profile": profile,
+    }
+    return _in_order({**{member: value for member, value in settings.items() if value}, **figures})
+
+
+def _in_order(built: dict[str, Any]) -> dict[str, Any]:
+    return {member: built[member] for member in recording_members() if member in built}
+
+
+def onto_primary(
+    recordings: list[dict[str, Any]],
+    readouts: dict[str, float],
+    *,
+    note: Reporter,
+    where: str,
+    stated: str,
+) -> None:
+    """A readout the source states once for the whole **dive**, onto the recording it is.
+
+    `docs/converting.md`'s rule, for the formats that state one there — Subsurface's
+    `<dive @cns>` and `@otu`. A readout is a computer's own arithmetic (§6.4a), so it goes on
+    the recording that computer produced: the **primary**, the first, the file not saying
+    which of its computers computed it. Where the dive has more than one recording that is a
+    decision about meaning rather than about scale, reported `resolved`; where it has none,
+    the readout is a recording of its own, which §6.4a allows — a CNS figure copied off a
+    wrist into a hand-kept log is a record of the dive nothing else produces.
+
+    `stated` names the source's own spelling for the report, the way `device`'s labels do.
+    The list is changed in place.
+    """
+    if not readouts:
+        return
+    if not recordings:
+        built = recording(readouts=readouts)
+        if built is not None:
+            recordings.append(built)
+        return
+    recordings[0] = _in_order({**recordings[0], **readouts})
+    if len(recordings) > 1:
+        note(where, shared_readout(stated, len(recordings)), "resolved")
+
+
+def shared_readout(stated: str, count: int) -> str:
+    """The `resolved` line for a readout stated on a dive that has `count` recordings.
+
+    Its own function because UDDF reaches the same finding by another road — its first link
+    is the primary whether or not it names a device, so the readout goes in as that
+    recording is built rather than onto it afterwards — and one finding is one sentence.
+    """
+    return (
+        f"the dive states {stated} once and has {count} recordings, and a readout is one computer's "
+        "figure; read as the primary recording's, the file not saying which computer computed it "
+        "(spec §6.4a)"
+    )
 
 
 # -- identity ------------------------------------------------------------------------

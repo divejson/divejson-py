@@ -161,7 +161,7 @@ def test_a_ceiling_of_zero_is_not_a_ceiling() -> None:
         session={"total_elapsed_time": 60.0},
     )
     profile = profile_of(_dive(data))
-    assert profile["ceiling"] == {"times": [30], "values": [300]}
+    assert profile["ceiling"] == {"times": [30_000], "values": [300]}
     assert len(profile["depth"]["times"]) == 3
 
 

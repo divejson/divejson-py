@@ -83,6 +83,8 @@ from .converter import (
     decimal_of,
     device,
     header,
+    in_seconds,
+    milliseconds,
     position,
     record_inferred,
     recorded,
@@ -439,7 +441,11 @@ def _elapsed(moment: datetime, origin: datetime) -> Decimal:
     """
     if (moment.tzinfo is None) != (origin.tzinfo is None):
         moment, origin = moment.replace(tzinfo=None), origin.replace(tzinfo=None)
-    return Decimal(str((moment - origin).total_seconds()))
+    # Exact to the microsecond a `datetime` holds, rather than through the float
+    # `total_seconds` returns: the axis keeps the millisecond, and a value that reached it by
+    # way of a binary fraction could round away from the one the file states.
+    delta = moment - origin
+    return Decimal(delta.days * 86_400 + delta.seconds) + Decimal(delta.microseconds) / Decimal(1_000_000)
 
 
 @dataclass(slots=True)
@@ -564,8 +570,10 @@ class _Converter:
         # In §6.2's own member order, so a converted dive reads down the schema.
         self.read_duration(dive, where)
         self.read_depths(dive, where)
-        self.read_oxygen(diving, dive, where)
-        self.read_surface_pressure(diving, dive, where)
+        # The oxygen clocks and the surface pressure are the computer's own figures, so they
+        # are read here and carried on its recording below rather than on the dive.
+        readouts = self.read_oxygen(diving, where)
+        readouts.update(self.read_surface_pressure(diving, where))
         self.read_positions(samples, dive)
 
         cylinders, numbering = self.read_cylinders(diving, started.at, where)
@@ -581,6 +589,7 @@ class _Converter:
             device=self.read_device(diving, where),
             mode=self.read_mode(diving, where),
             deco_model=self.read_deco_model(diving, where),
+            readouts=readouts,
             profile=profile,
         )
         if built is not None:
@@ -772,10 +781,10 @@ class _Converter:
             )
             del dive["avg_depth"]
 
-    def read_oxygen(self, diving: dict[str, Any], dive: dict[str, Any], where: str) -> None:
+    def read_oxygen(self, diving: dict[str, Any], where: str) -> dict[str, float]:
         """The oxygen clock, out of `Diving.StartTissue` and `Diving.EndTissue`.
 
-        **CNS is a 0-1 fraction here and §6.2 holds whole percent**, which is invisible
+        **CNS is a 0-1 fraction here and §6.4a holds whole percent**, which is invisible
         until the same dive is read out of two Suunto exports: `EndTissue.CNS: 0.069` is the
         DM5 export's `<CnsEnd>7</CnsEnd>`. Carrying it unconverted would report a 69 %
         oxygen clock as 0.069 %. OTU needs no conversion — it is the same absolute count in
@@ -783,9 +792,10 @@ class _Converter:
         full float32 where the desktop one rounds.
 
         Both members read a zero as an answer, which is the schema's decision rather than
-        this reader's: §6.2 gives them `minimum: 0`, so the 0 a diver's first dive of the
+        this reader's: §6.4a gives them `minimum: 0`, so the 0 a diver's first dive of the
         day starts on is a reading and not a placeholder.
         """
+        readouts: dict[str, float] = {}
         for block, half in (("StartTissue", "start"), ("EndTissue", "end")):
             tissue = diving.get(block)
             tissue = tissue if isinstance(tissue, dict) else {}
@@ -795,7 +805,7 @@ class _Converter:
             ):
                 if value is None:
                     continue
-                if not recorded(value, record="dive", member=member):
+                if not recorded(value, record="recording", member=member):
                     self.note(
                         where,
                         f"the export records {member.replace('_', ' ')} as {value}, which is below what the "
@@ -803,18 +813,19 @@ class _Converter:
                         "dropped",
                     )
                     continue
-                dive[member] = float(value)
+                readouts[member] = float(value)
+        return readouts
 
-    def read_surface_pressure(self, diving: dict[str, Any], dive: dict[str, Any], where: str) -> None:
-        """`Diving.SurfacePressure`, in Pascal where §6.2 holds bar.
+    def read_surface_pressure(self, diving: dict[str, Any], where: str) -> dict[str, float]:
+        """`Diving.SurfacePressure`, in Pascal where §6.4a holds bar.
 
-        §6.2 bounds the member at 0.4 to 1.2 bar, which is the range a barometer at a dive
+        §6.4a bounds the member at 0.4 to 1.2 bar, which is the range a barometer at a dive
         site can read; a value outside it is a device that recorded something other than a
         surface pressure, and is reported rather than clamped.
         """
         pascal = _number(diving.get("SurfacePressure"))
         if pascal is None:
-            return
+            return {}
         bar = pascal / PASCALS_PER_BAR
         if not Decimal("0.4") <= bar <= Decimal("1.2"):
             self.note(
@@ -823,8 +834,8 @@ class _Converter:
                 "allows; dropped",
                 "dropped",
             )
-            return
-        dive["surface_pressure"] = float(bar)
+            return {}
+        return {"surface_pressure": float(bar)}
 
     def read_positions(self, samples: SampleAxis, dive: dict[str, Any]) -> None:
         """The fix on the way in and the fix on the way out, split at the deepest sample.
@@ -842,8 +853,8 @@ class _Converter:
         then — so without it these files yield an exit and no entry, while the app draws
         both pins from the same export.
         """
-        fixed = [(second, sample) for second, sample in samples.ordered() if sample.latitude is not None]
-        depths = [(second, sample.depth) for second, sample in samples.ordered() if sample.depth is not None]
+        fixed = [(at, sample) for at, sample in samples.ordered() if sample.latitude is not None]
+        depths = [(at, sample.depth) for at, sample in samples.ordered() if sample.depth is not None]
         if not fixed or not depths:
             return
 
@@ -854,12 +865,12 @@ class _Converter:
         before = [pair for pair in fixed if pair[0] <= pivot]
         after = [pair for pair in fixed if pair[0] > pivot]
         for member, chosen in (("entry_position", before[-1:]), ("exit_position", after[:1])):
-            for second, sample in chosen:
+            for at, sample in chosen:
                 found = position(
                     sample.latitude,
                     sample.longitude,
                     note=self.note,
-                    where=f"dive/0/sample/{second}",
+                    where=f"dive/0/sample/{in_seconds(at)}",
                 )
                 if found is not None:
                     dive[member] = found
@@ -960,7 +971,7 @@ class _Converter:
         limit = None if po2 is None else po2 / PASCALS_PER_BAR
         if limit is not None:
             if Decimal("0.4") <= limit <= Decimal(2):
-                cylinder["po2_limit"] = float(limit)
+                cylinder["ppo2_limit"] = float(limit)
             else:
                 self.note(
                     where,
@@ -1036,12 +1047,13 @@ class _Converter:
 
         **Over the samples' own recorded instants, and not off the profile.** Two ways of
         taking them off the profile lose the answer, and *neither is the merged axis* —
-        which reproduces it, `axis` folding an entry into the second another channel's entry
+        which reproduces it, `axis` folding an entry into the instant another channel's entry
         already holds rather than dropping it. What loses it is either of the two below,
         measured on the file this reader is checked against, whose start pressure is
         211.625 bar:
 
-        * an **unmerged** axis, one entry per second with the first winning it whole, gives
+        * an **unmerged** whole-second axis, one entry per second with the first winning it
+          whole, gives
           211.26562 — the earlier depth entry taking the second and carrying the cylinder
           reading 0.1 s later away with it;
         * the axis's pressure **channel**, which §6.5 stores in tenths of a bar, gives
@@ -1140,26 +1152,28 @@ class _Converter:
     # -- the profile -------------------------------------------------------------
 
     def axis(self, origin: datetime, where: str) -> SampleAxis:
-        """The dive's time axis, offered one merged sample per second the file recorded at.
+        """The dive's time axis, offered one merged sample per millisecond the file recorded at.
 
-        The origin is `Header.DateTime`, so the profile's seconds are elapsed time from the
-        instant `started_at` names — and a sample before it is dropped and reported by the
-        axis, which is the right answer for a stream whose entries arrive out of order.
+        The origin is `Header.DateTime`, so the profile's axis is the elapsed milliseconds
+        from the instant `started_at` names — the fraction each `TimeISO8601` states kept, so
+        `suunto-ocean.json`'s first depth sits at 160 rather than at 0 — and a sample before
+        it is dropped and reported by the axis, which is the right answer for a stream whose
+        entries arrive out of order.
 
-        **Entries that land on one second are merged rather than one of them being
-        dropped**, and that is the whole difference between a faithful profile and a
-        quarter of one. This exporter appends its sensor streams as separate entries: on the
-        file this reader is measured against, 7 477 entries carry a depth, a temperature, a
-        satellite fix or a battery reading, almost never two of those at once, and they
-        collide on the whole seconds §6.5 requires. Offering them one at a time leaves the
-        axis choosing between a depth and a temperature recorded at the same instant, and it
-        keeps 345 of the dive's 431 depths. Merging keeps all 431 — the count the same
-        dive's FIT reading gives — because each of §6.5's channels carries its own times and
-        two different channels at one second were never in competition.
+        **Entries that land on one millisecond are merged rather than one of them being
+        dropped.** This exporter appends its sensor streams as separate entries: on the file
+        this reader is measured against, 7 477 entries carry a depth, a temperature, a
+        satellite fix or a battery reading, almost never two of those at once. On a
+        whole-second axis they collided, and offering them one at a time kept 345 of the
+        dive's 431 depths where merging kept all 431 — the count the same dive's FIT reading
+        gives. The millisecond places each at its own instant, and merging is what still
+        decides two entries of different channels stamped the same one: each of §6.5's
+        channels carries its own times, and two different channels at one instant were never
+        in competition.
 
-        What is still a collision is one **channel** twice on a second, and that is reported
-        per channel rather than per sample: a file whose streams overlap throughout would
-        otherwise write thousands of identical lines saying one thing about the file.
+        What is still a collision is one **channel** twice on a millisecond, and that is
+        reported per channel rather than per sample: a file whose streams overlap throughout
+        would otherwise write thousands of identical lines saying one thing about the file.
         """
         axis = SampleAxis(self.note, where, noun="sample", time_member="TimeISO8601")
         merged: dict[int, _Sample] = {}
@@ -1170,10 +1184,10 @@ class _Converter:
             if moment is None:
                 undated += 1
                 continue
-            second = rounded(_elapsed(moment.at, origin))
-            standing = merged.get(second)
+            at = milliseconds(_elapsed(moment.at, origin))
+            standing = merged.get(at)
             if standing is None:
-                merged[second] = self.sample(raw)
+                merged[at] = self.sample(raw)
             else:
                 _merge(standing, self.sample(raw), collisions)
 
@@ -1182,12 +1196,12 @@ class _Converter:
         for channel, count in sorted(collisions.items()):
             self.note(
                 where,
-                f"{count} {channel} readings land on a second the dive already has one at; the later reading "
+                f"{count} {channel} readings land on a millisecond the dive already has one at; the later reading "
                 "is dropped, because the format's sample times are strictly increasing (spec §6.5)",
                 "dropped",
             )
-        for second, sample in merged.items():
-            axis.offer(second, sample)
+        for at, sample in merged.items():
+            axis.offer(at, sample)
         return axis
 
     def sample(self, raw: dict[str, Any]) -> _Sample:
@@ -1286,15 +1300,15 @@ class _Converter:
         # Counted rather than reported one at a time, for `axis`'s reason: this device writes
         # its absent-marker for hundreds of consecutive samples.
         empty_tts = 0
-        for second, sample in samples.ordered():
+        for at, sample in samples.ordered():
             if sample.depth is not None:
-                depth.record(second, rounded(sample.depth * CENTIMETRES_PER_METRE))
+                depth.record(at, rounded(sample.depth * CENTIMETRES_PER_METRE))
             if sample.ceiling is not None and sample.ceiling > 0:
-                ceiling.record(second, rounded(sample.ceiling * CENTIMETRES_PER_METRE))
+                ceiling.record(at, rounded(sample.ceiling * CENTIMETRES_PER_METRE))
             if sample.kelvin is not None:
-                temperature.record(second, rounded((sample.kelvin - KELVIN_OFFSET) * TENTHS_PER_UNIT))
+                temperature.record(at, rounded((sample.kelvin - KELVIN_OFFSET) * TENTHS_PER_UNIT))
             if sample.ndl is not None:
-                ndl.record(second, rounded(sample.ndl))
+                ndl.record(at, rounded(sample.ndl))
             if sample.tts is not None:
                 if sample.tts == 0:
                     empty_tts += 1
@@ -1304,16 +1318,16 @@ class _Converter:
                     # that floor is applied and reported, once for every format. Refusing a
                     # negative here instead would drop it silently, which is the one thing
                     # the shared floor exists to stop.
-                    tts.record(second, rounded(sample.tts))
+                    tts.record(at, rounded(sample.tts))
             if sample.gradient_factor is not None:
-                gradient_factor.record(second, rounded(sample.gradient_factor))
+                gradient_factor.record(at, rounded(sample.gradient_factor))
             if sample.surface_gradient_factor is not None:
-                surface_gradient_factor.record(second, rounded(sample.surface_gradient_factor))
+                surface_gradient_factor.record(at, rounded(sample.surface_gradient_factor))
             for source_number, pascal in sample.pressures.items():
                 bar = pascal / PASCALS_PER_BAR
                 number = numbering.get(source_number)
                 if number in pressures and 0 <= bar <= MAX_CYLINDER_PRESSURE:
-                    pressures[number].record(second, rounded(bar * TENTHS_PER_UNIT))
+                    pressures[number].record(at, rounded(bar * TENTHS_PER_UNIT))
         if empty_tts:
             self.note(
                 where,
@@ -1370,19 +1384,19 @@ class _Converter:
         would only double it. A `GasSwitch` has no `Active` and is not a pair.
         """
         events: list[dict[str, Any]] = []
-        for second, sample in samples.ordered():
+        for at, sample in samples.ordered():
             for name, payload in sample.events:
-                event = self.event(name, payload, second, numbering, where)
+                event = self.event(name, payload, at, numbering, where)
                 if event is not None:
                     events.append(event)
         return events
 
     def event(
-        self, name: str, payload: Any, second: int, numbering: dict[int, int], where: str
+        self, name: str, payload: Any, at: int, numbering: dict[int, int], where: str
     ) -> dict[str, Any] | None:
         """One `{name: payload}` pair as a §6.5 event, or nothing worth a marker."""
         if name == "GasSwitch" and isinstance(payload, dict):
-            event: dict[str, Any] = {"time": second, "type": "gas_switch"}
+            event: dict[str, Any] = {"time": at, "type": "gas_switch"}
             number = payload.get("GasNumber")
             if not isinstance(number, bool) and isinstance(number, int):
                 # The source's own number resolved to the cylinder's position, so a marker
@@ -1404,14 +1418,14 @@ class _Converter:
             # than wording the diver was shown, so carrying it would put "Deco" on a marker
             # nobody read.
             stop = STOP_TYPES.get(reported.lower())
-            return None if stop is None else {"time": second, "type": stop}
+            return None if stop is None else {"time": at, "type": stop}
         if name in ALERT_NAMES:
             # The type its wording earns, **and** that wording as the label: §6.6's
             # vocabulary was seeded from this list, one value per distinct meaning, and
             # "Ceiling Broken" is still what the diver was shown. An alert the table does
             # not name arrives with no type at all rather than forced into the nearest one.
             kind = ALERT_TYPES.get(reported.lower())
-            event = {"time": second, "type": kind} if kind is not None else {"time": second}
+            event = {"time": at, "type": kind} if kind is not None else {"time": at}
             event["label"] = reported
             return event
         return None
@@ -1423,13 +1437,13 @@ class _Converter:
 
 
 def _merge(standing: _Sample, arriving: _Sample, collisions: dict[str, int]) -> None:
-    """Fold a later entry's readings into the one already holding that second.
+    """Fold a later entry's readings into the one already holding that millisecond.
 
     The first reading of a channel wins and the later one is counted, which is
     `series.py`'s rule applied one level down: the channels are what §6.5 makes strictly
-    increasing, and two entries at one second are only in competition where they carry the
+    increasing, and two entries at one millisecond are only in competition where they carry the
     same channel. Events are not a channel and are all kept — a gas switch and an alarm on
-    one second are two things that happened.
+    one millisecond are two things that happened.
     """
     for member, channel in (
         ("depth", "depth"),

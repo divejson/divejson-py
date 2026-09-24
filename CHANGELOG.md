@@ -7,6 +7,54 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Breaking: the profile axis is milliseconds.** §5.1 of
+  [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) puts a
+  Series' `times`, a profile's `duration` and an event's `time` in milliseconds, where a
+  dive's own `duration` and the `ndl` and `tts` readings stay seconds. Every reader multiplies
+  its source's seconds by a thousand before rounding, so a fraction the source states keeps
+  its place — a Suunto app export's first depth lands at 160 rather than 0 — and two readings
+  collide only on one millisecond: `<DIVETIME>30</DIVETIME>` and `<DIVETIME>30.4</DIVETIME>`
+  are two samples now. The members keep their names and types, so a document written in
+  seconds still validates and reads a thousand times short; this package's converters wrote
+  every such document up to this release. The UDDF writer puts `<divetime>` back in seconds
+  with a fraction only where the millisecond is not a whole second. Report lines still speak
+  seconds (`converter.in_seconds`), and `converter.milliseconds` is the one factor.
+
+- **Breaking: a device's readouts and its salinity sit on the recording.**
+  `surface_pressure`, `cns_start`, `cns_end`, `otu_start` and `otu_end` move from the dive to
+  §6.4a's recording, and `divejson validate` refuses them on a dive as undefined members.
+  Each reader puts them on the recording its file produced; a figure a source states once
+  for the whole dive — UDDF's `<surfacepressure>`, Subsurface's `@cns` and `@otu` — goes to
+  the primary recording, reported `resolved` where the dive has more than one, and is a
+  recording of its own where it has none, a readout now satisfying §3 rule 4 on its own. FIT's
+  `dive_settings.water_type` is the recording's `salinity`, and the dive's `water_type` loses
+  `en13319`. The UDDF writer takes `<surfacepressure>` from the primary recording and reports
+  a recording's salinity and oxygen clocks dropped. `converter.recording` takes `salinity` and
+  `readouts`; `converter.onto_primary` is the dive-level rule.
+
+- **Breaking: a dive may start on a date alone.** A UDDF `<datetime>2002-06-18</datetime>` or
+  `2002-06-18T`, and a `.ssrf` `@date` with no `@time`, read as the bare date with the time of
+  day reported absent, where they read as midnight. `divejson validate` accepts a date in a
+  dive's `started_at` and nowhere else. The UDDF writer writes it back as the bare date with
+  no report, which the UDDF XSD's `xs:dateTime` refuses; the suite's XSD pass widens that one
+  element's spelling for itself alone.
+
+- **Breaking: `po2_limit` is `ppo2_limit`**, the name of the quantity §6.4's `ppo2` channel
+  samples. The readers write the new name, the writer reads it, and `divejson validate`
+  refuses the old one as an undefined member.
+
+- **Breaking: `notes` has no length cap.** A converter carries a note whole, where it cut one
+  at 10 000 characters and reported the rest dropped; `converter.MAX_NOTES` is gone. The
+  strings that stay bounded are names, numbers, labels and identifiers.
+
+- **`divejson validate` no longer checks member order.** §4 makes `format` first and
+  `version` second a SHOULD, so a document a generic re-serialisation sorted is conforming.
+  §3's `gf_low ≤ gf_high` is rule 6, and the converter's report says so.
+
+- **The certification and course agencies gain twenty values**, AIDA among them, arriving
+  with the schema. §5.5 now reserves the `divejson` producer key for converters following
+  `docs/converting.md`, which is where this package's converters already write.
+
 ## 0.12.0
 
 - **A diver carries a portrait.** §6.1 of

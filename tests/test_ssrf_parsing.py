@@ -36,6 +36,7 @@ from divejson import (
     sniff,
 )
 from divejson.ssrf import SSRF_ID_NAMESPACE
+from divejson.validate import validate_document
 
 
 def dive(attributes: str = "", body: str = "", *, sites: str = "") -> dict:
@@ -158,6 +159,32 @@ def test_a_time_of_day_with_no_seconds_is_read_as_the_minute_and_reported() -> N
     conversion = convert(ssrf("<dives><dive date='2026-04-17' time='11:49'/></dives>"))
     assert conversion.document["dives"][0]["started_at"] == "2026-04-17T11:49:00"
     assert any("records no seconds" in message for message in messages(conversion))
+
+
+def test_a_date_with_no_time_of_day_is_a_date_only_start() -> None:
+    """§5.2 lets a dive's start be the date alone, so a `@date` with no `@time` is exactly
+    that — midnight would be a time the file never stated — and the report says the time of
+    day is absent. No offset note: there is no wall clock for an offset to be missing from."""
+    conversion = convert(ssrf("<dives><dive date='2002-06-18'/></dives>"))
+    assert conversion.document["dives"][0]["started_at"] == "2002-06-18"
+    assert validate_document(conversion.document) == []
+    assert [(note.kind, note.message) for note in conversion.notes if "time of day" in note.message] == [
+        (
+            "absent",
+            (
+                "the dive records a date with no time of day; read as a date-only start rather than as "
+                "midnight (spec §5.2)"
+            ),
+        )
+    ]
+    assert not any("no UTC offset" in message for message in messages(conversion))
+
+
+@pytest.mark.parametrize("date", ["2002-02-30", "18-06-2002"])
+def test_a_date_alone_that_is_not_one_drops_the_dive(date: str) -> None:
+    conversion = convert(ssrf(f"<dives><dive date='{date}'/></dives>"))
+    assert "dives" not in conversion.document
+    assert any("the dive's date is not a date" in message for message in messages(conversion))
 
 
 def test_a_dive_with_no_date_is_dropped_because_the_format_requires_a_start_time() -> None:
@@ -373,7 +400,7 @@ def test_a_channel_is_not_padded_to_another_channels_length() -> None:
         "<sample time='0:20 min' depth='2.22 m'/>"
     )
     found = profile_of(convert(one_ssrf_computer(samples)).document["dives"][0])
-    assert found["depth"]["times"] == [0, 10, 20]
+    assert found["depth"]["times"] == [0, 10_000, 20_000]
     assert found["temperature"]["times"] == [0]
 
 
@@ -386,19 +413,20 @@ def test_a_sample_with_no_time_has_no_place_on_the_axis() -> None:
 
 
 def test_two_samples_on_one_second_keep_the_first() -> None:
-    """§6.5's `times` are strictly increasing, and a source's are not."""
+    """§6.5's `times` are strictly increasing, and a source's are not. `M:SS` states whole
+    seconds, so a repeated one collides at any grain."""
     conversion = convert(
         one_ssrf_computer("<sample time='0:30 min' depth='6.2 m'/><sample time='0:30 min' depth='6.4 m'/>")
     )
     assert profile_of(conversion.document["dives"][0])["depth"]["values"] == [620]
-    assert any("share the second 30" in message for message in messages(conversion))
+    assert any("two samples are both at 30 s" in message for message in messages(conversion))
 
 
 def test_samples_are_ordered_by_their_own_recorded_time() -> None:
     """Never by position: §6.5 requires increasing times and no writer guarantees its order."""
     samples = "<sample time='1:00 min' depth='9.0 m'/><sample time='0:00 min' depth='1.0 m'/>"
     found = profile_of(convert(one_ssrf_computer(samples)).document["dives"][0])
-    assert found["depth"]["times"] == [0, 60]
+    assert found["depth"]["times"] == [0, 60_000]
     assert found["depth"]["values"] == [100, 900]
 
 
@@ -423,8 +451,57 @@ def test_the_profiles_duration_is_the_span_of_its_own_samples() -> None:
     samples = "<sample time='0:00 min' depth='1.0 m'/><sample time='71:40 min' depth='0.0 m'/>"
     conversion = convert(one_ssrf_dive("duration='66:50 min'", f"<divecomputer>{samples}</divecomputer>"))
     found = conversion.document["dives"][0]
+    # The dive's own duration is seconds and the profile's axis milliseconds (§5.1).
     assert found["duration"] == 4010
-    assert profile_of(found)["duration"] == 4300
+    assert profile_of(found)["duration"] == 4_300_000
+
+
+# -- the readouts on the dive ------------------------------------------------------------
+
+
+def test_the_oxygen_clock_on_the_dive_is_its_computers() -> None:
+    """`@cns` and `@otu` sit on the `<dive>`, and a readout is a computer's own arithmetic
+    (§6.4a), so they go to the recording its computer produced."""
+    conversion = convert(one_ssrf_dive("cns='11%' otu='31'", "<divecomputer model='Ocean'/>"))
+    found = conversion.document["dives"][0]
+    assert "cns_end" not in found and "otu_end" not in found
+    assert found["recordings"] == [{"device": {"model": "Ocean"}, "cns_end": 11.0, "otu_end": 31.0}]
+    assert not any(note.kind == "resolved" for note in conversion.notes)
+
+
+def test_on_a_dive_with_two_computers_it_is_the_primarys_and_says_so() -> None:
+    """The file does not say whose figure it is, so giving it to the primary is a reading of
+    its meaning — this reader's one `resolved` finding, and not about a scale."""
+    conversion = convert(
+        one_ssrf_dive("cns='11%'", "<divecomputer model='Ocean'/><divecomputer model='Perdix'/>")
+    )
+    assert conversion.document["dives"][0]["recordings"] == [
+        {"device": {"model": "Ocean"}, "cns_end": 11.0},
+        {"device": {"model": "Perdix"}},
+    ]
+    resolved = [note for note in conversion.notes if note.kind == "resolved"]
+    assert [note.where for note in resolved] == ["dive/0"]
+    assert "the dive states <dive cns> once and has 2 recordings" in resolved[0].message
+
+
+def test_the_primary_is_the_first_recording_a_computer_yielded() -> None:
+    """A `<divecomputer>` carrying nothing a recording can hold yields none — and the one after
+    it is then the primary, which is where the figure goes."""
+    conversion = convert(
+        one_ssrf_dive(
+            "otu='31'",
+            "<divecomputer last-manual-time='44:00 min'><depth max='21.2 m'/></divecomputer>"
+            "<divecomputer model='Ocean'/>",
+        )
+    )
+    assert conversion.document["dives"][0]["recordings"] == [{"device": {"model": "Ocean"}, "otu_end": 31.0}]
+
+
+def test_a_readout_on_a_dive_no_computer_recorded_is_a_recording_of_its_own() -> None:
+    """The CNS a diver copied off their wrist into a hand-kept log is a record of the dive."""
+    document = convert(one_ssrf_dive("cns='11%'")).document
+    assert document["dives"][0]["recordings"] == [{"cns_end": 11.0}]
+    assert validate_document(document) == []
 
 
 # -- trips ----------------------------------------------------------------------------

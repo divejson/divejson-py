@@ -162,27 +162,43 @@ def test_samples_are_ordered_by_their_own_time_and_not_by_position() -> None:
             suunto_sample(30, Depth=10.0),
         ],
     )
-    assert profile_of(dive)["depth"]["times"] == [0, 30, 60]
+    assert profile_of(dive)["depth"]["times"] == [0, 30_000, 60_000]
     assert profile_of(dive)["depth"]["values"] == [100, 1000, 2000]
 
 
-def test_two_entries_on_one_second_merge_rather_than_one_being_dropped() -> None:
-    """Different channels at one instant were never in competition for that second."""
+def test_entries_inside_one_second_keep_their_own_instants() -> None:
+    """The axis is milliseconds (§5.1), so the fractions this exporter stamps are kept — and
+    what a whole-second axis made two readings compete for is two places on it."""
+    dive = _dive(
+        {},
+        [
+            suunto_sample(0.16, Depth=1.0),
+            suunto_sample(0.4, Temperature=293.75),
+            suunto_sample(0.88, Depth=8.8),
+        ],
+    )
+    profile = profile_of(dive)
+    assert profile["depth"] == {"times": [160, 880], "values": [100, 880]}
+    assert profile["temperature"]["times"] == [400]
+
+
+def test_two_entries_on_one_millisecond_merge_rather_than_one_being_dropped() -> None:
+    """Different channels at one instant were never in competition for it."""
     dive = _dive(
         {},
         [
             suunto_sample(0.1, Depth=1.0),
-            suunto_sample(0.4, Temperature=293.75),
-            suunto_sample(0.2, Cylinders=suunto_slots(20_000_000)),
+            suunto_sample(0.1, Temperature=293.75),
+            suunto_sample(0.1, Cylinders=suunto_slots(20_000_000)),
         ],
     )
     profile = profile_of(dive)
-    assert profile["depth"]["times"] == [0]
-    assert profile["temperature"]["times"] == [0]
-    assert profile["pressures"][0]["times"] == [0]
+    assert profile["depth"]["times"] == [100]
+    assert profile["temperature"]["times"] == [100]
+    assert profile["pressures"][0]["times"] == [100]
 
 
-def test_one_channel_twice_on_a_second_keeps_the_first_and_is_reported_once() -> None:
+def test_one_channel_twice_on_a_millisecond_keeps_the_first_and_is_reported_once() -> None:
     """The collision that survives merging, counted per channel rather than per sample.
 
     A file whose streams overlap throughout would otherwise write one line per sample
@@ -192,15 +208,15 @@ def test_one_channel_twice_on_a_second_keeps_the_first_and_is_reported_once() ->
         {},
         [
             suunto_sample(0.1, Depth=1.0),
-            suunto_sample(0.4, Depth=9.9),
-            suunto_sample(0.2, Depth=8.8),
+            suunto_sample(0.1, Depth=9.9),
+            suunto_sample(0.1, Depth=8.8),
             suunto_sample(60, Depth=20.0),
         ],
     )
     assert profile_of(conversion.document["dives"][0])["depth"]["values"] == [100, 2000]
     assert _messages(conversion, "dropped") == [
         (
-            "2 depth readings land on a second the dive already has one at; the later reading is "
+            "2 depth readings land on a millisecond the dive already has one at; the later reading is "
             "dropped, because the format's sample times are strictly increasing (spec §6.5)"
         )
     ]
@@ -295,7 +311,7 @@ def test_a_null_pressure_is_skipped_rather_than_ending_the_series() -> None:
         ],
     )
     assert dive["cylinders"][0]["end_pressure"] == 150.0
-    assert profile_of(dive)["pressures"] == [{"times": [0, 600], "values": [2000, 1500], "gas_number": 0}]
+    assert profile_of(dive)["pressures"] == [{"times": [0, 600_000], "values": [2000, 1500], "gas_number": 0}]
 
 
 def test_readings_after_the_dive_ended_are_dropped_from_the_cylinder() -> None:
@@ -569,7 +585,7 @@ def test_a_notify_beyond_the_stops_is_typed_and_unlabelled() -> None:
     )
     assert profile_of(dive)["events"] == [
         {"time": 0, "type": "ndl_reached"},
-        {"time": 30, "type": "safety_stop_violation"},
+        {"time": 30_000, "type": "safety_stop_violation"},
     ]
 
 
@@ -762,7 +778,7 @@ def test_a_no_decompression_time_of_zero_is_a_reading() -> None:
         suunto_sample(0, Depth=44.5, NoDecTime=0, TimeToSurface=256),
         suunto_sample(10, Depth=42.6, NoDecTime=6000),
     )
-    assert found["ndl"] == {"times": [0, 10], "values": [0, 6000]}
+    assert found["ndl"] == {"times": [0, 10_000], "values": [0, 6000]}
 
 
 def test_a_time_to_surface_of_zero_is_the_absent_marker_and_is_reported() -> None:
@@ -776,7 +792,7 @@ def test_a_time_to_surface_of_zero_is_the_absent_marker_and_is_reported() -> Non
         ],
     )
     profile = profile_of(conversion.document["dives"][0])
-    assert profile["tts"] == {"times": [10], "values": [88]}
+    assert profile["tts"] == {"times": [10_000], "values": [88]}
     assert any("time to surface of zero" in message for message in _messages(conversion, "dropped"))
 
 
@@ -809,11 +825,11 @@ def test_a_negative_readout_is_dropped_by_the_channels_own_floor_and_reported() 
         ],
     )
     profile = profile_of(conversion.document["dives"][0])
-    assert profile["ndl"] == {"times": [10], "values": [600]}
-    assert profile["tts"] == {"times": [10], "values": [120]}
-    assert profile["gradient_factor"] == {"times": [10], "values": [42]}
+    assert profile["ndl"] == {"times": [10_000], "values": [600]}
+    assert profile["tts"] == {"times": [10_000], "values": [120]}
+    assert profile["gradient_factor"] == {"times": [10_000], "values": [42]}
     # A zero surface gradient factor is a reading, and stays.
-    assert profile["surface_gradient_factor"] == {"times": [0, 10], "values": [0, 30]}
+    assert profile["surface_gradient_factor"] == {"times": [0, 10_000], "values": [0, 30]}
     dropped = _messages(conversion, "dropped")
     for channel in ("ndl", "tts", "gradient_factor"):
         assert any(f"{channel} readings" in message and "negative" in message for message in dropped)

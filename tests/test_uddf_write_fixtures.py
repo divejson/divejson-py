@@ -40,7 +40,7 @@ from typing import Any
 
 import pytest
 import xmlschema
-from helpers import FIXTURES, ROOT, device_of, profile_of
+from helpers import FIXTURES, ROOT, device_of, for_the_xsd, profile_of
 
 from divejson import compared, convert
 from divejson.uddf_write import compared as compared_xml
@@ -96,10 +96,13 @@ LOST: dict[str, frozenset[str]] = {
             "sites/0/location/position",
             "sites/0/location/bbox",
             "dives/0/water_type",
-            "dives/0/cns_start",
-            "dives/0/cns_end",
-            "dives/0/otu_start",
-            "dives/0/otu_end",
+            # A recording's settings and oxygen clocks have no slot, and its surface
+            # pressure has the dive's `<surfacepressure>` and so comes back.
+            "dives/0/recordings/0/salinity",
+            "dives/0/recordings/0/cns_start",
+            "dives/0/recordings/0/cns_end",
+            "dives/0/recordings/0/otu_start",
+            "dives/0/recordings/0/otu_end",
             "dives/0/entry_position",
             "dives/0/exit_position",
             "dives/0/course_uuid",
@@ -235,7 +238,7 @@ def test_the_input_document_conforms(source) -> None:
 
 @pytest.mark.parametrize("source", WRITE_FIXTURES, ids=lambda path: path.stem)
 def test_the_written_file_validates_against_the_uddf_schema(source, schema) -> None:
-    schema.validate(write_uddf(_document(source)).data.decode("utf-8"))
+    schema.validate(for_the_xsd(write_uddf(_document(source)).data.decode("utf-8")))
 
 
 @pytest.mark.parametrize("source", WRITE_FIXTURES, ids=lambda path: path.stem)
@@ -246,7 +249,7 @@ def test_the_committed_file_validates_against_the_uddf_schema(source, schema) ->
     edit that made one of them invalid is worth catching here rather than in somebody
     else's implementation.
     """
-    schema.validate(source.with_suffix(".uddf").read_text(encoding="utf-8"))
+    schema.validate(for_the_xsd(source.with_suffix(".uddf").read_text(encoding="utf-8")))
 
 
 @pytest.mark.parametrize("source", WRITE_FIXTURES, ids=lambda path: path.stem)

@@ -11,6 +11,8 @@ directory on `sys.path` for the test modules either way.
 from __future__ import annotations
 
 import json
+import re
+import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -78,6 +80,28 @@ def one_dive(
         version=version,
         namespace=namespace,
     )
+
+
+def for_the_xsd(text: str) -> str:
+    """UDDF text with a dive's bare `<datetime>` widened to midnight, for the XSD's pass alone.
+
+    `docs/uddf-writing.md` writes a date-only start as `<datetime>2002-06-18</datetime>`, UDDF's
+    documentation allowing the lower-order elements to be omitted while its XSD types the
+    element `xs:dateTime`. The validation pass exists to catch element order and a mandatory
+    child left out, and a date's spelling is neither — so the **spelling** is widened here
+    rather than the element exempted, which would blind the pass to both. Only a dive's own
+    `<informationbeforedive><datetime>` is touched: every other date-time this writer emits
+    is one already.
+    """
+    root = ET.fromstring(text)
+    for before in root.iter(f"{{{UDDF_NAMESPACE}}}informationbeforedive"):
+        stamp = before.find(f"{{{UDDF_NAMESPACE}}}datetime")
+        if stamp is not None and stamp.text is not None and _BARE_DATE.fullmatch(stamp.text):
+            stamp.text = f"{stamp.text}T00:00:00"
+    return ET.tostring(root, encoding="unicode")
+
+
+_BARE_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
 # -- Subsurface `.ssrf` ---------------------------------------------------------------

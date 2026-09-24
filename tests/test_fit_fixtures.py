@@ -109,8 +109,8 @@ def test_the_ocean_dive_is_read_from_its_session_and_nothing_is_computed() -> No
     assert dive["avg_depth"] == 19.43
     assert dive["started_at"] == "2026-04-17T11:49:23+02:00"
     assert dive["duration"] == 4302
-    assert dive["cns_end"] == 20.0
-    assert dive["otu_end"] == 55.0
+    assert dive["recordings"][0]["cns_end"] == 20.0
+    assert dive["recordings"][0]["otu_end"] == 55.0
     assert INFERRED not in conversion.document["extensions"][PRODUCER_KEY]
     assert [note.kind for note in conversion.notes if note.kind == "inferred"] == []
 

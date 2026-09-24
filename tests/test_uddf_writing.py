@@ -21,7 +21,7 @@ from typing import Any
 
 import pytest
 import xmlschema
-from helpers import ROOT
+from helpers import ROOT, for_the_xsd
 
 from divejson import convert
 from divejson.uddf_write import compared, write_uddf
@@ -74,7 +74,7 @@ def written(source: dict[str, Any], schema: xmlschema.XMLSchema | None = None) -
     """The document as UDDF text, validated against the schema when one is passed."""
     data = write_uddf(source).data
     if schema is not None:
-        schema.validate(data.decode("utf-8"))
+        schema.validate(for_the_xsd(data.decode("utf-8")))
     return data.decode("utf-8")
 
 
@@ -324,9 +324,9 @@ def test_a_typed_event_with_no_label_is_dropped_rather_than_written_as_the_word(
     """
     source = one_dive(
         profile={
-            "duration": 60,
-            "depth": {"times": [0, 60], "values": [0, 500]},
-            "events": [{"time": 30, "type": "ppo2_high"}],
+            "duration": 60_000,
+            "depth": {"times": [0, 60_000], "values": [0, 500]},
+            "events": [{"time": 30_000, "type": "ppo2_high"}],
         }
     )
     assert "<setmarker>" not in written(source, schema)
@@ -338,13 +338,13 @@ def test_an_event_with_a_label_and_no_type_goes_out_and_comes_back_whole(schema)
     """§6.6's spelling of an unclassified event, which is what `<setmarker>` *is*."""
     source = one_dive(
         profile={
-            "duration": 60,
-            "depth": {"times": [0, 60], "values": [0, 500]},
-            "events": [{"time": 30, "label": "Ceiling Broken"}],
+            "duration": 60_000,
+            "depth": {"times": [0, 60_000], "values": [0, 500]},
+            "events": [{"time": 30_000, "label": "Ceiling Broken"}],
         }
     )
     assert "<setmarker>Ceiling Broken</setmarker>" in written(source, schema)
-    assert recorded(read_back(source))["profile"]["events"] == [{"time": 30, "label": "Ceiling Broken"}]
+    assert recorded(read_back(source))["profile"]["events"] == [{"time": 30_000, "label": "Ceiling Broken"}]
     assert messages(source, "dives/0/recordings/0/profile/events/0") == []
 
 
@@ -358,13 +358,13 @@ def test_a_typed_event_with_a_label_keeps_the_label_and_loses_the_type(schema) -
     """
     source = one_dive(
         profile={
-            "duration": 60,
-            "depth": {"times": [0, 60], "values": [0, 500]},
-            "events": [{"time": 30, "type": "ppo2_high", "label": "PO2 High"}],
+            "duration": 60_000,
+            "depth": {"times": [0, 60_000], "values": [0, 500]},
+            "events": [{"time": 30_000, "type": "ppo2_high", "label": "PO2 High"}],
         }
     )
     assert "<setmarker>PO2 High</setmarker>" in written(source, schema)
-    assert recorded(read_back(source))["profile"]["events"] == [{"time": 30, "label": "PO2 High"}]
+    assert recorded(read_back(source))["profile"]["events"] == [{"time": 30_000, "label": "PO2 High"}]
     assert "the type is dropped" in messages(source, "dives/0/recordings/0/profile/events/0")[0]
 
 
@@ -377,9 +377,9 @@ def test_a_gas_switch_to_a_cylinder_this_dive_does_not_have_is_dropped(schema) -
     source = one_dive(
         cylinders=[{"start_pressure": 200.0, "oxygen": 21.0, "gas_number": 0}],
         profile={
-            "duration": 60,
-            "depth": {"times": [0, 60], "values": [0, 500]},
-            "events": [{"time": 30, "type": "gas_switch", "gas_number": 7}],
+            "duration": 60_000,
+            "depth": {"times": [0, 60_000], "values": [0, 500]},
+            "events": [{"time": 30_000, "type": "gas_switch", "gas_number": 7}],
         },
     )
     assert "<switchmix" not in written(source, schema)
@@ -404,11 +404,11 @@ def test_two_cylinders_on_one_blend_get_a_mix_each(schema) -> None:
             {"start_pressure": 218.0, "oxygen": 18.0, "helium": 45.0, "gas_number": 1},
         ],
         profile={
-            "duration": 600,
-            "depth": {"times": [0, 600], "values": [0, 3000]},
+            "duration": 600_000,
+            "depth": {"times": [0, 600_000], "values": [0, 3000]},
             "pressures": [
                 {"times": [0], "values": [2200], "gas_number": 0},
-                {"times": [600], "values": [2000], "gas_number": 1},
+                {"times": [600_000], "values": [2000], "gas_number": 1},
             ],
         },
     )
@@ -418,7 +418,7 @@ def test_two_cylinders_on_one_blend_get_a_mix_each(schema) -> None:
     channels = recorded(read_back(source))["profile"]["pressures"]
     assert channels == [
         {"times": [0], "values": [2200], "gas_number": 0},
-        {"times": [600], "values": [2000], "gas_number": 1},
+        {"times": [600_000], "values": [2000], "gas_number": 1},
     ]
 
 
@@ -451,9 +451,9 @@ def test_a_cylinder_whose_gas_nobody_recorded_still_gets_a_mix(schema) -> None:
     source = one_dive(
         cylinders=[{"start_pressure": 200.0, "gas_number": 0}],
         profile={
-            "duration": 60,
-            "depth": {"times": [0, 60], "values": [0, 500]},
-            "pressures": [{"times": [0, 60], "values": [2000, 1500], "gas_number": 0}],
+            "duration": 60_000,
+            "depth": {"times": [0, 60_000], "values": [0, 500]},
+            "pressures": [{"times": [0, 60_000], "values": [2000, 1500], "gas_number": 0}],
         },
     )
     text = written(source, schema)
@@ -473,8 +473,8 @@ def test_a_gas_number_that_is_a_label_comes_back_as_a_position() -> None:
             {"start_pressure": 190.0, "oxygen": 50.0, "gas_number": 5},
         ],
         profile={
-            "duration": 60,
-            "depth": {"times": [0, 60], "values": [0, 500]},
+            "duration": 60_000,
+            "depth": {"times": [0, 60_000], "values": [0, 500]},
             "pressures": [{"times": [0], "values": [2000], "gas_number": 3}],
         },
     )
@@ -508,8 +508,8 @@ def test_a_numbering_that_survives_is_not_reported() -> None:
             {"start_pressure": 190.0, "oxygen": 50.0, "gas_number": 1},
         ],
         profile={
-            "duration": 60,
-            "depth": {"times": [0, 60], "values": [0, 500]},
+            "duration": 60_000,
+            "depth": {"times": [0, 60_000], "values": [0, 500]},
             "pressures": [{"times": [0], "values": [2000], "gas_number": 1}],
         },
     )
@@ -522,7 +522,7 @@ def test_a_numbering_that_survives_is_not_reported() -> None:
 
 def _with_readouts(**channels: Any) -> dict[str, Any]:
     """The smallest profile that carries a channel, on two depth samples."""
-    return {"duration": 60, "depth": {"times": [0, 60], "values": [0, 500]}, **channels}
+    return {"duration": 60_000, "depth": {"times": [0, 60_000], "values": [0, 500]}, **channels}
 
 
 @pytest.mark.parametrize(
@@ -644,25 +644,41 @@ def test_a_reading_between_two_depth_samples_gets_its_own_waypoint(schema) -> No
     """
     source = one_dive(
         profile={
-            "duration": 60,
-            "depth": {"times": [0, 60], "values": [0, 500]},
-            "temperature": {"times": [30], "values": [245]},
+            "duration": 60_000,
+            "depth": {"times": [0, 60_000], "values": [0, 500]},
+            "temperature": {"times": [30_000], "values": [245]},
         }
     )
     text = written(source, schema)
     assert text.count("<waypoint>") == 3
 
     profile = recorded(read_back(source))["profile"]
-    assert profile["temperature"] == {"times": [30], "values": [245]}
-    assert profile["depth"] == {"times": [0, 60], "values": [0, 500]}
+    assert profile["temperature"] == {"times": [30_000], "values": [245]}
+    assert profile["depth"] == {"times": [0, 60_000], "values": [0, 500]}
+
+
+def test_a_millisecond_that_is_not_a_whole_second_goes_out_as_a_fraction(schema) -> None:
+    """`<divetime>` is `xs:float` seconds and the axis milliseconds, so a time is divided by a
+    thousand in decimal: a whole second is the integer it is, and `1200.02` comes back as
+    exactly `1200020` — the self round trip is exact."""
+    source = one_dive(
+        profile={"duration": 1_200_020, "depth": {"times": [160, 60_000, 1_200_020], "values": [145, 500, 132]}}
+    )
+    text = written(source, schema)
+    assert "<divetime>0.16</divetime>" in text
+    assert "<divetime>60</divetime>" in text
+    assert "<divetime>1200.02</divetime>" in text
+    assert recorded(read_back(source))["profile"] == source["dives"][0]["recordings"][0]["profile"]
 
 
 def test_a_profile_duration_longer_than_its_samples_is_reported() -> None:
     """§6.4 defines the member as the span of the samples, and UDDF records no such member
     at all — so a reader recomputes it and a document claiming more comes back with less."""
-    source = one_dive(profile={"duration": 900, "depth": {"times": [0, 60], "values": [0, 500]}})
-    assert recorded(read_back(source))["profile"]["duration"] == 60
-    assert "its samples span 60 s" in messages(source, "dives/0/recordings/0/profile")[0]
+    source = one_dive(profile={"duration": 900_000, "depth": {"times": [0, 60_000], "values": [0, 500]}})
+    assert recorded(read_back(source))["profile"]["duration"] == 60_000
+    assert "the profile's duration is 900 s where its samples span 60 s" in messages(
+        source, "dives/0/recordings/0/profile"
+    )[0]
 
 
 def test_two_events_on_one_second_keep_the_first(schema) -> None:
@@ -670,16 +686,16 @@ def test_two_events_on_one_second_keep_the_first(schema) -> None:
     markers with a separator, which comes back as one event labelled with two labels."""
     source = one_dive(
         profile={
-            "duration": 60,
-            "depth": {"times": [0, 60], "values": [0, 500]},
+            "duration": 60_000,
+            "depth": {"times": [0, 60_000], "values": [0, 500]},
             "events": [
-                {"time": 30, "label": "first"},
-                {"time": 30, "label": "second"},
+                {"time": 30_000, "label": "first"},
+                {"time": 30_000, "label": "second"},
             ],
         }
     )
     written(source, schema)
-    assert recorded(read_back(source))["profile"]["events"] == [{"time": 30, "label": "first"}]
+    assert recorded(read_back(source))["profile"]["events"] == [{"time": 30_000, "label": "first"}]
     assert "the later event is dropped" in messages(source, "dives/0/recordings/0/profile/events/1")[0]
 
 
@@ -688,13 +704,13 @@ def test_a_marker_event_keeps_its_type_and_loses_its_label(schema) -> None:
     go on, so a labelled safety stop keeps the half a reader can recognise."""
     source = one_dive(
         profile={
-            "duration": 60,
-            "depth": {"times": [0, 60], "values": [0, 500]},
-            "events": [{"time": 30, "type": "safety_stop", "label": "at the line"}],
+            "duration": 60_000,
+            "depth": {"times": [0, 60_000], "values": [0, 500]},
+            "events": [{"time": 30_000, "type": "safety_stop", "label": "at the line"}],
         }
     )
     assert "<setmarker>safety_stop</setmarker>" in written(source, schema)
-    assert recorded(read_back(source))["profile"]["events"] == [{"time": 30, "type": "safety_stop"}]
+    assert recorded(read_back(source))["profile"]["events"] == [{"time": 30_000, "type": "safety_stop"}]
     assert "the label is dropped" in messages(source, "dives/0/recordings/0/profile/events/0")[0]
 
 
@@ -1174,8 +1190,8 @@ def test_a_second_recording_is_dropped_with_its_device_kept(schema) -> None:
     sampled cannot be."""
     source = one_dive(
         recordings=[
-            {"device": {"name": "Ocean"}, "profile": {"duration": 60, "depth": {"times": [0], "values": [500]}}},
-            {"device": {"name": "Perdix"}, "profile": {"duration": 60, "depth": {"times": [0], "values": [510]}}},
+            {"device": {"name": "Ocean"}, "profile": {"duration": 60_000, "depth": {"times": [0], "values": [500]}}},
+            {"device": {"name": "Perdix"}, "profile": {"duration": 60_000, "depth": {"times": [0], "values": [510]}}},
         ]
     )
     text = written(source, schema)
@@ -1185,6 +1201,57 @@ def test_a_second_recording_is_dropped_with_its_device_kept(schema) -> None:
         "UDDF holds one profile per dive" in message
         for message in messages(source, "dives/0/recordings/1")
     )
+
+
+def test_the_primary_recordings_surface_pressure_is_the_dives(schema) -> None:
+    """UDDF states one `<surfacepressure>` per dive, and the reader gives it back to the first
+    recording — so it is written from there, and a later recording's goes with that
+    recording, which is reported dropped whole."""
+    source = one_dive(
+        recordings=[
+            {"device": {"name": "Ocean"}, "surface_pressure": 1.013},
+            {"device": {"name": "Perdix"}, "surface_pressure": 1.009},
+        ]
+    )
+    text = written(source, schema)
+    assert text.count("<surfacepressure>") == 1 and "<surfacepressure>101300</surfacepressure>" in text
+    assert recorded(read_back(source))["surface_pressure"] == 1.013
+    assert not any("surface_pressure" in message for message in messages(source, "dives/0/recordings/0"))
+    assert any("UDDF holds one profile per dive" in message for message in messages(source, "dives/0/recordings/1"))
+
+
+def test_a_recordings_salinity_and_oxygen_clocks_have_no_slot(schema) -> None:
+    """UDDF's per-waypoint `<cns>` is a channel and not the clock's two ends, and its one
+    density sits on a recalculated profile — so neither is a home for these, and each is
+    reported from the record rather than dropped quietly."""
+    readouts = {"salinity": "en13319", "cns_start": 4.5, "cns_end": 61.0, "otu_start": 0, "otu_end": 88.5}
+    source = one_dive(recordings=[{"device": {"name": "Ocean"}, **readouts}])
+    text = written(source, schema)
+    assert "en13319" not in text and "<cns>" not in text
+    back = recorded(read_back(source))
+    assert not any(member in back for member in readouts)
+    reported = " ".join(messages(source, "dives/0/recordings/0"))
+    for member in readouts:
+        assert member in reported, member
+
+
+def test_a_date_only_start_goes_out_as_the_bare_date_and_comes_back_one(schema) -> None:
+    """`<datetime>2002-06-18</datetime>` is UDDF's documented spelling for an omitted time of
+    day, though its XSD types the element `xs:dateTime` — so the schema pass here widens the
+    spelling for itself alone (`helpers.for_the_xsd`). Midnight would be a time the document
+    never had, and nothing is lost, so nothing is reported."""
+    source = one_dive(started_at="2002-06-18")
+    text = written(source, schema)
+    assert "<datetime>2002-06-18</datetime>" in text
+    assert read_back(source)["dives"][0]["started_at"] == "2002-06-18"
+    assert not any("started_at" in message or "datetime" in message for _, _, message in notes(source))
+
+
+def test_the_xsd_refuses_the_bare_date_the_pass_widens(schema) -> None:
+    """What the widening is for, pinned: without it the file fails `xs:dateTime`, which is
+    the disagreement `docs/uddf-writing.md` records rather than a defect in the writer."""
+    with pytest.raises(xmlschema.XMLSchemaValidationError):
+        schema.validate(write_uddf(one_dive(started_at="2002-06-18")).data.decode("utf-8"))
 
 
 def test_a_recordings_own_start_and_files_have_no_slot(schema) -> None:
@@ -1243,7 +1310,7 @@ def test_a_kit_computer_linked_ahead_of_the_recordings_own_is_reported(schema) -
                 "recordings": [
                     {
                         "device": {"name": "Ocean", "brand": "Suunto", "serial": "S1", "dive_number": 118},
-                        "profile": {"duration": 60, "depth": {"times": [0, 60], "values": [0, 500]}},
+                        "profile": {"duration": 60_000, "depth": {"times": [0, 60_000], "values": [0, 500]}},
                     }
                 ],
             }
@@ -1355,7 +1422,7 @@ def test_a_kit_computer_no_recording_answers_to_is_a_gain_and_is_silent(schema) 
                 "recordings": [
                     {
                         "device": {"name": "Ocean"},
-                        "profile": {"duration": 60, "depth": {"times": [0, 60], "values": [0, 500]}},
+                        "profile": {"duration": 60_000, "depth": {"times": [0, 60_000], "values": [0, 500]}},
                     }
                 ],
             }

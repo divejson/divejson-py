@@ -9,9 +9,11 @@ fixture for a defect nobody checks. Nor can it say *why* an invalid document fai
 that it does.
 
 So these, and deliberately nothing else: the channels §6.4 added, the gradient-factor
-ordering §3 rule 7 states, and the one uuid claim whose fixture is refused for another
-reason by any validator that does not know its member. Everything already covered by a pair
-stays covered by the pair.
+ordering §3 rule 6 states, what §3 rule 4 accepts as a recording's content, the one member
+that may hold a date as well as a date-time, the member order the validator no longer
+checks — no `invalid/` document can pin an absence of a rule — and the one uuid claim whose
+fixture is refused for another reason by any validator that does not know its member.
+Everything already covered by a pair stays covered by the pair.
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ import json
 import pytest
 from helpers import FIXTURES
 
-from divejson.validate import CHANNELS, validate_document
+from divejson.validate import CHANNELS, READOUTS, validate_document
 
 
 def document(recording: dict) -> dict:
@@ -77,7 +79,7 @@ def test_the_validators_channel_list_is_the_schemas() -> None:
 
 
 def test_a_gradient_factor_low_above_the_high_is_rejected() -> None:
-    """§3 rule 7, and UDDF's own constraint on the same pair. The schema makes them
+    """§3 rule 6, and UDDF's own constraint on the same pair. The schema makes them
     both-or-neither and puts each on 0-100; neither of those can say one is not above the
     other, and a low above a high is a decompression model nothing ran."""
     found = issues({"deco_model": {"gf_low": 85, "gf_high": 30}, "device": {"model": "Perdix 3"}})
@@ -108,3 +110,70 @@ def test_a_portrait_shares_the_documents_one_identifier_space() -> None:
     assert [str(issue) for issue in validate_document(doc)] == [
         "certifications/0/front_file: uuid 0198a6f0-1111-7081-8000-000000000081 already used at diver/portrait_file"
     ]
+
+
+# -- §3 rule 4: what a recording carries -------------------------------------------------
+
+
+@pytest.mark.parametrize("readout", READOUTS)
+def test_a_readout_alone_is_a_recording(readout) -> None:
+    """A figure the device computed is a record of the dive nothing else produces (§6.4a) —
+    the CNS a diver copied off their computer into a hand-kept log."""
+    value = 1.0 if readout == "surface_pressure" else 0
+    assert issues({readout: value}) == []
+
+
+def test_a_setting_alone_is_not() -> None:
+    """`mode`, `deco_model` and `salinity` describe how a computer was set, and a setting
+    nothing recorded a dive with is not a record of one."""
+    assert issues({"mode": "gauge", "salinity": "en13319", "deco_model": {"conservatism": 0}}) == [
+        (
+            "dives/0/recordings/0: a recording carries at least one of device, profile, source_files and a "
+            "readout — surface_pressure, cns_start, cns_end, otu_start, otu_end (spec §3, §6.4a)"
+        )
+    ]
+
+
+def test_the_readout_list_is_the_recordings_own() -> None:
+    """Every readout is a member of the recording and of nothing else a dive carries, so the
+    list and the schema cannot drift apart silently in either direction."""
+    from divejson.validate import load_schema
+
+    defs = load_schema()["$defs"]
+    assert set(READOUTS) <= set(defs["recording"]["properties"])
+    assert not set(READOUTS) & set(defs["dive"]["properties"])
+
+
+# -- a dive's start may be its date --------------------------------------------------------
+
+
+def _with_start(started_at: str) -> list[str]:
+    doc = document({"device": {"model": "Perdix 3"}})
+    doc["dives"][0]["started_at"] = started_at
+    return [str(issue) for issue in validate_document(doc)]
+
+
+def test_a_dive_may_start_on_a_date_alone() -> None:
+    assert _with_start("2026-07-05") == []
+
+
+def test_a_date_that_is_not_one_is_refused() -> None:
+    assert "dives/0/started_at: '2026-02-30' is not a real calendar date" in _with_start("2026-02-30")
+
+
+def test_a_recordings_own_start_takes_a_date_time_and_nothing_else() -> None:
+    """§5.2: no other date-time member takes a date — a recording that knows its own start
+    knows its instant."""
+    found = issues({"device": {"model": "Perdix 3"}, "started_at": "2026-07-05"})
+    assert "dives/0/recordings/0/started_at: '2026-07-05' is not a DiveJSON date-time" in found
+
+
+# -- §4's member order is a SHOULD -------------------------------------------------------------
+
+
+def test_a_document_in_any_member_order_conforms() -> None:
+    """A generic re-serialisation — Go's `encoding/json` sorting a map's keys — writes
+    `exported_at` before `format`, and the document it wrote is as conforming as the one it
+    read (§4)."""
+    doc = document({"device": {"model": "Perdix 3"}})
+    assert validate_document(dict(sorted(doc.items()))) == []
