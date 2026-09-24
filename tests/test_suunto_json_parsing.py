@@ -702,15 +702,16 @@ def _recording(header: dict, samples: list[dict] | None = None) -> dict:
     """The dive's one recording, on a file that kept a sample.
 
     The sample is not decoration: §3's rule 4 says a recording carries at least one of
-    `device`, `profile` and `source_files`, and neither §6.4a member this plan adds is one of
-    them — so a header stating a mode and nothing else produces no recording to put it in.
+    `device`, `profile`, `source_files` and a readout, and neither a mode nor a model is one
+    of them — so a header stating a mode and nothing else produces no recording to put it in.
     """
     recordings = _dive(header, samples or [suunto_sample(0, Depth=20.0)]).get("recordings") or []
     return recordings[0] if recordings else {}
 
 
 def test_a_mode_and_a_model_alone_do_not_make_a_recording() -> None:
-    """§3's rule 4 names `device`, `profile` and `source_files`, and these are neither."""
+    """§3's rule 4 names `device`, `profile`, `source_files` and a readout, and these are
+    none of them."""
     assert "recordings" not in _dive({"Diving": {"DiveMode": "Air", "Conservatism": 0}})
 
 

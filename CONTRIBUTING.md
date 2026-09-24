@@ -73,8 +73,12 @@ this arrangement exists to prevent:
 - **Parse XML through `xmlsource.parse_xml`**, which refuses a `<!DOCTYPE>` before expat
   expands anything (spec §9).
 - **Build a profile through `series.SampleAxis`**, which owns the ordering, the sample with
-  no time, the two samples on one second, and the dive whose samples carry nothing this
-  format can hold. `noun` and `time_member` keep the report speaking the source's language.
+  no time, the two samples on one millisecond, and the dive whose samples carry nothing this
+  format can hold. Offer it `converter.milliseconds` of the seconds the source states, which
+  keeps a fraction the source wrote. `noun` and `time_member` keep the report speaking the
+  source's language.
+- **Put a device's readouts on its recording.** A figure the source states once for the
+  whole dive goes through `converter.onto_primary`, which is `docs/converting.md`'s rule.
 - **Ask `converter.recorded` which way a zero reads.** The member's own schema constraint
   decides, and the answer differs between members that look alike.
 - **Validate the document before returning it, unless `scope.validates_alone` is false.**

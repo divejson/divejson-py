@@ -29,7 +29,7 @@ holds the report to that.
 by both, compared after reading rather than as two files, because the writers are allowed to
 differ and the logbook is not. Profile channels are compared by count and extremes there,
 the reference writer snapping its other channels onto the depth axis where this one leaves
-every reading on its own second.
+every reading on its own instant.
 """
 
 from __future__ import annotations
@@ -318,7 +318,6 @@ SCALARS = (
     "visibility",
     "weight",
     "altitude",
-    "surface_pressure",
     "trip_uuid",
     "site_uuids",
     "gear_uuids",
@@ -362,6 +361,15 @@ def test_the_two_writers_agree_on_every_dive_level_scalar(both) -> None:
     reference, ours = both
     assert [_picked(dive, SCALARS) for dive in ours["dives"]] == [
         _picked(dive, SCALARS) for dive in reference["dives"]
+    ]
+
+
+def test_the_two_writers_agree_on_the_surface_pressure(both) -> None:
+    """UDDF's one dive-level readout, which both files state and the reader gives to the
+    primary recording (§6.4a)."""
+    reference, ours = both
+    assert [(dive.get("recordings") or [{}])[0].get("surface_pressure") for dive in ours["dives"]] == [
+        (dive.get("recordings") or [{}])[0].get("surface_pressure") for dive in reference["dives"]
     ]
 
 
