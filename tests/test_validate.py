@@ -1,19 +1,25 @@
-"""The two §3 rules the schema cannot express about a recording's decompression data.
+"""What the corpus cannot say about this validator: a rule's reach, and why a document fails.
 
 The corpus is where most of this validator is exercised: `fixtures/invalid/` holds a
 document per rule and `divejson conform fixtures --strict` runs every one of them, which
 `test_conform.py` does inside this suite. What that cannot reach is a rule's *reach* — §3's
 rule 3 is quantified over every series in a recording, so a channel missing from the
 validator's list is one whose defect no `invalid/` document would ever show, there being no
-fixture for a defect nobody checks.
+fixture for a defect nobody checks. Nor can it say *why* an invalid document fails, only
+that it does.
 
-So these two, and deliberately nothing else: the channels §6.4 added, and the gradient-factor
-ordering §3 rule 7 states. Everything already covered by a pair stays covered by the pair.
+So these, and deliberately nothing else: the channels §6.4 added, the gradient-factor
+ordering §3 rule 7 states, and the one uuid claim whose fixture is refused for another
+reason by any validator that does not know its member. Everything already covered by a pair
+stays covered by the pair.
 """
 
 from __future__ import annotations
 
+import json
+
 import pytest
+from helpers import FIXTURES
 
 from divejson.validate import CHANNELS, validate_document
 
@@ -92,4 +98,13 @@ def test_the_rule_reaches_every_recording_and_not_only_the_first() -> None:
     )
     assert [str(issue) for issue in validate_document(doc)] == [
         "dives/0/recordings/1/deco_model: gf_low exceeds gf_high (spec §3, §6.4c)"
+    ]
+
+
+def test_a_portrait_shares_the_documents_one_identifier_space() -> None:
+    """§5.3: a Stored File's uuid is claimed like any record's, and the portrait's is claimed
+    beside the diver's. The fixture is schema-valid, so this is the only thing refusing it."""
+    doc = json.loads((FIXTURES / "invalid" / "duplicate-file-uuid-portrait.divejson").read_text(encoding="utf-8"))
+    assert [str(issue) for issue in validate_document(doc)] == [
+        "certifications/0/front_file: uuid 0198a6f0-1111-7081-8000-000000000081 already used at diver/portrait_file"
     ]

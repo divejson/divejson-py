@@ -7,6 +7,13 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **A diver carries a portrait.** §6.1 of
+  [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) adds
+  `portrait_file`, a Stored File (§6.7), and `divejson validate` claims its uuid in the
+  document's one identifier space, so a portrait sharing a uuid with any other record is
+  refused (§5.3). UDDF carries no portrait in either direction: the reader takes no image
+  from `<owner>`, and the writer reports the member rather than writing it.
+
 ## 0.11.0
 
 - **Breaking: a diver carries a date of birth, a phone, emergency contacts and insurances,

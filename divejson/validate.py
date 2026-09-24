@@ -200,6 +200,9 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
     seen_uuids: dict[str, str] = {}
     if isinstance(diver, dict):
         _claim_uuid(diver, "diver", seen_uuids, issues)
+        portrait = diver.get("portrait_file")
+        if isinstance(portrait, dict):
+            _claim_uuid(portrait, "diver/portrait_file", seen_uuids, issues)
         _check_datetime(diver, "created_at", "diver", issues)
 
     collections = {
