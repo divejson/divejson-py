@@ -311,9 +311,10 @@ class Scope:
     def positional(self, index: int | str) -> str:
         """The stand-in source id for a record the source gave none.
 
-        An index where one list holds every record of the kind, and a path into the source
-        where the kind is read from more than one place — UDDF's centers come from bases,
-        shops, purchases and trip parts, and one number would give two of them one identity.
+        The record's position in the list it was read from, or a path into the source where
+        one kind is read from several lists: a UDDF center with no id takes its path when it
+        is a base, a shop or a purchase's shop, so that none of them shares the plain count an
+        operator takes from its trip part.
         """
         return f"#{index}" if self.member is None else f"{self.member}#{index}"
 

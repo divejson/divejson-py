@@ -21,10 +21,10 @@ this file is about the package, whose version moves independently.
   part's `<accomodation>` — `<accommodation>` too — or its `<operator>` is its
   `accommodation_uuid`, folded by trimmed, case-insensitive name into a center already read;
   an operator takes its part's position in the file as its identity. The name-only base
-  nothing points at, which Subsurface writes into every export, is skipped, and every element
-  a center or a part carries that the format does not — a price, a rating, a vessel, a
-  part's `type`, a purchase — is reported. `docs/uddf-mapping.md` *Centers* fixes the order
-  `centers` comes out in.
+  nothing points at, which Subsurface writes into every export, is skipped, and what a center
+  carries that the format does not — a price, a rating, an alias — is reported, as are a
+  part's vessel, `type` and link and a piece's purchase. `docs/uddf-mapping.md` *Centers*
+  fixes the order `centers` comes out in.
 
 - **The UDDF writer writes them.** A center whose roles are exactly `["shop"]` is a
   `<business><shop>` and every other a `<divebase>` ahead of the sites; a dive links its
