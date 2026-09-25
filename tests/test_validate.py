@@ -11,8 +11,10 @@ that it does.
 So these, and deliberately nothing else: the channels §6.4 added, the gradient-factor
 ordering §3 rule 6 states, what §3 rule 4 accepts as a recording's content, the one member
 that may hold a date as well as a date-time, the member order the validator does not
-check — no `invalid/` document can pin an absence of a rule — and the one uuid claim whose
-fixture is refused for another reason by any validator that does not know its member.
+check — no `invalid/` document can pin an absence of a rule — the one uuid claim whose
+fixture is refused for another reason by any validator that does not know its member, and
+the hosts a center reference sits on, the corpus holding a dangling one on a trip part
+alone.
 Everything already covered by a pair stays covered by the pair.
 """
 
@@ -177,3 +179,55 @@ def test_a_document_in_any_member_order_conforms() -> None:
     read (§4)."""
     doc = document({"device": {"model": "Perdix 3"}})
     assert validate_document(dict(sorted(doc.items()))) == []
+
+
+# -- §3 rule 1 reaches every center reference --------------------------------------------------
+
+CENTER = "0198a6f0-9999-7020-8000-000000000020"
+NOWHERE = "0198a6f0-9999-7029-8000-000000000029"
+
+
+def _referencing(host: str, record: dict) -> dict:
+    return {
+        "format": "divejson",
+        "version": "1.0",
+        "exported_at": "2026-09-05T00:00:00+00:00",
+        "gear": [{"uuid": "0198a6f0-9999-7004-8000-000000000004", "name": "Regulator", "type": "regulator"}],
+        "centers": [{"uuid": CENTER, "name": "Blue Hole Divers"}],
+        host: [record],
+    }
+
+
+REFERENCING = {
+    "dives": {"uuid": "0198a6f0-9999-7001-8000-000000000001", "started_at": "2026-04-17T11:49:23+02:00"},
+    "courses": {"uuid": "0198a6f0-9999-7022-8000-000000000022", "name": "AOW"},
+    "certifications": {"uuid": "0198a6f0-9999-7023-8000-000000000023", "agency": "padi", "name": "AOW"},
+    "gear_service_records": {
+        "uuid": "0198a6f0-9999-7024-8000-000000000024",
+        "gear_uuid": "0198a6f0-9999-7004-8000-000000000004",
+        "type": "service",
+        "serviced_on": "2026-03-05",
+    },
+}
+
+
+@pytest.mark.parametrize("host", REFERENCING)
+def test_a_center_uuid_resolves_in_centers_on_every_host(host: str) -> None:
+    assert validate_document(_referencing(host, {**REFERENCING[host], "center_uuid": CENTER})) == []
+    dangling = _referencing(host, {**REFERENCING[host], "center_uuid": NOWHERE})
+    found = [str(issue) for issue in validate_document(dangling)]
+    assert found == [f"{host}/0/center_uuid: references {NOWHERE}, not present in centers"]
+
+
+def test_a_parts_accommodation_resolves_in_centers_though_it_is_not_named_after_them() -> None:
+    """§5.3: a member not named after its collection resolves where its definition says."""
+    trip = {
+        "uuid": "0198a6f0-9999-7003-8000-000000000003",
+        "name": "Spring",
+        "parts": [{"accommodation_uuid": CENTER}],
+    }
+    assert validate_document(_referencing("trips", trip)) == []
+    trip["parts"].append({"accommodation_uuid": NOWHERE})
+    assert [str(issue) for issue in validate_document(_referencing("trips", trip))] == [
+        f"trips/0/parts/1/accommodation_uuid: references {NOWHERE}, not present in centers"
+    ]

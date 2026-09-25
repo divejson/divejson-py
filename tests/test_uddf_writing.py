@@ -32,6 +32,8 @@ DIVE_UUID = "0198a6f0-9999-7001-8000-000000000001"
 SITE_UUID = "0198a6f0-9999-7002-8000-000000000002"
 TRIP_UUID = "0198a6f0-9999-7003-8000-000000000003"
 GEAR_UUID = "0198a6f0-9999-7004-8000-000000000004"
+CENTER_UUID = "0198a6f0-9999-7020-8000-000000000020"
+OTHER_CENTER_UUID = "0198a6f0-9999-7021-8000-000000000021"
 
 
 @pytest.fixture(scope="module")
@@ -183,15 +185,22 @@ def test_a_trip_with_no_parts_is_written_as_the_element_it_reads_back_from(schem
 
 
 def test_a_placeless_part_says_what_a_reader_will_make_of_its_empty_name(schema) -> None:
-    """`simpleNamedType` makes `<name>` mandatory, and the finding turns on the dates.
+    """`simpleNamedType` makes `<name>` mandatory, and the finding turns on the rest of the part.
 
-    A dated placeless part comes back as itself; one carrying neither a place nor a date is
-    the same element as the floor above, so it does not come back at all — and that is the
-    one shape of part the self round trip loses.
+    A dated placeless part comes back as itself, and so does one with a copy of where the
+    diver stayed; one carrying none of a place, a date and a stay is the same element as the
+    floor above, so it does not come back at all — and that is the one shape of part the self
+    round trip loses.
     """
     dated = trip_of({"starts_on": "2026-05-01", "ends_on": "2026-05-03"})
     assert read_back(dated)["trips"][0]["parts"] == [{"starts_on": "2026-05-01", "ends_on": "2026-05-03"}]
-    assert "reads back as the dated placeless part it is" in messages(dated, "trips/0/parts/0")[0]
+    assert "reads back as the placeless part it is" in messages(dated, "trips/0/parts/0")[0]
+
+    stayed = trip_of({"accommodation_uuid": CENTER_UUID})
+    stayed["centers"] = [{"uuid": CENTER_UUID, "name": "Grandma's house"}]
+    written(stayed, schema)
+    assert read_back(stayed)["trips"][0]["parts"] == [{"accommodation_uuid": CENTER_UUID}]
+    assert "reads back as the placeless part it is" in messages(stayed, "trips/0/parts/0")[0]
 
     empty = trip_of({})
     written(empty, schema)
@@ -917,6 +926,165 @@ def test_a_portrait_alone_writes_no_diver_and_the_guards_note_covers_it(schema) 
             "no diver is written"
         )
     ]
+
+
+# -- centers -----------------------------------------------------------------------------
+
+
+def center(uuid: str = CENTER_UUID, **members: Any) -> dict[str, Any]:
+    return {"uuid": uuid, "name": "Blue Hole Divers", **members}
+
+
+def test_a_center_that_is_only_a_shop_goes_out_as_a_shop_and_says_its_role_back(schema) -> None:
+    source = one_dive(center_uuid=CENTER_UUID)
+    source["centers"] = [center(name="Reefside", roles=["shop"], phone="+20 100 555 0142")]
+    text = written(source, schema)
+    assert "<business>" in text
+    assert f'<shop id="center-{CENTER_UUID}">' in text
+    assert read_back(source)["centers"] == source["centers"]
+    assert messages(source, "centers/0") == []
+
+
+@pytest.mark.parametrize(
+    ("roles", "said"),
+    [
+        (None, "the center records none; the <divebase> it goes out as reads back as dive_center"),
+        ([], "the center records none; the <divebase> it goes out as reads back as dive_center"),
+        (["school"], "say only dive_center back"),
+        (["shop", "school"], "say only dive_center back"),
+    ],
+    ids=["absent", "empty", "school", "shop-and-school"],
+)
+def test_every_other_center_is_a_divebase_and_roles_it_does_not_say_back_are_reported(schema, roles, said) -> None:
+    source = one_dive(center_uuid=CENTER_UUID, site_uuids=[SITE_UUID])
+    source["sites"] = [{"uuid": SITE_UUID, "name": "The Canyon"}]
+    source["centers"] = [center(**({} if roles is None else {"roles": roles}))]
+    text = written(source, schema)
+    # `<divesite>` is a sequence of bases and then sites.
+    assert text.index(f'<divebase id="center-{CENTER_UUID}">') < text.index("<site ")
+    assert read_back(source)["centers"][0]["roles"] == ["dive_center"]
+    assert any(said in message for message in messages(source, "centers/0"))
+
+
+def test_a_dive_links_its_center_after_its_sites(schema) -> None:
+    """An importer reading one link takes the first as the dive's site, so the site leads."""
+    source = one_dive(center_uuid=CENTER_UUID, site_uuids=[SITE_UUID])
+    source["sites"] = [{"uuid": SITE_UUID, "name": "The Canyon"}]
+    source["centers"] = [center(roles=["dive_center"])]
+    text = written(source, schema)
+    assert text.index(f'<link ref="site-{SITE_UUID}"') < text.index(f'<link ref="center-{CENTER_UUID}"')
+    back = read_back(source)["dives"][0]
+    assert (back["site_uuids"], back["center_uuid"]) == ([SITE_UUID], CENTER_UUID)
+
+
+def test_a_parts_accommodation_is_a_numbered_copy_and_the_part_is_typed_by_the_center(schema) -> None:
+    """`accommodation-<n>` in document order, `boat` for a liveaboard and `hotel` otherwise."""
+    source = trip_of(
+        {"location": {"name": "Brothers"}, "accommodation_uuid": OTHER_CENTER_UUID},
+        {"location": {"name": "Dahab"}, "accommodation_uuid": CENTER_UUID},
+        {"location": {"name": "Dahab"}, "accommodation_uuid": CENTER_UUID},
+    )
+    source["centers"] = [
+        center(roles=["dive_center", "accommodation"], address={"city": "Dahab", "country": "Egypt"}),
+        center(OTHER_CENTER_UUID, name="Northern Star", roles=["liveaboard"]),
+    ]
+    text = written(source, schema)
+    assert re.findall(r'<trippart type="(\w+)"', text) == ["boat", "hotel", "hotel"]
+    assert re.findall(r'<accomodation id="([\w-]+)"', text) == [f"accommodation-{n}" for n in range(3)]
+    back = read_back(source)
+    assert [part["accommodation_uuid"] for part in back["trips"][0]["parts"]] == [
+        OTHER_CENTER_UUID,
+        CENTER_UUID,
+        CENTER_UUID,
+    ]
+    by_uuid = {row["uuid"]: row for row in back["centers"]}
+    assert by_uuid[CENTER_UUID] == source["centers"][0]
+    assert messages(source, "centers/0") == []
+    assert any("say only dive_center, accommodation back" in message for message in messages(source, "centers/1"))
+
+
+def test_a_part_whose_center_shares_its_name_gets_no_copy(schema) -> None:
+    """A reader folds a copy back by name alone, so a copy of either would come back as one."""
+    source = trip_of({"location": {"name": "El Gouna"}, "accommodation_uuid": OTHER_CENTER_UUID})
+    source["centers"] = [
+        center(name="Reefside", roles=["shop"], phone="+20 100 555 0142"),
+        center(OTHER_CENTER_UUID, name=" reefside", roles=["accommodation"], notes="Guest house."),
+    ]
+    text = written(source, schema)
+    assert "<accomodation" not in text and "type=" not in text
+    back = read_back(source)
+    assert back["trips"][0]["parts"] == [{"location": {"name": "El Gouna"}}]
+    assert any("shares its name with another center" in message for message in messages(source, "trips/0/parts/0"))
+    # Its base carries a note, so it still comes back, as a base.
+    assert {row["uuid"] for row in back["centers"]} == {CENTER_UUID, OTHER_CENTER_UUID}
+
+
+def test_a_name_only_center_nothing_points_at_is_reported_as_the_placeholder_it_reads_as(schema) -> None:
+    """The ordinary case is a school only a course or a card names, neither having a slot."""
+    source = document(
+        courses=[{"uuid": "0198a6f0-9999-7022-8000-000000000022", "name": "AOW", "center_uuid": CENTER_UUID}],
+        centers=[center(roles=["school"])],
+    )
+    written(source, schema)
+    assert "centers" not in read_back(source)
+    assert any("placeholder" in message for message in messages(source, "centers/0"))
+
+
+def test_a_name_only_center_a_dive_links_is_not_a_placeholder(schema) -> None:
+    source = one_dive(center_uuid=CENTER_UUID)
+    source["centers"] = [center(roles=["dive_center"])]
+    written(source, schema)
+    assert read_back(source)["centers"] == source["centers"]
+    assert messages(source, "centers/0") == []
+
+
+def test_what_a_center_holds_beyond_its_slot_is_reported_from_the_record(schema) -> None:
+    source = one_dive(center_uuid=CENTER_UUID)
+    source["centers"] = [
+        center(
+            roles=["dive_center"],
+            created_at="2026-03-02T18:00:00+02:00",
+            address={"country": "Egypt", "extensions": {"com.example": {"plus_code": "8GX2+2F"}}},
+            notes="",
+            extensions={"com.example": {"rating": 4}},
+        )
+    ]
+    written(source, schema)
+    reported = [(where, message) for _, where, message in notes(source)]
+    assert ("centers/0", "UDDF has no slot for created_at; it is not written") in reported
+    assert ("centers/0", "UDDF has no slot for extensions; it is not written") in reported
+    assert ("centers/0/address", "UDDF has no slot for extensions; it is not written") in reported
+    assert any(where == "centers/0" and "the note is empty" in message for where, message in reported)
+
+
+def test_a_centers_contact_block_goes_out_in_the_schemas_order(schema) -> None:
+    """`contactType` is an `xs:sequence`: phone, then email, then homepage."""
+    source = one_dive(center_uuid=CENTER_UUID)
+    source["centers"] = [
+        center(
+            roles=["dive_center"], website="https://bluehole.example/", email="desk@bluehole.example", phone="+20 69"
+        )
+    ]
+    text = written(source, schema)
+    assert text.index("<phone>") < text.index("<email>") < text.index("<homepage>")
+    assert read_back(source)["centers"] == source["centers"]
+
+
+def test_a_center_reference_on_a_record_uddf_has_no_slot_for_goes_with_the_record(schema) -> None:
+    source = document(
+        certifications=[
+            {
+                "uuid": "0198a6f0-9999-7023-8000-000000000023",
+                "agency": "padi",
+                "name": "AOW",
+                "center_uuid": CENTER_UUID,
+            }
+        ],
+        centers=[center(roles=["school"], phone="+20 69")],
+    )
+    written(source, schema)
+    assert ("dropped", "$", "UDDF has no slot for certifications; it is not written") in notes(source)
+    assert read_back(source)["centers"][0]["phone"] == "+20 69"
 
 
 # -- the file itself -------------------------------------------------------------------

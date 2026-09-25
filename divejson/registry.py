@@ -91,7 +91,7 @@ ZIP = "zip"
 ZIP_MAGIC = b"PK\x03\x04"
 
 # The collections a converted document can carry, in the order §4 puts them.
-COLLECTIONS = ("dives", "trips", "sites", "gear")
+COLLECTIONS = ("dives", "trips", "sites", "gear", "centers")
 
 
 class Adapter(Protocol):

@@ -7,6 +7,33 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Breaking: centers are records.** §6.18 and §6.19 of
+  [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) add a
+  top-level `centers` collection — a name, a set of `roles`, a phone, an email, a website, an
+  address anchored on its `country`, and notes — referenced by `center_uuid` from a dive, a
+  course, a certification and a service record and by `accommodation_uuid` from a trip part.
+  `training_center` is gone from a course and a certification, so `divejson validate` refuses
+  it as an undefined member, and it resolves all five references, a part's in `centers`
+  though its name is not theirs (§5.3). An archive's merge carries the collection.
+
+- **The UDDF reader reads centers.** A `<divebase>` and a `<business><shop>` become centers
+  with the role their slot implies, and a dive's `<link>` to either is its `center_uuid`. A
+  part's `<accomodation>` — `<accommodation>` too — or its `<operator>` is its
+  `accommodation_uuid`, folded by trimmed, case-insensitive name into a center already read;
+  an operator takes its part's position in the file as its identity. The name-only base
+  nothing points at, which Subsurface writes into every export, is skipped, and every element
+  a center or a part carries that the format does not — a price, a rating, a vessel, a
+  part's `type`, a purchase — is reported. `docs/uddf-mapping.md` *Centers* fixes the order
+  `centers` comes out in.
+
+- **The UDDF writer writes them.** A center whose roles are exactly `["shop"]` is a
+  `<business><shop>` and every other a `<divebase>` ahead of the sites; a dive links its
+  center after its sites; a part carries an `<accomodation id="accommodation-<n>">` copy of
+  its center and a `type` of `boat` or `hotel`. Roles the slots do not say back, a part whose
+  center shares its name with another center, and a name-only base a reader will take for a
+  placeholder are each reported. `converter.center_roles`, `roles_in_order` and
+  `center_members` read §6.18's vocabulary and member order off the schema.
+
 ## 0.13.0
 
 - **Breaking: the profile axis is milliseconds.** §5.1 of

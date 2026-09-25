@@ -236,6 +236,23 @@ def test_a_record_two_members_share_is_carried_once_and_referred_to_by_both() ->
     assert not any("not a dive site this converter carries" in note.message for note in conversion.notes)
 
 
+def test_a_center_a_dive_links_survives_the_merge_and_is_carried_once() -> None:
+    """The merge concatenates the collections it knows, and the validation after it resolves
+    every reference — so a collection missing from that list leaves each `center_uuid`
+    dangling, and the archive fails as a whole where either file alone converts."""
+    def logbook(dive_id: str) -> bytes:
+        return uddf(
+            "<divesite><divebase id='b1'><name>Blue Hole Divers</name></divebase></divesite>"
+            f"<profiledata><repetitiongroup><dive id='{dive_id}'><informationbeforedive>"
+            "<link ref='b1'/><datetime>2026-04-17T09:00:00+02:00</datetime>"
+            "</informationbeforedive></dive></repetitiongroup></profiledata>"
+        )
+
+    document = convert(_zip({"a.uddf": logbook("d1"), "b.uddf": logbook("d2")}), exported_at=EXPORTED_AT).document
+    (center,) = document["centers"]
+    assert [dive["center_uuid"] for dive in document["dives"]] == [center["uuid"]] * 2
+
+
 def test_one_file_naming_two_records_the_same_is_still_a_source_defect() -> None:
     """The opposite case, and the one the collision rule was written for.
 

@@ -85,6 +85,7 @@ from .converter import (
     NoteKind,
     Scope,
     capped,
+    center_members,
     deco_model,
     decimal_of,
     device,
@@ -95,6 +96,7 @@ from .converter import (
     record_inferred,
     recorded,
     recording,
+    roles_in_order,
     rounded,
     in_seconds,
     shared_readout,
@@ -138,12 +140,15 @@ LITRES_THRESHOLD = Decimal(1)
 # fills the members they cap. §6.12's `serial` is 1-64 rather than the 255 its neighbours
 # share, and the reason is worth knowing: a gear serial longer than a device's (§6.4b) could
 # never equal one, and equality between the two is what says a kit item and a device are
-# one machine. §6.1's phone and email are never cut to theirs, only dropped past them — a
-# number or an address with its end missing is a wrong one rather than a short one.
+# one machine. A phone, an email and a website — §6.1's and §6.18's — are never cut to theirs,
+# only dropped past them: a number or an address with its end missing is a wrong one rather
+# than a short one. An address's parts are cut like a name, the postcode to a code's length.
 MAX_FULL_NAME = 512
 MAX_SERIAL = 64
 MAX_PHONE = 32
 MAX_EMAIL = 255
+MAX_WEBSITE = 512
+MAX_POSTCODE = 32
 MIN_PO2_LIMIT = Decimal("0.4")
 MAX_PO2_LIMIT = Decimal("2.0")
 MIN_SURFACE_PRESSURE = Decimal("0.4")
@@ -158,6 +163,32 @@ MAX_ALTITUDE = 6500
 # record. This admits every real address and rejects what writers actually leave in the
 # field — `n/a`, `-`, a person's name, a sentence.
 _EMAIL = re.compile(r"\A[^@\s]+@[^@\s]+\Z")
+
+# An absolute URI: a scheme, a colon, and something after it. `xs:anyURI` admits a bare
+# `www.example.com`, which §6.18's `website` does not mean and an application cannot open,
+# and prepending a scheme would be stating one the file never did.
+_ABSOLUTE_URI = re.compile(r"\A[A-Za-z][A-Za-z0-9+.\-]*:\S+\Z")
+
+# `addressType`'s children onto §6.19's members, in §6.19's order, with each one's cap.
+_ADDRESS = (
+    ("street", "street", MAX_NAME),
+    ("city", "city", MAX_NAME),
+    ("postcode", "postcode", MAX_POSTCODE),
+    ("province", "region", MAX_NAME),
+    ("country", "country", MAX_NAME),
+)
+
+# The children of a center's shape that §6.18 reads; every other one is reported by name, so
+# that what UDDF records about a base, a shop or a hotel and this format does not — a price,
+# a rating, a guide, a hotel's category — is never dropped in silence.
+_CENTER_READ = {"name", "address", "contact", "notes"}
+_CONTACT_READ = {"phone", "mobilephone", "email", "homepage"}
+
+# Where a part's diver slept, and the role each shape gives its center. The accommodation is
+# read under both spellings — the XSD declares `<accomodation>`, the documentation writes
+# `<accommodation>` — and an `<operator>` is the liveaboard, `trippartType` pairing it with a
+# `<vessel>` in place of the accommodation.
+_STAYS = {"accomodation": "accommodation", "accommodation": "accommodation", "operator": "liveaboard"}
 
 # `xs:dateTime`, leniently. The `T`, the seconds and the offset are each optional because
 # real writers omit each of them, and the offset is accepted with or without its colon.
@@ -435,6 +466,11 @@ def _date_time(text: str) -> tuple[str | None, str | None]:
     return value + offset, note
 
 
+def _carries(element: ET.Element | None) -> bool:
+    """Whether an element holds any text at all, anywhere beneath it."""
+    return element is not None and any(text.strip() for text in element.itertext())
+
+
 def _has_offset(value: str) -> bool:
     _, _, time_part = value.partition("T")
     return time_part.endswith(("Z", "z")) or "+" in time_part or "-" in time_part
@@ -470,6 +506,17 @@ class _Converter:
         # a dive links resolves — it is not a dangling reference — and is reported as a
         # model this reader cannot name.
         self.deco_models: dict[str, ET.Element] = {}
+        # A `<divebase>`'s or a `<shop>`'s `@id` to its center, for a dive's link to one —
+        # recorded whether or not this file carries the row, like the tables above. An inline
+        # shape's id is not here: nothing in UDDF links one.
+        self.center_uuids: dict[str, str] = {}
+        # The ids of a base or a shop that was not read, so a link to one says why it went.
+        self.unread_centers: set[str] = set()
+        # The centers this file carries, in the order `docs/uddf-mapping.md` fixes; and every
+        # center read, carried or not, by its trimmed case-folded name, which is all an
+        # inline shape has to be folded by.
+        self.centers: list[dict[str, Any]] = []
+        self.center_names: dict[str, dict[str, Any]] = {}
         self.local_clock_with_z = self.generator_writes_a_local_z()
         self.percent_gradient_factors = self.generator_writes_percent_gradient_factors()
         self.reported_gradient_scale = False
@@ -506,7 +553,7 @@ class _Converter:
 
     # -- identity ----------------------------------------------------------------
 
-    def uuid_for(self, kind: str, source_id: str | None, where: str, index: int) -> tuple[str | None, bool]:
+    def uuid_for(self, kind: str, source_id: str | None, where: str, index: int | str) -> tuple[str | None, bool]:
         """A record's stable UUID, and whether this file is the one that carries it."""
         return self.identities.for_record(kind, source_id, where, index)
 
@@ -541,12 +588,15 @@ class _Converter:
             return None
         return value
 
-    def phone(self, contact: ET.Element | None, where: str) -> str | None:
+    def phone(
+        self, contact: ET.Element | None, where: str, *, section: str = "§6.1", whose: str = "the owner"
+    ) -> str | None:
         """The first `<phone>`, else the first `<mobilephone>`, reporting every other one.
 
-        §6.1 carries one number the way it carries one address, and `contactType` holds any
-        number of each. A first number past §6.1's bound is dropped rather than cut, for the
-        reason `MAX_PHONE` gives, and the next is not read in its place.
+        §6.1 and §6.18 each carry one number the way they carry one address, and
+        `contactType` holds any number of each. A first number past the bound is dropped
+        rather than cut, for the reason `MAX_PHONE` gives, and the next is not read in its
+        place.
         """
         recorded = [
             (tag, value)
@@ -558,7 +608,9 @@ class _Converter:
             return None
         for tag, value in recorded[1:]:
             self.note(
-                where, f"§6.1 carries one phone, the first the owner records; <{tag}> {value!r} is not read", "dropped"
+                where,
+                f"{section} carries one phone, the first {whose} records; <{tag}> {value!r} is not read",
+                "dropped",
             )
         _, value = recorded[0]
         if len(value) > MAX_PHONE:
@@ -620,21 +672,25 @@ class _Converter:
             if source_id is not None:
                 self.source_ids.add(source_id)
 
-        # Order matters: the dives resolve links into the tables the five calls above it
-        # fill, and the diver is last only so its identity yields to a real record's on
+        # Order matters: the dives resolve links into the tables the calls above them fill,
+        # the centers come before the trip parts and the kit list whose inline shapes fold
+        # into them, and the diver is last only so its identity yields to a real record's on
         # the vanishingly rare id collision.
         self.read_mixes()
         self.read_deco_models()
         sites = self.read_sites()
+        self.read_centers()
         trips = self.read_trips()
         gear = self.read_gear()
         dives = self.read_dives()
         diver = self.read_diver()
+        centers = [{member: row[member] for member in center_members() if member in row} for row in self.centers]
 
         document: dict[str, Any] = header(self.exported_at)
         if diver:
             document["diver"] = diver
-        for member, rows in (("dives", dives), ("trips", trips), ("sites", sites), ("gear", gear)):
+        collections = (("dives", dives), ("trips", trips), ("sites", sites), ("gear", gear), ("centers", centers))
+        for member, rows in collections:
             if rows:
                 document[member] = rows
         document["extensions"] = {PRODUCER_KEY: self.provenance()}
@@ -809,6 +865,251 @@ class _Converter:
             sites.append(site)
         return sites
 
+    # -- centers -------------------------------------------------------------------
+
+    def read_centers(self) -> None:
+        """`<divesite><divebase>` and `<business><shop>` as §6.18 centers, the bases first.
+
+        Each carries the role its slot implies, and a trip part's or a purchase's inline
+        shape folds into one of these by name later (`read_inline`), which is why they are
+        read before either.
+
+        **A name-only base nothing points at is skipped**, and reported: Subsurface writes
+        one into every export for want of the concept, and read as a center it would give
+        every such logbook a dive center nobody dived with. The test is on shape rather than
+        on that string — `docs/uddf-mapping.md` *Centers* has it — and a shop is never
+        skipped, nothing writing one as a placeholder.
+        """
+        linked, named = self.center_anchors()
+        for index, element in enumerate(_kids(_kid(self.root, "divesite"), "divebase")):
+            where = f"divebase/{index}"
+            name = _text_of(element, "name")
+            source_id = _attr(element, "id")
+            carries = any(_carries(_kid(element, tag)) for tag in ("address", "contact", "notes"))
+            if name and not carries and source_id not in linked and name.casefold() not in named:
+                self.note(
+                    where,
+                    f"the <divebase> {name!r} records nothing but its name and nothing in the file links it, "
+                    "which is the placeholder a writer emits for want of a dive base; it is not read as a "
+                    "center (spec §6.18)",
+                    "dropped",
+                )
+                if source_id:
+                    self.unread_centers.add(source_id)
+                continue
+            self.read_center(element, "dive_center", where)
+        for index, element in enumerate(_kids(_kid(self.root, "business"), "shop")):
+            self.read_center(element, "shop", f"shop/{index}")
+
+    def center_anchors(self) -> tuple[set[str], set[str]]:
+        """What keeps a name-only `<divebase>` from being a placeholder.
+
+        The ids every dive and every `<trippart>` links, and the case-folded names every
+        part's `<accomodation>` and `<operator>` carries — the second because an inline
+        shape folds into the base it names, which is how a writer's copy of a center finds
+        the base it came from.
+        """
+        linked: set[str] = set()
+        for dive in self.dive_elements():
+            for link in _kids(_kid(dive, "informationbeforedive"), "link"):
+                ref = _attr(link, "ref")
+                if ref:
+                    linked.add(ref)
+        named: set[str] = set()
+        for trip in _kids(_kid(self.root, "divetrip"), "trip"):
+            for part in _kids(trip, "trippart"):
+                for link in _kids(part, "link"):
+                    ref = _attr(link, "ref")
+                    if ref:
+                        linked.add(ref)
+                for tag in _STAYS:
+                    name = _text_of(_kid(part, tag), "name")
+                    if name:
+                        named.add(name.casefold())
+        return linked, named
+
+    def read_center(self, element: ET.Element, role: str, where: str) -> None:
+        """One `<divebase>` or `<shop>` as a center, which a dive may link by its `@id`."""
+        source_id = _attr(element, "id")
+        name = _text_of(element, "name")
+        if not name:
+            self.note(
+                where,
+                f"the <{local_name(element)}> has no name, which the format requires of a center; it is "
+                "dropped, and every link to it with it (spec §6.18)",
+                "dropped",
+            )
+            if source_id:
+                self.unread_centers.add(source_id)
+            return
+        # A path rather than an index for a shape with no id: centers come from four places,
+        # and one count would give two of them one identity.
+        claimed, carried = self.uuid_for("center", source_id, where, where)
+        if claimed is None:
+            if source_id:
+                self.unread_centers.add(source_id)
+            return
+        if source_id:
+            # Recorded before the row is written, and whether or not it is: a repeat of
+            # another archive member's record is not carried again, and this file's
+            # references to it still have to resolve to the one that is.
+            self.center_uuids[source_id] = claimed
+        self.add_center(claimed, carried, name, role, self.center_contents(element, where), where)
+
+    def read_inline(self, element: ET.Element, role: str, where: str, position: int | str) -> str | None:
+        """A shape held inside another element — a part's stay, a purchase's shop — as a center.
+
+        **Folded by name into a center already read**, trimmed and case-insensitively, where
+        one has it: the shape adds its slot's role to that center, fills the members it
+        lacks, and reports each one it states differently, the center's own standing. Two
+        parts at one hotel are two elements and one center, and a resort's `<divebase>` and
+        the `<accomodation>` a part slept at are one center with both roles. A shape that
+        matches nothing is a center of its own, under its `@id` — or `position` where it has
+        none, which is how an `<operator>` is identified (`operatorType` carries no id).
+
+        Returns the center's uuid, or nothing where the shape names no center.
+        """
+        tag = local_name(element)
+        name = _text_of(element, "name")
+        if not name:
+            self.note(
+                where,
+                f"the <{tag}> has no name, which the format requires of a center; it is dropped (spec §6.18)",
+                "dropped",
+            )
+            return None
+        contents = self.center_contents(element, where)
+        standing = self.center_names.get(name.casefold())
+        if standing is not None:
+            standing["roles"] = roles_in_order([*standing["roles"], role])
+            for member, value in contents.items():
+                if member not in standing:
+                    standing[member] = value
+                elif standing[member] != value:
+                    self.note(
+                        where,
+                        f"the <{tag}> folds into the center {standing['name']!r} by name, and states its {member} "
+                        f"as {value!r} where the center has {standing[member]!r}; the center's stands",
+                        "dropped",
+                    )
+            return str(standing["uuid"])
+        claimed, carried = self.uuid_for("center", _attr(element, "id"), where, position)
+        if claimed is None:
+            return None
+        self.add_center(claimed, carried, name, role, contents, where)
+        return claimed
+
+    def add_center(
+        self, uuid: str, carried: bool, name: str, role: str, contents: dict[str, Any], where: str
+    ) -> None:
+        center: dict[str, Any] = {
+            "uuid": uuid,
+            "name": self.capped(name, MAX_NAME, where, "the center's name"),
+            "roles": [role],
+            **contents,
+        }
+        # The first of two centers of one name is the one a later shape folds into — a file
+        # gives a reader nothing else to tell them apart by.
+        self.center_names.setdefault(name.casefold(), center)
+        if carried:
+            self.centers.append(center)
+
+    def center_contents(self, element: ET.Element, where: str) -> dict[str, Any]:
+        """What a center's shape says beyond its name, reporting what §6.18 does not carry.
+
+        The same four children on every shape that reads into a center — `<address>`,
+        `<contact>`, `<notes>` and the name — and every other child is reported by its tag,
+        derived from the element rather than listed, so a price, a rating or a hotel's
+        category is named in the report whichever shape carried it.
+        """
+        contact = _kid(element, "contact")
+        contents = {
+            "phone": self.phone(contact, where, section="§6.18", whose="the center"),
+            "email": self.center_email(contact, where),
+            "website": self.website(contact, where),
+            "address": self.address(_kid(element, "address"), where),
+            "notes": self.notes_text(element),
+        }
+        for child in element:
+            tag = local_name(child)
+            if tag in _CENTER_READ:
+                continue
+            said = f"<{tag}> {_text(child)!r}" if tag == "aliasname" and _text(child) else f"<{tag}>"
+            self.note(where, f"§6.18 has no member for {said}; it is not read", "dropped")
+        for child in contact if contact is not None else ():
+            tag = local_name(child)
+            if tag not in _CONTACT_READ and _carries(child):
+                self.note(where, f"§6.18 has no member for <contact><{tag}>; it is not read", "dropped")
+        return {member: value for member, value in contents.items() if value}
+
+    def center_email(self, contact: ET.Element | None, where: str) -> str | None:
+        """The first `<email>`, on the owner's terms (`email`), reporting every other one."""
+        recorded = [value for value in (_text(kid) for kid in _kids(contact, "email")) if value]
+        for value in recorded[1:]:
+            self.note(
+                where, f"§6.18 carries one email, the first the center records; {value!r} is not read", "dropped"
+            )
+        return self.email(recorded[0], where) if recorded else None
+
+    def website(self, contact: ET.Element | None, where: str) -> str | None:
+        """The first `<homepage>`, where it is an absolute URL, reporting every other one.
+
+        Checked rather than merely capped: `xs:anyURI` admits a bare host, which §6.18's
+        `website` does not mean and nothing can open, and a scheme prepended here would be
+        one the file never stated. Past §6.18's bound it is dropped, not cut, for the reason
+        `MAX_PHONE` gives.
+        """
+        recorded = [value for value in (_text(kid) for kid in _kids(contact, "homepage")) if value]
+        if not recorded:
+            return None
+        for value in recorded[1:]:
+            self.note(
+                where, f"§6.18 carries one website, the first the center records; {value!r} is not read", "dropped"
+            )
+        value = recorded[0]
+        if not _ABSOLUTE_URI.match(value):
+            self.note(
+                where,
+                f"the recorded homepage {value!r} is not an absolute URL with its scheme; read as no website "
+                "recorded rather than given a scheme the file never stated",
+                "dropped",
+            )
+            return None
+        if len(value) > MAX_WEBSITE:
+            self.note(
+                where,
+                f"the recorded homepage is {len(value)} characters and the format allows {MAX_WEBSITE}; an address "
+                "cut short is a wrong one, so it is dropped",
+                "dropped",
+            )
+            return None
+        return value
+
+    def address(self, element: ET.Element | None, where: str) -> dict[str, str] | None:
+        """An `<address>` as §6.19's Address, or nothing where it names no country.
+
+        `<country>` is the anchor — `addressType` requires it and so does §6.19 — and the
+        rest of an address without one has nowhere valid to go. It is dropped and reported
+        rather than failing the whole conversion at the output validation, real files being
+        routinely schema-invalid.
+        """
+        if not _carries(element):
+            return None
+        if not _text_of(element, "country"):
+            self.note(
+                where,
+                "the address records no <country>, which §6.19 requires as the anchor every other part is "
+                "read inside; the address is dropped",
+                "dropped",
+            )
+            return None
+        address: dict[str, str] = {}
+        for tag, member, cap in _ADDRESS:
+            value = _text_of(element, tag)
+            if value:
+                address[member] = self.capped(value, cap, where, f"the address's {member}")
+        return address
+
     # -- trips -------------------------------------------------------------------
 
     def read_trips(self) -> list[dict[str, Any]]:
@@ -820,14 +1121,18 @@ class _Converter:
         parts carry none has no span in either and is still a trip.
         """
         trips: list[dict[str, Any]] = []
+        # Every `<trippart>` in the file before this trip's, counted whether or not its trip
+        # is read: an `<operator>`'s identity is its part's position in the whole file.
+        first_part = 0
         for index, element in enumerate(_kids(_kid(self.root, "divetrip"), "trip")):
             where = f"trip/{index}"
             name = _text_of(element, "name")
+            first, first_part = first_part, first_part + len(_kids(element, "trippart"))
             if not name:
                 self.note(where, "the trip has no name, which the format requires of one; it is dropped (spec §6.8)", "dropped")
                 continue
 
-            parts, notes = self.read_trip_parts(element, where)
+            parts, notes = self.read_trip_parts(element, where, first)
             claimed, carried = self.uuid_for("trip", _attr(element, "id"), where, index)
             if claimed is None:
                 continue
@@ -849,20 +1154,26 @@ class _Converter:
             trips.append(trip)
         return trips
 
-    def read_trip_parts(self, element: ET.Element, where: str) -> tuple[list[dict[str, Any]], str | None]:
+    def read_trip_parts(
+        self, element: ET.Element, where: str, first: int
+    ) -> tuple[list[dict[str, Any]], str | None]:
         """Every `<trippart>` as a part, in file order, and the trip's note.
 
-        A part with neither a name nor a date is **no part at all**, which is what lets a
-        trip with no parts survive a round trip: `tripType` requires at least one
-        `<trippart>`, so a writer with nothing to put in one emits exactly this element
+        A part with neither a name, a date nor a place to stay is **no part at all**, which
+        is what lets a trip with no parts survive a round trip: `tripType` requires at least
+        one `<trippart>`, so a writer with nothing to put in one emits exactly this element
         (`docs/uddf-writing.md`), and reading it back as nothing is what closes the circle.
         Its note is still collected — a note belongs to the trip (§6.9a gives a part none).
+
+        `first` is this trip's first part's position among every `<trippart>` in the file.
         """
         parts: list[dict[str, Any]] = []
         paragraphs: list[str] = []
 
         for part_index, part in enumerate(_kids(element, "trippart")):
             part_where = f"{where}/trippart/{part_index}"
+            stay = self.read_stay(part, part_where, first + part_index)
+            self.report_part_residue(part, part_where)
             date_of_trip = _kid(part, "dateoftrip")
             dates: dict[str, str] = {}
             for attribute, member in (("startdate", "starts_on"), ("enddate", "ends_on")):
@@ -895,13 +1206,14 @@ class _Converter:
                 if position:
                     location["position"] = position
             elif geography is not None:
-                # What the finding has to say is what survives, and that turns on the dates
-                # — a dateless nameless part is nothing at all once the place goes, which is
-                # the same split `uddf_write.nameless_part` makes from the other side.
+                # What the finding has to say is what survives, and that turns on the rest of
+                # the part — a nameless part with no dates and nowhere to stay is nothing at
+                # all once the place goes, which is the same split `uddf_write.nameless_part`
+                # makes from the other side.
                 kept = (
-                    "the part keeps its dates"
-                    if starts is not None or ends is not None
-                    else "the part records no dates either, so nothing of it is carried"
+                    "the rest of the part is kept"
+                    if starts is not None or ends is not None or stay is not None
+                    else "the part records no dates and no stay either, so nothing of it is carried"
                 )
                 self.note(
                     part_where,
@@ -921,11 +1233,67 @@ class _Converter:
                 record["ends_on"] = ends
             if location is not None:
                 record["location"] = location
+            if stay is not None:
+                record["accommodation_uuid"] = stay
             if record:
                 parts.append(record)
 
         joined = "\n\n".join(paragraphs) if paragraphs else None
         return parts, joined
+
+    def read_stay(self, part: ET.Element, where: str, position: int) -> str | None:
+        """Where the diver slept during one part: its `<accomodation>`, or its `<operator>`.
+
+        `trippartType` holds one or the other, and the second comes with a `<vessel>`: UDDF's
+        liveaboard, the boat being the bed. The operator is the center, with
+        `roles: ["liveaboard"]`, and the vessel — a boat, which §6.18 does not model — is
+        reported. An `<operator>` carries no id, so its identity is `position`, its part's
+        place among every `<trippart>` in the file.
+        """
+        vessel = _kid(part, "vessel")
+        if vessel is not None:
+            named = _text_of(vessel, "name")
+            self.note(
+                f"{where}/vessel",
+                f"the <vessel>{f' {named!r}' if named else ''} is a boat, which §6.18 does not model; it and "
+                "everything it records about the boat are not read, the operator being the center",
+                "dropped",
+            )
+        for tag, role in _STAYS.items():
+            shape = _kid(part, tag)
+            if shape is not None:
+                return self.read_inline(shape, role, f"{where}/{tag}", position)
+        return None
+
+    def report_part_residue(self, part: ET.Element, where: str) -> None:
+        """A part's `@type` and its `<link>`s, which §6.9a has no member for.
+
+        The type says whether the diver slept aboard or ashore, which the center a part's
+        `accommodation_uuid` names says for itself, and how the trip was booked, which
+        nothing stores. A link to a base says the diver dived with it during the part, where
+        §6.9a records where the diver stayed — who they dived with is each dive's (§6.2).
+        The base itself is read, the link being what keeps a name-only one from being taken
+        for a placeholder.
+        """
+        stated = _attr(part, "type")
+        if stated is not None:
+            self.note(where, f"§6.9a has no member for the part's type {stated!r}; it is not read", "dropped")
+        for link in _kids(part, "link"):
+            ref = _attr(link, "ref")
+            if ref is None:
+                continue
+            if ref in self.center_uuids:
+                self.note(
+                    where,
+                    f"the part links the center {ref!r}, saying the diver dived with it during the part; §6.9a "
+                    "records where the diver stayed, and whom a dive was with is the dive's, so the link is "
+                    "dropped (spec §6.9a)",
+                    "dropped",
+                )
+            else:
+                self.note(
+                    where, f"the part links {ref!r}, and §6.9a has no member a link fills; it is dropped", "dropped"
+                )
 
     # -- gear --------------------------------------------------------------------
 
@@ -950,6 +1318,10 @@ class _Converter:
                 computer_id = _attr(element, "id")
                 if computer_id:
                     self.computers[computer_id] = element
+            # Before the name test too: where a piece was bought is a center whether or not
+            # the piece is a gear item. `iter`, because a camera's body and lens each carry one.
+            for purchase in (child for child in element.iter() if local_name(child) == "purchase"):
+                self.read_purchase(purchase, f"{where}/purchase")
             name = _text_of(element, "name")
             if not name:
                 self.note(
@@ -993,6 +1365,23 @@ class _Converter:
 
             gear.append(item)
         return gear
+
+    def read_purchase(self, purchase: ET.Element, where: str) -> None:
+        """A `<purchase>`'s own `<shop>` as a center, and the purchase reported.
+
+        The shop folds into a center already read by name, as a part's stay does
+        (`read_inline`); the purchase itself — what the piece cost, when, and where — has no
+        member until §6.12 records one.
+        """
+        shop = _kid(purchase, "shop")
+        if shop is not None:
+            self.read_inline(shop, "shop", f"{where}/shop", f"{where}/shop")
+        self.note(
+            where,
+            "§6.12 has no member for the piece's <purchase>, its price and its date; it is not read"
+            + (", and the shop it names is read as a center" if shop is not None else ""),
+            "dropped",
+        )
 
     # -- gases -------------------------------------------------------------------
 
@@ -1220,7 +1609,22 @@ class _Converter:
         trip_uuid = self.reference(_attr(_kid(before, "tripmembership"), "ref"), self.trip_uuids, where, "trip")
         if trip_uuid:
             dive["trip_uuid"] = trip_uuid
-        site_uuids = self.references([_attr(link, "ref") for link in _kids(before, "link")], self.site_uuids, where, "dive site")
+        # A site first where an id names both, as it did before a link could name a center —
+        # a source id is not unique within a file (the module docstring).
+        links = [_attr(link, "ref") for link in _kids(before, "link")]
+        to_centers = [
+            ref
+            for ref in links
+            if ref is not None
+            and ref not in self.site_uuids
+            and (ref in self.center_uuids or ref in self.unread_centers)
+        ]
+        center_uuid = self.dive_center(to_centers, where)
+        if center_uuid:
+            dive["center_uuid"] = center_uuid
+        site_uuids = self.references(
+            [ref for ref in links if ref not in to_centers], self.site_uuids, where, "dive site"
+        )
         if site_uuids:
             dive["site_uuids"] = site_uuids
         gear_uuids = self.references([_attr(link, "ref") for link in _kids(used, "link")], self.gear_uuids, where, "gear item")
@@ -1410,6 +1814,33 @@ class _Converter:
         self.note(where, f"{source} is {value}, which the format records only when positive; read as not recorded", "absent")
         return None
 
+    def dive_center(self, refs: list[str], where: str) -> str | None:
+        """The center a dive's `<link>`s name — a `<divebase>` or a `<shop>` — or nothing.
+
+        UDDF's prose names buddies and sites as this link's targets, and its XSD lets it name
+        any id, so resolving a base or a shop loses nothing. §6.2 carries one center, so a
+        dive linking two keeps the first and reports the rest; a link to a base or a shop
+        that was not read goes with it, and says so.
+        """
+        found: list[str] = []
+        for ref in refs:
+            if ref not in self.center_uuids:
+                self.note(
+                    where,
+                    f"a link points at the center {ref!r}, which is not read; the reference goes with it",
+                    "dropped",
+                )
+            elif self.center_uuids[ref] not in found:
+                found.append(self.center_uuids[ref])
+        if len(found) > 1:
+            self.note(
+                where,
+                f"the dive links {len(found)} centers and §6.2 carries one; the first is kept and the rest are "
+                "dropped",
+                "dropped",
+            )
+        return found[0] if found else None
+
     def reference(self, ref: str | None, table: dict[str, str], where: str, kind: str) -> str | None:
         resolved = self.references([ref], table, where, kind)
         return resolved[0] if resolved else None
@@ -1430,12 +1861,12 @@ class _Converter:
             elif ref not in self.source_ids:
                 self.note(where, f"a link points at {ref!r}, which nothing in the file defines; the reference is dropped", "dropped")
             elif ref not in self.mixes and ref not in self.deco_models:
-                # A `<link>` under `informationbeforedive` addresses a site here, but the
-                # schema lets it address a buddy or a shop too, and one under
-                # `<equipmentused>` addresses a piece of kit. A reference to a record this
-                # converter carries nowhere is worth a note; a gas reference is not, and
-                # neither is a decompression model — that one resolves in `read_deco_model`
-                # and was reported there if it went nowhere.
+                # A `<link>` under `informationbeforedive` addresses a site here — a center's
+                # was taken off before (`dive_center`) — but the schema lets it address a
+                # buddy too, and one under `<equipmentused>` addresses a piece of kit. A
+                # reference to a record this converter carries nowhere is worth a note; a gas
+                # reference is not, and neither is a decompression model — that one resolves
+                # in `read_deco_model` and was reported there if it went nowhere.
                 self.note(where, f"a link points at {ref!r}, which is not a {kind} this converter carries; the reference is dropped", "dropped")
         return resolved
 
