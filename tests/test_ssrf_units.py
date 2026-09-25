@@ -107,6 +107,21 @@ def test_a_samples_clock_is_the_same_seconds_on_a_millisecond_axis(written: str,
     assert profile(f"<sample time='{written} min' depth='1.0 m'/>")["depth"]["times"] == [milliseconds]
 
 
+def test_a_clock_too_large_for_the_axis_is_not_a_time() -> None:
+    """Minutes that clear `decimal_of`'s bound still take two factors to reach the axis —
+    sixty, then a thousand — so the product is bounded too, and a sample the axis could not
+    carry as a double is dropped rather than written as a number no reader can read back."""
+    minutes = "9" * 305
+    samples = f"<sample time='0:10 min' depth='1.0 m'/><sample time='{minutes}:00 min' depth='2.0 m'/>"
+    conversion = convert(one_ssrf_computer(samples))
+    depth = profile_of(conversion.document["dives"][0])["depth"]
+    assert depth == {"times": [10_000], "values": [100]}
+    assert any(
+        "<sample time> is recorded in min with something that is not a number" in note.message
+        for note in conversion.notes
+    )
+
+
 @pytest.mark.parametrize("written", ["66", "66:5", "1:60", "66:50:00", "1.5", "66m50s"])
 def test_something_that_is_not_a_clock_is_refused_rather_than_read_as_minutes(written: str) -> None:
     """A bare `66` is the tempting one, and reading it would be a factor-of-60 guess."""

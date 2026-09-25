@@ -59,6 +59,7 @@ from typing import Any
 
 from .converter import (
     CENTIMETRES_PER_METRE,
+    MAX_MAGNITUDE,
     MAX_NAME,
     PRODUCER_KEY,
     TENTHS_PER_UNIT,
@@ -123,14 +124,21 @@ _TIME = re.compile(r"\A(?P<hour>\d{2}):(?P<minute>\d{2})(?::(?P<second>\d{2}))?(
 
 
 def _clock(raw: str) -> Decimal | None:
-    """`'66:50'` as 4010 seconds, or nothing for text that is not a `M:SS` time."""
+    """`'66:50'` as 4010 seconds, or nothing for text that is not a `M:SS` time.
+
+    The product is held to `MAX_MAGNITUDE` as well as the minutes, because a sample time
+    takes two factors past its text — sixty here and a thousand on the axis — where the
+    bound covers one: minutes that clear it can still reach the axis as a number no double
+    holds, and a time that cannot be carried is text that is not a time.
+    """
     match = _CLOCK.match(raw)
     if match is None:
         return None
     minutes = decimal_of(match.group(1))
     if minutes is None:
         return None
-    return minutes * SECONDS_PER_MINUTE + Decimal(match.group(2))
+    seconds = minutes * SECONDS_PER_MINUTE + Decimal(match.group(2))
+    return seconds if seconds <= MAX_MAGNITUDE else None
 
 
 def _calendar_date(text: str) -> bool:

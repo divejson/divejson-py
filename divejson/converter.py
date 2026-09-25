@@ -402,8 +402,9 @@ def channel_floor(member: str) -> int | None:
 
     A channel is a `$ref` to a series definition rather than a member carrying constraints
     of its own, so `recorded` is not the question to ask about one — every call site it has
-    names a record's own member, and `_floor` finds nothing under a reference. This resolves the reference instead: the six decompression readouts share a
-    definition whose `values` floor at zero, because no-decompression time, time to surface,
+    names a record's own member, and `_floor` finds nothing under a reference. This
+    resolves the reference instead: the six decompression readouts share a definition whose
+    `values` floor at zero, because no-decompression time, time to surface,
     ppO₂, CNS and a gradient factor have no negative reading and a source that writes one is
     spelling absence in the only space it had. Depth, ceiling and temperature share the
     signed definition and floor at nothing.
@@ -479,7 +480,8 @@ TENTHS_PER_UNIT = Decimal(10)
 # Divided by 1000, the largest factor any adapter applies to a number it has read — UDDF's
 # cubic metres to litres, every source's seconds to the profile axis's milliseconds, and
 # above any channel scale — so that checking the value as the text is read also covers
-# every value derived from it.
+# every value derived from it. A reader that multiplies before that factor, as `.ssrf`'s
+# `M:SS` does minutes into seconds, checks its own product against this bound too.
 MAX_MAGNITUDE = Decimal(sys.float_info.max) / 1000
 
 # §5.1's grain for elapsed time on a profile axis — a Series' `times`, a profile's
@@ -556,8 +558,8 @@ def in_seconds(milliseconds: int) -> str:
     The report speaks seconds because that is what every source format and every dive
     computer's display does; the document's milliseconds are an encoding, and a note saying
     a waypoint is "at 1200020" would send a diver looking for a number their file does not
-    contain. A whole second is written as the integer it is, so a report on a file that
-    samples whole seconds reads exactly as it did before the axis moved.
+    contain. A whole second is written as the integer it is — `30`, never `30.0` — so a
+    report on a file that samples whole seconds shows no fraction the file does not.
     """
     return format((Decimal(milliseconds) / MILLISECONDS_PER_SECOND).normalize(), "f")
 
