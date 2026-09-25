@@ -4,7 +4,7 @@
   "exported_at": "2026-09-07T00:00:00+00:00",
   "generator": {
     "name": "divejson convert",
-    "version": "0.3.0"
+    "version": "0.12.0"
   },
   "dives": [
     {
@@ -13,10 +13,6 @@
       "duration": 1800,
       "max_depth": 20.5,
       "bottom_temperature": 24.0,
-      "cns_start": 0.0,
-      "cns_end": 12.0,
-      "otu_start": 0.0,
-      "otu_end": 30.0,
       "cylinders": [
         {
           "volume": 12.0,
@@ -30,7 +26,7 @@
           "end_pressure": 120.0,
           "oxygen": 50.0,
           "helium": 0.0,
-          "po2_limit": 1.6,
+          "ppo2_limit": 1.6,
           "gas_number": 1
         }
       ],
@@ -47,12 +43,16 @@
           "deco_model": {
             "conservatism": 0
           },
+          "cns_start": 0.0,
+          "cns_end": 12.0,
+          "otu_start": 0.0,
+          "otu_end": 30.0,
           "profile": {
-            "duration": 21,
+            "duration": 21000,
             "depth": {
               "times": [
-                1,
-                21
+                1000,
+                21000
               ],
               "values": [
                 186,
@@ -61,9 +61,9 @@
             },
             "temperature": {
               "times": [
-                1,
-                11,
-                21
+                1000,
+                11000,
+                21000
               ],
               "values": [
                 245,
@@ -73,7 +73,7 @@
             },
             "events": [
               {
-                "time": 1200,
+                "time": 1200000,
                 "type": "gas_switch",
                 "gas_number": 1
               }

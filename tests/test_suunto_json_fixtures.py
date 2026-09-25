@@ -171,27 +171,25 @@ def test_the_purged_regulator_is_not_the_dive_s_end_pressure() -> None:
 
 
 def test_the_ocean_profile_takes_each_channel_only_where_it_was_recorded() -> None:
-    """No channel is padded to another's length, and the entries at one second merge.
+    """No channel is padded to another's length, and each entry keeps its own instant.
 
-    This exporter appends its sensor streams as separate entries, so a depth and a
-    temperature recorded at the same instant arrive as two objects. They are readings of two
-    channels rather than two readings of one, so they are merged onto the second rather than
-    one of them being dropped — which is what keeps the depth channel whole.
+    This exporter appends its sensor streams as separate entries, and stamps each to the
+    millisecond: the first depth is 160 ms after the header's own instant, and sits there.
     """
     profile = profile_of(_dive(OCEAN))
-    assert profile["duration"] == 4300
-    assert profile["depth"]["times"] == [0, 1200, 4000]
+    assert profile["duration"] == 4_299_990
+    assert profile["depth"]["times"] == [160, 1_200_000, 4_000_020]
     assert profile["depth"]["values"] == [145, 4464, 132]
     # One temperature and one non-zero ceiling among them, on their own axes.
-    assert profile["temperature"] == {"times": [60], "values": [224]}
-    assert profile["ceiling"] == {"times": [1200], "values": [300]}
+    assert profile["temperature"] == {"times": [60_000], "values": [224]}
+    assert profile["ceiling"] == {"times": [1_200_000], "values": [300]}
 
 
 def test_a_ceiling_of_zero_is_not_a_ceiling() -> None:
     """This shape writes `"Ceiling": 0` on every no-deco sample, twice in this file."""
     raw = json.loads(OCEAN.read_text(encoding="utf-8"))
     assert [sample.get("Ceiling") for sample in raw["DeviceLog"]["Samples"]].count(0) == 2
-    assert profile_of(_dive(OCEAN))["ceiling"]["times"] == [1200]
+    assert profile_of(_dive(OCEAN))["ceiling"]["times"] == [1_200_000]
 
 
 def test_the_ocean_events_name_the_cylinder_they_switched_to() -> None:
@@ -203,10 +201,10 @@ def test_the_ocean_events_name_the_cylinder_they_switched_to() -> None:
     """
     events = profile_of(_dive(OCEAN))["events"]
     assert events == [
-        {"time": 0, "type": "gas_switch", "gas_number": 0},
-        {"time": 1230, "type": "ceiling_violation", "label": "Ceiling Broken"},
-        {"time": 2075, "type": "gas_switch", "gas_number": 1},
-        {"time": 3840, "type": "safety_stop"},
+        {"time": 20, "type": "gas_switch", "gas_number": 0},
+        {"time": 1_230_000, "type": "ceiling_violation", "label": "Ceiling Broken"},
+        {"time": 2_075_190, "type": "gas_switch", "gas_number": 1},
+        {"time": 3_840_000, "type": "safety_stop"},
     ]
 
 
@@ -240,7 +238,7 @@ def test_the_d5_cylinders_come_from_the_header_s_own_gas_block() -> None:
             "end_pressure": 122.4375,
             "oxygen": 21.0,
             "helium": 0.0,
-            "po2_limit": 1.4,
+            "ppo2_limit": 1.4,
             "role": "bottom",
             "gas_number": 0,
         },
@@ -248,7 +246,7 @@ def test_the_d5_cylinders_come_from_the_header_s_own_gas_block() -> None:
             "volume": 11.0,
             "oxygen": 49.0,
             "helium": 0.0,
-            "po2_limit": 1.6,
+            "ppo2_limit": 1.6,
             "role": "bottom",
             "gas_number": 1,
         },
@@ -282,11 +280,11 @@ def test_the_d5_oxygen_clock_is_a_fraction_here_and_percent_in_the_document() ->
     the precision the file states, this export writing a full float32 where the same
     vendor's desktop export rounds to a whole number.
     """
-    dive = _dive(D5)
-    assert (dive["cns_start"], dive["cns_end"]) == (7.2, 15.3)
-    assert (dive["otu_start"], dive["otu_end"]) == (23.09649658203125, 45.12766647338867)
-    # 104 900 Pa, in a member §6.2 measures in bar and bounds at 0.4 to 1.2.
-    assert dive["surface_pressure"] == 1.049
+    recording = _dive(D5)["recordings"][0]
+    assert (recording["cns_start"], recording["cns_end"]) == (7.2, 15.3)
+    assert (recording["otu_start"], recording["otu_end"]) == (23.09649658203125, 45.12766647338867)
+    # 104 900 Pa, in a member §6.4a measures in bar and bounds at 0.4 to 1.2.
+    assert recording["surface_pressure"] == 1.049
 
 
 # -- the third shape, and what is not a dive ------------------------------------------

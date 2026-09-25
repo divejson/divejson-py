@@ -4,7 +4,7 @@
   "exported_at": "2026-09-05T00:00:00+00:00",
   "generator": {
     "name": "divejson convert",
-    "version": "0.4.0"
+    "version": "0.12.0"
   },
   "dives": [
     {
@@ -35,12 +35,12 @@
             "firmware": "2.51.28"
           },
           "profile": {
-            "duration": 3051,
+            "duration": 3051000,
             "depth": {
               "times": [
                 0,
-                600,
-                3051
+                600000,
+                3051000
               ],
               "values": [
                 0,
@@ -51,7 +51,7 @@
             "temperature": {
               "times": [
                 0,
-                3051
+                3051000
               ],
               "values": [
                 298,
@@ -66,12 +66,12 @@
           },
           "started_at": "2026-09-08T15:18:10",
           "profile": {
-            "duration": 3019,
+            "duration": 3019000,
             "depth": {
               "times": [
                 0,
-                568,
-                3019
+                568000,
+                3019000
               ],
               "values": [
                 0,

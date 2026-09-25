@@ -4,7 +4,7 @@
   "exported_at": "2026-09-07T00:00:00+00:00",
   "generator": {
     "name": "divejson convert",
-    "version": "0.3.0"
+    "version": "0.12.0"
   },
   "dives": [
     {
@@ -12,17 +12,12 @@
       "started_at": "2025-05-01T09:58:12.5",
       "notes": "Shore entry; the pod was paired to the computer but the app never wrote which tank it was on.",
       "bottom_temperature": 22.0,
-      "cns_start": 0.0,
-      "cns_end": 3.0,
-      "otu_start": 0.0,
-      "otu_end": 8.0,
-      "surface_pressure": 1.013,
       "cylinders": [
         {
           "volume": 12.0,
           "oxygen": 21.0,
           "helium": 0.0,
-          "po2_limit": 1.4,
+          "ppo2_limit": 1.4,
           "gas_number": 0
         },
         {
@@ -41,14 +36,19 @@
           "deco_model": {
             "conservatism": 0
           },
+          "surface_pressure": 1.013,
+          "cns_start": 0.0,
+          "cns_end": 3.0,
+          "otu_start": 0.0,
+          "otu_end": 8.0,
           "profile": {
-            "duration": 40,
+            "duration": 40000,
             "depth": {
               "times": [
-                10,
-                20,
-                30,
-                40
+                10000,
+                20000,
+                30000,
+                40000
               ],
               "values": [
                 142,
@@ -59,7 +59,7 @@
             },
             "ceiling": {
               "times": [
-                30
+                30000
               ],
               "values": [
                 450
@@ -67,10 +67,10 @@
             },
             "temperature": {
               "times": [
-                10,
-                20,
-                30,
-                40
+                10000,
+                20000,
+                30000,
+                40000
               ],
               "values": [
                 224,
@@ -82,9 +82,9 @@
             "pressures": [
               {
                 "times": [
-                  10,
-                  20,
-                  40
+                  10000,
+                  20000,
+                  40000
                 ],
                 "values": [
                   1980,

@@ -7,7 +7,9 @@ invalid-value sentinels for the channels a device did not carry; the Suunto app'
 writes an array of objects with their own timestamps; Suunto's DM5 XML writes a
 `<Dive.Sample>` carrying every channel, `i:nil` where the sensor had nothing. What §6.5
 wants out of all five is the same: channels sampled on their own axes, with strictly
-increasing integer times.
+increasing integer times in milliseconds (§5.1). Every source states its times in seconds,
+whole or fractional, and an adapter hands this module `converter.milliseconds` of them, so
+a fraction the source states keeps its place on the axis.
 
 The rules that survive that translation are the ones in here, and no adapter re-derives
 them:
@@ -17,8 +19,8 @@ them:
   order.
 * **A sample with no time has no place on the axis**, and is dropped and reported. Nothing
   else can put a reading anywhere.
-* **Two samples on one second keep the first and report the second**, because the times
-  are integers and strictly increasing while a source's are usually neither.
+* **Two samples on one millisecond keep the first and report the second**, because the
+  times are integers and strictly increasing while a source's are usually neither.
 * **The samples set the time axis and each channel takes only the samples that carried a
   reading for it.** No channel is padded to another's length: a Subsurface dive keeps 431
   depths beside 29 temperatures rather than inventing 402 readings.
@@ -44,13 +46,13 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from .converter import Reporter, channel_floor, profile_members
+from .converter import Reporter, channel_floor, in_seconds, profile_members
 
 __all__ = ["Channel", "SampleAxis"]
 
 
 class Channel:
-    """One sampled quantity: the seconds it has readings at, and the readings.
+    """One sampled quantity: the milliseconds it has readings at, and the readings.
 
     Values are integers in the units §6.5 fixes for each channel — centimetres of depth,
     tenths of a degree, tenths of a bar, hundredths of a bar of ppO₂ — so the scaling is the
@@ -73,15 +75,16 @@ class Channel:
         self.refused = 0
         self._floor = channel_floor(name)
 
-    def record(self, second: int, value: int) -> bool:
-        """Take one reading, unless the floor refuses it or the channel has one already.
+    def record(self, at: int, value: int) -> bool:
+        """Take one reading at a millisecond, unless the floor refuses it or one is there.
 
         Two refusals and one return value, reported in two different places on purpose.
         **A value below the channel's floor is refused here**, because that floor is §6.5's
         and the sentence is the same in every format; the count is reported once, by
-        `SampleAxis.profile`. A repeat on one second is two readings of one channel inside
-        one sample — two tank pressures resolving to one cylinder — and only the caller
-        knows which reading it was, so that one returns silently for the caller to report.
+        `SampleAxis.profile`. A repeat on one millisecond is two readings of one channel
+        inside one sample — two tank pressures resolving to one cylinder — and only the
+        caller knows which reading it was, so that one returns silently for the caller to
+        report.
 
         A caller that reports its own `False` therefore has to be sure which refusal it
         saw; `taken` is how it asks, and the one such caller uses it.
@@ -89,15 +92,15 @@ class Channel:
         if self._floor is not None and value < self._floor:
             self.refused += 1
             return False
-        if self.taken(second):
+        if self.taken(at):
             return False
-        self.times.append(second)
+        self.times.append(at)
         self.values.append(value)
         return True
 
-    def taken(self, second: int) -> bool:
-        """Whether this channel already holds a reading at that second."""
-        return bool(self.times) and self.times[-1] == second
+    def taken(self, at: int) -> bool:
+        """Whether this channel already holds a reading at that millisecond."""
+        return bool(self.times) and self.times[-1] == at
 
     def __len__(self) -> int:
         return len(self.times)
@@ -109,9 +112,10 @@ class Channel:
 class SampleAxis:
     """The time axis of one dive's profile, and the profile built on it.
 
-    An adapter offers every sample it found with the second it was recorded at, then walks
-    `ordered()` to fill its channels, then asks for `profile()`. What is dropped on the way
-    is reported through the `note` this was built with.
+    An adapter offers every sample it found with the millisecond it was recorded at, then
+    walks `ordered()` to fill its channels, then asks for `profile()`. What is dropped on
+    the way is reported through the `note` this was built with, which speaks seconds
+    (`converter.in_seconds`) because the source and the diver both do.
     """
 
     __slots__ = ("_note", "_where", "_noun", "_time_member", "_seen", "_offered", "_ordered")
@@ -136,40 +140,40 @@ class SampleAxis:
         self._offered: list[tuple[int, Any]] = []
         self._ordered: list[tuple[int, Any]] | None = None
 
-    def offer(self, second: int | None, payload: Any) -> None:
-        """One of the source's samples, with the second it recorded — or `None` for none.
+    def offer(self, at: int | None, payload: Any) -> None:
+        """One of the source's samples, with its millisecond on the axis — or `None` for none.
 
         `payload` is whatever the adapter needs to read the sample's channels off again on
         the second pass; this class never looks inside it.
         """
-        at = f"{self._where}/{self._noun}/{self._seen}"
+        where = f"{self._where}/{self._noun}/{self._seen}"
         self._seen += 1
-        if second is None:
+        if at is None:
             self._note(
-                at,
+                where,
                 f"the {self._noun} records no {self._time_member}, so it has no place on "
                 "the profile's time axis; dropped",
                 "dropped",
             )
-        elif second < 0:
-            self._note(at, f"the {self._noun} is at {second} s, before the dive began; dropped", "dropped")
+        elif at < 0:
+            self._note(where, f"the {self._noun} is at {in_seconds(at)} s, before the dive began; dropped", "dropped")
         else:
-            self._offered.append((second, payload))
+            self._offered.append((at, payload))
 
     def ordered(self) -> list[tuple[int, Any]]:
         """The samples that have a place on the axis, in recorded-time order."""
         if self._ordered is None:
             kept: list[tuple[int, Any]] = []
-            for second, payload in sorted(self._offered, key=lambda pair: pair[0]):
-                if kept and kept[-1][0] == second:
+            for at, payload in sorted(self._offered, key=lambda pair: pair[0]):
+                if kept and kept[-1][0] == at:
                     self._note(
                         self._where,
-                        f"two {self._noun}s share the second {second}; the later one is dropped, because "
-                        "the format's sample times are strictly increasing (spec §6.5)",
+                        f"two {self._noun}s are both at {in_seconds(at)} s, to the millisecond; the later one is "
+                        "dropped, because the format's sample times are strictly increasing (spec §6.5)",
                         "dropped",
                     )
                     continue
-                kept.append((second, payload))
+                kept.append((at, payload))
             self._ordered = kept
         return self._ordered
 

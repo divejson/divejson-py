@@ -134,6 +134,7 @@ value.
 | sample temperature | `sint8` whole degrees Celsius | tenths of a degree on a §6.5 channel |
 | tank pressure | `uint16` bar scaled by 100 | bar; tenths of a bar on a §6.5 channel |
 | elapsed and timer time | `uint32` seconds scaled by 1000 | whole seconds, halves away from zero |
+| a sample's place on the axis | `uint32` whole seconds, a `record`'s `timestamp` | milliseconds on a §6.5 axis, × 1000 |
 | CNS | `uint8` percent | percent |
 | OTU | `uint16` "OTUs" | the same number |
 | oxygen, helium | `uint8` whole percent | whole percent |
@@ -240,10 +241,10 @@ FIT has no field for what a device calls itself, so §6.4b's `name` has no sourc
 | `session.total_elapsed_time` (7), else `total_timer_time` (8), else `dive_summary.bottom_time` (11) **untested** | | `duration` |
 | `session.max_depth` (141), else `dive_summary.max_depth` (3) **untested**, else the depth samples | | `max_depth` |
 | `session.avg_depth` (140), else `dive_summary.avg_depth` (2) **untested**, else the depth samples | | `avg_depth` |
-| `dive_summary.start_cns` (5) **untested**, else `session.start_cns` (143) | | `cns_start` |
-| `dive_summary.end_cns` (6) **untested**, else `session.end_cns` (144) | | `cns_end` |
-| `dive_summary.o2_toxicity` (9) **untested**, else `session.o2_toxicity` (155) | | `otu_end` |
-| `dive_settings.water_type` (4) | | `water_type` |
+| `dive_summary.start_cns` (5) **untested**, else `session.start_cns` (143) | | the recording's `cns_start` |
+| `dive_summary.end_cns` (6) **untested**, else `session.end_cns` (144) | | the recording's `cns_end` |
+| `dive_summary.o2_toxicity` (9) **untested**, else `session.o2_toxicity` (155) | | the recording's `otu_end` |
+| `dive_settings.water_type` (4) **untested** | | the recording's `salinity` |
 
 **The duration order is what a diver means by one.** `total_elapsed_time` is the wall clock
 from the moment the dive started to the moment it ended. `total_timer_time` excludes pauses,
@@ -254,7 +255,8 @@ Garmin's `bottom_time` is deliberately last: it measures time *at depth*, not th
 which looks inconsistent and is not. The depths agree wherever both exist, and the fallback
 is for a device that summarises a dive in one message and not the other. The CNS and OTU
 totals are the *dive's*, and on a multi-dive Garmin file the session's cover the whole
-activity while the `dive_summary` describes the dive being read.
+activity while the `dive_summary` describes the dive being read. Being the computer's own
+figures, they land on the file's one recording (§6.4a) rather than on the dive.
 
 A Garmin freediving activity writes a `dive_summary` per descent **plus** a session-level
 one, and `reference_mesg` (0) is what separates them: the summary referring to `session` is
@@ -272,11 +274,16 @@ reader reports rather than fills: the XML records `<CnsStart>8</CnsStart>` and t
 carries no `start_cns` at all, which is why that member is the one `absent` line both
 fixtures raise.
 
-`water_type`'s enum is `{fresh, salt, en13319, custom}`, and three of the four are §6.2
-members under the same name. `en13319` stays `en13319` rather than being folded into `salt`:
-it is the calibration a computer ships set to, and rewriting it as the nearest real water
-would be inventing a reading. `custom` says the diver dialled in a `water_density` number,
-which §6.2 has nowhere to put, and is reported rather than rounded off. A device that wrote
+`water_type`'s enum is `{fresh, salt, en13319, custom}`, and three of the four are §6.4a
+`salinity` values under the same name: the field is the density the computer was set to,
+which is a setting of that device and not a record of the water, so it reaches the
+recording and never the dive's `water_type`. `en13319` stays `en13319` rather than being
+folded into `salt`: it is the calibration a computer ships set to, and rewriting it as the
+nearest real water would be inventing a reading. `custom` says the diver dialled in a
+`water_density` number, which §6.4a has nowhere to put, and is reported rather than rounded
+off. No file in the corpus carries a `dive_settings.water_type`
+([`fixtures/README.md`](../fixtures/README.md#fit), the `suunto-d5.fit` row), which is why
+the row is untested. A device that wrote
 no `dive_settings` raises nothing — the message is the computer's *configuration* rather
 than a record of the dive, unlike the session summaries above, every one of which the
 device was describing this dive when it left empty.
@@ -447,16 +454,17 @@ source defect rather than a scale to reinterpret: the profile states the unit ou
 | `temperature` (13) | | the `temperature` channel, tenths of a degree |
 | `position_lat` (0) / `position_long` (1) | | `entry_position` / `exit_position` |
 
-The axis origin is the session's own `start_time`, so the profile's seconds are elapsed time
-from the instant `started_at` names; a file whose session recorded no start time falls back
+The axis origin is the session's own `start_time`, so the profile's axis is the elapsed
+milliseconds from the instant `started_at` names — whole seconds multiplied by a thousand,
+`timestamp` carrying nothing finer; a file whose session recorded no start time falls back
 to its earliest reading. The rest of the axis — ordering by recorded time, the sample with no
-time, two samples on one second, a dive whose samples carry nothing this format can hold — is
-`converting.md`'s and shared with every other format.
+time, two samples on one instant, a dive whose samples carry nothing this format can hold —
+is `converting.md`'s and shared with every other format.
 
 **Each channel takes only the records that carried its reading.** A Suunto Ocean writes 4,295
 `record`s of which 431 carry a depth and 4,294 a temperature, and padding either to the
 other's length would invent nearly four thousand depths the dive never reached. A `record`
-and a `tank_update` on one second are one sample rather than two, by `converting.md`'s
+and a `tank_update` on one timestamp are one sample rather than two, by `converting.md`'s
 per-channel collision rule — the two carry different channels and were never in
 competition.
 

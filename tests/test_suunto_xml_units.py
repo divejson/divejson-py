@@ -163,9 +163,9 @@ def test_the_surface_pressure_is_pascal_and_nothing_else_here_is(pascal: str, ba
     """The one pressure in this file that is not millibar.
 
     Read at the cylinder scale, `104900` would be 104.9 bar — a kilometre of seawater at
-    the surface — and §6.2's own 0.4 to 1.2 bound is what catches it either way.
+    the surface — and §6.4a's own 0.4 to 1.2 bound is what catches it either way.
     """
-    assert one(f"<SurfacePressure>{pascal}</SurfacePressure>")["surface_pressure"] == bar
+    assert one(f"<SurfacePressure>{pascal}</SurfacePressure>")["recordings"][0]["surface_pressure"] == bar
 
 
 def test_a_cylinder_size_is_plain_litres() -> None:
@@ -186,7 +186,7 @@ def test_the_oxygen_clock_is_whole_percent_where_the_app_json_writes_a_fraction(
     OTU needs no conversion in either format — it is the same absolute count — and this
     export rounds it where the app's writes a full float.
     """
-    found = one("<CnsStart>0</CnsStart><CnsEnd>4</CnsEnd><OtuStart>0</OtuStart><OtuEnd>10</OtuEnd>")
+    found = one("<CnsStart>0</CnsStart><CnsEnd>4</CnsEnd><OtuStart>0</OtuStart><OtuEnd>10</OtuEnd>")["recordings"][0]
     assert found["cns_start"] == 0.0
     assert found["cns_end"] == 4.0
     assert found["otu_start"] == 0.0
@@ -195,7 +195,7 @@ def test_the_oxygen_clock_is_whole_percent_where_the_app_json_writes_a_fraction(
 
 def test_a_ppo2_limit_is_already_bar() -> None:
     """`<PO2>1.4</PO2>`, where the app's JSON writes the same limit as `140000` Pascal."""
-    assert cylinder("<PO2>1.4</PO2>")["po2_limit"] == 1.4
+    assert cylinder("<PO2>1.4</PO2>")["ppo2_limit"] == 1.4
 
 
 def test_a_duration_is_already_seconds() -> None:
@@ -227,13 +227,15 @@ def test_the_same_dive_read_from_fit_and_from_this_export_agrees() -> None:
 
     assert xml["started_at"] == "2021-04-06T11:16:42.6"
     assert fit["started_at"] == "2021-04-06T11:16:42+02:00"
-    for member in ("duration", "max_depth", "avg_depth", "cns_end", "otu_end"):
+    for member in ("duration", "max_depth", "avg_depth"):
         assert xml[member] == fit[member], member
+    for member in ("cns_end", "otu_end"):
+        assert xml["recordings"][0][member] == fit["recordings"][0][member], member
     assert xml["cylinders"][0]["oxygen"] == fit["cylinders"][0]["oxygen"] == 21.0
 
     # Sample for sample on the three seconds the reduction and the whole recording share.
     shared = [0, 1, 2]
-    assert [profile_of(xml)["depth"]["times"][index] for index in shared] == [1, 11, 21]
-    assert [profile_of(fit)["depth"]["times"][index] for index in shared] == [1, 11, 21]
+    assert [profile_of(xml)["depth"]["times"][index] for index in shared] == [1000, 11_000, 21_000]
+    assert [profile_of(fit)["depth"]["times"][index] for index in shared] == [1000, 11_000, 21_000]
     assert [profile_of(xml)["depth"]["values"][index] for index in shared] == [186, 588, 756]
     assert [profile_of(fit)["depth"]["values"][index] for index in shared] == [186, 588, 756]

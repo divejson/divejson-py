@@ -30,9 +30,11 @@ divejson validate my-logbook.divejson
 
 The JSON Schema, and then the requirements the specification states in prose and a schema
 cannot — identifier uniqueness, referential closure, profile-series integrity in **every**
-recording of a dive, a recording carrying at least one of a device, a profile and its
-stored files, the member order, the UTC offset on `exported_at`. Exit status is non-zero if
-any file fails, with one line per violation.
+recording of a dive, a recording carrying at least one of a device, a profile, its stored
+files and a readout, the UTC offset on `exported_at`. The order of a document's members is
+not among them: §4 asks a writer to put `format` and `version` first, and a document that
+does not is as conforming as one that does. Exit status is non-zero if any file fails, with
+one line per violation.
 
 ## Convert a logbook into DiveJSON
 
@@ -228,8 +230,13 @@ directory now yields 384 dives where it used to yield 342.
 **What a recording carries beyond its samples.** Every reader fills §6.4a's `mode` and
 §6.4c's `deco_model` where its files state them — UDDF from `<divemode>` and the
 `<decomodel>` a dive links, FIT from `dive_settings`, the Suunto app's JSON from
-`Header.Diving`, the DM5 XML from `<Mode>` and `<PersonalMode>` — and the profile carries
-the readouts the computer *computed*, as distinct from what it measured. Which channels
+`Header.Diving`, the DM5 XML from `<Mode>` and `<PersonalMode>` — and §6.4a's readouts, the
+surface pressure and the two ends of the oxygen clocks the computer used, on the recording
+beside them rather than on the dive. A format that states a readout once for the whole dive
+— UDDF's `<surfacepressure>`, Subsurface's `@cns` and `@otu` — gives it to the primary
+recording, and reports that reading where the dive has more than one. The profile carries
+the figures the computer *computed* sample by sample, as distinct from what it measured, on
+an axis in milliseconds that keeps every sub-second offset a source states. Which channels
 those are, and in what units, is
 [§6.4 of the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md);
 which of them a given format states, and what it does with a device's absent-markers and

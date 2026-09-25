@@ -4,7 +4,7 @@
   "exported_at": "2026-09-05T00:00:00+00:00",
   "generator": {
     "name": "divejson convert",
-    "version": "0.2.0"
+    "version": "0.12.0"
   },
   "dives": [
     {
@@ -13,11 +13,6 @@
       "duration": 4683,
       "max_depth": 46.29,
       "avg_depth": 17.79,
-      "cns_start": 7.2,
-      "otu_start": 23.09649658203125,
-      "cns_end": 15.3,
-      "otu_end": 45.12766647338867,
-      "surface_pressure": 1.049,
       "cylinders": [
         {
           "volume": 22.0,
@@ -25,7 +20,7 @@
           "end_pressure": 122.4375,
           "oxygen": 21.0,
           "helium": 0.0,
-          "po2_limit": 1.4,
+          "ppo2_limit": 1.4,
           "role": "bottom",
           "gas_number": 0
         },
@@ -33,7 +28,7 @@
           "volume": 11.0,
           "oxygen": 49.0,
           "helium": 0.0,
-          "po2_limit": 1.6,
+          "ppo2_limit": 1.6,
           "role": "bottom",
           "gas_number": 1
         }
@@ -50,14 +45,19 @@
             "algorithm": "rgbm",
             "name": "Suunto Fused RGBM 2"
           },
+          "surface_pressure": 1.049,
+          "cns_start": 7.2,
+          "cns_end": 15.3,
+          "otu_start": 23.09649658203125,
+          "otu_end": 45.12766647338867,
           "profile": {
-            "duration": 4683,
+            "duration": 4683000,
             "depth": {
               "times": [
                 0,
-                2000,
-                4000,
-                4683
+                2000000,
+                4000000,
+                4683000
               ],
               "values": [
                 110,
@@ -68,7 +68,7 @@
             },
             "ceiling": {
               "times": [
-                2000
+                2000000
               ],
               "values": [
                 300
@@ -77,7 +77,7 @@
             "temperature": {
               "times": [
                 0,
-                2000
+                2000000
               ],
               "values": [
                 206,
@@ -88,8 +88,8 @@
               {
                 "times": [
                   0,
-                  2000,
-                  4683
+                  2000000,
+                  4683000
                 ],
                 "values": [
                   2071,
@@ -106,17 +106,17 @@
                 "gas_number": 0
               },
               {
-                "time": 4000,
+                "time": 4000000,
                 "type": "gas_switch",
                 "gas_number": 1
               },
               {
-                "time": 4000,
+                "time": 4000000,
                 "type": "ascent_rate",
                 "label": "Ascent Speed"
               },
               {
-                "time": 4683,
+                "time": 4683000,
                 "type": "safety_stop"
               }
             ]

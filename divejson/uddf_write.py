@@ -57,13 +57,19 @@ rather than a cylinder, and the reader resolves a shared reference positionally,
 sidemount pair on one blend would come back with its two pressure channels crossed the
 moment one of them missed a waypoint the other had.
 
-**Every reading keeps its own second.** UDDF puts everything recorded at one instant inside
+**Every reading keeps its own instant.** UDDF puts everything recorded at one instant inside
 one `<waypoint>`, so the waypoints here are the union of every channel's times and a
-waypoint carries only what was actually measured at that second. The reference writer snaps
+waypoint carries only what was actually measured at that instant. The reference writer snaps
 its other channels onto the depth axis instead and drops what cannot reach one, because two
 importers mishandle a depth-less waypoint in opposite ways — a real constraint on a file
 written for those two, and the wrong trade for a file written to be read back. What that
 costs a consumer is in `docs/uddf-writing.md` under *Known consumer artefacts*.
+
+**`<divetime>` is `xs:float` seconds and the axis is milliseconds**, so a time goes out
+divided by a thousand in decimal: a whole second as the integer it is, so a document whose
+samples all fall on whole seconds writes no fraction at all, and a millisecond that is not
+one as seconds with the fraction — `1200.02` — which the reader multiplies back to exactly
+`1200020`.
 """
 
 from __future__ import annotations
@@ -77,10 +83,12 @@ from . import __version__
 from .converter import (
     CENTIMETRES_PER_METRE,
     GENERATOR_NAME,
+    MILLISECONDS_PER_SECOND,
     TENTHS_PER_UNIT,
     Note,
     NoteKind,
     Written,
+    in_seconds,
 )
 from .uddf import (
     FORMAT,
@@ -200,8 +208,8 @@ _DIVE_MODES = {
 HUNDREDTHS_PER_UNIT = Decimal(100)
 PERCENT_PER_FRACTION = Decimal(100)
 
-# What one dive's waypoints are collected into before they are written: a second, and the
-# readings and annotations that landed on it. UDDF's `<waypoint>` is the one instant every
+# What one dive's waypoints are collected into before they are written: a millisecond on the
+# axis, and the readings and annotations that landed on it. UDDF's `<waypoint>` is the one instant every
 # channel has to be folded back into, so the fold happens here and the elements come out of
 # it in the schema's order.
 _Readings = dict[int, dict[str, Any]]
@@ -304,7 +312,7 @@ def _person_names(name: str) -> tuple[str, str]:
 class _MixKey:
     """What makes two cylinders the same `<mix>`: the blend and the limit planned for it.
 
-    `po2_limit` is part of the key rather than of the payload alone, because it maps onto
+    `ppo2_limit` is part of the key rather than of the payload alone, because it maps onto
     `<mix><maximumpo2>` — a diver carrying the same EAN32 planned to 1.4 on the bottom and
     1.6 on the ascent has defined two mixes as far as UDDF is concerned, and collapsing them
     would mean picking one limit and dropping the other. An unrecorded fraction is a key
@@ -314,7 +322,7 @@ class _MixKey:
 
     oxygen: Decimal | None
     helium: Decimal | None
-    po2_limit: Decimal | None
+    ppo2_limit: Decimal | None
 
     @property
     def sort_key(self) -> tuple[Decimal, Decimal, Decimal]:
@@ -325,7 +333,7 @@ class _MixKey:
         return (
             absent if self.oxygen is None else self.oxygen,
             absent if self.helium is None else self.helium,
-            absent if self.po2_limit is None else self.po2_limit,
+            absent if self.ppo2_limit is None else self.ppo2_limit,
         )
 
 
@@ -333,7 +341,7 @@ def _mix_key(cylinder: dict[str, Any]) -> _MixKey:
     return _MixKey(
         oxygen=None if cylinder.get("oxygen") is None else _decimal(cylinder["oxygen"]),
         helium=None if cylinder.get("helium") is None else _decimal(cylinder["helium"]),
-        po2_limit=None if cylinder.get("po2_limit") is None else _decimal(cylinder["po2_limit"]),
+        ppo2_limit=None if cylinder.get("ppo2_limit") is None else _decimal(cylinder["ppo2_limit"]),
     )
 
 
@@ -1142,9 +1150,9 @@ class _Writer:
                 _sub(mix, "o2", _num(key.oxygen / 100))
             if key.helium is not None:
                 _sub(mix, "he", _num(key.helium / 100))
-            if key.po2_limit is not None:
+            if key.ppo2_limit is not None:
                 # Bar in both formats — the one pressure UDDF does *not* express in Pascal.
-                _sub(mix, "maximumpo2", _num(key.po2_limit))
+                _sub(mix, "maximumpo2", _num(key.ppo2_limit))
         return gasdefinitions
 
     # -- dives -------------------------------------------------------------------
@@ -1185,7 +1193,6 @@ class _Writer:
                     "visibility",
                     "weight",
                     "altitude",
-                    "surface_pressure",
                     "trip_uuid",
                     "site_uuids",
                     "gear_uuids",
@@ -1218,6 +1225,11 @@ class _Writer:
                     "dropped",
                 )
         self.internal_dive_number(before, recordings, where)
+        # Exactly as recorded, a date-only start included: `<datetime>2002-06-18</datetime>`
+        # is the bare date UDDF's own documentation calls a legal omission of the lower-order
+        # elements, though its XSD types the element `xs:dateTime`. Midnight would be a time
+        # the document never had, and the reader takes the bare date back as the date it was
+        # (`docs/uddf-writing.md`), so nothing is lost and nothing is reported.
         _sub(before, "datetime", str(dive["started_at"]))
         _optional(before, "altitude", dive.get("altitude"))
         weight, gear_uuids = dive.get("weight"), dive.get("gear_uuids") or []
@@ -1240,8 +1252,12 @@ class _Writer:
         self.check_link_order(index, recordings, gear_uuids, devices, where)
         if dive.get("trip_uuid"):
             _sub(before, "tripmembership", ref=_uddf_id("trip", dive["trip_uuid"]))
-        if dive.get("surface_pressure") is not None:
-            _sub(before, "surfacepressure", _num(_decimal(dive["surface_pressure"]) * PASCAL_PER_BAR))
+        # UDDF states one surface pressure per dive, so it is the **primary** recording's
+        # (§6.4a) — the one the reader gives it back to — and a later recording's goes with
+        # that recording, which `recording_elements` reports dropped.
+        surface_pressure = recordings[0].get("surface_pressure") if recordings else None
+        if surface_pressure is not None:
+            _sub(before, "surfacepressure", _num(_decimal(surface_pressure) * PASCAL_PER_BAR))
 
         mix_by_gas_number, declared = self.tankdata_elements(element, dive, where)
         numbered = self.recording_elements(element, recordings, where, mix_by_gas_number)
@@ -1432,11 +1448,12 @@ class _Writer:
         numbered = False
         for index, entry in enumerate(recordings):
             here = f"{where}/recordings/{index}"
-            # `device`, `mode` and `profile` are the three this writer places, and
+            # `device`, `mode`, `profile` and the surface pressure are the four this writer
+            # places, the last on the dive's `<surfacepressure>` (`dive_element`), and
             # `deco_model` is in the set because it has a report of its own below rather than
-            # the generic one; `started_at`, `source_files` and anything §6.4a gains report
-            # themselves from the record.
-            self.unmapped(here, entry, frozenset({"device", "mode", "deco_model", "profile"}))
+            # the generic one; `salinity`, the oxygen clocks, `started_at`, `source_files` and
+            # anything §6.4a gains report themselves from the record.
+            self.unmapped(here, entry, frozenset({"device", "mode", "deco_model", "surface_pressure", "profile"}))
             if entry.get("deco_model"):
                 self.note(
                     f"{here}/deco_model",
@@ -1475,7 +1492,7 @@ class _Writer:
             self.unmapped(
                 cylinder_where,
                 cylinder,
-                frozenset({"volume", "start_pressure", "end_pressure", "oxygen", "helium", "po2_limit", "gas_number"}),
+                frozenset({"volume", "start_pressure", "end_pressure", "oxygen", "helium", "ppo2_limit", "gas_number"}),
             )
             key = _mix_key(cylinder)
             occurrence = seen.get(key, 0)
@@ -1544,7 +1561,7 @@ class _Writer:
     ) -> bool:
         """`<samples>`, and whether what was written asks a reader for a gas numbering.
 
-        One waypoint per second any channel or event landed on — the union rather than the
+        One waypoint per instant any channel or event landed on — the union rather than the
         depth channel's axis, see the module docstring — so a temperature taken between two
         depth samples becomes its own waypoint, carrying a `<divetime>` and a
         `<temperature>` and no depth.
@@ -1583,26 +1600,26 @@ class _Writer:
 
         readings: _Readings = {}
 
-        def at(second: int) -> dict[str, Any]:
-            return readings.setdefault(second, {"pressures": []})
+        def at(instant: int) -> dict[str, Any]:
+            return readings.setdefault(instant, {"pressures": []})
 
-        for second, centimetres in _series(profile.get("depth")):
-            at(second)["depth"] = _decimal(centimetres) / CENTIMETRES_PER_METRE
-        for second, tenths in _series(profile.get("temperature")):
-            at(second)["temperature"] = _decimal(tenths) / TENTHS_PER_UNIT + KELVIN_OFFSET
-        for second, seconds in _series(profile.get("ndl")):
-            at(second)["nodecotime"] = _decimal(seconds)
-        for second, hundredths in _series(profile.get("ppo2")):
-            at(second)["calculatedpo2"] = _decimal(hundredths) / HUNDREDTHS_PER_UNIT
-        for second, tenths in _series(profile.get("cns")):
-            at(second)["cns"] = _decimal(tenths) / TENTHS_PER_UNIT
+        for instant, centimetres in _series(profile.get("depth")):
+            at(instant)["depth"] = _decimal(centimetres) / CENTIMETRES_PER_METRE
+        for instant, tenths in _series(profile.get("temperature")):
+            at(instant)["temperature"] = _decimal(tenths) / TENTHS_PER_UNIT + KELVIN_OFFSET
+        for instant, seconds in _series(profile.get("ndl")):
+            at(instant)["nodecotime"] = _decimal(seconds)
+        for instant, hundredths in _series(profile.get("ppo2")):
+            at(instant)["calculatedpo2"] = _decimal(hundredths) / HUNDREDTHS_PER_UNIT
+        for instant, tenths in _series(profile.get("cns")):
+            at(instant)["cns"] = _decimal(tenths) / TENTHS_PER_UNIT
         # **The documented fraction, not the whole percent §6.4 records.** `uddf-mapping.md`
         # keys the percent-or-fraction question on the generator, and this writer is not a
         # generator that table names — it stamps `divejson convert` — so a file it produces
         # is read back by the fraction branch, and a written `0.67` comes back as `67`.
         # Writing whole percent would come back as `6700`.
-        for second, percent in _series(profile.get("gradient_factor")):
-            at(second)["gradientfactor"] = _decimal(percent) / PERCENT_PER_FRACTION
+        for instant, percent in _series(profile.get("gradient_factor")):
+            at(instant)["gradientfactor"] = _decimal(percent) / PERCENT_PER_FRACTION
 
         for channel in profile.get("pressures") or []:
             mix_id = mix_by_gas_number.get(channel["gas_number"])
@@ -1616,8 +1633,8 @@ class _Writer:
                     "dropped",
                 )
                 continue
-            for second, tenths in _series(channel):
-                at(second)["pressures"].append((mix_id, _decimal(tenths) / TENTHS_PER_UNIT * PASCAL_PER_BAR))
+            for instant, tenths in _series(channel):
+                at(instant)["pressures"].append((mix_id, _decimal(tenths) / TENTHS_PER_UNIT * PASCAL_PER_BAR))
 
         self.events(profile.get("events") or [], profile_where, mix_by_gas_number, readings)
 
@@ -1626,8 +1643,8 @@ class _Writer:
             return False
         first = min(readings)
         samples = _sub(element, "samples")
-        for second in sorted(readings):
-            reading = readings[second]
+        for instant in sorted(readings):
+            reading = readings[instant]
             # `waypointType` is an `xs:sequence`, so these go in exactly this order. It is
             # the XSD's and not a preference: `<cns>` comes third in the type and therefore
             # first in a waypoint carrying no alarm or battery reading, and `<nodecotime>` is
@@ -1639,7 +1656,7 @@ class _Writer:
                 _sub(waypoint, "calculatedpo2", _num(reading["calculatedpo2"]))
             if "depth" in reading:
                 _sub(waypoint, "depth", _num(reading["depth"]))
-            _sub(waypoint, "divetime", _num(second))
+            _sub(waypoint, "divetime", _num(_decimal(instant) / MILLISECONDS_PER_SECOND))
             if "setmarker" in reading:
                 _sub(waypoint, "setmarker", reading["setmarker"])
             if "switchmix" in reading:
@@ -1648,7 +1665,7 @@ class _Writer:
                 _sub(waypoint, "tankpressure", _num(pascal), ref=mix_id)
             if "temperature" in reading:
                 _sub(waypoint, "temperature", _num(reading["temperature"]))
-            if divemode is not None and second == first:
+            if divemode is not None and instant == first:
                 _sub(waypoint, "divemode", type=divemode)
             if "gradientfactor" in reading:
                 _sub(waypoint, "gradientfactor", _num(reading["gradientfactor"]))
@@ -1681,7 +1698,8 @@ class _Writer:
             # UDDF has no profile-level duration at all.
             self.note(
                 profile_where,
-                f"the profile's duration is {profile.get('duration')} s where its samples span {span} s, and "
+                f"the profile's duration is {in_seconds(profile.get('duration') or 0)} s where its samples span "
+                f"{in_seconds(span)} s, and "
                 "UDDF records no duration for a profile; a reader takes the span (spec §6.4)",
                 "dropped",
             )
@@ -1741,13 +1759,13 @@ class _Writer:
         carrying that label, exactly as it arrived. What UDDF can carry is the wording.
         """
 
-        def at(second: int) -> dict[str, Any]:
-            return readings.setdefault(second, {"pressures": []})
+        def at(instant: int) -> dict[str, Any]:
+            return readings.setdefault(instant, {"pressures": []})
 
         for index, event in enumerate(events):
             event_where = f"{where}/events/{index}"
             self.unmapped(event_where, event, frozenset({"time", "type", "gas_number", "label"}))
-            second = event["time"]
+            instant = event["time"]
             kind = event.get("type")
             if kind == "gas_switch":
                 # A switch the document recorded without saying what to, and one naming a
@@ -1763,15 +1781,15 @@ class _Writer:
                         "dropped",
                     )
                     continue
-                if "switchmix" in readings.get(second, {}):
+                if "switchmix" in readings.get(instant, {}):
                     self.note(
                         event_where,
-                        f"a gas switch at {second} s shares its second with an earlier one, and a waypoint "
-                        "carries one <switchmix>; the later switch is dropped",
+                        f"a gas switch at {in_seconds(instant)} s shares its instant with an earlier one, and a "
+                        "waypoint carries one <switchmix>; the later switch is dropped",
                         "dropped",
                     )
                     continue
-                at(second)["switchmix"] = mix_id
+                at(instant)["switchmix"] = mix_id
                 continue
 
             label = event.get("label")
@@ -1811,19 +1829,19 @@ class _Writer:
                     "dropped",
                 )
                 continue
-            if "setmarker" in readings.get(second, {}):
+            if "setmarker" in readings.get(instant, {}):
                 self.note(
                     event_where,
-                    f"an event at {second} s shares its second with an earlier one, and a waypoint carries one "
-                    "<setmarker>; the later event is dropped",
+                    f"an event at {in_seconds(instant)} s shares its instant with an earlier one, and a waypoint "
+                    "carries one <setmarker>; the later event is dropped",
                     "dropped",
                 )
                 continue
-            at(second)["setmarker"] = str(marker)
+            at(instant)["setmarker"] = str(marker)
 
 
 def _series(channel: Any) -> list[tuple[int, int]]:
-    """A §6.5 channel as `(second, value)` pairs, in the order it stores them.
+    """A §6.5 channel as `(millisecond, value)` pairs, in the order it stores them.
 
     `strict`, because §6.5 makes the two arrays the same length and the validator enforces
     it: a mismatch here is a caller handing this writer a document it never validated, and

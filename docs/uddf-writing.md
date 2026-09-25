@@ -465,14 +465,38 @@ a dive of no length.
 `started_at` is written **exactly as recorded**, offset and sub-second fraction and all;
 §5.2's rule that an offset is never supplied applies as much to a writer as to a reader.
 
-Members with no UDDF slot anywhere: `water_type`, `cns_start`, `cns_end`, `otu_start`,
-`otu_end`, `entry_position`, `exit_position`, `course_uuid`, `species_uuids`,
-`created_at`, and — on the recording rather than the dive —
+**A `started_at` that is a date goes out as the bare date**, `<datetime>2002-06-18</datetime>`,
+and nothing is reported. UDDF disagrees with itself about that spelling: its documentation
+says lower-order time and date elements may be omitted, while its XSD types `<datetime>`
+`xs:dateTime`, which a bare date fails. This writer takes the documentation's side, because
+both alternatives lose something the file could have kept. Midnight with a report line would
+be a time the document never had — a reader cannot tell it from a dive that began at midnight,
+so the round trip returns one — and dropping the dive would take a whole dive out of the file
+a diver hands to a shop. `uddf-mapping.md` reads the bare date back as the date-only start it
+was. A date **member** is another matter, and *Diver and gear* widens those to midnight: a
+`born_on` is a date whatever the file says, so a reader takes the date off the front and
+the midnight never reaches a document, where a dive's start could have been a time.
+
+The XSD assertion an implementation keeps for its output therefore widens a bare dive
+`<datetime>` for that pass alone. The pass exists to catch element order and a mandatory
+child left out, and a date's spelling is neither; exempting the element rather than the
+spelling would blind it to both. A consumer that validates against the XSD refuses the file,
+which is the price of this answer, and no consumer's handling of a bare `<datetime>` has
+been checked.
+
+`recordings[].surface_pressure` is written from the **primary** recording, to the dive's
+`<surfacepressure>` — UDDF states one per dive, and a later recording's goes with that
+recording under *What is never written*.
+
+Members with no UDDF slot anywhere: `water_type`, `entry_position`, `exit_position`,
+`course_uuid`, `species_uuids`, `created_at`, and — on the recording rather than the dive —
+`recordings[].salinity`, `recordings[].cns_start`, `cns_end`, `otu_start` and `otu_end`,
 `recordings[].source_files`, `recordings[].started_at` and
 **`recordings[].device.firmware`**, `equipmentPieceType` carrying no firmware element, so a
 `dropped` finding reports it on every export whose device has one. *Devices* above has the
-reasoning for each of the three. `source_files` was a dive member until it moved onto the
-recording (§6.4a) and the answer did not change with it.
+reasoning for the last three. UDDF's per-waypoint `<cns>` is a channel and not the clock's
+two ends, and its one density element sits on a recalculated profile rather than on the dive
+(`uddf-mapping.md`, *Deliberately not mapped*), so neither is a home for these.
 
 ### Cylinders and gases
 
@@ -512,9 +536,9 @@ reported, there being nowhere in the file to put it.
 
 ### Profiles
 
-**Every reading keeps its own second.** UDDF puts everything recorded at one instant inside
+**Every reading keeps its own instant.** UDDF puts everything recorded at one instant inside
 one `<waypoint>`, so the waypoints are the **union** of every channel's times, and a
-waypoint carries only what was measured at that second — a temperature taken between two
+waypoint carries only what was measured at that instant — a temperature taken between two
 depth samples becomes its own waypoint, with a `<divetime>` and a `<temperature>` and no
 depth.
 
@@ -534,6 +558,12 @@ data loss and a moved timestamp is a reading presented as measured where it was 
 (repeatable), `<temperature>`, `<divemode>`, `<gradientfactor>`, `<nodecotime>`. That is the
 XSD's own order and not a preference — `<cns>` comes third in the type and therefore first
 in a waypoint that carries no alarm or battery reading, while `<nodecotime>` is last of all.
+
+**`<divetime>` is `xs:float` seconds** and the axis is milliseconds, so a time is divided by
+a thousand in decimal: a whole second is written as the integer it is, and a millisecond
+that is not a whole second as seconds with the fraction — `1200.02` — which a reader
+multiplies back to exactly `1200020`. The self round trip is exact, and a document whose
+samples all fall on whole seconds writes no fraction at all.
 
 Channel units: depth centimetres → metres, temperature tenths of °C → Kelvin, pressures
 tenths of a bar → Pascal, ppO₂ hundredths of a bar → bar, CNS tenths of a percent →
@@ -622,7 +652,7 @@ Four cases lose something, each reported:
   mix would say the diver breathed a gas they did not carry.
 
 `waypointType` allows one `<setmarker>` and one `<switchmix>`, so a **second** event of
-either kind on one second is dropped and reported.
+either kind on one instant is dropped and reported.
 
 **Differs from the reference writer**: it joins simultaneous markers with `"; "` rather than
 dropping the later one, which is right for a file a human is reading and wrong for one being
@@ -646,7 +676,7 @@ once per record that carries it, and none of them has anywhere in UDDF to go:
 | `diver.emergency_contacts` | UDDF has no element for one, and `<owner>` describes the logbook's owner and nobody else |
 | `diver.insurances[].number` | `insuranceType` holds a `name`, `aliasname`, `issuedate`, `validdate` and `notes`, with nothing for the identifier the insurer knows the diver by. `<notes>` would read back as a remark, and `<personal><membership memberid>` as a membership, which a reader cannot tell from a club's |
 | `diver.portrait_file` | `<owner>` has no image element. A `<notes><link>` to a `<mediadata><image>` names a file by path, whose bytes a UDDF file does not carry, and reads back as a linked picture with no role — `uddf-mapping.md`'s *Diver* section says why no linked image is read as a portrait |
-| a recording's `source_files`, `started_at` and its device's `firmware`, and every recording after the first | UDDF gives a dive one `<samples>`, and `equipmentPieceType` no firmware element — *Devices* above has each answer and why the device of a dropped recording is kept even so |
+| a recording's `source_files`, `started_at`, `salinity` and oxygen clocks, its device's `firmware`, and every recording after the first, its `surface_pressure` included | UDDF gives a dive one `<samples>` and one `<surfacepressure>`, `equipmentPieceType` no firmware element, and nothing at all a salinity setting or an oxygen clock's two ends could go in — *Devices* and *Dives* above have each answer, and why the device of a dropped recording is kept even so |
 | `trips[].parts[].location.bbox` | `geographyType` carries a point, not a box |
 | `sites[].location.full_name`, `position` and `bbox` | a site's `<name>` is its own, so the locality gets only `<geography><location>` and that slot holds `location.name`; `<geography>`'s coordinates are the site's pin, and the box has nowhere either — *Sites and trips* above has the asymmetry with a part |
 | a record's `extensions` | producer-defined members (§5.5) |
@@ -675,7 +705,7 @@ makes of it. Recording them here saves the next reader the round trip; they are 
 of `uddf-mapping.md`'s section of the same name.
 
 - **Subsurface discards every depth-less waypoint on import.** A file written here puts a
-  reading on its own second, so a temperature or pressure sampled between two depth samples
+  reading on its own instant, so a temperature or pressure sampled between two depth samples
   is a depth-less waypoint and Subsurface will not keep it. The depth channel arrives whole.
 - **divelogs.de reads a missing depth as zero**, so the same waypoints arrive as a profile
   that saws between the real depth and the surface.

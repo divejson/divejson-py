@@ -21,8 +21,9 @@ the number in front of it, and a spelling the table does not carry is **refused 
 reported** rather than converted by a factor no file has checked. That is the whole reason
 this reader has no scale ambiguity of its own: UDDF's `<tankvolume>` and `<o2>` are numbers
 whose units the file never states, and there is no such number here. This reader therefore
-emits no `resolved` finding, and the only two kinds in its report are `absent` and
-`dropped`.
+emits one `resolved` finding and it is not about a scale — a `<dive @cns>` or `@otu` on a
+dive with more than one recording, the file not saying whose figure it is — and past that
+the only two kinds in its report are `absent` and `dropped`.
 
 **A dive has no id, so its identity is its position.** Subsurface keys a dive by its
 computer's own dive id where there is one and by nothing at all otherwise; `@number` is the
@@ -58,8 +59,8 @@ from typing import Any
 
 from .converter import (
     CENTIMETRES_PER_METRE,
+    MAX_MAGNITUDE,
     MAX_NAME,
-    MAX_NOTES,
     PRODUCER_KEY,
     TENTHS_PER_UNIT,
     Conversion,
@@ -74,6 +75,8 @@ from .converter import (
     device,
     header,
     integer_of,
+    milliseconds,
+    onto_primary,
     recorded,
     recording,
     rounded,
@@ -113,21 +116,38 @@ _MEASUREMENT = re.compile(r"\A(?P<number>\S+?)\s*(?P<unit>%|[A-Za-z][A-Za-z/]*)?
 
 # A dive's `@date` and `@time`. Subsurface writes both to the digit, and the leniency here
 # is for the seconds alone: a hand-edited file missing them costs a dive otherwise, and
-# §5.2's grammar requires them. There is no offset in either pattern because there is none
-# anywhere in the format — see `read_started_at`.
+# §5.2's grammar requires them. A `@date` with no `@time` at all is a date-only start, which
+# §5.2 has a value for. There is no offset in either pattern because there is none anywhere
+# in the format — see `read_started_at`.
 _DATE = re.compile(r"\A\d{4}-\d{2}-\d{2}\Z")
 _TIME = re.compile(r"\A(?P<hour>\d{2}):(?P<minute>\d{2})(?::(?P<second>\d{2}))?(?P<fraction>\.\d+)?\Z")
 
 
 def _clock(raw: str) -> Decimal | None:
-    """`'66:50'` as 4010 seconds, or nothing for text that is not a `M:SS` time."""
+    """`'66:50'` as 4010 seconds, or nothing for text that is not a `M:SS` time.
+
+    The product is held to `MAX_MAGNITUDE` as well as the minutes, because a sample time
+    takes two factors past its text — sixty here and a thousand on the axis — where the
+    bound covers one: minutes that clear it can still reach the axis as a number no double
+    holds, and a time that cannot be carried is text that is not a time.
+    """
     match = _CLOCK.match(raw)
     if match is None:
         return None
     minutes = decimal_of(match.group(1))
     if minutes is None:
         return None
-    return minutes * SECONDS_PER_MINUTE + Decimal(match.group(2))
+    seconds = minutes * SECONDS_PER_MINUTE + Decimal(match.group(2))
+    return seconds if seconds <= MAX_MAGNITUDE else None
+
+
+def _calendar_date(text: str) -> bool:
+    """Whether a `YYYY-MM-DD` is a day the calendar has, which no pattern can check."""
+    try:
+        datetime.fromisoformat(f"{text}T00:00:00")
+    except ValueError:
+        return False
+    return True
 
 
 # Every unit spelling this reader knows, against the way the number in front of it is read.
@@ -419,17 +439,19 @@ class _Converter:
 
         notes = text(child(element, "notes"))
         if notes:
-            dive["notes"] = self.capped(notes, MAX_NOTES, where, "the note")
+            dive["notes"] = notes
 
-        # `cns='11%'` and `otu='31'`: a percentage and a bare count, both of them the dive's
-        # *end* figure. Subsurface records no starting pair, which is why `cns_start` and
-        # `otu_start` have no source here.
+        # `cns='11%'` and `otu='31'`: a percentage and a bare count, both of them the *end*
+        # figure of the computer that computed them. Subsurface records no starting pair,
+        # which is why `cns_start` and `otu_start` have no source here. They are §6.4a's
+        # readouts and not the dive's, so they wait for the recordings below.
+        readouts: dict[str, float] = {}
         for member, source, unit in (("cns_end", "cns", "%"), ("otu_end", "otu", "")):
             value = self.measure(attribute(element, source), unit, where, f"<dive {source}>")
             if value is None:
                 continue
-            if recorded(value, record="dive", member=member):
-                dive[member] = float(value)
+            if recorded(value, record="recording", member=member):
+                readouts[member] = float(value)
             else:
                 self.note(where, f"<dive {source}> is {value}, which the format records only from zero up; dropped", "dropped")
 
@@ -457,6 +479,11 @@ class _Converter:
             dive["cylinders"] = cylinders
 
         recordings = self.read_recordings(element, dive, where)
+        # On the `<dive>` rather than on a `<divecomputer>`, so they go where
+        # `docs/converting.md` sends a dive-level readout: the primary recording, or one of
+        # their own where no computer yielded one.
+        stated = " and ".join(f"<dive {member[:3]}>" for member in readouts)
+        onto_primary(recordings, readouts, note=self.note, where=where, stated=stated)
         if recordings:
             dive["recordings"] = recordings
         return dive
@@ -474,6 +501,11 @@ class _Converter:
         The two halves are composed rather than concatenated, because §5.2's grammar
         requires the seconds and a hand-edited `time='11:49'` would otherwise reach the
         document and fail its own validation.
+
+        **A `@date` with no `@time` is a date-only start**, the date alone (§5.2): the day was
+        recorded and the time of day was not, and midnight would be a time the file never
+        stated. It carries no offset note, there being no wall clock for an offset to be
+        missing from.
         """
         date = attribute(element, "date")
         clock = attribute(element, "time")
@@ -485,8 +517,16 @@ class _Converter:
             )
             return None
         if clock is None:
-            self.note(where, "the dive records a date with no time of day; read as midnight", "absent")
-            clock = "00:00:00"
+            if _DATE.match(date) is None or not _calendar_date(date):
+                self.note(where, "the dive's date is not a date; the dive is dropped (spec §6.2)", "dropped")
+                return None
+            self.note(
+                where,
+                "the dive records a date with no time of day; read as a date-only start rather than as "
+                "midnight (spec §5.2)",
+                "absent",
+            )
+            return date
 
         parts = _TIME.match(clock)
         if _DATE.match(date) is None or parts is None:
@@ -787,16 +827,16 @@ class _Converter:
 
         axis = SampleAxis(self.note, where, noun="sample", time_member="time")
         for sample in samples:
-            axis.offer(integer_of(self.measure(attribute(sample, "time"), "min", where, "<sample time>")), sample)
+            axis.offer(milliseconds(self.measure(attribute(sample, "time"), "min", where, "<sample time>")), sample)
 
         depth = Channel("depth")
         temperature = Channel("temperature")
-        for second, sample in axis.ordered():
+        for at, sample in axis.ordered():
             metres = self.measure(attribute(sample, "depth"), "m", where, "<sample depth>")
             if metres is not None:
-                depth.record(second, rounded(metres * CENTIMETRES_PER_METRE))
+                depth.record(at, rounded(metres * CENTIMETRES_PER_METRE))
             celsius = self.measure(attribute(sample, "temp"), "C", where, "<sample temp>")
             if celsius is not None:
-                temperature.record(second, rounded(celsius * TENTHS_PER_UNIT))
+                temperature.record(at, rounded(celsius * TENTHS_PER_UNIT))
 
         return axis.profile({"depth": depth, "temperature": temperature})

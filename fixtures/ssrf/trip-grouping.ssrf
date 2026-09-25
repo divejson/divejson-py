@@ -24,7 +24,7 @@
   </divecomputer>
 </dive>
 </trip>
-<dive number='44' date='2026-07-11' time='09:45:00' duration='58:00 min'>
+<dive number='44' otu='9' cns='6%' date='2026-07-11' time='09:45:00' duration='58:00 min'>
   <divecomputer last-manual-time='58:00 min'>
   <depth max='14.9 m' mean='9.1 m' />
   </divecomputer>

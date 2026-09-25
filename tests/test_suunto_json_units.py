@@ -53,7 +53,7 @@ def test_a_pressure_is_exact_and_never_rounded() -> None:
 
 def test_a_ppo2_limit_is_pascal_too() -> None:
     """140 000 Pa is 1.4 bar, which is the number written on every deco planner."""
-    assert _dive(_gas(PO2=140_000))["cylinders"][0]["po2_limit"] == 1.4
+    assert _dive(_gas(PO2=140_000))["cylinders"][0]["ppo2_limit"] == 1.4
 
 
 def test_a_pressure_channel_is_tenths_of_a_bar() -> None:
@@ -163,14 +163,15 @@ def test_cns_is_a_fraction_and_otu_is_not() -> None:
             }
         }
     )
-    assert dive["cns_end"] == 6.9 and dive["otu_end"] == 17.89002799987793
-    # Zero is an answer for both: §6.2 gives them `minimum: 0`, so a first dive of the day
+    recording = dive["recordings"][0]
+    assert recording["cns_end"] == 6.9 and recording["otu_end"] == 17.89002799987793
+    # Zero is an answer for both: §6.4a gives them `minimum: 0`, so a first dive of the day
     # starting on nothing is a reading rather than a placeholder.
-    assert dive["cns_start"] == 0.0 and dive["otu_start"] == 0.0
+    assert recording["cns_start"] == 0.0 and recording["otu_start"] == 0.0
 
 
 def test_a_surface_pressure_is_pascal_and_the_member_is_bar() -> None:
-    assert _dive({"Diving": {"SurfacePressure": 104_900}})["surface_pressure"] == 1.049
+    assert _dive({"Diving": {"SurfacePressure": 104_900}})["recordings"][0]["surface_pressure"] == 1.049
 
 
 # -- coordinates ----------------------------------------------------------------------
@@ -229,10 +230,18 @@ def test_a_duration_is_seconds_and_rounds_half_away_from_zero() -> None:
     assert _dive({"DiveTime": 2.5})["duration"] == 3
 
 
-def test_a_sample_second_is_elapsed_time_from_the_header_s_own_start() -> None:
-    """The axis's origin, which is the instant `started_at` names."""
+def test_a_samples_place_is_elapsed_milliseconds_from_the_header_s_own_start() -> None:
+    """The axis's origin, which is the instant `started_at` names, and the fraction the
+    export stamps kept to the millisecond (§5.1)."""
     dive = _dive({}, [suunto_sample(0, Depth=1.0), suunto_sample(120.49, Depth=2.0)])
-    assert profile_of(dive)["depth"]["times"] == [0, 120]
+    assert profile_of(dive)["depth"]["times"] == [0, 120_490]
+
+
+def test_the_elapsed_time_is_exact_rather_than_a_binary_fraction() -> None:
+    """A `timedelta`'s float seconds can land a hair either side of the millisecond the
+    file states; the axis takes the microseconds as the decimal they are."""
+    dive = _dive({}, [suunto_sample(0, Depth=1.0), suunto_sample(4000.02, Depth=2.0)])
+    assert profile_of(dive)["depth"]["times"] == [0, 4_000_020]
 
 
 # -- the decompression readouts -------------------------------------------------------

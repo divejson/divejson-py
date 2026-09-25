@@ -105,6 +105,7 @@ validates perfectly and describes a dive nobody took.
 | `Samples[].Latitude` / `Longitude` | **radians** | decimal degrees at six places | × 180/π |
 | `DiveRouteOrigin.Latitude` / `Longitude` | **degrees** | decimal degrees, exactly as recorded | — |
 | `DiveTime`, `Duration` | seconds, fractional | whole seconds, halves away from zero | — |
+| `Samples[].TimeISO8601` | an ISO 8601 instant, fractional | **milliseconds** on a §6.5 axis, elapsed from `Header.DateTime` | the difference × 1 000, halves away from zero |
 | `NoDecTime`, `TimeToSurface` | seconds | **seconds** on a §6.5 channel | — |
 | `RtGradientFactors.gf99`, `.gfSurface` | whole percent | **whole percent** on a §6.5 channel | — |
 
@@ -198,18 +199,19 @@ than an empty record (§6.4a). `fixtures/suunto_json/header-only.json` is that s
 | `Header.DiveTime`, else `Header.Duration` | | `duration` |
 | `Header.Depth.Max` | | `max_depth` |
 | `Header.DepthAverage`, else `Header.Depth.Avg` | | `avg_depth` |
-| `Diving.StartTissue.CNS` × 100 | | `cns_start` |
-| `Diving.EndTissue.CNS` × 100 | | `cns_end` |
-| `Diving.StartTissue.OTU` | | `otu_start` |
-| `Diving.EndTissue.OTU` | | `otu_end` |
-| `Diving.SurfacePressure` ÷ 100 000 | | `surface_pressure` |
+| `Diving.StartTissue.CNS` × 100 | | the recording's `cns_start` |
+| `Diving.EndTissue.CNS` × 100 | | the recording's `cns_end` |
+| `Diving.StartTissue.OTU` | | the recording's `otu_start` |
+| `Diving.EndTissue.OTU` | | the recording's `otu_end` |
+| `Diving.SurfacePressure` ÷ 100 000 | | the recording's `surface_pressure` |
 | `Diving.DiveMode` | | the recording's `mode`, by the table below |
 | `Diving.Algorithm` | | `deco_model.name` verbatim, and `deco_model.algorithm` by the table below |
 | `Diving.Conservatism` | | `deco_model.conservatism` |
 
-**The mode and the model are the recording's, not the dive's** (§6.4a), and only the D5
-header shape states them: the Ocean shape has no `Header.Diving` at all, so an Ocean file
-yields the channels below and no `deco_model`, which is correct rather than a gap.
+**The mode, the model and the readouts are the recording's, not the dive's** (§6.4a), and
+only the D5 header shape states them: the Ocean shape has no `Header.Diving` at all, so an
+Ocean file yields the channels below and no `deco_model` and no readout, which is correct
+rather than a gap.
 
 | `Diving.DiveMode` | `mode` | seen on |
 | --- | --- | --- |
@@ -264,7 +266,7 @@ An average depth deeper than the maximum cannot be, and the average is dropped.
 | `TankSize` × 1 000 | | `volume` |
 | `StartPressure` ÷ 100 000 | | `start_pressure` |
 | `EndPressure` ÷ 100 000 | | `end_pressure` |
-| `PO2` ÷ 100 000 | | `po2_limit` |
+| `PO2` ÷ 100 000 | | `ppo2_limit` |
 | `State` | | `role`, through the table below |
 
 **The block is authoritative where it exists** and the sample telemetry adds nothing to it.
@@ -337,14 +339,14 @@ channels keep. So a converted dive's last channel value and its cylinder's `end_
 disagree, on purpose, and every fixture with a `DiveTime` and a pressure channel encodes that.
 
 **The extremes are taken over the samples' own recorded instants, not off the profile.**
-The merged axis is not what loses them — it folds an entry into a second another channel's
+The merged axis is not what loses them — it folds an entry into an instant another channel's
 entry already holds rather than dropping it, which is `converting.md`'s collision rule
 read per channel, and *The profile* below is where this exporter's habit of appending its
 sensor streams separately makes that rule visible. Two other readings do,
 and both are measured on the dive `suunto-ocean.json` is reduced from, whose start pressure
-is 211.625 bar: an **unmerged** axis, one entry per second with the first winning it whole,
-gives 211.26562, the earlier depth entry taking the second and carrying the cylinder reading
-0.1 s later away with it; and the axis's pressure **channel**, which §6.5 stores in tenths
+is 211.625 bar: an **unmerged** whole-second axis, one entry per second with the first
+winning it whole, gives 211.26562, the earlier depth entry taking the second and carrying
+the cylinder reading 0.1 s later away with it; and the axis's pressure **channel**, which §6.5 stores in tenths
 of a bar, gives 211.6, which is a rounding of a value the source recorded and so is
 `converting.md`'s rule the other way round.
 
@@ -373,7 +375,7 @@ switch that happened, and saying so is honest where guessing a position would no
 
 | member | | into |
 | --- | --- | --- |
-| `TimeISO8601` | | the sample's second, elapsed from `Header.DateTime` |
+| `TimeISO8601` | | the sample's instant, in milliseconds elapsed from `Header.DateTime` |
 | `Depth` | | the `depth` channel, centimetres |
 | `Ceiling` | | the `ceiling` channel, centimetres, **where it is above zero** |
 | `Temperature` | | the `temperature` channel, tenths of a degree Celsius |
@@ -388,10 +390,13 @@ switch that happened, and saying so is honest where guessing a position would no
 **This exporter is what made `converting.md`'s collision rule per channel.** It appends its
 sensor streams as separate entries: on the dive `suunto-ocean.json` is reduced from, 7 477
 entries carry a depth, a temperature, a satellite fix or a battery reading, almost never two
-of those at once, and they collide on the whole seconds §6.5 requires. Offering them to the
-axis one at a time leaves it choosing between a depth and a temperature recorded at the same
-instant, and keeps 345 of that dive's 431 depths; merging them keeps all 431 — the count the
-same dive's FIT reading gives.
+of those at once. On a whole-second axis they collide: offering them one at a time leaves
+the axis choosing between a depth and a temperature recorded within one second, and keeps
+345 of that dive's 431 depths, where merging them keeps all 431 — the count the same dive's
+FIT reading gives. §6.5's axis is milliseconds, which places each entry at its own stated
+instant and keeps the sub-second offsets the export writes: `suunto-ocean.json`'s first three
+depths sit at 160, 1 200 000 and 4 000 020 ms. The per-channel rule is what still decides two
+entries of different channels stamped the same millisecond.
 
 **Samples are ordered by their own recorded time.** The union of an Ocean export's sample
 timestamps is not monotonic: adjacent entries go backwards by up to a second — 1.05 s is
@@ -575,10 +580,10 @@ unit, and neither is in doubt.
   cylinder; a start time with no UTC offset; a zero in a member whose schema makes zero a
   placeholder; a member the header does not state.
 - **`dropped`** — an activity that is not a dive; a start time that is not one; a sample
-  with no `TimeISO8601`; a sample before the dive began; one channel twice on a second; an
-  end pressure above its start; a pressure, ppO₂ limit or surface pressure outside what §6
-  allows; a mix whose halves sum above 100 %; cylinders past the cap; samples that carry a
-  time and no reading this format can hold.
+  with no `TimeISO8601`; a sample before the dive began; one channel twice on a
+  millisecond; an end pressure above its start; a pressure, ppO₂ limit or surface pressure
+  outside what §6 allows; a mix whose halves sum above 100 %; cylinders past the cap; samples
+  that carry a time and no reading this format can hold.
 - **`inferred`** — never. This export summarises its own dive, so there is nothing for this
   reader to compute, and `extensions.divejson.inferred` is never written.
 - **`resolved`** — never, as above.

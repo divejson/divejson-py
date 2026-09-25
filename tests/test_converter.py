@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from decimal import Decimal
+from typing import Any
 
 import pytest
 
@@ -23,6 +24,9 @@ from divejson.converter import (
     channel_floor,
     deco_model,
     header,
+    in_seconds,
+    milliseconds,
+    onto_primary,
     profile_members,
     record_inferred,
     recorded,
@@ -142,7 +146,7 @@ def test_members_of_one_archive_share_what_has_been_claimed() -> None:
 # -- the document header --------------------------------------------------------------
 
 
-def test_the_header_opens_with_the_two_members_section_4_requires_first() -> None:
+def test_the_header_opens_with_the_two_members_section_4_asks_for_first() -> None:
     written = header(datetime(2026, 9, 5, tzinfo=timezone.utc))
     assert list(written)[:2] == ["format", "version"]
     assert written["exported_at"] == "2026-09-05T00:00:00+00:00"
@@ -169,7 +173,10 @@ def test_the_header_opens_with_the_two_members_section_4_requires_first() -> Non
         ("cylinder", "oxygen", True),
         # A floor above zero: a zero is below it, so it is no more an answer than a
         # placeholder is.
-        ("dive", "surface_pressure", False),
+        ("recording", "surface_pressure", False),
+        # A readout's clock starts at zero, which a first dive of the day reads.
+        ("recording", "cns_start", True),
+        ("recording", "otu_end", True),
     ],
 )
 def test_a_zero_reads_the_way_the_schema_constrains_the_member(record: str, member: str, answer: bool) -> None:
@@ -278,31 +285,132 @@ def test_a_boolean_is_not_an_integer_here() -> None:
 # -- §6.4a's Recording -----------------------------------------------------------------
 
 
-def test_a_mode_or_a_model_alone_does_not_make_a_recording() -> None:
-    """§3's rule 4 names `device`, `profile` and `source_files`, and neither of the two
-    members §6.4a gained is one of them — a recording built from a mode alone would emit
+def test_a_setting_alone_does_not_make_a_recording() -> None:
+    """§3's rule 4 names `device`, `profile`, `source_files` and a readout, and none of the
+    three settings is one of them — a recording built from a mode alone would emit
     `recordings: [{}]`'s conforming twin and describe no record of a dive at all."""
-    assert recording(mode="gauge", deco_model={"conservatism": 0}) is None
+    assert recording(mode="gauge", deco_model={"conservatism": 0}, salinity="en13319") is None
     assert recording(mode="gauge", device={"model": "Perdix 3"}) == {
         "device": {"model": "Perdix 3"},
         "mode": "gauge",
     }
 
 
+def test_a_readout_alone_makes_a_recording_and_a_zero_one_counts() -> None:
+    """The CNS figure a diver copied off their computer is a record of the dive (§6.4a), and
+    the zero a first dive of the day starts on is a figure, not an absence."""
+    assert recording(readouts={"cns_end": 0.0}) == {"cns_end": 0.0}
+    assert recording(salinity="salt", readouts={"surface_pressure": 1.013}) == {
+        "salinity": "salt",
+        "surface_pressure": 1.013,
+    }
+
+
+def test_a_member_that_is_not_a_readout_is_refused_as_one() -> None:
+    with pytest.raises(KeyError):
+        recording(readouts={"water_type": 1.0})
+
+
 def test_the_recordings_members_come_out_in_the_sections_order() -> None:
     built = recording(
         profile={"duration": 60},
         source_files=[{"uuid": "0198a6f0-2222-7120-8000-000000000120"}],
+        readouts={"otu_end": 22.0, "surface_pressure": 1.012, "cns_start": 0.0},
         started_at="2026-04-17T11:49:23+02:00",
+        salinity="en13319",
         deco_model={"conservatism": 0},
         mode="open_circuit",
         device={"model": "Perdix 3"},
     )
-    assert list(built) == ["device", "mode", "deco_model", "started_at", "source_files", "profile"]
+    assert list(built) == [
+        "device",
+        "mode",
+        "deco_model",
+        "salinity",
+        "started_at",
+        "surface_pressure",
+        "cns_start",
+        "otu_end",
+        "source_files",
+        "profile",
+    ]
+
+
+# -- a readout the source states on the dive -----------------------------------------------
+
+
+def _collected() -> tuple[list[tuple[str, str, str]], Any]:
+    notes: list[tuple[str, str, str]] = []
+    return notes, lambda where, message, kind: notes.append((where, message, kind))
+
+
+def test_a_dive_level_readout_joins_the_primary_recording_in_its_place() -> None:
+    notes, note = _collected()
+    recordings = [{"device": {"model": "Perdix 3"}, "profile": {"duration": 60}}]
+    onto_primary(recordings, {"cns_end": 11.0}, note=note, where="dive/0", stated="<dive cns>")
+    assert list(recordings[0]) == ["device", "cns_end", "profile"]
+    assert notes == []
+
+
+def test_on_a_dive_with_two_recordings_it_is_the_primarys_and_says_so() -> None:
+    """The file states it once and does not say which computer computed it, so where it goes
+    is a reading of its meaning — `resolved`, which is what `docs/converting.md` asks."""
+    notes, note = _collected()
+    recordings = [{"device": {"model": "A"}}, {"device": {"model": "B"}}]
+    onto_primary(recordings, {"otu_end": 31.0}, note=note, where="dive/0", stated="<dive otu>")
+    assert recordings == [{"device": {"model": "A"}, "otu_end": 31.0}, {"device": {"model": "B"}}]
+    assert [(where, kind) for where, _, kind in notes] == [("dive/0", "resolved")]
+    assert "the dive states <dive otu> once and has 2 recordings" in notes[0][1]
+
+
+def test_on_a_dive_with_no_recording_it_is_a_recording_of_its_own() -> None:
+    notes, note = _collected()
+    recordings: list[dict[str, Any]] = []
+    onto_primary(recordings, {"cns_end": 11.0, "otu_end": 31.0}, note=note, where="dive/0", stated="x")
+    assert recordings == [{"cns_end": 11.0, "otu_end": 31.0}]
+    assert notes == []
+
+
+def test_no_readout_changes_nothing() -> None:
+    notes, note = _collected()
+    recordings: list[dict[str, Any]] = []
+    onto_primary(recordings, {}, note=note, where="dive/0", stated="x")
+    assert recordings == [] and notes == []
+
+
+# -- the millisecond axis ----------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("seconds", "expected"),
+    [
+        ("0.16", 160),
+        ("1200.02", 1_200_020),
+        ("4300", 4_300_000),
+        # Halves away from zero, at the millisecond's grain (`docs/converting.md`).
+        ("0.0005", 1),
+        ("-0.0005", -1),
+        ("0.0004", 0),
+    ],
+)
+def test_a_sources_seconds_are_a_whole_millisecond_on_the_axis(seconds: str, expected: int) -> None:
+    assert milliseconds(Decimal(seconds)) == expected
+
+
+def test_no_time_is_no_place() -> None:
+    assert milliseconds(None) is None
+
+
+@pytest.mark.parametrize(
+    ("at", "said"),
+    [(0, "0"), (30_000, "30"), (30_400, "30.4"), (1_200_020, "1200.02"), (-250, "-0.25"), (4_000_000, "4000")],
+)
+def test_the_report_speaks_seconds(at: int, said: str) -> None:
+    assert in_seconds(at) == said
 
 
 def test_an_inverted_gradient_factor_pair_is_dropped_rather_than_reaching_validation() -> None:
-    """§3's rule 7, kept here rather than left to the validator.
+    """§3's rule 6, kept here rather than left to the validator.
 
     `validate_document` does check it, and a converter that let an inverted pair through
     would raise `NonConformingOutputError` and lose the whole file — every dive in it, under
@@ -316,7 +424,7 @@ def test_an_inverted_gradient_factor_pair_is_dropped_rather_than_reaching_valida
     assert _built({"algorithm": "buhlmann", "gf_low": 85, "gf_high": 50}, notes) == {
         "algorithm": "buhlmann"
     }
-    assert any("§3 rule 7" in message for message in notes)
+    assert any("§3 rule 6" in message for message in notes)
 
 
 def test_an_equal_pair_is_not_inverted() -> None:

@@ -149,8 +149,8 @@ def test_where_the_two_readings_differ_it_is_the_exporters_doing() -> None:
         "dives[]/cylinders[]/helium",
         "dives[]/weight",
         "dives[]/bottom_temperature",
-        "dives[]/cns_end",
-        "dives[]/otu_end",
+        "dives[]/recordings[]/cns_end",
+        "dives[]/recordings[]/otu_end",
         "sites[]/location/name",
         "dives[]/recordings[]/device/model",
     }
@@ -161,8 +161,9 @@ def test_where_the_two_readings_differ_it_is_the_exporters_doing() -> None:
     assert "helium" not in first_ssrf["cylinders"][0] and first_uddf["cylinders"][0]["helium"] == 0.0
     assert "weight" not in first_ssrf and first_uddf["weight"] == 0.0
     assert first_ssrf["bottom_temperature"] == 22.4 and "bottom_temperature" not in first_uddf
-    assert first_ssrf["cns_end"] == 11.0 and "cns_end" not in first_uddf
-    assert first_ssrf["otu_end"] == 31.0 and "otu_end" not in first_uddf
+    # The save file's `@cns` and `@otu` are its computer's figures (§6.4a), on that recording.
+    assert first_ssrf["recordings"][0]["cns_end"] == 11.0 and "cns_end" not in first_uddf["recordings"][0]
+    assert first_ssrf["recordings"][0]["otu_end"] == 31.0 and "otu_end" not in first_uddf["recordings"][0]
     assert "location" not in ssrf["sites"][0]
     assert uddf["sites"][0]["location"] == {"name": uddf["sites"][0]["name"]}
     assert (ssrf["dives"][0]["recordings"][0]["device"] or {}).get("model") == "Open Diving"

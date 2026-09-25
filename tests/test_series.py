@@ -80,18 +80,35 @@ def test_a_notes_path_counts_samples_in_document_order() -> None:
 def test_a_sample_before_the_dive_began_is_dropped() -> None:
     report = Reported()
     axis = _axis(report)
-    axis.offer(-1, "impossible")
+    axis.offer(-1000, "impossible")
+    axis.offer(-250, "impossible")
     assert axis.ordered() == []
-    assert report.messages == ["the record is at -1 s, before the dive began; dropped"]
+    # The report speaks the seconds a source and a diver both do, the axis's milliseconds
+    # being an encoding.
+    assert report.messages == [
+        "the record is at -1 s, before the dive began; dropped",
+        "the record is at -0.25 s, before the dive began; dropped",
+    ]
 
 
-def test_two_samples_on_one_second_keep_the_first_and_report_the_second() -> None:
+def test_two_samples_on_one_millisecond_keep_the_first_and_report_the_second() -> None:
     report = Reported()
     axis = _axis(report)
-    axis.offer(30, "kept")
-    axis.offer(30, "later")
+    axis.offer(30_000, "kept")
+    axis.offer(30_000, "later")
     assert [pair[1] for pair in axis.ordered()] == ["kept"]
-    assert "two records share the second 30" in report.messages[0]
+    assert "two records are both at 30 s, to the millisecond" in report.messages[0]
+
+
+def test_two_samples_inside_one_second_are_two_places_on_the_axis() -> None:
+    """The collision is at the millisecond (§5.1), so two readings a source stamps inside
+    one second are two places on the axis."""
+    report = Reported()
+    axis = _axis(report)
+    axis.offer(30_000, "first")
+    axis.offer(30_400, "second")
+    assert [pair for pair in axis.ordered()] == [(30_000, "first"), (30_400, "second")]
+    assert report.notes == []
 
 
 def test_the_order_is_worked_out_once_however_often_it_is_asked_for() -> None:

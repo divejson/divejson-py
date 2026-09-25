@@ -4,7 +4,7 @@
   "exported_at": "2026-09-11T00:00:00+00:00",
   "generator": {
     "name": "divejson convert",
-    "version": "0.5.0"
+    "version": "0.12.0"
   },
   "dives": [
     {
@@ -13,11 +13,6 @@
       "duration": 3462,
       "max_depth": 28.27,
       "avg_depth": 12.92,
-      "cns_start": 8.3,
-      "otu_start": 31.794235229492188,
-      "cns_end": 18.6,
-      "otu_end": 59.34442138671875,
-      "surface_pressure": 1.055,
       "cylinders": [
         {
           "volume": 11.0,
@@ -25,7 +20,7 @@
           "end_pressure": 53.59375,
           "oxygen": 31.0,
           "helium": 0.0,
-          "po2_limit": 1.4,
+          "ppo2_limit": 1.4,
           "role": "bottom",
           "gas_number": 0
         }
@@ -45,17 +40,22 @@
             "name": "Suunto Fused2 RGBM",
             "conservatism": -1
           },
+          "surface_pressure": 1.055,
+          "cns_start": 8.3,
+          "cns_end": 18.6,
+          "otu_start": 31.794235229492188,
+          "otu_end": 59.34442138671875,
           "profile": {
-            "duration": 3463,
+            "duration": 3462960,
             "depth": {
               "times": [
-                1,
-                571,
-                1152,
-                1732,
-                2312,
-                2893,
-                3463
+                980,
+                571240,
+                1151560,
+                1731870,
+                2312170,
+                2892610,
+                3462960
               ],
               "values": [
                 126,
@@ -69,13 +69,13 @@
             },
             "temperature": {
               "times": [
-                1,
-                571,
-                1152,
-                1732,
-                2312,
-                2893,
-                3463
+                980,
+                571240,
+                1151560,
+                1731870,
+                2312170,
+                2892610,
+                3462960
               ],
               "values": [
                 264,
@@ -90,13 +90,13 @@
             "pressures": [
               {
                 "times": [
-                  1,
-                  571,
-                  1152,
-                  1732,
-                  2312,
-                  2893,
-                  3463
+                  980,
+                  571240,
+                  1151560,
+                  1731870,
+                  2312170,
+                  2892610,
+                  3462960
                 ],
                 "values": [
                   2064,
@@ -112,13 +112,13 @@
             ],
             "ndl": {
               "times": [
-                1,
-                571,
-                1152,
-                1732,
-                2312,
-                2893,
-                3463
+                980,
+                571240,
+                1151560,
+                1731870,
+                2312170,
+                2892610,
+                3462960
               ],
               "values": [
                 6000,
@@ -132,12 +132,12 @@
             },
             "tts": {
               "times": [
-                571,
-                1152,
-                1732,
-                2312,
-                2893,
-                3463
+                571240,
+                1151560,
+                1731870,
+                2312170,
+                2892610,
+                3462960
               ],
               "values": [
                 120,
@@ -155,52 +155,52 @@
                 "gas_number": 0
               },
               {
-                "time": 1367,
+                "time": 1366880,
                 "type": "ascent_rate",
                 "label": "Ascent Speed"
               },
               {
-                "time": 1367,
+                "time": 1366880,
                 "type": "safety_stop_mandatory",
                 "label": "Mandatory Safety Stop"
               },
               {
-                "time": 1790,
+                "time": 1789870,
                 "type": "deep_stop"
               },
               {
-                "time": 1827,
+                "time": 1826910,
                 "type": "deep_stop_violation",
                 "label": "Deep Stop Broken"
               },
               {
-                "time": 1837,
+                "time": 1836920,
                 "type": "deep_stop_violation",
                 "label": "Violated Deep Stop"
               },
               {
-                "time": 2900,
+                "time": 2899880,
                 "type": "safety_stop"
               },
               {
-                "time": 2913,
+                "time": 2912910,
                 "type": "safety_stop"
               },
               {
-                "time": 2987,
+                "time": 2986910,
                 "type": "safety_stop_violation",
                 "label": "Safety Stop Broken"
               },
               {
-                "time": 3001,
+                "time": 3000940,
                 "type": "safety_stop_violation"
               },
               {
-                "time": 3002,
+                "time": 3001920,
                 "type": "safety_stop"
               },
               {
-                "time": 3002,
+                "time": 3001920,
                 "type": "safety_stop_violation",
                 "label": "Safety Stop Broken"
               }

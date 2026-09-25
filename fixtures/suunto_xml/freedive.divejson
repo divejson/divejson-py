@@ -4,7 +4,7 @@
   "exported_at": "2026-09-07T00:00:00+00:00",
   "generator": {
     "name": "divejson convert",
-    "version": "0.3.0"
+    "version": "0.12.0"
   },
   "dives": [
     {
@@ -14,7 +14,6 @@
       "max_depth": 8.53,
       "avg_depth": 4.89,
       "bottom_temperature": 29.0,
-      "surface_pressure": 1.058,
       "recordings": [
         {
           "device": {
@@ -25,13 +24,14 @@
             "dive_number": 1
           },
           "mode": "freedive",
+          "surface_pressure": 1.058,
           "profile": {
-            "duration": 33,
+            "duration": 33000,
             "depth": {
               "times": [
-                1,
-                20,
-                33
+                1000,
+                20000,
+                33000
               ],
               "values": [
                 127,
@@ -41,9 +41,9 @@
             },
             "temperature": {
               "times": [
-                1,
-                20,
-                33
+                1000,
+                20000,
+                33000
               ],
               "values": [
                 299,

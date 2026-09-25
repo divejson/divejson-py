@@ -4,7 +4,7 @@
   "exported_at": "2026-09-05T00:00:00+00:00",
   "generator": {
     "name": "divejson convert",
-    "version": "0.2.0"
+    "version": "0.12.0"
   },
   "dives": [
     {
@@ -40,12 +40,12 @@
             "name": "Suunto Ocean"
           },
           "profile": {
-            "duration": 4300,
+            "duration": 4299990,
             "depth": {
               "times": [
-                0,
-                1200,
-                4000
+                160,
+                1200000,
+                4000020
               ],
               "values": [
                 145,
@@ -55,7 +55,7 @@
             },
             "ceiling": {
               "times": [
-                1200
+                1200000
               ],
               "values": [
                 300
@@ -63,7 +63,7 @@
             },
             "temperature": {
               "times": [
-                60
+                60000
               ],
               "values": [
                 224
@@ -72,10 +72,10 @@
             "pressures": [
               {
                 "times": [
-                  0,
-                  1200,
-                  4000,
-                  4300
+                  160,
+                  1200000,
+                  4000020,
+                  4299990
                 ],
                 "values": [
                   2116,
@@ -88,22 +88,22 @@
             ],
             "events": [
               {
-                "time": 0,
+                "time": 20,
                 "type": "gas_switch",
                 "gas_number": 0
               },
               {
-                "time": 1230,
+                "time": 1230000,
                 "type": "ceiling_violation",
                 "label": "Ceiling Broken"
               },
               {
-                "time": 2075,
+                "time": 2075190,
                 "type": "gas_switch",
                 "gas_number": 1
               },
               {
-                "time": 3840,
+                "time": 3840000,
                 "type": "safety_stop"
               }
             ]

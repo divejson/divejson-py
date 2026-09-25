@@ -4,7 +4,7 @@
   "exported_at": "2026-09-07T00:00:00+00:00",
   "generator": {
     "name": "divejson convert",
-    "version": "0.3.0"
+    "version": "0.12.0"
   },
   "dives": [
     {
@@ -14,11 +14,6 @@
       "max_depth": 31.95,
       "avg_depth": 16.6,
       "bottom_temperature": 25.0,
-      "cns_start": 0.0,
-      "cns_end": 20.0,
-      "otu_start": 0.0,
-      "otu_end": 43.0,
-      "surface_pressure": 1.063,
       "cylinders": [
         {
           "volume": 22.0,
@@ -26,14 +21,14 @@
           "end_pressure": 144.625,
           "oxygen": 21.0,
           "helium": 0.0,
-          "po2_limit": 1.4,
+          "ppo2_limit": 1.4,
           "gas_number": 0
         },
         {
           "volume": 11.0,
           "oxygen": 52.0,
           "helium": 0.0,
-          "po2_limit": 1.6,
+          "ppo2_limit": 1.6,
           "gas_number": 1
         }
       ],
@@ -50,18 +45,23 @@
           "deco_model": {
             "conservatism": -1
           },
+          "surface_pressure": 1.063,
+          "cns_start": 0.0,
+          "cns_end": 20.0,
+          "otu_start": 0.0,
+          "otu_end": 43.0,
           "profile": {
-            "duration": 3485,
+            "duration": 3485000,
             "depth": {
               "times": [
-                1,
-                11,
-                241,
-                1112,
-                1122,
-                1583,
-                1593,
-                3485
+                1000,
+                11000,
+                241000,
+                1112000,
+                1122000,
+                1583000,
+                1593000,
+                3485000
               ],
               "values": [
                 141,
@@ -76,10 +76,10 @@
             },
             "ceiling": {
               "times": [
-                1112,
-                1122,
-                1583,
-                1593
+                1112000,
+                1122000,
+                1583000,
+                1593000
               ],
               "values": [
                 300,
@@ -90,14 +90,14 @@
             },
             "temperature": {
               "times": [
-                1,
-                11,
-                241,
-                1112,
-                1122,
-                1583,
-                1593,
-                3485
+                1000,
+                11000,
+                241000,
+                1112000,
+                1122000,
+                1583000,
+                1593000,
+                3485000
               ],
               "values": [
                 290,
@@ -113,12 +113,12 @@
             "pressures": [
               {
                 "times": [
-                  1,
-                  11,
-                  241,
-                  1112,
-                  1122,
-                  1583
+                  1000,
+                  11000,
+                  241000,
+                  1112000,
+                  1122000,
+                  1583000
                 ],
                 "values": [
                   2114,
@@ -138,7 +138,7 @@
                 "gas_number": 0
               },
               {
-                "time": 1592,
+                "time": 1592000,
                 "type": "gas_switch",
                 "gas_number": 1
               }

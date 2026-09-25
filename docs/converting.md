@@ -66,6 +66,12 @@ own schema forbids, and where refusing would cost a diver their logbook.
   library parser is then used for.
 - **A time of day with no seconds is read as `:00`, and reported.** §5.2's grammar requires
   them, and refusing would cost a diver a whole dive over a spelling.
+- **A date with no time of day is a date-only start, and reported.** §5.2 lets a dive's
+  `started_at` be the date alone, so a source that recorded the day and not the time gives
+  exactly that, with an `absent` finding for the time of day. Reading it as midnight would
+  put a time the source never stated into the logbook, and a real midnight dive read back
+  would be indistinguishable from it. This holds only for the dive's own start: every other
+  date-time member, a recording's own start among them, takes a date-time or nothing.
 
 ### For every XML source, a `<!DOCTYPE>` is refused outright
 
@@ -103,8 +109,8 @@ mean, a conversion by an irrational factor — which each format's mapping docum
 Arithmetic runs on decimal values parsed from the source text, not on floating point:
 `2.6 × 100` is exactly `260` that way, where the float route arrives at
 `260.00000000000003` and has to be rounded back out. Rounding to an integer is
-half-away-from-zero — a reading of 2.5 seconds is 3, not the 2 that banker's rounding
-gives.
+half-away-from-zero, at whatever grain the member counts — a sample stamped 2.5 ms in is at
+3 ms, not the 2 that banker's rounding gives.
 
 ## Identity
 
@@ -140,8 +146,9 @@ it; nothing can recover from a writer that does not keep its own ids stable.
 ## Provenance
 
 What the source said about itself — its format version, its generating application — rides
-under the `divejson` producer key in `extensions` (§5.5), because the source's own identity
-is worth keeping and the core vocabulary has nowhere for it. Each format's mapping document
+under the `divejson` producer key in `extensions`, which §5.5 reserves for converters
+following this document, because the source's own identity is worth keeping and the core
+vocabulary has nowhere for it. Each format's mapping document
 names the members it writes there.
 
 `generator` is **the converter**, not the source; §4 defines it as what produced *this*
@@ -150,10 +157,11 @@ document. `exported_at` is the moment of conversion, always offset-aware.
 ## What the format cannot hold, and what the source did not record
 
 - **A member whose type constrains the text a source may put in it is checked, not merely
-  capped.** Most source strings reach a free-text member where the only limit is a length;
-  a constrained one — an email address is the case in hand — is different. A source string
-  that the member cannot hold is read as *not recorded* and reported: a member the format
-  cannot hold is a member the source did not fill in. A converter that passed it through
+  capped.** Most source strings reach a free-text member that takes any text, up to a
+  length where the member has one; a constrained one — an email address is the case in
+  hand — is different. A source string that the member cannot hold is read as *not
+  recorded* and reported: a member the format cannot hold is a member the source did not
+  fill in. A converter that passed it through
   would emit a document that fails its own validation, and since that is treated as the
   converter's bug rather than the file's, one unusable header field would discard an entire
   logbook. Any mapping added later that lands a source string on a constrained member owes
@@ -237,6 +245,14 @@ about the dive, and the recording is where it lives.
   format that states a dive's start once. A source that timestamps each computer's record
   separately — `.ssrf`'s `<divecomputer @date @time>` — states one per recording, and
   writing it is what keeps a second computer's samples on their own axis.
+- **A readout goes on the recording its computer produced** (§6.4a). A source that states
+  one per computer's record — a FIT file, a Suunto export, one per file — gives it to that
+  recording. A source that states one on the **dive** — Subsurface's `<dive @cns>` and
+  `@otu`, UDDF's `<surfacepressure>` — gives it to the recording its first computer
+  produced, the primary, and reports it `resolved` where the dive has more than one
+  recording, the file not saying which computer computed it. A dive with a readout and no
+  recording otherwise gets one carrying the readout alone, which §6.4a allows: the figure is
+  a computer's, whether or not the file said which.
 - **A device is data on a recording, never a gear item.** The two can describe one piece
   of hardware; they are not one record. A converter that minted a `computer` gear item per
   dive from a model string would fill a logbook's kit list with duplicates of one computer,
@@ -313,11 +329,12 @@ readings beside 29 temperatures keeps both, rather than gaining 402 invented one
   make. This is reported, unlike a dive that simply carries no samples: the source did
   record a profile, and this is the converter unable to carry it — the same class as a
   dropped sample rather than an absence.
-- Source sample times are commonly fractional while §6.5's `times` are strictly increasing
-  integers, so **two readings of one channel that round to the same second keep the first
-  and report the second**. The collision is **per channel, not per source record**: §6.5
+- §6.5's `times` are milliseconds, so a source's seconds are multiplied by a thousand and
+  rounded to the whole millisecond — which keeps every sub-second offset a source states —
+  and **two readings of one channel that round to the same millisecond keep the first and
+  report the second**. The collision is **per channel, not per source record**: §6.5
   gives every channel its own `times`, so readings of *different* channels landing on one
-  second are collected into one sample rather than competing for it. Sources that append
+  millisecond are collected into one sample rather than competing for it. Sources that append
   each sensor's stream as its own record — a depth here, a temperature there, almost never
   two at once — are common, and offering those records to the axis one at a time makes the
   axis choose between two readings that were never in competition, losing real ones by it.

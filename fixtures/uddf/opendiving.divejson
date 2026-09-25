@@ -4,7 +4,7 @@
   "exported_at": "2026-09-05T00:00:00+00:00",
   "generator": {
     "name": "divejson convert",
-    "version": "0.1.0"
+    "version": "0.12.0"
   },
   "diver": {
     "uuid": "d8b9bbd3-c66e-52c1-b8e8-d908f921af7e",
@@ -31,7 +31,6 @@
       "visibility": 20.0,
       "weight": 6.0,
       "altitude": 0,
-      "surface_pressure": 1.013,
       "trip_uuid": "0198a6f0-4444-7001-8000-000000000001",
       "site_uuids": [
         "0198a6f0-3333-7001-8000-000000000001"
@@ -48,7 +47,7 @@
           "end_pressure": 60.0,
           "oxygen": 21.0,
           "helium": 0.0,
-          "po2_limit": 1.4,
+          "ppo2_limit": 1.4,
           "gas_number": 0
         },
         {
@@ -57,7 +56,7 @@
           "end_pressure": 150.0,
           "oxygen": 50.0,
           "helium": 0.0,
-          "po2_limit": 1.6,
+          "ppo2_limit": 1.6,
           "gas_number": 1
         }
       ],
@@ -67,16 +66,17 @@
             "brand": "Suunto",
             "name": "Ocean"
           },
+          "surface_pressure": 1.013,
           "profile": {
-            "duration": 2880,
+            "duration": 2880000,
             "depth": {
               "times": [
                 0,
-                120,
-                600,
-                2400,
-                2700,
-                2880
+                120000,
+                600000,
+                2400000,
+                2700000,
+                2880000
               ],
               "values": [
                 0,
@@ -90,8 +90,8 @@
             "temperature": {
               "times": [
                 0,
-                120,
-                600
+                120000,
+                600000
               ],
               "values": [
                 244,
@@ -103,9 +103,9 @@
               {
                 "times": [
                   0,
-                  120,
-                  600,
-                  2880
+                  120000,
+                  600000,
+                  2880000
                 ],
                 "values": [
                   2100,
@@ -117,8 +117,8 @@
               },
               {
                 "times": [
-                  2400,
-                  2700
+                  2400000,
+                  2700000
                 ],
                 "values": [
                   2000,
@@ -134,16 +134,16 @@
                 "gas_number": 0
               },
               {
-                "time": 600,
+                "time": 600000,
                 "label": "Deepest point"
               },
               {
-                "time": 2400,
+                "time": 2400000,
                 "type": "gas_switch",
                 "gas_number": 1
               },
               {
-                "time": 2700,
+                "time": 2700000,
                 "type": "safety_stop"
               }
             ]

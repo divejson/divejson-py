@@ -210,15 +210,42 @@ def test_offset_spellings_are_normalized_without_being_moved(written: str, expec
     assert dive(before(datetime_text=written))["started_at"] == expected
 
 
-def test_a_truncated_midnight_is_read_as_midnight_and_reported() -> None:
-    """Subsurface emits `<datetime>2002-06-18T</datetime>` for a dive logged at midnight.
+@pytest.mark.parametrize("written", ["2002-06-18T", "2002-06-18", " 2002-06-18 "])
+def test_a_date_with_no_time_of_day_is_a_date_only_start(written: str) -> None:
+    """Subsurface emits `<datetime>2002-06-18T</datetime>` for a dive logged at midnight, and a
+    bare date is what UDDF's documentation calls a legal omission of the lower-order elements.
 
-    Dropping the dive would lose it over a writer's unguarded string concatenation, so the
-    reading is stated in the report rather than made silently.
+    Neither states a time of day, so neither is read as midnight: §5.2 lets a dive's start be
+    the date alone, and the absence of the time is reported rather than filled.
     """
-    data = one_dive(before(datetime_text="2002-06-18T"))
-    assert convert(data).document["dives"][0]["started_at"] == "2002-06-18T00:00:00"
-    assert any("no time of day" in message for message in messages(data))
+    data = one_dive(before(datetime_text=written))
+    conversion = convert(data)
+    assert conversion.document["dives"][0]["started_at"] == "2002-06-18"
+    assert validate_document(conversion.document) == []
+    found = [(note.kind, note.message) for note in conversion.notes if "2002-06-18" in note.message]
+    assert found == [
+        (
+            "absent",
+            (
+                f"{written.strip()!r} records a date with no time of day; read as a date-only start rather "
+                "than as midnight (spec §5.2)"
+            ),
+        )
+    ]
+    # No wall clock, so no offset for it to be missing.
+    assert not any("no UTC offset" in message for message in messages(data))
+
+
+def test_an_offset_beside_a_date_alone_is_dropped() -> None:
+    """A date carries no offset, and one written beside it has nowhere to go."""
+    data = one_dive(before(datetime_text="2002-06-18+02:00"))
+    assert convert(data).document["dives"][0]["started_at"] == "2002-06-18"
+    assert any("a UTC offset beside a date alone" in message for message in messages(data))
+
+
+def test_a_date_that_is_not_one_drops_the_dive() -> None:
+    conversion = convert(one_dive(before(datetime_text="2002-02-30")))
+    assert "dives" not in conversion.document
 
 
 def test_a_dive_with_no_start_time_is_dropped_rather_than_dated() -> None:
@@ -490,7 +517,8 @@ def test_hostile_source_strings_still_produce_a_conforming_document() -> None:
     assert "email" not in conversion.document["diver"]
     assert "phone" not in conversion.document["diver"]
     assert len(conversion.document["diver"]["insurances"][0]["provider"]) == 255
-    assert len(conversion.document["dives"][0]["notes"]) == 10_000
+    # A note is prose and carries whole, however long (§6.2 bounds none).
+    assert conversion.document["dives"][0]["notes"] == long_note.strip()
     assert len(conversion.document["sites"][0]["name"]) == 255
 
 
@@ -643,9 +671,9 @@ def test_channels_keep_their_own_time_axes() -> None:
         "<waypoint><depth>3.0</depth><divetime>20</divetime></waypoint>"
     )
     found = profile_of(dive(f"{STARTED_AT}<samples>{samples}</samples>"))
-    assert found["depth"]["times"] == [0, 10, 20]
+    assert found["depth"]["times"] == [0, 10_000, 20_000]
     assert found["temperature"]["times"] == [0]
-    assert found["duration"] == 20
+    assert found["duration"] == 20_000
 
 
 def test_profile_duration_spans_the_samples_rather_than_the_logged_duration() -> None:
@@ -661,7 +689,7 @@ def test_profile_duration_spans_the_samples_rather_than_the_logged_duration() ->
         "<informationafterdive><diveduration>4010</diveduration></informationafterdive>"
     )
     assert found["duration"] == 4010
-    assert profile_of(found)["duration"] == 4300
+    assert profile_of(found)["duration"] == 4_300_000
 
 
 def test_waypoints_are_ordered_by_their_recorded_time() -> None:
@@ -670,7 +698,7 @@ def test_waypoints_are_ordered_by_their_recorded_time() -> None:
         "<waypoint><depth>1.0</depth><divetime>0</divetime></waypoint>"
     )
     found = profile_of(dive(f"{STARTED_AT}<samples>{samples}</samples>"))
-    assert found["depth"]["times"] == [0, 20]
+    assert found["depth"]["times"] == [0, 20_000]
     assert found["depth"]["values"] == [100, 300]
 
 
@@ -690,17 +718,33 @@ def test_a_dropped_waypoint_is_reported_at_its_own_position_in_the_file() -> Non
     assert dropped == ["dive/0/waypoint/0", "dive/0/waypoint/2"]
 
 
-def test_waypoints_landing_on_one_second_keep_the_first() -> None:
-    """`<divetime>` is `xs:float`, and §6.5's `times` are strictly increasing integers."""
+def test_a_fractional_divetime_keeps_its_place_to_the_millisecond() -> None:
+    """`<divetime>` is `xs:float` seconds and §6.5's axis is milliseconds, so `30` and `30.4`
+    share a second and are two readings — `fixtures/uddf/legacy-writer.uddf`'s shape."""
     samples = (
         "<waypoint><depth>1.0</depth><divetime>30</divetime></waypoint>"
         "<waypoint><depth>2.0</depth><divetime>30.4</divetime></waypoint>"
+        "<waypoint><depth>3.0</depth><divetime>1200.0205</divetime></waypoint>"
     )
     data = one_dive(f"{STARTED_AT}<samples>{samples}</samples>")
     found = profile_of(convert(data).document["dives"][0])
-    assert found["depth"]["times"] == [30]
+    # Halves away from zero at the millisecond's grain.
+    assert found["depth"]["times"] == [30_000, 30_400, 1_200_021]
+    assert found["depth"]["values"] == [100, 200, 300]
+    assert not any("strictly increasing" in message for message in messages(data))
+
+
+def test_waypoints_landing_on_one_millisecond_keep_the_first() -> None:
+    """§6.5's `times` are strictly increasing integers."""
+    samples = (
+        "<waypoint><depth>1.0</depth><divetime>30.4</divetime></waypoint>"
+        "<waypoint><depth>2.0</depth><divetime>30.4002</divetime></waypoint>"
+    )
+    data = one_dive(f"{STARTED_AT}<samples>{samples}</samples>")
+    found = profile_of(convert(data).document["dives"][0])
+    assert found["depth"]["times"] == [30_400]
     assert found["depth"]["values"] == [100]
-    assert any("strictly increasing" in message for message in messages(data))
+    assert any("two waypoints are both at 30.4 s" in message for message in messages(data))
 
 
 def test_waypoints_with_no_usable_reading_produce_no_profile_and_say_so() -> None:
@@ -739,7 +783,7 @@ def test_a_dive_with_no_samples_at_all_is_not_reported() -> None:
 def test_a_waypoint_with_no_time_has_no_place_on_the_axis() -> None:
     samples = "<waypoint><depth>1.0</depth></waypoint><waypoint><depth>2.0</depth><divetime>10</divetime></waypoint>"
     data = one_dive(f"{STARTED_AT}<samples>{samples}</samples>")
-    assert profile_of(convert(data).document["dives"][0])["depth"]["times"] == [10]
+    assert profile_of(convert(data).document["dives"][0])["depth"]["times"] == [10_000]
     assert any("no place on the profile's time axis" in message for message in messages(data))
 
 
@@ -778,7 +822,7 @@ def test_a_marker_naming_an_event_type_comes_back_as_that_type() -> None:
     events = profile_of(dive(f"{STARTED_AT}<samples>{samples}</samples>"))["events"]
     assert events == [
         {"time": 0, "type": "safety_stop"},
-        {"time": 10, "label": "NoDecoTime"},
+        {"time": 10_000, "label": "NoDecoTime"},
     ]
 
 
@@ -875,6 +919,53 @@ def test_a_counter_with_no_computer_to_belong_to_is_reported() -> None:
     assert any("no device to carry it" in message for message in messages(data))
 
 
+SURFACE = "<surfacepressure>101300</surfacepressure>"
+
+
+def test_the_surface_pressure_is_the_first_links_recordings() -> None:
+    """A readout (§6.4a), stated once per dive: it goes where the samples and the counter go."""
+    computers = _equipment(_computer("c1", "<name>Ocean</name>"))
+    found = dive(before(f"{_uses('c1')}{SURFACE}"), header=computers)
+    assert "surface_pressure" not in found
+    assert found["recordings"] == [{"device": {"name": "Ocean"}, "surface_pressure": 1.013}]
+
+
+def test_a_surface_pressure_with_no_computer_is_a_recording_of_its_own() -> None:
+    """A figure a computer produced is a record of the dive (§6.4a), whether or not the file
+    says which computer — so a dive with nothing else to make a recording of still keeps it."""
+    data = one_dive(before(SURFACE))
+    assert convert(data).document["dives"][0]["recordings"] == [{"surface_pressure": 1.013}]
+    assert not any(note.kind == "resolved" for note in convert(data).notes)
+
+
+def test_on_a_dive_linking_two_computers_it_is_the_first_ones_and_says_so() -> None:
+    """The file does not say whose figure it is, so where it goes is a reading of its meaning."""
+    computers = _equipment(_computer("c1", "<name>Ocean</name>"), _computer("c2", "<name>Perdix</name>"))
+    data = one_dive(before(f"{_uses('c1', 'c2')}{SURFACE}"), header=computers)
+    conversion = convert(data)
+    assert conversion.document["dives"][0]["recordings"] == [
+        {"device": {"name": "Ocean"}, "surface_pressure": 1.013},
+        {"device": {"name": "Perdix"}},
+    ]
+    resolved = [note for note in conversion.notes if note.kind == "resolved"]
+    assert [note.where for note in resolved] == ["dive/0"]
+    assert "the dive states <surfacepressure> once and has 2 recordings" in resolved[0].message
+
+
+def test_the_surface_pressure_carries_the_first_link_past_the_carve_out() -> None:
+    """The way a profile does: the first link is a recording whether or not its element
+    names a device, and the later ones are judged on their devices alone."""
+    computers = _equipment(_computer("c1", "<notes><para>x</para></notes>"), _computer("c2", "<name>Ocean</name>"))
+    found = dive(before(f"{_uses('c1', 'c2')}{SURFACE}"), header=computers)
+    assert found["recordings"] == [{"surface_pressure": 1.013}, {"device": {"name": "Ocean"}}]
+
+
+def test_a_surface_pressure_outside_the_range_is_dropped_and_makes_nothing() -> None:
+    data = one_dive(before("<surfacepressure>10130000</surfacepressure>"))
+    assert "recordings" not in convert(data).document["dives"][0]
+    assert any("outside the 0.4 to 1.2" in message for message in messages(data))
+
+
 def test_the_dives_own_divenumber_is_the_divers_and_stays_there() -> None:
     """The two counters are different members, and this is the one the diver keeps."""
     computers = _equipment(_computer("c1", "<name>Ocean</name>"))
@@ -944,9 +1035,9 @@ BUEHLMANN_PERCENT = (
     "</buehlmann></decomodel>"
 )
 
-# §3's rule 4: a recording carries at least one of `device`, `profile` and `source_files`,
-# and a `mode` or a `deco_model` satisfies none of them. So every test below hangs its model
-# on a dive that kept a sample.
+# §3's rule 4: a recording carries at least one of `device`, `profile`, `source_files` and a
+# readout, and a `mode` or a `deco_model` satisfies none of them. So every test below hangs
+# its model on a dive that kept a sample.
 ONE_SAMPLE = "<samples><waypoint><depth>1</depth><divetime>0</divetime></waypoint></samples>"
 
 
@@ -963,8 +1054,8 @@ def test_a_linked_buehlmann_becomes_the_recordings_deco_model() -> None:
 
 
 def test_a_deco_model_alone_does_not_make_a_recording() -> None:
-    """§3's rule 4 names `device`, `profile` and `source_files`, and neither §6.4a member
-    this plan adds is one of them."""
+    """§3's rule 4 names `device`, `profile`, `source_files` and a readout, and neither a
+    mode nor a model is one of them."""
     assert _recording(before('<link ref="zhl16c" />'), header=BUEHLMANN) == {}
 
 
@@ -1026,7 +1117,7 @@ def test_an_inverted_gradient_factor_pair_costs_the_pair_and_not_the_file() -> N
     )
     body = before('<link ref="m" />') + ONE_SAMPLE
     assert _recording(body, header=header)["deco_model"] == {"algorithm": "buhlmann"}
-    assert any("§3 rule 7" in message for message in messages(one_dive(body, header=header)))
+    assert any("§3 rule 6" in message for message in messages(one_dive(body, header=header)))
 
 
 @pytest.mark.parametrize(

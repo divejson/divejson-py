@@ -24,11 +24,6 @@
       "weight": 0,
       "water_type": "salt",
       "altitude": 0,
-      "cns_start": 4.5,
-      "cns_end": 61.0,
-      "otu_start": 0,
-      "otu_end": 88.5,
-      "surface_pressure": 1.013,
       "entry_position": {
         "latitude": -45.86055,
         "longitude": 170.66973
@@ -57,7 +52,7 @@
           "end_pressure": 80.0,
           "oxygen": 18.0,
           "helium": 45.0,
-          "po2_limit": 1.4,
+          "ppo2_limit": 1.4,
           "gas_number": 1,
           "role": "bottom",
           "usage": "parallel"
@@ -68,7 +63,7 @@
           "end_pressure": 95.0,
           "oxygen": 18.0,
           "helium": 45.0,
-          "po2_limit": 1.4,
+          "ppo2_limit": 1.4,
           "gas_number": 2,
           "role": "bottom",
           "usage": "parallel"
@@ -79,7 +74,7 @@
           "end_pressure": 120.0,
           "oxygen": 50.0,
           "helium": 0.0,
-          "po2_limit": 1.6,
+          "ppo2_limit": 1.6,
           "gas_number": 3,
           "role": "deco",
           "usage": "staged"
@@ -90,7 +85,7 @@
           "end_pressure": 0.0,
           "oxygen": 100.0,
           "helium": 0.0,
-          "po2_limit": 1.6,
+          "ppo2_limit": 1.6,
           "gas_number": 4,
           "role": "oxygen",
           "usage": "staged"
@@ -98,20 +93,20 @@
       ],
       "created_at": "2026-07-03T18:30:00+12:45",
       "profile": {
-        "duration": 5520,
+        "duration": 5520000,
         "depth": {
           "times": [
             0,
-            120,
-            600,
-            1500,
-            2400,
-            3000,
-            3600,
-            4200,
-            4800,
-            5400,
-            5520
+            120000,
+            600000,
+            1500000,
+            2400000,
+            3000000,
+            3600000,
+            4200000,
+            4800000,
+            5400000,
+            5520000
           ],
           "values": [
             0,
@@ -129,12 +124,12 @@
         },
         "ceiling": {
           "times": [
-            1500,
-            2400,
-            3000,
-            3600,
-            4200,
-            4800
+            1500000,
+            2400000,
+            3000000,
+            3600000,
+            4200000,
+            4800000
           ],
           "values": [
             1800,
@@ -148,8 +143,8 @@
         "temperature": {
           "times": [
             0,
-            1500,
-            5400
+            1500000,
+            5400000
           ],
           "values": [
             162,
@@ -161,8 +156,8 @@
           {
             "times": [
               0,
-              2400,
-              5400
+              2400000,
+              5400000
             ],
             "values": [
               2200,
@@ -174,8 +169,8 @@
           {
             "times": [
               0,
-              2400,
-              5400
+              2400000,
+              5400000
             ],
             "values": [
               2180,
@@ -186,8 +181,8 @@
           },
           {
             "times": [
-              3000,
-              4200
+              3000000,
+              4200000
             ],
             "values": [
               2000,
@@ -197,8 +192,8 @@
           },
           {
             "times": [
-              4200,
-              5400
+              4200000,
+              5400000
             ],
             "values": [
               1950,
@@ -214,29 +209,29 @@
             "gas_number": 1
           },
           {
-            "time": 2980,
+            "time": 2980000,
             "type": "deep_stop"
           },
           {
-            "time": 3005,
+            "time": 3005000,
             "type": "gas_switch",
             "gas_number": 3
           },
           {
-            "time": 4210,
+            "time": 4210000,
             "type": "gas_switch",
             "gas_number": 4
           },
           {
-            "time": 5100,
+            "time": 5100000,
             "type": "safety_stop"
           },
           {
-            "time": 5200,
+            "time": 5200000,
             "label": "Tissue ceiling cleared"
           },
           {
-            "time": 5605,
+            "time": 5605000,
             "type": "bookmark",
             "label": "Surface marker"
           }

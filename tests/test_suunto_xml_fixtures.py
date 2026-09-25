@@ -134,6 +134,6 @@ def test_the_two_gas_dive_ties_its_channel_and_its_markers_to_the_right_cylinder
     assert profile_of(dive)["pressures"][0]["gas_number"] == 0
     assert profile_of(dive)["events"] == [
         {"time": 0, "type": "gas_switch", "gas_number": 0},
-        {"time": 1592, "type": "gas_switch", "gas_number": 1},
+        {"time": 1_592_000, "type": "gas_switch", "gas_number": 1},
     ]
     assert profile_of(dive)["ceiling"]["times"], "the deco dive's ceiling channel"

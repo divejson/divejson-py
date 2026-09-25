@@ -78,6 +78,7 @@ from .converter import (
     device,
     header,
     integer_of,
+    milliseconds,
     position,
     record_inferred,
     recorded,
@@ -166,11 +167,12 @@ COORDINATE_PLACES = Decimal("0.000001")
 UNCARRIED_GAS_STATUSES = frozenset({"disabled"})
 
 # `dive_settings.water_type`, whose FIT enum is `{0: fresh, 1: salt, 2: en13319,
-# 3: custom}`. Three of the four are §6.2 members under the same name. `custom` is
-# deliberately absent: it says the diver dialled in a `water_density` number, which is not
-# a water type and which §6.2 has nowhere to put — so it is reported rather than rounded
-# to the nearest real water.
-WATER_TYPES = {"fresh": "fresh", "salt": "salt", "en13319": "en13319"}
+# 3: custom}`, is the density the computer was set to, so three of the four are §6.4a
+# `salinity` values under the same name and none of them is the dive's `water_type`: a
+# setting of the device is not a record of the water. `custom` is deliberately absent: it
+# says the diver dialled in a `water_density` number, which §6.4a has nowhere to put — so it
+# is reported rather than rounded to the nearest named setting.
+SALINITIES = {"fresh": "fresh", "salt": "salt", "en13319": "en13319"}
 
 # `event.event` values that describe the dive, and the §6.5 event type each becomes. A
 # table rather than a cast: this is Garmin's vocabulary, and the other 43 members of its
@@ -303,12 +305,12 @@ class _Point:
     messages of which 431 carry a depth and 4,294 a temperature — and a transmitter's
     `tank_update` is a message of its own at its own instant. They are collected onto one
     instant here so that the §6.5 axis is built once, and so that a `record` and a
-    `tank_update` at one second are one sample rather than two, the later of which the
+    `tank_update` at one timestamp are one sample rather than two, the later of which the
     axis would drop.
 
     `eq=False` so a point stays hashable and compares by identity. A dataclass that
     generates `__eq__` sets `__hash__` to `None`, and these are used as dictionary keys —
-    an event finds its second by looking its own instant's point up in the axis. Identity
+    an event finds its place by looking its own instant's point up in the axis. Identity
     is also the comparison that means anything here: two instants that happened to record
     the same depth are still two samples.
     """
@@ -694,8 +696,11 @@ class _Converter:
         # In §6.2's own member order, so a converted dive reads down the schema.
         self.read_duration(session, summary, dive, where)
         self.read_depths(session, summary, samples, dive, where)
-        self.read_water_type(dive, where)
-        self.read_oxygen(session, summary, dive, where)
+        # The salinity setting and the oxygen clocks are the computer's own (§6.4a), so they
+        # are read here and carried on its recording below rather than on the dive — and the
+        # clocks are enough on their own to make one, where the setting is not.
+        salinity = self.read_salinity(where)
+        readouts = self.read_oxygen(session, summary, where)
         self.read_positions(samples, dive)
 
         cylinders, sensors = self.read_cylinders(where)
@@ -706,11 +711,14 @@ class _Converter:
         # one to point at.
         profile = self.read_profile(samples, cylinders, sensors, where)
         # A FIT file is one dive written by one computer, so a converted document has
-        # exactly one recording (§6.4a) — and none at all where the file names no computer
-        # and kept no usable sample, §6.4a forbidding a recording that carries nothing.
+        # exactly one recording (§6.4a) — and none at all where the file names no computer,
+        # kept no usable sample and states no readout, §6.4a forbidding a recording that
+        # carries nothing.
         built = recording(
             device=self.read_device(session, where),
             deco_model=self.read_deco_model(where),
+            salinity=salinity,
+            readouts=readouts,
             profile=profile,
         )
         if built is not None:
@@ -833,8 +841,8 @@ class _Converter:
 
     # -- the summary scalars -----------------------------------------------------
 
-    def absent(self, member: str, source: str, where: str) -> None:
-        self.note(where, f"the file records no {source}, so the dive's {member} is not carried", "absent")
+    def absent(self, member: str, source: str, where: str, *, record: str = "dive") -> None:
+        self.note(where, f"the file records no {source}, so the {record}'s {member} is not carried", "absent")
 
     def read_duration(
         self,
@@ -952,15 +960,16 @@ class _Converter:
         self,
         session: fitdecode.FitDataMessage,
         summary: fitdecode.FitDataMessage | None,
-        dive: dict[str, Any],
         where: str,
-    ) -> None:
+    ) -> dict[str, float]:
         """The dive's CNS and OTU totals — the summary first, then the session.
 
         The mirror of `read_depths`, which prefers the session. The order is the other way
         round because these are the *dive's* oxygen accounting: on a multi-dive Garmin
         file the session totals cover the whole activity, while `summary` has already
-        picked out the summary that describes the dive being read.
+        picked out the summary that describes the dive being read. They are the computer's
+        own arithmetic, so they are returned for its recording rather than written onto the
+        dive (§6.4a).
 
         **`o2_toxicity` is the dive's ending OTU total rather than the OTUs it added**,
         which the profile's bare "OTUs" unit does not settle. The corpus does: one dive
@@ -969,44 +978,51 @@ class _Converter:
         delta it would have been 1. There is no `start_otu` anywhere in the FIT profile,
         so `otu_start` has no source at all — see `docs/fit-mapping.md`.
         """
+        readouts: dict[str, float] = {}
         for member, source in (("cns_start", "start_cns"), ("cns_end", "end_cns"), ("otu_end", "o2_toxicity")):
             value = _first(_number(_native(summary, source)), _number(_native(session, source)))
             if value is None:
-                self.absent(member, f"{source} on its session or on a dive summary", where)
-            elif recorded(value, record="dive", member=member):
-                dive[member] = float(value)
+                self.absent(member, f"{source} on its session or on a dive summary", where, record="recording")
+            elif recorded(value, record="recording", member=member):
+                readouts[member] = float(value)
             else:
                 self.note(
                     where,
                     f"the session's {source} is {value}, which the format records only from zero up; dropped",
                     "dropped",
                 )
+        return readouts
 
-    def read_water_type(self, dive: dict[str, Any], where: str) -> None:
-        """`dive_settings.water_type`, which is the only salinity evidence a FIT carries.
+    def read_salinity(self, where: str) -> str | None:
+        """`dive_settings.water_type`, which is the density the computer was set to.
 
-        `en13319` stays `en13319` rather than being folded into `salt`: it is the
-        calibration a computer ships set to, and rewriting it as the nearest real water
-        would be inventing a reading. `custom` says the diver dialled in a density number,
-        which §6.2 has no member for, and is reported rather than rounded off.
+        §6.4a's `salinity`, on the recording: a setting of this device rather than a record
+        of the water, so it never reaches the dive's `water_type`, and a reader deriving one
+        from the other is what §6.4a forbids. `en13319` stays `en13319` rather than being
+        folded into `salt`: it is the calibration a computer ships set to, and rewriting it
+        as the nearest real water would be inventing a reading. `custom` says the diver
+        dialled in a density number, which §6.4a has no member for, and is reported rather
+        than rounded off.
 
         **A device that wrote no `dive_settings`, or wrote one with no `water_type`,
         raises nothing.** The message is the computer's configuration rather than a record
         of the dive, so a setting it did not write is not a reading the dive failed to
         take — unlike the session summaries above, every one of which the device was
         describing this dive when it left empty.
+
+        **Untested against a real file**: no FIT file in the corpus writes the field.
         """
         value = _native(self.scan.settings, "water_type")
         if not isinstance(value, str):
-            return
-        if value in WATER_TYPES:
-            dive["water_type"] = WATER_TYPES[value]
-        else:
-            self.note(
-                where,
-                f"the device's water type is {value!r}, which this format has no value for; dropped",
-                "dropped",
-            )
+            return None
+        if value in SALINITIES:
+            return SALINITIES[value]
+        self.note(
+            where,
+            f"the device's water type setting is {value!r}, which this format has no value for; dropped",
+            "dropped",
+        )
+        return None
 
     def read_positions(self, samples: SampleAxis, dive: dict[str, Any]) -> None:
         """The fix on the way in and the fix on the way out, split at the deepest sample.
@@ -1024,8 +1040,8 @@ class _Converter:
         there is no pivot and so no answer, and nothing is written: a file that recorded
         positions and never a depth cannot say which of them is the entry.
         """
-        fixed = [(second, point) for second, point in samples.ordered() if point.latitude is not None]
-        depths = [(second, point.depth) for second, point in samples.ordered() if point.depth is not None]
+        fixed = [(at, point) for at, point in samples.ordered() if point.latitude is not None]
+        depths = [(at, point.depth) for at, point in samples.ordered() if point.depth is not None]
         if not fixed or not depths:
             return
 
@@ -1036,8 +1052,9 @@ class _Converter:
         before = [pair for pair in fixed if pair[0] <= pivot]
         after = [pair for pair in fixed if pair[0] > pivot]
         for member, chosen in (("entry_position", before[-1:]), ("exit_position", after[:1])):
-            for second, point in chosen:
-                where = f"dive/0/record/{second}"
+            for at, point in chosen:
+                # The elapsed second the record is at, which a FIT timestamp states whole.
+                where = f"dive/0/record/{at // 1000}"
                 found = position(point.latitude, point.longitude, note=self.note, where=where)
                 if found is not None:
                     dive[member] = found
@@ -1291,8 +1308,9 @@ class _Converter:
     def axis(self, where: str) -> SampleAxis:
         """The dive's time axis, offered every instant the file recorded a reading at.
 
-        The origin is the session's own start time, so the profile's seconds are elapsed
-        time from the moment the dive began — the same instant `started_at` names. A
+        The origin is the session's own start time, so the profile's axis is the elapsed
+        milliseconds from the moment the dive began — the same instant `started_at` names —
+        whole seconds times a thousand, `timestamp` stating nothing finer. A
         reading before it is dropped and reported by the axis, and a file whose session
         recorded no start time falls back to its earliest reading, which is the only other
         thing that can put a sample at zero.
@@ -1313,7 +1331,7 @@ class _Converter:
         start = _native(self.scan.session, "start_time")
         origin = start if isinstance(start, datetime) else min(self.scan.points)
         for at, point in self.scan.points.items():
-            axis.offer(rounded(Decimal(str((at - origin).total_seconds()))), point)
+            axis.offer(milliseconds(Decimal(str((at - origin).total_seconds()))), point)
         return axis
 
     def read_profile(
@@ -1339,16 +1357,16 @@ class _Converter:
         ceiling = Channel("ceiling")
         temperature = Channel("temperature")
         pressures = {sensor: Channel("pressures") for sensor in sensors}
-        for second, point in samples.ordered():
+        for at, point in samples.ordered():
             if point.depth is not None:
-                depth.record(second, rounded(point.depth * CENTIMETRES_PER_METRE))
+                depth.record(at, rounded(point.depth * CENTIMETRES_PER_METRE))
             if point.ceiling is not None and point.ceiling > 0:
-                ceiling.record(second, rounded(point.ceiling * CENTIMETRES_PER_METRE))
+                ceiling.record(at, rounded(point.ceiling * CENTIMETRES_PER_METRE))
             if point.temperature is not None:
-                temperature.record(second, rounded(point.temperature * TENTHS_PER_UNIT))
+                temperature.record(at, rounded(point.temperature * TENTHS_PER_UNIT))
             for sensor, bar in point.pressures.items():
                 if sensor in pressures and 0 <= bar <= MAX_CYLINDER_PRESSURE:
-                    pressures[sensor].record(second, rounded(bar * TENTHS_PER_UNIT))
+                    pressures[sensor].record(at, rounded(bar * TENTHS_PER_UNIT))
 
         events = self.read_events(samples, where)
         numbered = [(number, pressures[sensor]) for number, sensor in enumerate(sensors) if sensor in pressures]
@@ -1389,11 +1407,11 @@ class _Converter:
             for number, index in enumerate(_native_raw(gas, "message_index") for gas in self.gases)
             if isinstance(index, int) and not isinstance(index, bool)
         }
-        # The axis is what decided which instants have a place and what second each landed
-        # on, so an event asks it rather than recomputing from the session's start time:
-        # a sample the axis dropped for sharing a second with an earlier one is an instant
-        # the profile does not reach, and an event there has nowhere to go either.
-        seconds = {point: second for second, point in samples.ordered()}
+        # The axis is what decided which instants have a place and where each landed, so
+        # an event asks it rather than recomputing from the session's start time: a sample
+        # the axis dropped for sharing its millisecond with an earlier one is an instant the
+        # profile does not reach, and an event there has nowhere to go either.
+        places = {point: at for at, point in samples.ordered()}
 
         events: list[dict[str, Any]] = []
         for frame in self.scan.events:
@@ -1407,8 +1425,8 @@ class _Converter:
             if not isinstance(at, datetime):
                 continue
             point = self.scan.points.get(at)
-            second = seconds.get(point) if point is not None else None
-            if second is None:
+            placed = places.get(point) if point is not None else None
+            if placed is None:
                 self.note(
                     where,
                     "an event is recorded at an instant the dive's samples do not reach, so it has no place "
@@ -1416,7 +1434,7 @@ class _Converter:
                     "dropped",
                 )
                 continue
-            event: dict[str, Any] = {"time": second, "type": kind} if kind else {"time": second}
+            event: dict[str, Any] = {"time": placed, "type": kind} if kind else {"time": placed}
             data = _native(frame, "data")
             if kind == "gas_switch" and isinstance(data, int) and not isinstance(data, bool):
                 number = positions.get(data & MESSAGE_INDEX_MASK)

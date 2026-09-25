@@ -4,13 +4,13 @@
   "exported_at": "2026-09-05T00:00:00+00:00",
   "generator": {
     "name": "divejson convert",
-    "version": "0.1.0"
+    "version": "0.12.0"
   },
   "dives": [
     {
       "uuid": "2d15ba8f-aad9-59bb-ba1a-9aa35a26adde",
       "number": 12,
-      "started_at": "2002-06-18T00:00:00",
+      "started_at": "2002-06-18",
       "duration": 2400,
       "notes": "Four writer habits in one dive: element names in upper case, a whole-percent oxygen fraction, a tank volume in litres where UDDF specifies cubic metres, and a midnight dive whose time of day the exporter never wrote.",
       "max_depth": 18.4,
@@ -28,14 +28,16 @@
       "recordings": [
         {
           "profile": {
-            "duration": 120,
+            "duration": 120000,
             "depth": {
               "times": [
-                30,
-                120
+                30000,
+                30400,
+                120000
               ],
               "values": [
                 250,
+                310,
                 1840
               ]
             }

@@ -222,14 +222,17 @@ def test_the_oxygen_accounting_comes_from_the_dive_summary_before_the_session() 
         message("dive_summary", reference_mesg="session", start_cns=3, end_cns=11, o2_toxicity=23),
         session={"start_cns": 90, "end_cns": 95, "o2_toxicity": 300},
     )
-    dive = _dive(data)
-    assert (dive["cns_start"], dive["cns_end"], dive["otu_end"]) == (3.0, 11.0, 23.0)
+    recording = _dive(data)["recordings"][0]
+    assert (recording["cns_start"], recording["cns_end"], recording["otu_end"]) == (3.0, 11.0, 23.0)
 
 
 def test_the_session_supplies_the_oxygen_accounting_where_there_is_no_dive_summary() -> None:
     data = dive_file(session={"start_cns": 5, "end_cns": 20, "o2_toxicity": 55})
     dive = _dive(data)
-    assert (dive["cns_start"], dive["cns_end"], dive["otu_end"]) == (5.0, 20.0, 55.0)
+    # The computer's own figures (§6.4a), on its recording rather than on the dive.
+    recording = dive["recordings"][0]
+    assert (recording["cns_start"], recording["cns_end"], recording["otu_end"]) == (5.0, 20.0, 55.0)
+    assert not any(member in dive for member in ("cns_start", "cns_end", "otu_end"))
 
 
 def test_the_summary_describing_the_whole_activity_is_the_one_read() -> None:
@@ -362,25 +365,37 @@ def test_a_second_session_is_reported_and_not_converted() -> None:
     assert any("describes 2 sessions" in text for text in _messages(conversion, "dropped"))
 
 
-# -- water type -----------------------------------------------------------------------
+# -- salinity -------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("water", ["fresh", "salt", "en13319"])
-def test_the_devices_water_type_is_carried_under_its_own_name(water: str) -> None:
-    """`en13319` stays `en13319` rather than being folded into `salt`.
-
-    It is the calibration a computer ships set to, and rewriting it as the nearest real
-    water would be inventing a reading.
+def test_the_devices_water_type_setting_is_its_recordings_salinity(water: str) -> None:
+    """A density the computer was set to, so §6.4a's `salinity` and never the dive's
+    `water_type` — a setting of the device is not a record of the water. `en13319` stays
+    `en13319` rather than being folded into `salt`: it is the calibration a computer ships
+    set to, and rewriting it as the nearest real water would be inventing a reading.
     """
-    data = dive_file(message("dive_settings", water_type=water))
-    assert _dive(data)["water_type"] == water
+    data = dive_file(message("dive_settings", water_type=water), _at(0, depth=5.0))
+    dive = _dive(data)
+    assert dive["recordings"][0]["salinity"] == water
+    assert "water_type" not in dive
+
+
+def test_a_salinity_alone_makes_no_recording() -> None:
+    """A setting nothing recorded a dive with is not a record of one (§6.4a)."""
+    data = fit_file(
+        message("file_id", type="activity"),
+        message("dive_settings", water_type="salt"),
+        message("session", sport="diving", start_time=STARTED_AT, total_elapsed_time=60.0),
+    )
+    assert "recordings" not in _dive(data)
 
 
 def test_a_custom_water_density_is_reported_rather_than_rounded_to_the_nearest_water() -> None:
-    data = dive_file(message("dive_settings", water_type="custom", water_density=1025.0))
+    data = dive_file(message("dive_settings", water_type="custom", water_density=1025.0), _at(0, depth=5.0))
     conversion = _run(data)
-    assert "water_type" not in conversion.document["dives"][0]
-    assert any("water type is 'custom'" in text for text in _messages(conversion, "dropped"))
+    assert "salinity" not in conversion.document["dives"][0]["recordings"][0]
+    assert any("water type setting is 'custom'" in text for text in _messages(conversion, "dropped"))
 
 
 def test_a_device_that_wrote_no_dive_settings_raises_nothing() -> None:
@@ -553,7 +568,7 @@ def test_a_transmitters_pressures_become_a_profile_channel_numbered_by_its_cylin
     )
     dive = _dive(data)
     assert dive["cylinders"][0]["gas_number"] == 0
-    assert profile_of(dive)["pressures"] == [{"times": [0, 60], "values": [2100, 640], "gas_number": 0}]
+    assert profile_of(dive)["pressures"] == [{"times": [0, 60_000], "values": [2100, 640], "gas_number": 0}]
 
 
 def test_a_pods_ends_are_its_earliest_and_latest_readings_not_the_files_first_and_last() -> None:
@@ -674,7 +689,7 @@ def test_a_gas_switch_names_the_cylinder_the_logbook_shows() -> None:
         session={"total_elapsed_time": 60.0},
     )
     dive = _dive(data)
-    assert profile_of(dive)["events"] == [{"time": 60, "type": "gas_switch", "gas_number": 1}]
+    assert profile_of(dive)["events"] == [{"time": 60_000, "type": "gas_switch", "gas_number": 1}]
     assert [c["gas_number"] for c in dive["cylinders"]] == [0, 1]
 
 
@@ -689,7 +704,7 @@ def test_a_switch_to_a_gas_this_file_does_not_describe_is_still_a_switch() -> No
         session={"total_elapsed_time": 60.0},
     )
     dive = _dive(data)
-    assert profile_of(dive)["events"] == [{"time": 60, "type": "gas_switch"}]
+    assert profile_of(dive)["events"] == [{"time": 60_000, "type": "gas_switch"}]
     assert "gas_number" not in dive["cylinders"][0]
 
 
@@ -700,7 +715,7 @@ def test_a_user_marker_is_a_bookmark() -> None:
         _event(60, "user_marker"),
         session={"total_elapsed_time": 60.0},
     )
-    assert profile_of(_dive(data))["events"] == [{"time": 60, "type": "bookmark"}]
+    assert profile_of(_dive(data))["events"] == [{"time": 60_000, "type": "bookmark"}]
 
 
 def test_a_dive_alert_carries_the_devices_own_wording_and_no_type() -> None:
@@ -718,7 +733,7 @@ def test_a_dive_alert_carries_the_devices_own_wording_and_no_type() -> None:
         _event(60, "dive_alert", data=0),
         session={"total_elapsed_time": 60.0},
     )
-    assert profile_of(_dive(data))["events"] == [{"time": 60, "label": "ndl_reached"}]
+    assert profile_of(_dive(data))["events"] == [{"time": 60_000, "label": "ndl_reached"}]
 
 
 def test_an_alert_the_device_gives_no_code_for_is_dropped_rather_than_failing_the_file() -> None:
@@ -955,3 +970,13 @@ def test_a_file_that_names_no_computer_and_kept_no_sample_has_no_recording() -> 
         message("session", sport="diving", start_time=STARTED_AT, total_elapsed_time=60.0),
     )
     assert "recordings" not in _dive(data)
+
+
+def test_its_oxygen_clock_alone_is_a_recording() -> None:
+    """A readout is a record of the dive nothing else produces (§6.4a), so a file that names
+    no computer and kept no sample still keeps the figures its session states."""
+    data = fit_file(
+        message("file_id", type="activity"),
+        message("session", sport="diving", start_time=STARTED_AT, total_elapsed_time=60.0, end_cns=20),
+    )
+    assert _dive(data)["recordings"] == [{"cns_end": 20.0}]

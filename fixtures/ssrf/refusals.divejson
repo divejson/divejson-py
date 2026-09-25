@@ -4,7 +4,7 @@
   "exported_at": "2026-09-05T00:00:00+00:00",
   "generator": {
     "name": "divejson convert",
-    "version": "0.2.0"
+    "version": "0.12.0"
   },
   "dives": [
     {
@@ -22,11 +22,11 @@
       "recordings": [
         {
           "profile": {
-            "duration": 30,
+            "duration": 30000,
             "depth": {
               "times": [
                 0,
-                30
+                30000
               ],
               "values": [
                 0,
@@ -35,7 +35,7 @@
             },
             "temperature": {
               "times": [
-                30
+                30000
               ],
               "values": [
                 195
@@ -80,11 +80,11 @@
       "recordings": [
         {
           "profile": {
-            "duration": 120,
+            "duration": 120000,
             "depth": {
               "times": [
                 0,
-                120
+                120000
               ],
               "values": [
                 0,

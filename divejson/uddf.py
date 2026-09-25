@@ -53,7 +53,9 @@ deliberately not `inferred`, which is reserved for a value computed from other r
 carries the obligation to list its member under `extensions.divejson.inferred`; a resolution
 lists nothing, because there is no derivation for a reader to be told about. So this reader
 infers nothing and that list is absent from every document it produces, while its report
-still says out loud where it chose a scale.
+still says out loud where it chose a scale. One `resolved` finding settles a meaning rather
+than a scale: a `<surfacepressure>` on a dive linking more than one computer, which the
+file states once for the dive and this reader gives to the first (`read_recordings`).
 
 That paragraph carried a count until this reader gained a third scale. It does not carry one
 now, for the reason `docs/uddf-mapping.md`'s own heading gives: one more ambiguity is exactly
@@ -66,14 +68,13 @@ import re
 import uuid as uuid_pkg
 import xml.etree.ElementTree as ET
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
 from .converter import (
     CENTIMETRES_PER_METRE,
     MAX_NAME,
-    MAX_NOTES,
     PRODUCER_KEY,
     TENTHS_PER_UNIT,
     Conversion,
@@ -89,11 +90,14 @@ from .converter import (
     device,
     header,
     integer_of,
+    milliseconds,
     position,
     record_inferred,
     recorded,
     recording,
     rounded,
+    in_seconds,
+    shared_readout,
 )
 from .series import Channel, SampleAxis
 from .validate import validate_document
@@ -128,9 +132,9 @@ LITRES_PER_CUBIC_METRE = Decimal(1000)
 # specifies — see `_volume_litres`.
 LITRES_THRESHOLD = Decimal(1)
 
-# `MAX_NOTES` and `MAX_NAME` are `converter.py`'s: every adapter meets those two, and
-# §6.9's `name` is one of them — a place's name shares the 255 every name in the format
-# has, and so does an insurer's. The caps below are UDDF's own, being the only reader that
+# `MAX_NAME` is `converter.py`'s: every adapter meets it, and §6.9's `name` is one of the
+# names it caps — a place's name shares the 255 every name in the format has, and so does
+# an insurer's. The caps below are UDDF's own, being the only reader that
 # fills the members they cap. §6.12's `serial` is 1-64 rather than the 255 its neighbours
 # share, and the reason is worth knowing: a gear serial longer than a device's (§6.4b) could
 # never equal one, and equality between the two is what says a kit item and a device are
@@ -380,7 +384,10 @@ def _gas_percent(raw: Decimal) -> tuple[Decimal, bool]:
 def _date_time(text: str) -> tuple[str | None, str | None]:
     """A DiveJSON date-time from `xs:dateTime` text, plus what had to be forgiven.
 
-    Returns `(value, note)`; `value` is `None` when the text is not a date and time at all.
+    Returns `(value, note)`; `value` is `None` when the text is not a date at all. **A text
+    carrying no time of day comes back as the bare date**, `2002-06-18`, and a caller that
+    wants a date-time checks for that: a dive's start may be a date alone (§5.2), and every
+    other caller takes the date off the front anyway.
 
     **The offset is preserved exactly as recorded, and never supplied.** That is §5.2's
     whole point, and converting to UTC — or assuming an offset where the source recorded
@@ -389,22 +396,26 @@ def _date_time(text: str) -> tuple[str | None, str | None]:
     The forgiven shapes are real writer output rather than hypotheticals: Subsurface emits
     a midnight dive as `<datetime>2002-06-18T</datetime>`, its XSLT building the string
     with an unguarded `concat`, and a bare date is what the same bug produces one character
-    earlier.
+    earlier — and what UDDF's own documentation calls a legal omission of the lower-order
+    elements.
     """
     match = _DATE_TIME.match(text.strip())
     if match is None:
         return None, None
 
     parts = match.groupdict()
-    note = None
     if parts["hour"] is None:
-        note = f"{text.strip()!r} records a date with no time of day; read as midnight"
-        hour, minute, second = "00", "00", "00"
-    else:
-        hour, minute, second = parts["hour"], parts["minute"], parts["second"]
-        if second is None:
-            note = f"{text.strip()!r} records no seconds; read as :00"
-            second = "00"
+        try:
+            date.fromisoformat(parts["date"])
+        except ValueError:
+            return None, None
+        return parts["date"], f"{text.strip()!r} records a date with no time of day"
+
+    note = None
+    hour, minute, second = parts["hour"], parts["minute"], parts["second"]
+    if second is None:
+        note = f"{text.strip()!r} records no seconds; read as :00"
+        second = "00"
 
     try:
         datetime.fromisoformat(f"{parts['date']}T{hour}:{minute}:{second}")
@@ -576,7 +587,7 @@ class _Converter:
             return None
         return value[:10]
 
-    def notes_text(self, parent: ET.Element | None, where: str) -> str | None:
+    def notes_text(self, parent: ET.Element | None) -> str | None:
         """A `<notes>` block as one string. Its `<link>` children carry no note text."""
         notes = _kid(parent, "notes")
         if notes is None:
@@ -584,7 +595,7 @@ class _Converter:
         paragraphs = [text for text in (_text(para) for para in _kids(notes, "para")) if text]
         if not paragraphs:
             return None
-        return self.capped("\n\n".join(paragraphs), MAX_NOTES, where, "the note")
+        return "\n\n".join(paragraphs)
 
     # -- geometry ----------------------------------------------------------------
 
@@ -791,7 +802,7 @@ class _Converter:
             position = self.position(geography, where)
             if position:
                 site["position"] = position
-            notes = self.notes_text(element, where)
+            notes = self.notes_text(element)
             if notes:
                 site["notes"] = notes
 
@@ -899,7 +910,7 @@ class _Converter:
                     "dropped",
                 )
 
-            part_notes = self.notes_text(part, part_where)
+            part_notes = self.notes_text(part)
             if part_notes:
                 paragraphs.append(part_notes)
 
@@ -913,7 +924,7 @@ class _Converter:
             if record:
                 parts.append(record)
 
-        joined = self.capped("\n\n".join(paragraphs), MAX_NOTES, where, "the trip note") if paragraphs else None
+        joined = "\n\n".join(paragraphs) if paragraphs else None
         return parts, joined
 
     # -- gear --------------------------------------------------------------------
@@ -976,7 +987,7 @@ class _Converter:
             if kind == "suit" and (_text_of(element, "suittype") or "").lower() in _DRYSUIT_TYPES:
                 gear_type = "drysuit"
             item["type"] = gear_type
-            notes = self.notes_text(element, where)
+            notes = self.notes_text(element)
             if notes:
                 item["notes"] = notes
 
@@ -1020,12 +1031,12 @@ class _Converter:
                 mix.pop("oxygen", None)
                 mix.pop("helium", None)
 
-            po2_limit = decimal_of(_text_of(element, "maximumpo2"))
-            if po2_limit is not None:
-                if MIN_PO2_LIMIT <= po2_limit <= MAX_PO2_LIMIT:
-                    mix["po2_limit"] = float(po2_limit)
+            ppo2_limit = decimal_of(_text_of(element, "maximumpo2"))
+            if ppo2_limit is not None:
+                if MIN_PO2_LIMIT <= ppo2_limit <= MAX_PO2_LIMIT:
+                    mix["ppo2_limit"] = float(ppo2_limit)
                 else:
-                    self.note(where, f"<maximumpo2> is {po2_limit} bar, outside the 0.4 to 2.0 the format allows; dropped", "dropped")
+                    self.note(where, f"<maximumpo2> is {ppo2_limit} bar, outside the 0.4 to 2.0 the format allows; dropped", "dropped")
             self.mixes[source_id] = mix
 
     def read_deco_models(self) -> None:
@@ -1146,7 +1157,7 @@ class _Converter:
             else:
                 self.note(where, f"<diveduration> is {duration} seconds; the format records a duration only when it is positive", "absent")
 
-        notes = self.notes_text(after, where)
+        notes = self.notes_text(after)
         if notes:
             dive["notes"] = notes
 
@@ -1195,11 +1206,14 @@ class _Converter:
             else:
                 self.note(where, f"<altitude> is {altitude} m, outside the -450 to 6500 the format allows; dropped", "dropped")
 
+        # §6.4a's readout rather than a member of the dive, and it is read here only
+        # because it is a child of the dive: `read_recordings` is where it goes.
+        readouts: dict[str, float] = {}
         surface_pressure = decimal_of(_text_of(before, "surfacepressure"))
         if surface_pressure is not None:
             bar = surface_pressure / PASCAL_PER_BAR
             if MIN_SURFACE_PRESSURE <= bar <= MAX_SURFACE_PRESSURE:
-                dive["surface_pressure"] = float(bar)
+                readouts["surface_pressure"] = float(bar)
             else:
                 self.note(where, f"<surfacepressure> reads as {bar} bar, outside the 0.4 to 1.2 the format allows; dropped", "dropped")
 
@@ -1227,7 +1241,7 @@ class _Converter:
         if cylinders:
             dive["cylinders"] = cylinders
         recordings = self.read_recordings(
-            before, used, profile, mode, self.read_deco_model(before, where), where
+            before, used, profile, mode, self.read_deco_model(before, where), readouts, where
         )
         if recordings:
             dive["recordings"] = recordings
@@ -1240,25 +1254,32 @@ class _Converter:
         profile: dict[str, Any] | None,
         mode: str | None,
         model: dict[str, Any] | None,
+        readouts: dict[str, float],
         where: str,
     ) -> list[dict[str, Any]]:
         """A §6.4a Recording per `<divecomputer>` the dive links, in link order.
 
-        UDDF states a dive's `<samples>` and its `<internaldivenumber>` **once per dive**
-        and never once per computer, so both go to the first linked computer and to no
-        other: a dive linking two has one profile and one counter, and there is no way in
-        the file to say whose the counter is. Confining the counter there is also what
-        keeps the emptiness test below from circling — every later link's device is made of
-        that element's own four members and nothing the dive supplies.
+        UDDF states a dive's `<samples>`, its `<internaldivenumber>` and its
+        `<surfacepressure>` **once per dive** and never once per computer, so all three go
+        to the first linked computer and to no other: a dive linking two has one profile, one
+        counter and one surface pressure, and there is no way in the file to say whose the
+        counter or the pressure is. Confining the counter there is also what keeps the
+        emptiness test below from circling — every later link's device is made of that
+        element's own four members and nothing the dive supplies.
 
-        The carve-out follows from those two facts rather than adding to them. The profile
-        is the only thing that carries a link past it without a device, and it reaches
-        exactly one link, so **where the dive has a profile** the first link is a recording
-        whether or not its element names a device — exactly as a dive linking no computer
-        at all is one recording made of its samples alone — and a link yielding neither a
-        device nor a profile yields nothing, §6.4a forbidding a recording that carries
-        nothing. Where the dive has no profile, every link is judged on its device alone,
-        the first included.
+        The carve-out follows from those facts rather than adding to them. The profile and
+        the surface pressure are the only things that carry a link past it without a device,
+        and they reach exactly one link, so **where the dive has either** the first link is a
+        recording whether or not its element names a device — exactly as a dive linking no
+        computer at all is one recording made of what the dive states — and a link yielding
+        neither a device nor one of those yields nothing, §6.4a forbidding a recording that
+        carries nothing. Where the dive has neither, every link is judged on its device
+        alone, the first included.
+
+        **The surface pressure on a dive with two recordings is `resolved`** rather than
+        silent: it is one computer's figure (§6.4a) and the file does not say whose, so
+        giving it to the first is a reading of its meaning, which `docs/converting.md` asks a
+        reader to report.
         """
         counter = integer_of(decimal_of(_text_of(before, "internaldivenumber")))
         linked = [
@@ -1274,7 +1295,7 @@ class _Converter:
                     "to belong to, so there is no device to carry it; dropped (spec §6.4b)",
                     "dropped",
                 )
-            built = recording(profile=profile, mode=mode, deco_model=model)
+            built = recording(profile=profile, mode=mode, deco_model=model, readouts=readouts)
             return [built] if built is not None else []
 
         recordings: list[dict[str, Any]] = []
@@ -1287,10 +1308,13 @@ class _Converter:
                 # two computers has no way in the file to say whose either is.
                 mode=mode if index == 0 else None,
                 deco_model=model if index == 0 else None,
+                readouts=readouts if index == 0 else None,
                 profile=profile if index == 0 else None,
             )
             if built is not None:
                 recordings.append(built)
+        if readouts and len(recordings) > 1:
+            self.note(where, shared_readout("<surfacepressure>", len(recordings)), "resolved")
         return recordings
 
     def read_device(
@@ -1347,6 +1371,15 @@ class _Converter:
         if started_at is None:
             self.note(where, f"<datetime> is {raw!r}, which is not a date and time; the dive is dropped (spec §6.2)", "dropped")
             return None
+        if "T" not in started_at:
+            # A date-only start (§5.2): the day was recorded and the time of day was not,
+            # and midnight would be a time the file never stated. An offset beside a bare
+            # date has nowhere to go, a date carrying none.
+            self.note(where, f"{forgiven}; read as a date-only start rather than as midnight (spec §5.2)", "absent")
+            stated = _DATE_TIME.match(raw.strip())
+            if stated is not None and stated["offset"] is not None:
+                self.note(where, f"{raw.strip()!r} records a UTC offset beside a date alone, which a date cannot carry; dropped", "dropped")
+            return started_at
         if forgiven:
             self.note(where, forgiven, "absent")
         if self.local_clock_with_z and started_at.endswith(("Z", "z")):
@@ -1509,7 +1542,7 @@ class _Converter:
         temperatures rather than padding the second to match the first.
 
         The axis itself — the ordering, the dropped and reported waypoints, the two on one
-        second, the profile that is not written at all — is `series.SampleAxis`, shared
+        millisecond, the profile that is not written at all — is `series.SampleAxis`, shared
         with every other format, and only what is UDDF's is below: which element carries
         which channel, and what a `<tankpressure ref>` resolves to.
 
@@ -1522,9 +1555,12 @@ class _Converter:
         if samples is None:
             return None, False, None
 
+        # `<divetime>` is `xs:float` seconds, and a fraction it states keeps its place on the
+        # millisecond axis: `legacy-writer.uddf`'s `30` and `30.4` share a second and are
+        # two instants here, both kept.
         axis = SampleAxis(self.note, where, noun="waypoint", time_member="<divetime>")
         for waypoint in _kids(samples, "waypoint"):
-            axis.offer(integer_of(decimal_of(_text_of(waypoint, "divetime"))), waypoint)
+            axis.offer(milliseconds(decimal_of(_text_of(waypoint, "divetime"))), waypoint)
 
         cylinders_of_mix: dict[str, list[int]] = {}
         for index, ref in enumerate(mix_refs):
@@ -1543,21 +1579,22 @@ class _Converter:
         mode: str | None = None
         reported_pascal_po2 = False
 
-        for second, waypoint in axis.ordered():
+        for at, waypoint in axis.ordered():
             metres = decimal_of(_text_of(waypoint, "depth"))
             if metres is not None:
-                depth.record(second, rounded(metres * CENTIMETRES_PER_METRE))
+                depth.record(at, rounded(metres * CENTIMETRES_PER_METRE))
 
             kelvin = decimal_of(_text_of(waypoint, "temperature"))
             if kelvin is not None:
-                temperature.record(second, rounded((kelvin - KELVIN_OFFSET) * TENTHS_PER_UNIT))
+                temperature.record(at, rounded((kelvin - KELVIN_OFFSET) * TENTHS_PER_UNIT))
 
-            # Seconds already, which is §6.4's unit. A value at the device's display cap —
+            # Seconds already, which is §6.4's unit for the reading — the axis it sits on
+            # is milliseconds, the value is not. A value at the device's display cap —
             # 5 940, the Shearwater's 99 minutes — is a reading rather than a missing one:
             # it means *at least this*, which is the number the diver read off their wrist.
             seconds = decimal_of(_text_of(waypoint, "nodecotime"))
             if seconds is not None:
-                ndl.record(second, rounded(seconds))
+                ndl.record(at, rounded(seconds))
 
             po2, in_pascal = self.po2_hundredths(_text_of(waypoint, "calculatedpo2"))
             if po2 is not None:
@@ -1569,43 +1606,43 @@ class _Converter:
                         "resolved",
                     )
                     reported_pascal_po2 = True
-                ppo2.record(second, po2)
+                ppo2.record(at, po2)
 
             percent = decimal_of(_text_of(waypoint, "cns"))
             if percent is not None:
-                cns.record(second, rounded(percent * TENTHS_PER_UNIT))
+                cns.record(at, rounded(percent * TENTHS_PER_UNIT))
 
             factor = self.gradient_factor(waypoint)
             if factor is not None:
-                gradient_factor.record(second, factor)
+                gradient_factor.record(at, factor)
 
-            mode = self.waypoint_mode(waypoint, mode, second, where)
+            mode = self.waypoint_mode(waypoint, mode, at, where)
 
-            for cylinder_index, tenths in self.waypoint_pressures(waypoint, where, second, cylinders_of_mix, len(mix_refs)):
+            for cylinder_index, tenths in self.waypoint_pressures(waypoint, where, at, cylinders_of_mix, len(mix_refs)):
                 channel = pressures.setdefault(cylinder_index, Channel("pressures"))
                 # Asked before the reading is offered rather than read off `record`'s
                 # answer, which has two refusals in it: a pressure channel carries no floor
                 # and so can only be refused for the second, but a caller that reported a
                 # floor refusal as a collision would be saying the wrong thing quietly.
-                if channel.taken(second):
-                    self.note(where, f"two tank pressures at {second} s resolve to the same cylinder; the later one is dropped", "dropped")
+                if channel.taken(at):
+                    self.note(where, f"two tank pressures at {in_seconds(at)} s resolve to the same cylinder; the later one is dropped", "dropped")
                     continue
-                channel.record(second, tenths)
+                channel.record(at, tenths)
                 needs_gas_numbers = True
 
             marker = _text_of(waypoint, "setmarker")
             if marker is not None:
                 if marker in _MARKER_TYPES:
-                    events.append({"time": second, "type": marker})
+                    events.append({"time": at, "type": marker})
                 else:
                     # No `type` at all, which §6.6 makes the spelling of an unclassified
                     # event: `<setmarker>` is a bare string with no type beside it, and the
                     # device's own wording is all this one has.
-                    events.append({"time": second, "label": marker})
+                    events.append({"time": at, "label": marker})
 
             switch = _kid(waypoint, "switchmix")
             if switch is not None:
-                event: dict[str, Any] = {"time": second, "type": "gas_switch"}
+                event: dict[str, Any] = {"time": at, "type": "gas_switch"}
                 ref = _attr(switch, "ref")
                 if ref is not None and ref in cylinders_of_mix:
                     event["gas_number"] = cylinders_of_mix[ref][0]
@@ -1613,7 +1650,7 @@ class _Converter:
                 elif ref is not None:
                     self.note(
                         where,
-                        f"a gas switch at {second} s names the gas {ref!r}, which no cylinder on this dive links "
+                        f"a gas switch at {in_seconds(at)} s names the gas {ref!r}, which no cylinder on this dive links "
                         "to; the switch is kept without saying what it was to (spec §6.6)",
                         "absent",
                     )
@@ -1651,7 +1688,7 @@ class _Converter:
         return rounded(value / PASCAL_PER_PO2_HUNDREDTH), True
 
     def waypoint_mode(
-        self, waypoint: ET.Element, standing: str | None, second: int, where: str
+        self, waypoint: ET.Element, standing: str | None, at: int, where: str
     ) -> str | None:
         """One waypoint's `<divemode @type>` against the mode the recording already has.
 
@@ -1691,7 +1728,7 @@ class _Converter:
         if mode != standing:
             self.note(
                 where,
-                f"the dive mode changes to {stated!r} at {second} s, and §6.4a records one mode for a "
+                f"the dive mode changes to {stated!r} at {in_seconds(at)} s, and §6.4a records one mode for a "
                 "recording; the change is dropped, there being no event a converter could label without "
                 "inventing the device's wording (spec §5.4)",
                 "dropped",
@@ -1702,7 +1739,7 @@ class _Converter:
         self,
         waypoint: ET.Element,
         where: str,
-        second: int,
+        at: int,
         cylinders_of_mix: dict[str, list[int]],
         tank_count: int,
     ) -> Iterator[tuple[int, int]]:
@@ -1727,7 +1764,7 @@ class _Converter:
                 if tank_count != 1:
                     self.note(
                         where,
-                        f"a tank pressure at {second} s names no cylinder, and the dive has {tank_count}; the "
+                        f"a tank pressure at {in_seconds(at)} s names no cylinder, and the dive has {tank_count}; the "
                         "reading is dropped rather than guessed onto one",
                         "dropped",
                     )
@@ -1740,7 +1777,7 @@ class _Converter:
                 if position >= len(candidates):
                     self.note(
                         where,
-                        f"a tank pressure at {second} s names the gas {ref!r}, which no further cylinder on this "
+                        f"a tank pressure at {in_seconds(at)} s names the gas {ref!r}, which no further cylinder on this "
                         "dive links to; the reading is dropped",
                         "dropped",
                     )

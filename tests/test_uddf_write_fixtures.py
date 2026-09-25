@@ -29,7 +29,7 @@ holds the report to that.
 by both, compared after reading rather than as two files, because the writers are allowed to
 differ and the logbook is not. Profile channels are compared by count and extremes there,
 the reference writer snapping its other channels onto the depth axis where this one leaves
-every reading on its own second.
+every reading on its own instant.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ from typing import Any
 
 import pytest
 import xmlschema
-from helpers import FIXTURES, ROOT, device_of, profile_of
+from helpers import FIXTURES, ROOT, device_of, for_the_xsd, profile_of
 
 from divejson import compared, convert
 from divejson.uddf_write import compared as compared_xml
@@ -96,10 +96,13 @@ LOST: dict[str, frozenset[str]] = {
             "sites/0/location/position",
             "sites/0/location/bbox",
             "dives/0/water_type",
-            "dives/0/cns_start",
-            "dives/0/cns_end",
-            "dives/0/otu_start",
-            "dives/0/otu_end",
+            # A recording's settings and oxygen clocks have no slot, and its surface
+            # pressure has the dive's `<surfacepressure>` and so comes back.
+            "dives/0/recordings/0/salinity",
+            "dives/0/recordings/0/cns_start",
+            "dives/0/recordings/0/cns_end",
+            "dives/0/recordings/0/otu_start",
+            "dives/0/recordings/0/otu_end",
             "dives/0/entry_position",
             "dives/0/exit_position",
             "dives/0/course_uuid",
@@ -124,6 +127,9 @@ LOST: dict[str, frozenset[str]] = {
             "trips/0/notes",
             # `<setmarker>` is one string, so a labelled bookmark keeps the type.
             "dives/0/recordings/0/profile/events/6/label",
+            # The third dive's one recording carries a CNS end and nothing else, and UDDF
+            # has no slot for it, so none of the recording is written and none comes back.
+            "dives/2/recordings",
             # UDDF records no cylinder numbering, so the labels come back as positions.
             *(f"dives/0/cylinders/{index}/gas_number" for index in range(4)),
             *(f"dives/0/recordings/0/profile/pressures/{index}/gas_number" for index in range(4)),
@@ -235,7 +241,7 @@ def test_the_input_document_conforms(source) -> None:
 
 @pytest.mark.parametrize("source", WRITE_FIXTURES, ids=lambda path: path.stem)
 def test_the_written_file_validates_against_the_uddf_schema(source, schema) -> None:
-    schema.validate(write_uddf(_document(source)).data.decode("utf-8"))
+    schema.validate(for_the_xsd(write_uddf(_document(source)).data.decode("utf-8")))
 
 
 @pytest.mark.parametrize("source", WRITE_FIXTURES, ids=lambda path: path.stem)
@@ -246,7 +252,7 @@ def test_the_committed_file_validates_against_the_uddf_schema(source, schema) ->
     edit that made one of them invalid is worth catching here rather than in somebody
     else's implementation.
     """
-    schema.validate(source.with_suffix(".uddf").read_text(encoding="utf-8"))
+    schema.validate(for_the_xsd(source.with_suffix(".uddf").read_text(encoding="utf-8")))
 
 
 @pytest.mark.parametrize("source", WRITE_FIXTURES, ids=lambda path: path.stem)
@@ -284,12 +290,53 @@ def test_the_report_names_everything_that_changed(source) -> None:
     written = write_uddf(document)
     read_back = convert(written.data, format="uddf").document
 
+    before, after = _compared(document), _compared(read_back)
     unreported = [
         path
-        for path in _differences(_compared(document), _compared(read_back))
-        if path not in RETURNED[source.stem] and not _reported(path, written.notes)
+        for path in _differences(before, after)
+        if path not in RETURNED[source.stem]
+        and not _reported(path, written.notes)
+        and not _wholly_reported(path, before, after, written.notes)
     ]
     assert unreported == []
+
+
+def _at(document: Any, path: str) -> Any:
+    """The value at a `dives/2/recordings` path, or `_MISSING` where there is none."""
+    node = document
+    for part in path.split("/"):
+        if isinstance(node, dict) and part in node:
+            node = node[part]
+        elif isinstance(node, list) and part.isdigit() and int(part) < len(node):
+            node = node[int(part)]
+        else:
+            return _MISSING
+    return node
+
+
+_MISSING = object()
+
+
+def _leaves(value: Any, path: str) -> list[str]:
+    if isinstance(value, dict):
+        return [leaf for key, child in value.items() for leaf in _leaves(child, f"{path}/{key}")]
+    if isinstance(value, list):
+        return [leaf for index, child in enumerate(value) for leaf in _leaves(child, f"{path}/{index}")]
+    return [path]
+
+
+def _wholly_reported(path: str, before: Any, after: Any, notes) -> bool:
+    """A record that did not come back at all is accounted for when everything it carried is.
+
+    `_differences` names a vanished member by its own path, and a writer reports from the
+    record — a readout-only recording's `cns_end`, one level down — so a member absent from
+    the read-back is matched on its leaves. A member that came back *changed* is not: it has
+    to be named where it differs.
+    """
+    if _at(after, path) is not _MISSING:
+        return False
+    leaves = _leaves(_at(before, path), path)
+    return bool(leaves) and all(_reported(leaf, notes) for leaf in leaves)
 
 
 # -- agreement with the reference writer ------------------------------------------------
@@ -315,7 +362,6 @@ SCALARS = (
     "visibility",
     "weight",
     "altitude",
-    "surface_pressure",
     "trip_uuid",
     "site_uuids",
     "gear_uuids",
@@ -359,6 +405,15 @@ def test_the_two_writers_agree_on_every_dive_level_scalar(both) -> None:
     reference, ours = both
     assert [_picked(dive, SCALARS) for dive in ours["dives"]] == [
         _picked(dive, SCALARS) for dive in reference["dives"]
+    ]
+
+
+def test_the_two_writers_agree_on_the_surface_pressure(both) -> None:
+    """UDDF's one dive-level readout, which both files state and the reader gives to the
+    primary recording (§6.4a)."""
+    reference, ours = both
+    assert [(dive.get("recordings") or [{}])[0].get("surface_pressure") for dive in ours["dives"]] == [
+        (dive.get("recordings") or [{}])[0].get("surface_pressure") for dive in reference["dives"]
     ]
 
 

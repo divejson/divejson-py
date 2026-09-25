@@ -8,6 +8,26 @@
   "diver": {
     "uuid": "0198a6f0-1111-7001-8000-000000000001",
     "name": "Alex Trim",
+    "emergency_contacts": [
+      {
+        "name": "Robin Trim",
+        "phone": "+64 3 555 0142",
+        "relationship": "brother"
+      }
+    ],
+    "insurances": [
+      {
+        "provider": "DAN World",
+        "number": "DW-88213"
+      }
+    ],
+    "portrait_file": {
+      "uuid": "0198a6f0-1111-7002-8000-000000000002",
+      "original_filename": "IMG_4471.jpg",
+      "content_type": "image/jpeg",
+      "byte_size": 2861904,
+      "sha256": "5e0c7a1b9d24f3e6a8b0c2d4e6f80a1b3c5d7e9f0a2b4c6d8e0f1a3b5c7d9e1f"
+    },
     "created_at": "2024-01-05T09:00:00+00:00"
   },
   "dives": [
@@ -17,12 +37,12 @@
       "started_at": "2026-07-03T09:14:00+12:45",
       "duration": 5520,
       "notes": "Trimix wall dive; two deco gases staged on the line.",
-      "max_depth": null,
+      "max_depth": 62.3,
       "avg_depth": 31.8,
       "bottom_temperature": 7.4,
       "visibility": 25,
       "weight": 0,
-      "water_type": "salt",
+      "water_type": "en13319",
       "altitude": 0,
       "entry_position": {
         "latitude": -45.86055,
@@ -93,6 +113,22 @@
       ],
       "recordings": [
         {
+          "device": {
+            "brand": "Shearwater",
+            "model": "Perdix 2",
+            "serial": "D9123456",
+            "firmware": "V92",
+            "name": "Deco",
+            "dive_number": 87
+          },
+          "mode": "open_circuit",
+          "deco_model": {
+            "algorithm": "buhlmann",
+            "name": "ZHL-16C",
+            "gf_low": 30,
+            "gf_high": 70
+          },
+          "salinity": "en13319",
           "surface_pressure": 1.013,
           "cns_start": 4.5,
           "cns_end": 61.0,
@@ -208,6 +244,168 @@
                 "gas_number": 4
               }
             ],
+            "ndl": {
+              "times": [
+                0,
+                120000,
+                600000,
+                1500000,
+                2400000,
+                3000000,
+                3600000,
+                4200000,
+                4800000,
+                5400000,
+                5520000
+              ],
+              "values": [
+                5940,
+                1200,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1800,
+                5940
+              ]
+            },
+            "tts": {
+              "times": [
+                600000,
+                1500000,
+                2400000,
+                3000000,
+                3600000,
+                4200000,
+                4800000,
+                5400000
+              ],
+              "values": [
+                900,
+                3900,
+                3300,
+                2400,
+                1500,
+                900,
+                420,
+                180
+              ]
+            },
+            "ppo2": {
+              "times": [
+                0,
+                120000,
+                600000,
+                1500000,
+                2400000,
+                3000000,
+                3600000,
+                4200000,
+                4800000,
+                5400000,
+                5520000
+              ],
+              "values": [
+                18,
+                51,
+                128,
+                130,
+                122,
+                56,
+                110,
+                95,
+                160,
+                130,
+                100
+              ]
+            },
+            "cns": {
+              "times": [
+                0,
+                120000,
+                600000,
+                1500000,
+                2400000,
+                3000000,
+                3600000,
+                4200000,
+                4800000,
+                5400000,
+                5520000
+              ],
+              "values": [
+                45,
+                50,
+                95,
+                210,
+                330,
+                360,
+                430,
+                480,
+                560,
+                600,
+                610
+              ]
+            },
+            "gradient_factor": {
+              "times": [
+                0,
+                120000,
+                600000,
+                1500000,
+                2400000,
+                3000000,
+                3600000,
+                4200000,
+                4800000,
+                5400000,
+                5520000
+              ],
+              "values": [
+                0,
+                8,
+                22,
+                31,
+                38,
+                64,
+                68,
+                69,
+                67,
+                55,
+                41
+              ]
+            },
+            "surface_gradient_factor": {
+              "times": [
+                0,
+                120000,
+                600000,
+                1500000,
+                2400000,
+                3000000,
+                3600000,
+                4200000,
+                4800000,
+                5400000,
+                5520000
+              ],
+              "values": [
+                0,
+                26,
+                88,
+                141,
+                158,
+                96,
+                84,
+                78,
+                72,
+                66,
+                41
+              ]
+            },
             "events": [
               {
                 "time": 0,
@@ -235,14 +433,20 @@
               {
                 "time": 5200000,
                 "label": "Tissue ceiling cleared"
+              },
+              {
+                "time": 5605000,
+                "type": "bookmark",
+                "label": "Surface marker"
               }
             ],
             "extensions": {
               "com.example.deco": {
-                "model": "ZHL-16C",
-                "gf": [
-                  30,
-                  70
+                "tissue_loading_bar": [
+                  0.41,
+                  0.55,
+                  0.68,
+                  0.62
                 ]
               }
             }
@@ -335,6 +539,15 @@
       "agency": "gue",
       "status": "planned",
       "notes": "Booked for the southern winter; no dates confirmed yet."
+    },
+    {
+      "uuid": "0198a6f0-1111-7092-8000-000000000092",
+      "name": "Underwater Videography",
+      "status": "completed",
+      "starts_on": "2026-08-14",
+      "ends_on": "2026-08-16",
+      "instructor_name": "T. Mahuta",
+      "notes": "Taught privately over two weekends; no agency issued it."
     }
   ],
   "sites": [
@@ -342,7 +555,18 @@
       "uuid": "0198a6f0-1111-7040-8000-000000000040",
       "name": "Harrys Wall",
       "location": {
-        "name": "Milford Sound, New Zealand"
+        "name": "Milford Sound, New Zealand",
+        "full_name": "Milford Sound / Piopiotahi, Southland, New Zealand",
+        "position": {
+          "latitude": -44.6414,
+          "longitude": 167.8974
+        },
+        "bbox": {
+          "south": -44.7,
+          "north": -44.58,
+          "west": 167.8,
+          "east": 167.99
+        }
       },
       "position": {
         "latitude": -44.6301,
@@ -463,6 +687,12 @@
         "sha256": "b4f1c2d4e5b697887960a1b2c3d4e5f60718293a4b5c6d7e8f9012345678abce"
       },
       "created_at": "2025-03-15T09:00:00+13:00"
+    },
+    {
+      "uuid": "0198a6f0-1111-7083-8000-000000000083",
+      "agency": "aida",
+      "name": "AIDA 2 Freediver",
+      "certified_on": "2024-11-09"
     }
   ],
   "extensions": {

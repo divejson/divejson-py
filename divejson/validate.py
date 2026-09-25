@@ -3,9 +3,13 @@
 Two passes, mirroring §3 of the specification: the JSON Schema (types, required members,
 enums, ranges, lengths, and the structural rules like Position objects), then the
 semantic requirements the schema cannot express — identifier uniqueness, referential
-closure, cross-member arithmetic, profile-series integrity and span, the offset
-requirement on ``exported_at``, and the member-order rule, checked on the parsed
-document's key order (which JSON parsing preserves).
+closure, cross-member arithmetic, profile-series integrity and span, what a recording
+carries, the offset requirement on ``exported_at``, and the gradient-factor order.
+
+§4's member order is a SHOULD, not a requirement on the document: a generic
+re-serialisation commonly sorts an object's members, and a document it produced is as
+conforming as the one it read. So nothing here looks at the order of any object's members,
+and a document that validates in one order validates in every order.
 
 Null is not a spelling of absence in this format (spec §5.4): the schema rejects it, so
 the semantic checks below simply treat a missing member as missing.
@@ -16,7 +20,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -96,10 +100,8 @@ def load_schema(minor: str = SPEC_VERSION) -> dict[str, Any]:
 def validate_document(doc: Any, raw: str | None = None) -> list[Issue]:
     """Validate one parsed document; an empty result means conforming.
 
-    ``raw`` is accepted for compatibility and unused: ``json.loads`` preserves the
-    text's member order in the parsed dict, so the member-order rule (spec §4) is
-    checked against ``doc`` itself — which also cannot be fooled by the words
-    "format" or "version" appearing inside some string value.
+    ``raw`` is accepted for compatibility and unused: nothing §3 lists is a property of
+    the text rather than of the parsed document.
     """
     if not isinstance(doc, dict):
         return [Issue("$", "a DiveJSON document is a JSON object")]
@@ -119,21 +121,9 @@ def validate_document(doc: Any, raw: str | None = None) -> list[Issue]:
         if major != SPEC_VERSION.split(".", 1)[0]:
             return issues
 
-    issues.extend(_member_order_issues(doc))
     issues.extend(_schema_issues(doc))
     issues.extend(_semantic_issues(doc))
     return issues
-
-
-def _member_order_issues(doc: dict[str, Any]) -> list[Issue]:
-    keys = list(doc)
-    if not keys:
-        return []
-    if keys[0] != "format":
-        return [Issue("$", f'the first member is "{keys[0]}"; "format" MUST come first (spec §4)')]
-    if len(keys) > 1 and keys[1] != "version":
-        return [Issue("$", f'the second member is "{keys[1]}"; "version" MUST come second (spec §4)')]
-    return []
 
 
 def _schema_issues(doc: dict[str, Any]) -> list[Issue]:
@@ -164,6 +154,16 @@ CHANNELS = (
     "gradient_factor",
     "surface_gradient_factor",
 )
+
+# §6.4a's readouts: the figures a device computed and showed, which live on its recording
+# and each of which is enough, alone, to make one (§3 rule 4). Read by the converters too,
+# which is why the list lives here rather than beside the one check that uses it.
+READOUTS = ("surface_pressure", "cns_start", "cns_end", "otu_start", "otu_end")
+
+# What §3's rule 4 accepts as the content of a recording. `mode`, `deco_model` and
+# `salinity` are settings and are not on it: a setting nothing recorded a dive with
+# describes no record of one.
+RECORDING_CONTENT = ("device", "profile", "source_files", *READOUTS)
 
 
 def _present(obj: dict[str, Any], member: str) -> bool:
@@ -234,7 +234,9 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
 
     for index, dive in enumerate(collections["dives"]):
         here = f"dives/{index}"
-        _check_datetime(dive, "started_at", here, issues)
+        # The one member that may hold a date as well as a date-time (§5.2): a source that
+        # recorded the day and not the time of day.
+        _check_datetime(dive, "started_at", here, issues, allow_date=True)
         if _present(dive, "avg_depth") and _present(dive, "max_depth"):
             try:
                 if dive["avg_depth"] > dive["max_depth"]:
@@ -276,17 +278,16 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
             for file_index, stored in enumerate(recording.get("source_files") or []):
                 if isinstance(stored, dict):
                     _claim_uuid(stored, f"{rec_path}/source_files/{file_index}", seen_uuids, issues)
-            if not any(
-                _present(recording, member) for member in ("device", "profile", "source_files")
-            ):
+            if not any(_present(recording, member) for member in RECORDING_CONTENT):
                 issues.append(
                     Issue(
                         rec_path,
-                        "a recording carries at least one of device, profile and source_files "
+                        "a recording carries at least one of device, profile, source_files and a "
+                        "readout — surface_pressure, cns_start, cns_end, otu_start, otu_end "
                         "(spec §3, §6.4a)",
                     )
                 )
-            # §3 rule 7. The schema makes the pair both-or-neither and puts each on 0-100,
+            # §3 rule 6. The schema makes the pair both-or-neither and puts each on 0-100,
             # and neither of those can say that one is not above the other — which is UDDF's
             # own constraint on the same pair, and the reason a low above a high is a
             # decompression model nothing ran.
@@ -451,6 +452,7 @@ def _check_series(series: dict[str, Any], path: str, issues: list[Issue]) -> int
 _DATE_TIME = re.compile(
     r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d+)?([Zz]|[+-]\d{2}:\d{2})?\Z"
 )
+_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}\Z")
 
 
 def _check_datetime(
@@ -459,14 +461,22 @@ def _check_datetime(
     path: str,
     issues: list[Issue],
     require_offset: bool = False,
+    allow_date: bool = False,
 ) -> None:
     value = obj.get(member)
     if not isinstance(value, str):
         return
     where = f"{path}/{member}" if path else member
+    if allow_date and _DATE.match(value):
+        try:
+            date.fromisoformat(value)
+        except ValueError:
+            issues.append(Issue(where, f"{value!r} is not a real calendar date"))
+        return
     match = _DATE_TIME.match(value)
     if not match:
-        issues.append(Issue(where, f"{value!r} is not a DiveJSON date-time"))
+        kind = "date-time or date" if allow_date else "date-time"
+        issues.append(Issue(where, f"{value!r} is not a DiveJSON {kind}"))
         return
     base, fraction, offset = match.groups()
     # Normalize before the calendar check: fromisoformat is case-sensitive about Z

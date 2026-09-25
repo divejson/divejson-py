@@ -95,7 +95,7 @@ def test_cylinder_pressures_are_plain_bar() -> None:
 def test_surface_pressure_is_plain_bar() -> None:
     """101 300 Pa / 100 000 = 1.013 bar."""
     document = convert(one_dive(before("<surfacepressure>101300</surfacepressure>"))).document
-    assert document["dives"][0]["surface_pressure"] == 1.013
+    assert document["dives"][0]["recordings"][0]["surface_pressure"] == 1.013
 
 
 @pytest.mark.parametrize(
@@ -244,7 +244,8 @@ def test_depths_and_temperatures_match_the_reference_export() -> None:
     fixture agreeing with the code that produced it.
     """
     found = profile_of(convert((FIXTURES / "uddf" / "subsurface.uddf").read_bytes()).document["dives"][0])
-    assert found["depth"]["times"] == [0, 10, 20, 30, 40, 80, 170, 4300]
+    # Milliseconds (§5.1), whole seconds times a thousand where `<divetime>` states no fraction.
+    assert found["depth"]["times"] == [0, 10_000, 20_000, 30_000, 40_000, 80_000, 170_000, 4_300_000]
     assert found["depth"]["values"] == [145, 183, 222, 257, 260, 332, 911, 0]
-    assert found["temperature"]["times"] == [30, 80]
+    assert found["temperature"]["times"] == [30_000, 80_000]
     assert found["temperature"]["values"] == [244, 240]
