@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.14.0
+
 - **Breaking: contacts are records.** §6.18 and §6.19 of
   [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) add a
   top-level `contacts` collection — a name, a set of `roles`, a phone, an email, a website, an
