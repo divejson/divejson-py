@@ -54,6 +54,7 @@
       },
       "trip_uuid": "0198a6f0-1111-7030-8000-000000000030",
       "course_uuid": "0198a6f0-1111-7090-8000-000000000090",
+      "center_uuid": "0198a6f0-1111-7095-8000-000000000095",
       "site_uuids": [
         "0198a6f0-1111-7040-8000-000000000040",
         "0198a6f0-1111-7041-8000-000000000041"
@@ -508,7 +509,8 @@
               "west": 167.8,
               "east": 167.99
             }
-          }
+          },
+          "accommodation_uuid": "0198a6f0-1111-7095-8000-000000000095"
         },
         {
           "location": {
@@ -544,7 +546,7 @@
       "starts_on": "2026-06-30",
       "ends_on": "2026-07-05",
       "instructor_name": "J. Harbord",
-      "training_center": "Deep South Divers",
+      "center_uuid": "0198a6f0-1111-7095-8000-000000000095",
       "notes": "Four training dives; the wall dive was the final assessment.",
       "created_at": "2026-06-01T09:00:00+12:00"
     },
@@ -670,7 +672,8 @@
       "type": "visual_inspection",
       "serviced_on": "2025-11-10",
       "dive_count_at_service": 84,
-      "performed_by": "Southern Cylinders Ltd",
+      "performed_by": "M. Rewi",
+      "center_uuid": "0198a6f0-1111-7095-8000-000000000095",
       "notes": "Passed.",
       "created_at": "2025-11-10T15:00:00+13:00"
     }
@@ -684,7 +687,7 @@
       "number": "NZT-2044",
       "certified_on": "2025-03-14",
       "instructor_name": "J. Harbord",
-      "training_center": "Deep South Divers",
+      "center_uuid": "0198a6f0-1111-7095-8000-000000000095",
       "course_uuid": "0198a6f0-1111-7090-8000-000000000090",
       "notes": "",
       "front_file": {
@@ -708,6 +711,35 @@
       "agency": "aida",
       "name": "AIDA 2 Freediver",
       "certified_on": "2024-11-09"
+    }
+  ],
+  "centers": [
+    {
+      "uuid": "0198a6f0-1111-7095-8000-000000000095",
+      "name": "Deep South Divers",
+      "roles": [
+        "dive_center",
+        "school",
+        "shop",
+        "accommodation"
+      ],
+      "phone": "+64 3 555 0187",
+      "email": "desk@deepsouth.example",
+      "website": "https://deepsouth.example/",
+      "address": {
+        "street": "1 Deepwater Basin Road",
+        "city": "Milford Sound",
+        "postcode": "9679",
+        "region": "Southland",
+        "country": "New Zealand"
+      },
+      "notes": "Runs the fiord boat, fills trimix, and has bunks above the shop.",
+      "created_at": "2026-06-01T08:30:00+12:00",
+      "extensions": {
+        "com.example.divekit": {
+          "rating": 4
+        }
+      }
     }
   ],
   "extensions": {

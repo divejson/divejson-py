@@ -326,7 +326,6 @@
       "starts_on": "2026-06-30",
       "ends_on": "2026-07-05",
       "instructor_name": "J. Harbord",
-      "training_center": "Deep South Divers",
       "notes": "Four training dives; the wall dive was the final assessment.",
       "created_at": "2026-06-01T09:00:00+12:00"
     },
@@ -446,7 +445,6 @@
       "number": "NZT-2044",
       "certified_on": "2025-03-14",
       "instructor_name": "J. Harbord",
-      "training_center": "Deep South Divers",
       "course_uuid": "0198a6f0-1111-7090-8000-000000000090",
       "notes": "",
       "front_file": {

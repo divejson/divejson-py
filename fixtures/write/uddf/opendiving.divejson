@@ -4,7 +4,7 @@
   "exported_at": "2026-09-05T00:00:00+00:00",
   "generator": {
     "name": "divejson convert",
-    "version": "0.1.0"
+    "version": "0.13.0"
   },
   "diver": {
     "uuid": "d8b9bbd3-c66e-52c1-b8e8-d908f921af7e",

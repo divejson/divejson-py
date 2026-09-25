@@ -3,7 +3,7 @@
   <generator>
     <name>divejson convert</name>
     <type>converter</type>
-    <version>0.12.0</version>
+    <version>0.13.0</version>
     <datetime>2026-08-28T12:00:00Z</datetime>
   </generator>
   <diver>
