@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.13.0
+
 - **Breaking: the profile axis is milliseconds.** §5.1 of
   [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) puts a
   Series' `times`, a profile's `duration` and an event's `time` in milliseconds, where a
