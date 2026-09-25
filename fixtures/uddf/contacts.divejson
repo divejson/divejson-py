@@ -1,0 +1,160 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-25T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.14.0"
+  },
+  "dives": [
+    {
+      "uuid": "6ba5d47c-aeac-5754-ac67-c28c73e7981e",
+      "number": 1,
+      "started_at": "2026-03-03T09:10:00+02:00",
+      "duration": 2940,
+      "max_depth": 24.6,
+      "trip_uuid": "7e61f622-466a-582d-9ee7-33b924019256",
+      "contact_uuid": "9f11d32a-6d82-5ec3-95b0-831dde23cda1",
+      "site_uuids": [
+        "cd4adc13-b149-5d0f-b848-616287cbb95e"
+      ]
+    },
+    {
+      "uuid": "abef6704-789a-5048-b078-ba21af60f74b",
+      "number": 2,
+      "started_at": "2026-03-14T10:05:00+02:00",
+      "duration": 3120,
+      "max_depth": 18.2,
+      "trip_uuid": "7e61f622-466a-582d-9ee7-33b924019256",
+      "contact_uuid": "9488e0a5-13e9-53bd-b994-4df9d05f08e0",
+      "site_uuids": [
+        "447128d7-b7c4-5f94-9da1-9379a41c415c"
+      ]
+    }
+  ],
+  "trips": [
+    {
+      "uuid": "7e61f622-466a-582d-9ee7-33b924019256",
+      "name": "Red Sea, spring",
+      "parts": [
+        {
+          "starts_on": "2026-03-01",
+          "ends_on": "2026-03-02",
+          "location": {
+            "name": "Hurghada"
+          },
+          "accommodation_uuid": "c34ec92c-8d08-5057-9af5-ba92b10617af"
+        },
+        {
+          "starts_on": "2026-03-02",
+          "ends_on": "2026-03-06",
+          "location": {
+            "name": "Dahab"
+          },
+          "accommodation_uuid": "9f11d32a-6d82-5ec3-95b0-831dde23cda1"
+        },
+        {
+          "starts_on": "2026-03-06",
+          "ends_on": "2026-03-13",
+          "location": {
+            "name": "Brothers Islands"
+          },
+          "accommodation_uuid": "b62202ee-bbc0-5250-ad1e-b385b5fa5deb"
+        },
+        {
+          "starts_on": "2026-03-13",
+          "ends_on": "2026-03-14",
+          "location": {
+            "name": "Hurghada"
+          },
+          "accommodation_uuid": "c34ec92c-8d08-5057-9af5-ba92b10617af"
+        }
+      ]
+    }
+  ],
+  "sites": [
+    {
+      "uuid": "cd4adc13-b149-5d0f-b848-616287cbb95e",
+      "name": "The Canyon",
+      "location": {
+        "name": "Dahab, Egypt"
+      },
+      "position": {
+        "latitude": 28.5585,
+        "longitude": 34.5212
+      }
+    },
+    {
+      "uuid": "447128d7-b7c4-5f94-9da1-9379a41c415c",
+      "name": "El Mina",
+      "location": {
+        "name": "Hurghada, Egypt"
+      },
+      "position": {
+        "latitude": 27.2295,
+        "longitude": 33.8472
+      }
+    }
+  ],
+  "contacts": [
+    {
+      "uuid": "9f11d32a-6d82-5ec3-95b0-831dde23cda1",
+      "name": "Blue Hole Divers",
+      "roles": [
+        "dive_center",
+        "accommodation"
+      ],
+      "phone": "+20 69 555 0199",
+      "email": "desk@bluehole.example",
+      "website": "https://bluehole.example/",
+      "address": {
+        "street": "Mashraba",
+        "city": "Dahab",
+        "postcode": "46617",
+        "region": "South Sinai",
+        "country": "Egypt"
+      },
+      "notes": "Shore dives from the house reef, and jeeps to the Blue Hole."
+    },
+    {
+      "uuid": "9488e0a5-13e9-53bd-b994-4df9d05f08e0",
+      "name": "Reefside Dive Supplies",
+      "roles": [
+        "shop"
+      ],
+      "phone": "+20 100 555 0142",
+      "address": {
+        "street": "14 Harbour Road",
+        "city": "Hurghada",
+        "region": "Red Sea",
+        "country": "Egypt"
+      },
+      "notes": "Regulator servicing; closed on Fridays."
+    },
+    {
+      "uuid": "c34ec92c-8d08-5057-9af5-ba92b10617af",
+      "name": "Grandma's house",
+      "roles": [
+        "accommodation"
+      ]
+    },
+    {
+      "uuid": "b62202ee-bbc0-5250-ad1e-b385b5fa5deb",
+      "name": "Northern Star Liveaboards",
+      "roles": [
+        "liveaboard"
+      ],
+      "phone": "+20 65 555 0123",
+      "notes": "Seven nights aboard, nitrox included."
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "uddf",
+      "uddf_version": "3.2.2",
+      "source_generator": {
+        "name": "DiveJSON fixtures"
+      }
+    }
+  }
+}

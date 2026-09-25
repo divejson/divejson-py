@@ -187,6 +187,70 @@ so the dive arrives without a site instead — and every reference to that site 
 Every site in a divelogs.de export also carries an exact `0.000000` / `0.000000` pair,
 which is the file that taught `converting.md`'s rule that such a pair is not a position.
 
+### Contacts — `/uddf/divesite/divebase`, `/uddf/business/shop`, and a trip part's own
+
+§6.18 is one record where UDDF has five shapes, and four of them read into `contacts[]`, each
+with the role its slot implies:
+
+| UDDF | DiveJSON |
+| --- | --- |
+| `divesite/divebase` | a contact with `roles: ["dive_center"]` |
+| `business/shop` | a contact with `roles: ["shop"]` — `<business>` is only their container |
+| `trippart/accomodation` | a contact with `roles: ["accommodation"]` — *Trips* below |
+| `trippart/operator` | a contact with `roles: ["liveaboard"]` — *Trips* below |
+| `name` | `contacts[].name` — REQUIRED, so a shape whose `<name>` is empty is no contact: it is reported, and every link to it goes with it |
+| `address/street`, `city`, `postcode`, `province`, `country` | `contacts[].address.street`, `.city`, `.postcode`, `.region`, `.country` |
+| `contact/phone`, else `contact/mobilephone` | `contacts[].phone` — the first `<phone>`, or the first `<mobilephone>` where there is none |
+| `contact/email` | `contacts[].email` — the first |
+| `contact/homepage` | `contacts[].website` — the first |
+| `notes/para` | `contacts[].notes`, paragraphs joined with blank lines |
+| `@id` | `contacts[].uuid`, under the one kind `contact` whichever slot it came from |
+| a dive's `informationbeforedive/link/@ref` naming a base or a shop | `dives[].contact_uuid` — *Dives* below |
+
+The fifth shape, `<vessel>`, is a boat rather than an organisation and reads into nothing
+(*Deliberately not mapped*). Nothing in UDDF joins a course, a certification or a service to
+a contact, so a reader never fills their `contact_uuid`: `<certification><organization>` is
+the agency, as text, and not the school.
+
+**`contacts[]` lists the bases in file order, then the shops, then the contacts the trip parts
+add in part order, then those the kit list's purchases add**, and a contact's `roles` come in
+the order §6.18's table gives them. Neither order is a fact about the file — `roles` is a
+set, and a reader may not depend on a collection's order (§4) — which is why both are fixed
+here: two readers differing only in an order the document means nothing by would fail each
+other's pairs.
+
+**A name-only `<divebase>` nothing points at is skipped**, and reported. Subsurface writes
+`<divebase id="allbase"><name>Subsurface Divebase</name></divebase>` into every UDDF export,
+beside a comment that Subsurface does not track the concept, and read as a contact it would
+give every Subsurface logbook a dive center nobody dived with. The test is on shape rather
+than on that string: a base is skipped when no dive and no `<trippart>` links it, no
+`<accomodation>` or `<operator>` in the file carries its name, and it carries no `<address>`,
+`<contact>` or `<notes>`. A base with any of those is kept whatever links it, and a linked
+one whatever it carries — which is what brings back the name-only base
+[`uddf-writing.md`](uddf-writing.md) writes for a contact a part stays at, wherever it gives
+the part a copy.
+
+**Every string meets its member's bound.** A `<name>` or an address part past its bound is
+cut to it and reported, as a site's name is; a phone past 32 characters, an email past 255
+or a homepage past 512 is dropped and reported instead, a number or an address with its end
+cut off being a wrong one.
+
+**`<email>` and `<homepage>` are checked, not merely capped.** `<email>` takes the owner's
+guard (*Diver* above): `n/a`, a dash or a person's name is no email, and reported. A
+`<homepage>` has to be an absolute URI with its scheme, which is what §6.18's `website` means
+and what an importer can open: `xs:anyURI` admits a bare `www.example.com`, and one like that
+is dropped and reported rather than given a scheme the file never stated. A second `<email>`
+or `<homepage>`, and every phone but the one read, is reported as well.
+
+**An `<address>` with no `<country>` is dropped**, and reported. `addressType` requires the
+element and §6.19 makes it the one member an address cannot omit, so the rest of such an
+address has nowhere valid to go — and an `address` without its anchor would fail the
+converter's own output validation and take the whole file with it.
+
+**A `<purchase>`'s own `<shop>` is read as a contact** where no contact read before it has its
+name, by the inline rule under *Trips* below; the purchase itself — a piece of kit's price
+and date, and the link to where it was bought — has no member and is reported.
+
 ### Trips — `/uddf/divetrip/trip`
 
 | UDDF | DiveJSON |
@@ -199,6 +263,8 @@ which is the file that taught `converting.md`'s rule that such a pair is not a p
 | `trippart/dateoftrip/@startdate` | `trips[].parts[].starts_on` |
 | `trippart/dateoftrip/@enddate` | `trips[].parts[].ends_on` |
 | `trippart/notes/para` | `trips[].notes`, every part's joined |
+| `trippart/accomodation` | `trips[].parts[].accommodation_uuid`, and a contact — *Contacts* above |
+| `trippart/operator` + `vessel` | `trips[].parts[].accommodation_uuid`, and a contact named for the operator |
 | dive's `informationbeforedive/tripmembership/@ref` | `dives[].trip_uuid` |
 
 **`<geography><location>` lands in a different member on each host**, and the asymmetry is
@@ -221,10 +287,40 @@ with its dates, where before the whole element did nothing but widen the trip's 
 **Where it carries no dates either, the rule below reaches the same element**: nothing comes
 back at all, and the finding says that rather than saying the part survived.
 
-**A `<trippart>` carrying neither a name nor a date produces no part at all**, and that is
-what closes the round trip in the other direction: `tripType` requires at least one
-`<trippart>`, so [`uddf-writing.md`](uddf-writing.md) emits a nameless empty one for a trip
-with no parts, and a trip with no parts is what comes back.
+**A `<trippart>` carrying neither a name, a date nor a place to stay produces no part at
+all**, and that is what closes the round trip in the other direction: `tripType` requires at
+least one `<trippart>`, so [`uddf-writing.md`](uddf-writing.md) emits a nameless empty one
+for a trip with no parts, and a trip with no parts is what comes back.
+
+**Where the diver slept is the part's `<accomodation>`**, or its `<operator>` with a
+`<vessel>`: `trippartType` holds one or the other, never both, and the second is UDDF's
+liveaboard, the boat being the bed. Both read into a contact the part's `accommodation_uuid`
+names. The element is read under both spellings — `<accomodation>`, which the XSD declares,
+and `<accommodation>`, which the documentation writes.
+
+**An inline shape is folded by name into the contact it names.** `<accomodation>` and
+`<operator>` sit inside the part rather than being linked from it, so one hotel stayed at
+twice is two elements, and a resort its `<divebase>` already describes is a third. Each is
+matched on its `<name>`, trimmed and case-insensitively, against every contact read before it
+— the bases, the shops and earlier parts' shapes — and a match adds the role its slot implies
+to that contact rather than making another. Where the contact lacks a member the shape states,
+it takes it; where both state one and they differ, the contact's stands and the shape's is
+reported. Two parts at "Grandma's house" are one contact, and a base that is also where the
+diver slept is one contact with both roles; two different places of one name are one contact
+too, a file giving a reader nothing else to tell them apart by. A shape that matches nothing
+is a contact of its own: an `<accomodation>` under its `@id`, like any record, and an
+`<operator>`, which carries none (`operatorType` extends `simpleNamedType`), under the
+positional identity `converting.md` gives a record without one, its position being its
+`<trippart>`'s among every `<trippart>` in the file, counted from 0.
+
+**The operator is the contact, and the vessel is not read.** Its `<name>`, `<address>`,
+`<contact>` and `<notes>` are the contact's, with `roles: ["liveaboard"]`; the `<vessel>` —
+its name, and everything about the boat — is dropped and reported.
+
+**A part's `<link>` to a base is not a member.** It says the diver dived with that base
+during the part, and §6.9a records where the diver stayed and not whom they dived with. The
+base itself is read, the link being what keeps a name-only one from being skipped as a
+placeholder, and the link is reported dropped.
 
 UDDF also allows the opposite direction — `trippart/relateddives/link` pointing from the
 trip at its dives. It is not read, because no writer in the corpus emits it.
@@ -380,6 +476,7 @@ carries nothing this format records.
 | `informationbeforedive/datetime` | `started_at` |
 | `informationbeforedive/divenumber` | `number` |
 | `informationbeforedive/link/@ref` | `site_uuids`, in source order, the first being the primary site |
+| `informationbeforedive/link/@ref` naming a `<divebase>` or a `<shop>` | `contact_uuid` |
 | `informationbeforedive/altitude` | `altitude` |
 | `informationbeforedive/surfacepressure` | the primary recording's `surface_pressure` — see below |
 | `informationbeforedive/equipmentused/leadquantity` | `weight` |
@@ -421,9 +518,14 @@ converted Subsurface file says "no lead" where the diver's original log said 6 k
 loss on Subsurface's side, and reading it any other way would discard a genuine "no lead"
 from every other writer.
 
-A `<link>` under `informationbeforedive` addresses a site here; the schema also lets it
-address a buddy or a shop, so one that resolves to something else is dropped with a note,
-and one that resolves to nothing at all is reported as a source defect.
+A `<link>` under `informationbeforedive` addresses a site, a `<decomodel>` child (*The
+decompression model* below) or a contact — a `<divebase>` or a `<shop>`, which becomes the
+dive's `contact_uuid`. UDDF's prose names buddies and sites as this link's targets, while
+`informationbeforediveType`'s `<link>` is a bare `xs:IDREF` that may name any id, so a reader
+resolving a base or a shop loses nothing and a writer linking one stays schema-valid. A dive
+linking two contacts keeps the first and reports the rest, §6.2 carrying one. A link that
+resolves to anything else — a buddy — is dropped with a note, and one that resolves to
+nothing at all is reported as a source defect.
 
 ### Cylinders — `dive/tankdata`
 
@@ -684,7 +786,11 @@ writes all three that way.
 | `<informationafterdive><rating>`, `<current>`, `<problems>` | no core member. |
 | `<site><ecology>` | site-level flora and fauna, where §6.11's species are per-dive sightings. |
 | `<trippart><relateddives>` | the reverse of `<tripmembership>`; no writer in the corpus emits it. |
-| `<trippart @type>` | `boat`, `hotel`, `individual` or `organized` — the liveaboard-then-hotel distinction §6.9a's part exists to record, and the one member a part might plausibly gain next. There is nowhere to read it into: a core field arrives when an implementation stores it ([divejson/divejson's CONTRIBUTING.md](https://github.com/divejson/divejson/blob/main/CONTRIBUTING.md#proposing-additions-to-the-data-model)), and none does. A reader that wants it has `extensions`. |
+| `<trippart @type>` | `boat`, `hotel`, `individual` or `organized`, and reported. What a part gained was a reference, not a type: the contact its `accommodation_uuid` names says whether the diver slept aboard (`liveaboard`) or ashore (`accommodation`), and `individual` and `organized` say how the trip was booked, which nothing stores ([divejson/divejson's CONTRIBUTING.md](https://github.com/divejson/divejson/blob/main/CONTRIBUTING.md#proposing-additions-to-the-data-model)). A reader that wants it has `extensions`. |
+| a contact's `<aliasname>` and `<rating>`; a base's `<priceperdive>`, `<pricedivepackage>`, `<guide>` and `<link>`; an accommodation's `<category>` | §6.18 carries none of them, and says so under *Deferred*. Each is reported. |
+| `<contact><language>`, `<fax>` on any shape a contact is read from | no member. Each is reported. |
+| `<vessel>`, with its `<shiptype>`, `<marina>` and `<shipdimension>` | a boat, which §6.18 does not model: the operator is the contact and the vessel is reported. |
+| `<purchase>` | a piece of kit's price, date and shop. Its inline `<shop>` is read as a contact (*Contacts* above) and the purchase is reported. |
 | `<mix><n2>`, `<ar>`, `<h2>` | §6.3 models the remainder as nitrogen and does not model argon or trace gases. |
 | `courses`, `certifications`, `gear_sets`, `gear service` | UDDF has no slot for any of them. |
 | `<insurance><aliasname>`, `<issuedate>`, `<notes>` | §6.1's Insurance holds the insurer, the diver's identifier with it and the last day of cover, and none of these is any of the three. Each is reported. |
@@ -707,6 +813,9 @@ converter's. Recording them here saves the next reader the round trip.
   from the values the original log held.
 - **Subsurface loses trips, gear and weights entirely** — its UDDF import reads no trip
   element at all, and the only equipment it reads is the dive computer's model.
+- **Subsurface writes one placeholder `<divebase>` into every export** — `allbase`, named
+  `Subsurface Divebase`, linked from nothing. *Contacts* above is why it does not arrive as a
+  contact.
 - **divelogs.de reads a missing depth as zero**, producing a profile that saws between the
   seabed and the surface on every other sample, and writes `0.000000` coordinates for every
   site.

@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<uddf xmlns="http://www.streit.cc/uddf/3.2/" version="3.2.2">
+  <generator>
+    <name>divejson convert</name>
+    <type>converter</type>
+    <version>0.13.0</version>
+    <datetime>2026-09-25T09:00:00+00:00</datetime>
+  </generator>
+  <business>
+    <shop id="contact-019fed00-5c3a-7000-8000-0000000000a3">
+      <name>Reefside</name>
+      <address>
+        <street>14 Harbour Road</street>
+        <city>Hurghada</city>
+        <country>Egypt</country>
+        <province>Red Sea</province>
+      </address>
+      <contact>
+        <phone>+20 100 555 0142</phone>
+      </contact>
+    </shop>
+  </business>
+  <diver>
+    <owner id="diver-019fed00-5c3a-7000-8000-000000000001">
+      <personal>
+        <firstname>Sam</firstname>
+        <lastname>Reef</lastname>
+      </personal>
+      <equipment>
+        <regulator id="gear-019fed00-5c3a-7000-8000-000000000060">
+          <name>Primary regulator</name>
+        </regulator>
+      </equipment>
+    </owner>
+  </diver>
+  <divesite>
+    <divebase id="contact-019fed00-5c3a-7000-8000-0000000000a1">
+      <name>Blue Hole Divers</name>
+      <address>
+        <street>Mashraba</street>
+        <city>Dahab</city>
+        <postcode>46617</postcode>
+        <country>Egypt</country>
+        <province>South Sinai</province>
+      </address>
+      <contact>
+        <phone>+20 69 555 0199</phone>
+        <email>desk@bluehole.example</email>
+        <homepage>https://bluehole.example/</homepage>
+      </contact>
+      <notes>
+        <para>Shore dives from the house reef, and jeeps to the Blue Hole.</para>
+      </notes>
+    </divebase>
+    <divebase id="contact-019fed00-5c3a-7000-8000-0000000000a2">
+      <name>Grandma's house</name>
+    </divebase>
+    <divebase id="contact-019fed00-5c3a-7000-8000-0000000000a4">
+      <name>Northern Star Liveaboards</name>
+      <contact>
+        <phone>+20 65 555 0123</phone>
+      </contact>
+      <notes>
+        <para>Seven nights aboard, nitrox included.</para>
+      </notes>
+    </divebase>
+    <divebase id="contact-019fed00-5c3a-7000-8000-0000000000a5">
+      <name>Reefside</name>
+    </divebase>
+    <site id="site-019fed00-5c3a-7000-8000-000000000020">
+      <name>The Canyon</name>
+      <geography>
+        <location>Dahab, Egypt</location>
+        <latitude>28.5585</latitude>
+        <longitude>34.5212</longitude>
+      </geography>
+    </site>
+  </divesite>
+  <divetrip>
+    <trip id="trip-019fed00-5c3a-7000-8000-000000000030">
+      <name>Red Sea, spring</name>
+      <trippart type="hotel">
+        <name>Dahab</name>
+        <dateoftrip startdate="2026-03-02T00:00:00" enddate="2026-03-06T00:00:00" />
+        <accomodation id="accommodation-0">
+          <name>Blue Hole Divers</name>
+          <address>
+            <street>Mashraba</street>
+            <city>Dahab</city>
+            <postcode>46617</postcode>
+            <country>Egypt</country>
+            <province>South Sinai</province>
+          </address>
+          <contact>
+            <phone>+20 69 555 0199</phone>
+            <email>desk@bluehole.example</email>
+            <homepage>https://bluehole.example/</homepage>
+          </contact>
+          <notes>
+            <para>Shore dives from the house reef, and jeeps to the Blue Hole.</para>
+          </notes>
+        </accomodation>
+      </trippart>
+      <trippart type="boat">
+        <name>Brothers Islands</name>
+        <dateoftrip startdate="2026-03-06T00:00:00" enddate="2026-03-13T00:00:00" />
+        <accomodation id="accommodation-1">
+          <name>Northern Star Liveaboards</name>
+          <contact>
+            <phone>+20 65 555 0123</phone>
+          </contact>
+          <notes>
+            <para>Seven nights aboard, nitrox included.</para>
+          </notes>
+        </accomodation>
+      </trippart>
+      <trippart type="hotel">
+        <name>Hurghada</name>
+        <dateoftrip startdate="2026-03-13T00:00:00" enddate="2026-03-14T00:00:00" />
+        <accomodation id="accommodation-2">
+          <name>Grandma's house</name>
+        </accomodation>
+      </trippart>
+      <trippart type="hotel">
+        <name>Hurghada</name>
+        <dateoftrip startdate="2026-03-20T00:00:00" enddate="2026-03-21T00:00:00" />
+        <accomodation id="accommodation-3">
+          <name>Grandma's house</name>
+        </accomodation>
+      </trippart>
+      <trippart>
+        <name>El Gouna</name>
+        <dateoftrip startdate="2026-03-21T00:00:00" enddate="2026-03-22T00:00:00" />
+      </trippart>
+    </trip>
+  </divetrip>
+  <profiledata>
+    <repetitiongroup id="rg-1">
+      <dive id="dive-019fed00-5c3a-7000-8000-000000000010">
+        <informationbeforedive>
+          <link ref="site-019fed00-5c3a-7000-8000-000000000020" />
+          <link ref="contact-019fed00-5c3a-7000-8000-0000000000a1" />
+          <divenumber>118</divenumber>
+          <datetime>2026-03-03T09:10:00+02:00</datetime>
+          <equipmentused>
+            <link ref="gear-019fed00-5c3a-7000-8000-000000000060" />
+          </equipmentused>
+          <tripmembership ref="trip-019fed00-5c3a-7000-8000-000000000030" />
+        </informationbeforedive>
+        <informationafterdive>
+          <greatestdepth>24.6</greatestdepth>
+          <diveduration>2940</diveduration>
+        </informationafterdive>
+      </dive>
+    </repetitiongroup>
+  </profiledata>
+</uddf>

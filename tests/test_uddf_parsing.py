@@ -9,12 +9,13 @@ by being helpful.
 from __future__ import annotations
 
 import json
+import uuid
 
 import pytest
 from helpers import STARTED_AT, before, device_of, one_dive, profile_of, uddf
 
 from divejson import DoctypeRefusedError, MalformedUddfError, convert
-from divejson.uddf import LOCAL_CLOCK_NOTE
+from divejson.uddf import LOCAL_CLOCK_NOTE, UDDF_ID_NAMESPACE
 from divejson.validate import validate_document
 
 
@@ -570,7 +571,7 @@ def test_a_nameless_trippart_keeps_its_dates_and_loses_its_place() -> None:
         "<longitude>31.24</longitude></geography></trippart>"
     )
     assert trip["parts"] == [{"starts_on": "2026-04-25", "ends_on": "2026-04-26"}]
-    assert "the place is dropped and the part keeps its dates" in "\n".join(messages)
+    assert "the place is dropped and the rest of the part is kept" in "\n".join(messages)
 
 
 def test_a_nameless_undated_trippart_says_that_nothing_of_it_is_carried() -> None:
@@ -584,7 +585,7 @@ def test_a_nameless_undated_trippart_says_that_nothing_of_it_is_carried() -> Non
         "<latitude>30.04</latitude><longitude>31.24</longitude></geography></trippart>"
     )
     assert "parts" not in trip
-    assert "the part records no dates either, so nothing of it is carried" in "\n".join(messages)
+    assert "the part records no dates and no stay either, so nothing of it is carried" in "\n".join(messages)
 
 
 def test_a_trippart_with_neither_a_name_nor_a_date_produces_no_part() -> None:
@@ -612,6 +613,286 @@ def test_a_parts_end_before_its_start_is_dropped_from_that_part() -> None:
     )
     assert trip["parts"] == [{"starts_on": "2026-04-18", "location": {"name": "Hurghada"}}]
     assert [message for message in messages if "before it starts on 2026-04-18" in message]
+
+
+# -- contacts ---------------------------------------------------------------------------
+
+
+def contacts_of(header: str, dives: str = "") -> tuple[dict, list[tuple[str, str]]]:
+    """A document built from `header` and `dives`, and its report as `(where, message)`."""
+    body = header + (
+        f'<profiledata><repetitiongroup id="rg">{dives}</repetitiongroup></profiledata>' if dives else ""
+    )
+    conversion = convert(uddf(body))
+    assert validate_document(conversion.document) == []
+    return conversion.document, [(note.where, note.message) for note in conversion.notes]
+
+
+def dive_linking(*refs: str, dive_id: str = "d1") -> str:
+    return f'<dive id="{dive_id}">' + before("".join(f'<link ref="{ref}"/>' for ref in refs)) + "</dive>"
+
+
+def test_a_base_and_a_shop_are_contacts_with_the_role_their_slot_implies() -> None:
+    document, _ = contacts_of(
+        "<business><shop id='shop'><name>Reefside</name></shop></business>"
+        "<divesite><divebase id='base'><name>Blue Hole Divers</name></divebase></divesite>",
+        dive_linking("base"),
+    )
+    assert [(contact["name"], contact["roles"]) for contact in document["contacts"]] == [
+        ("Blue Hole Divers", ["dive_center"]),
+        ("Reefside", ["shop"]),
+    ]
+
+
+def test_a_dive_linking_a_base_or_a_shop_carries_it_as_its_contact_and_not_as_a_site() -> None:
+    """The link names buddies and sites in UDDF's prose and any id in its XSD (§6.2)."""
+    document, report = contacts_of(
+        "<business><shop id='shop'><name>Reefside</name></shop></business>"
+        "<divesite><divebase id='base'><name>Blue Hole Divers</name></divebase>"
+        "<site id='site'><name>The Canyon</name></site></divesite>",
+        dive_linking("site", "shop", "base"),
+    )
+    dive = document["dives"][0]
+    shop, base = (contact["uuid"] for contact in reversed(document["contacts"]))
+    assert dive["site_uuids"] == [document["sites"][0]["uuid"]]
+    assert dive["contact_uuid"] == shop
+    assert base != shop
+    assert (
+        "dive/0",
+        "the dive links 2 contacts and §6.2 carries one; the first is kept and the rest are dropped",
+    ) in report
+    assert not [message for _, message in report if "not a dive site" in message]
+
+
+def test_the_placeholder_base_a_writer_emits_is_skipped_and_reported() -> None:
+    """Subsurface writes one into every export, and a dive center nobody dived with is a lie."""
+    document, report = contacts_of(
+        "<divesite><divebase id='allbase'><name>Subsurface Divebase</name></divebase></divesite>",
+        dive_linking(),
+    )
+    assert "contacts" not in document
+    assert [where for where, message in report if "placeholder" in message] == ["divebase/0"]
+
+
+def one_part(part: str) -> str:
+    return f'<divetrip><trip id="t"><name>Spring</name><trippart>{part}</trippart></trip></divetrip>'
+
+
+@pytest.mark.parametrize(
+    ("header", "dives"),
+    [
+        ("", dive_linking("base")),
+        (one_part('<name>Dahab</name><link ref="base"/>'), ""),
+        (one_part('<accomodation id="a"><name> blue hole divers</name></accomodation>'), ""),
+        (one_part('<operator><name>BLUE HOLE DIVERS</name></operator><vessel id="v"><name>MV</name></vessel>'), ""),
+    ],
+    ids=["a-dive-links-it", "a-part-links-it", "an-accommodation-names-it", "an-operator-names-it"],
+)
+def test_a_name_only_base_is_kept_where_anything_points_at_it(header: str, dives: str) -> None:
+    document, report = contacts_of(
+        "<divesite><divebase id='base'><name>Blue Hole Divers</name></divebase></divesite>" + header, dives
+    )
+    assert [contact["name"] for contact in document["contacts"]] == ["Blue Hole Divers"]
+    assert not [message for _, message in report if "placeholder" in message]
+
+
+@pytest.mark.parametrize(
+    "carried",
+    [
+        "<address><country>Egypt</country></address>",
+        "<contact><phone>+20 69 555 0199</phone></contact>",
+        "<notes><para>Jeeps.</para></notes>",
+    ],
+    ids=["address", "contact", "notes"],
+)
+def test_a_base_carrying_more_than_its_name_is_kept_whatever_links_it(carried: str) -> None:
+    document, _ = contacts_of(
+        f"<divesite><divebase id='base'><name>Blue Hole Divers</name>{carried}</divebase></divesite>"
+    )
+    assert len(document["contacts"]) == 1
+
+
+def test_a_contact_with_no_name_is_dropped_and_the_link_to_it_with_it() -> None:
+    document, report = contacts_of(
+        "<divesite><divebase id='base'><name> </name><notes><para>Jeeps.</para></notes></divebase></divesite>",
+        dive_linking("base"),
+    )
+    assert "contacts" not in document and "contact_uuid" not in document["dives"][0]
+    assert any(where == "divebase/0" and "has no name" in message for where, message in report)
+    assert any(where == "dive/0" and "which is not read" in message for where, message in report)
+
+
+def test_an_inline_accommodation_folds_into_the_base_it_names() -> None:
+    """One resort, two roles: the base's and the stay's, filling what the base lacked.
+
+    Trimmed and case-insensitively, and a member both state differently keeps the base's
+    and reports the stay's — a file gives a reader nothing else to fold by.
+    """
+    document, report = contacts_of(
+        "<divesite><divebase id='base'><name>Blue Hole Divers</name>"
+        "<contact><phone>+20 69 555 0199</phone></contact></divebase></divesite>"
+        '<divetrip><trip id="t"><name>Spring</name><trippart><name>Dahab</name>'
+        "<accomodation id='a'><name> blue hole divers </name>"
+        "<address><city>Dahab</city><country>Egypt</country></address>"
+        "<contact><phone>+20 69 555 0100</phone></contact></accomodation></trippart></trip></divetrip>",
+    )
+    (contact,) = document["contacts"]
+    assert contact["roles"] == ["dive_center", "accommodation"]
+    assert contact["phone"] == "+20 69 555 0199"
+    assert contact["address"] == {"city": "Dahab", "country": "Egypt"}
+    assert document["trips"][0]["parts"][0]["accommodation_uuid"] == contact["uuid"]
+    assert any(
+        where == "trip/0/trippart/0/accomodation" and "states its phone as '+20 69 555 0100'" in message
+        for where, message in report
+    )
+
+
+def test_two_parts_at_one_place_are_one_contact() -> None:
+    document, _ = contacts_of(
+        '<divetrip><trip id="t"><name>Spring</name>'
+        "<trippart><name>Hurghada</name>"
+        "<accomodation id='a1'><name>Grandma's house</name></accomodation></trippart>"
+        "<trippart><name>Hurghada</name>"
+        "<accommodation id='a2'><name>GRANDMA'S HOUSE</name></accommodation></trippart>"
+        "</trip></divetrip>",
+    )
+    (contact,) = document["contacts"]
+    assert contact["name"] == "Grandma's house" and contact["roles"] == ["accommodation"]
+    assert [part["accommodation_uuid"] for part in document["trips"][0]["parts"]] == [contact["uuid"]] * 2
+
+
+def test_an_operators_identity_is_its_parts_position_among_every_part_in_the_file() -> None:
+    """`operatorType` carries no id, and a part's index within its own trip would repeat."""
+    document, report = contacts_of(
+        '<divetrip><trip id="t1"><name>One</name><trippart><name>Dahab</name></trippart></trip>'
+        '<trip id="t2"><name>Two</name><trippart><name>Brothers</name><operator><name>Northern Star</name>'
+        "</operator><vessel id='v'><name>MV Northern Star</name><shiptype>motor yacht</shiptype></vessel>"
+        "</trippart></trip></divetrip>",
+    )
+    (contact,) = document["contacts"]
+    assert contact["uuid"] == str(uuid.uuid5(UDDF_ID_NAMESPACE, "contact:#1"))
+    assert contact["roles"] == ["liveaboard"]
+    assert any(where == "trip/1/trippart/0/vessel" and "MV Northern Star" in message for where, message in report)
+
+
+def test_a_part_that_records_only_where_the_diver_stayed_is_a_part() -> None:
+    document, _ = contacts_of(
+        '<divetrip><trip id="t"><name>Spring</name><trippart><name></name>'
+        "<accomodation id='a'><name>Grandma's house</name></accomodation></trippart></trip></divetrip>",
+    )
+    assert document["trips"][0]["parts"] == [{"accommodation_uuid": document["contacts"][0]["uuid"]}]
+
+
+def test_a_parts_type_and_its_link_to_a_base_are_reported() -> None:
+    """§6.9a records where the diver slept; whom a dive was with is the dive's (§6.2)."""
+    _, report = contacts_of(
+        "<divesite><divebase id='base'><name>Blue Hole Divers</name></divebase></divesite>"
+        '<divetrip><trip id="t"><name>Spring</name><trippart type="hotel"><name>Dahab</name>'
+        '<link ref="base"/></trippart></trip></divetrip>',
+    )
+    at_part = [message for where, message in report if where == "trip/0/trippart/0"]
+    assert any("type 'hotel'" in message for message in at_part)
+    assert any("links the contact 'base'" in message for message in at_part)
+
+
+def test_the_contacts_come_out_bases_then_shops_then_parts_then_purchases() -> None:
+    """The order `docs/uddf-mapping.md` fixes, so that two readers' pairs agree."""
+    document, report = contacts_of(
+        "<business><shop id='s'><name>Shop</name></shop></business>"
+        "<diver><owner id='owner'><personal><firstname>A</firstname><lastname>B</lastname></personal>"
+        "<equipment><regulator id='r'><name>Reg</name><purchase><price currency='EUR'>400</price>"
+        "<shop id='bought'><name>Mail order</name></shop></purchase></regulator></equipment></owner></diver>"
+        "<divesite><divebase id='b'><name>Base</name><notes><para>x</para></notes></divebase></divesite>"
+        '<divetrip><trip id="t"><name>Spring</name><trippart><name>Dahab</name>'
+        "<accomodation id='a'><name>Hotel</name></accomodation></trippart></trip></divetrip>",
+    )
+    assert [contact["name"] for contact in document["contacts"]] == ["Base", "Shop", "Hotel", "Mail order"]
+    assert document["contacts"][3]["roles"] == ["shop"]
+    assert any(where == "gear/0/purchase/0" and "<purchase>" in message for where, message in report)
+
+
+def test_two_purchases_under_one_piece_are_two_places_in_the_report_and_two_shops() -> None:
+    """The XSD allows a piece one, and a shop with no id is identified by where it sits — so a
+    file holding two has to put them at two places."""
+    document, report = contacts_of(
+        "<diver><owner id='owner'><personal><firstname>A</firstname><lastname>B</lastname></personal>"
+        "<equipment><regulator id='r'><name>Reg</name><purchase><shop><name>One</name></shop></purchase>"
+        "<purchase><shop><name>Two</name></shop></purchase></regulator></equipment></owner></diver>",
+    )
+    assert [contact["name"] for contact in document["contacts"]] == ["One", "Two"]
+    assert [where for where, message in report if "<purchase>" in message] == [
+        "gear/0/purchase/0",
+        "gear/0/purchase/1",
+    ]
+
+
+def test_a_purchase_whose_shop_is_no_contact_does_not_say_it_is_one() -> None:
+    document, report = contacts_of(
+        "<diver><owner id='owner'><personal><firstname>A</firstname><lastname>B</lastname></personal>"
+        "<equipment><regulator id='r'><name>Reg</name><purchase><shop id='s'><name> </name></shop>"
+        "</purchase></regulator></equipment></owner></diver>",
+    )
+    assert "contacts" not in document
+    (said,) = [message for where, message in report if where == "gear/0/purchase/0"]
+    assert "read as a contact" not in said
+
+
+def test_a_dropped_pieces_purchase_goes_with_it() -> None:
+    """A `<camera>` has no `<name>` and is no gear item, so where its body was bought is not
+    read either — the camera's own finding covers everything under it."""
+    document, report = contacts_of(
+        "<diver><owner id='owner'><personal><firstname>A</firstname><lastname>B</lastname></personal>"
+        "<equipment><camera id='c'><body id='b'><name>Body</name><purchase><shop id='s'><name>One</name>"
+        "</shop></purchase></body></camera></equipment></owner></diver>",
+    )
+    assert "contacts" not in document
+    assert [where for where, message in report if "no name" in message] == ["gear/0"]
+
+
+def test_a_contacts_roles_come_in_the_order_its_section_lists_them() -> None:
+    document, _ = contacts_of(
+        "<business><shop id='s'><name>Resort</name></shop></business>"
+        '<divetrip><trip id="t"><name>Spring</name>'
+        "<trippart><name>Aboard</name><operator><name>resort</name></operator>"
+        "<vessel id='v'><name>V</name></vessel></trippart>"
+        "<trippart><name>Ashore</name><accomodation id='a'><name>Resort</name></accomodation></trippart>"
+        "</trip></divetrip>",
+    )
+    assert document["contacts"][0]["roles"] == ["shop", "accommodation", "liveaboard"]
+
+
+def test_a_contacts_phone_email_and_website_are_read_on_the_owners_terms_and_the_rest_reported() -> None:
+    """One phone, one email, one website — each the first, each dropped rather than cut."""
+    long_phone = "+" + "1" * 40
+    document, report = contacts_of(
+        "<divesite><divebase id='base'><name>Blue Hole Divers</name><aliasname>BHD</aliasname>"
+        "<contact><language>en</language><phone>" + long_phone + "</phone><mobilephone>+20 100</mobilephone>"
+        "<fax>+20 69</fax><email>n/a</email><email>desk@bluehole.example</email>"
+        "<homepage>bluehole.example</homepage><homepage>https://bluehole.example/</homepage></contact>"
+        "<rating><ratingvalue>9</ratingvalue></rating></divebase></divesite>",
+        dive_linking("base"),
+    )
+    (contact,) = document["contacts"]
+    assert {"phone", "email", "website"}.isdisjoint(contact)
+    reported = "\n".join(message for where, message in report if where == "divebase/0")
+    for said in ("<aliasname> 'BHD'", "<rating>", "<contact><language>", "<contact><fax>", "'+20 100'",
+                 "'desk@bluehole.example' is not read", "'https://bluehole.example/' is not read",
+                 "not an address", "not an absolute URL", "a number cut short"):
+        assert said in reported
+
+
+def test_an_address_with_no_country_is_dropped_and_its_parts_are_capped() -> None:
+    document, report = contacts_of(
+        "<divesite><divebase id='one'><name>One</name><address><city>Dahab</city></address>"
+        "<notes><para>x</para></notes></divebase>"
+        f"<divebase id='two'><name>Two</name><address><postcode>{'9' * 40}</postcode>"
+        "<country>Egypt</country><province>South Sinai</province></address></divebase></divesite>",
+    )
+    one, two = document["contacts"]
+    assert "address" not in one
+    assert two["address"] == {"postcode": "9" * 32, "region": "South Sinai", "country": "Egypt"}
+    assert any(where == "divebase/0" and "no <country>" in message for where, message in report)
+    assert any(where == "divebase/1" and "postcode" in message for where, message in report)
 
 
 # -- identity ------------------------------------------------------------------------

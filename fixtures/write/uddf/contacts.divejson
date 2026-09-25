@@ -1,0 +1,197 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-25T09:00:00+00:00",
+  "generator": {
+    "name": "DiveJSON fixtures"
+  },
+  "diver": {
+    "uuid": "019fed00-5c3a-7000-8000-000000000001",
+    "name": "Sam Reef"
+  },
+  "dives": [
+    {
+      "uuid": "019fed00-5c3a-7000-8000-000000000010",
+      "number": 118,
+      "started_at": "2026-03-03T09:10:00+02:00",
+      "duration": 2940,
+      "max_depth": 24.6,
+      "trip_uuid": "019fed00-5c3a-7000-8000-000000000030",
+      "course_uuid": "019fed00-5c3a-7000-8000-000000000040",
+      "contact_uuid": "019fed00-5c3a-7000-8000-0000000000a1",
+      "site_uuids": [
+        "019fed00-5c3a-7000-8000-000000000020"
+      ],
+      "gear_uuids": [
+        "019fed00-5c3a-7000-8000-000000000060"
+      ]
+    }
+  ],
+  "trips": [
+    {
+      "uuid": "019fed00-5c3a-7000-8000-000000000030",
+      "name": "Red Sea, spring",
+      "parts": [
+        {
+          "starts_on": "2026-03-02",
+          "ends_on": "2026-03-06",
+          "location": {
+            "name": "Dahab"
+          },
+          "accommodation_uuid": "019fed00-5c3a-7000-8000-0000000000a1"
+        },
+        {
+          "starts_on": "2026-03-06",
+          "ends_on": "2026-03-13",
+          "location": {
+            "name": "Brothers Islands"
+          },
+          "accommodation_uuid": "019fed00-5c3a-7000-8000-0000000000a4"
+        },
+        {
+          "starts_on": "2026-03-13",
+          "ends_on": "2026-03-14",
+          "location": {
+            "name": "Hurghada"
+          },
+          "accommodation_uuid": "019fed00-5c3a-7000-8000-0000000000a2"
+        },
+        {
+          "starts_on": "2026-03-20",
+          "ends_on": "2026-03-21",
+          "location": {
+            "name": "Hurghada"
+          },
+          "accommodation_uuid": "019fed00-5c3a-7000-8000-0000000000a2"
+        },
+        {
+          "starts_on": "2026-03-21",
+          "ends_on": "2026-03-22",
+          "location": {
+            "name": "El Gouna"
+          },
+          "accommodation_uuid": "019fed00-5c3a-7000-8000-0000000000a5"
+        }
+      ]
+    }
+  ],
+  "courses": [
+    {
+      "uuid": "019fed00-5c3a-7000-8000-000000000040",
+      "name": "Advanced Open Water",
+      "agency": "padi",
+      "status": "completed",
+      "starts_on": "2026-03-03",
+      "ends_on": "2026-03-05",
+      "contact_uuid": "019fed00-5c3a-7000-8000-0000000000a1"
+    }
+  ],
+  "sites": [
+    {
+      "uuid": "019fed00-5c3a-7000-8000-000000000020",
+      "name": "The Canyon",
+      "location": {
+        "name": "Dahab, Egypt"
+      },
+      "position": {
+        "latitude": 28.5585,
+        "longitude": 34.5212
+      }
+    }
+  ],
+  "gear": [
+    {
+      "uuid": "019fed00-5c3a-7000-8000-000000000060",
+      "name": "Primary regulator",
+      "type": "regulator"
+    }
+  ],
+  "gear_service_records": [
+    {
+      "uuid": "019fed00-5c3a-7000-8000-000000000070",
+      "gear_uuid": "019fed00-5c3a-7000-8000-000000000060",
+      "type": "service",
+      "serviced_on": "2026-03-05",
+      "performed_by": "Ahmed",
+      "contact_uuid": "019fed00-5c3a-7000-8000-0000000000a1"
+    },
+    {
+      "uuid": "019fed00-5c3a-7000-8000-000000000071",
+      "gear_uuid": "019fed00-5c3a-7000-8000-000000000060",
+      "type": "visual_inspection",
+      "serviced_on": "2026-03-14",
+      "contact_uuid": "019fed00-5c3a-7000-8000-0000000000a3"
+    }
+  ],
+  "certifications": [
+    {
+      "uuid": "019fed00-5c3a-7000-8000-000000000050",
+      "agency": "padi",
+      "name": "Advanced Open Water Diver",
+      "certified_on": "2026-03-05",
+      "course_uuid": "019fed00-5c3a-7000-8000-000000000040",
+      "contact_uuid": "019fed00-5c3a-7000-8000-0000000000a1"
+    }
+  ],
+  "contacts": [
+    {
+      "uuid": "019fed00-5c3a-7000-8000-0000000000a1",
+      "name": "Blue Hole Divers",
+      "roles": [
+        "dive_center",
+        "school",
+        "shop",
+        "accommodation"
+      ],
+      "phone": "+20 69 555 0199",
+      "email": "desk@bluehole.example",
+      "website": "https://bluehole.example/",
+      "address": {
+        "street": "Mashraba",
+        "city": "Dahab",
+        "postcode": "46617",
+        "region": "South Sinai",
+        "country": "Egypt"
+      },
+      "notes": "Shore dives from the house reef, and jeeps to the Blue Hole.",
+      "created_at": "2026-03-02T18:00:00+02:00"
+    },
+    {
+      "uuid": "019fed00-5c3a-7000-8000-0000000000a2",
+      "name": "Grandma's house",
+      "roles": [
+        "accommodation"
+      ]
+    },
+    {
+      "uuid": "019fed00-5c3a-7000-8000-0000000000a3",
+      "name": "Reefside",
+      "roles": [
+        "shop"
+      ],
+      "phone": "+20 100 555 0142",
+      "address": {
+        "street": "14 Harbour Road",
+        "city": "Hurghada",
+        "region": "Red Sea",
+        "country": "Egypt"
+      }
+    },
+    {
+      "uuid": "019fed00-5c3a-7000-8000-0000000000a4",
+      "name": "Northern Star Liveaboards",
+      "roles": [
+        "liveaboard"
+      ],
+      "phone": "+20 65 555 0123",
+      "notes": "Seven nights aboard, nitrox included."
+    },
+    {
+      "uuid": "019fed00-5c3a-7000-8000-0000000000a5",
+      "name": "Reefside",
+      "roles": [
+        "accommodation"
+      ]
+    }
+  ]
+}

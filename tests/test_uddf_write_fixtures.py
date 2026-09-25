@@ -138,6 +138,33 @@ LOST: dict[str, frozenset[str]] = {
             # difference either way.
             "gear",
             "dives/0/gear_uuids",
+            # The contact goes out as a `<divebase>` with a copy on the first part, which say
+            # `dive_center` and `accommodation` back of its four roles; its `created_at` and
+            # its producer's extension have no slot. Its references from the course, the card
+            # and the service record go with those records, which are lost whole above.
+            "contacts/0/roles",
+            "contacts/0/created_at",
+            "contacts/0/extensions",
+        }
+    ),
+    "contacts": frozenset(
+        {
+            "courses",
+            "certifications",
+            "gear_service_records",
+            "dives/0/course_uuid",
+            # Blue Hole Divers: a base and a copy say two of its four roles back.
+            "contacts/0/roles",
+            "contacts/0/created_at",
+            # Grandma's house and the liveaboard: a base and the copies say `dive_center` and
+            # `accommodation`, which is not what either recorded.
+            "contacts/1/roles",
+            "contacts/3/roles",
+            # The guest house that shares the shop's name: its part gets no copy, so the part
+            # comes back without its accommodation, and its name-only base, which nothing
+            # else points at, is the placeholder a reader skips.
+            "trips/0/parts/4/accommodation_uuid",
+            "contacts/4",
         }
     ),
 }
@@ -157,6 +184,7 @@ RETURNED: dict[str, frozenset[str]] = {
     "opendiving": frozenset(),
     "owner-profile-only": frozenset(),
     "technical-dive": frozenset({"gear", "dives/0/gear_uuids"}),
+    "contacts": frozenset(),
 }
 
 
@@ -170,8 +198,11 @@ def _document(path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _compared(document: dict[str, Any]) -> dict[str, Any]:
-    """A document reduced to what the round trip is about — see the module docstring."""
+def _compared(document: dict[str, Any], written: dict[str, Any]) -> dict[str, Any]:
+    """A document reduced to what the round trip is about — see the module docstring.
+
+    `written` is the document the pair wrote, which `document` is or was read back from.
+    """
     reduced = compared(document)
     reduced.pop("extensions", None)
     # `<equipment>` is an `xs:sequence`, so a written logbook's gear is grouped by type and
@@ -180,6 +211,13 @@ def _compared(document: dict[str, Any]) -> dict[str, Any]:
     # are — which is also what makes a *missing* piece still fail this test.
     if "gear" in reduced:
         reduced["gear"] = sorted(reduced["gear"], key=lambda item: item["uuid"])
+    # A reader lists the bases, then the shops, then what the parts add, so a contact comes
+    # back at another index than it went out at, and one that does not come back moves every
+    # one after it. Keyed by where each sat in the written document, a difference names the
+    # contact it is in, at the path the writer's report uses.
+    if "contacts" in reduced:
+        at = {contact["uuid"]: str(index) for index, contact in enumerate(written.get("contacts") or [])}
+        reduced["contacts"] = {at.get(contact["uuid"], contact["uuid"]): contact for contact in reduced["contacts"]}
     return reduced
 
 
@@ -272,7 +310,7 @@ def test_reading_the_written_file_back_returns_the_document(source) -> None:
     """
     document = _document(source)
     read_back = convert(write_uddf(document).data, format="uddf").document
-    assert set(_differences(_compared(document), _compared(read_back))) == LOST[source.stem]
+    assert set(_differences(_compared(document, document), _compared(read_back, document))) == LOST[source.stem]
 
 
 @pytest.mark.parametrize("source", WRITE_FIXTURES, ids=lambda path: path.stem)
@@ -290,7 +328,7 @@ def test_the_report_names_everything_that_changed(source) -> None:
     written = write_uddf(document)
     read_back = convert(written.data, format="uddf").document
 
-    before, after = _compared(document), _compared(read_back)
+    before, after = _compared(document, document), _compared(read_back, document)
     unreported = [
         path
         for path in _differences(before, after)

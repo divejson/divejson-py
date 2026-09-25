@@ -218,6 +218,7 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
             "gear_service_schedules",
             "gear_service_records",
             "certifications",
+            "contacts",
         )
     }
 
@@ -245,6 +246,7 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
                 pass
         _check_reference(dive, "trip_uuid", known["trips"], "trips", here, issues)
         _check_reference(dive, "course_uuid", known["courses"], "courses", here, issues)
+        _check_reference(dive, "contact_uuid", known["contacts"], "contacts", here, issues)
         _check_reference_list(dive, "site_uuids", known["sites"], "sites", here, issues)
         _check_reference_list(dive, "gear_uuids", known["gear"], "gear", here, issues)
         _check_reference_list(dive, "species_uuids", known["species"], "species", here, issues)
@@ -315,6 +317,9 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
                 except TypeError:
                     pass
             _check_location_bbox(part, part_path, issues)
+            # The one reference out of an embedded object, and the one not named after its
+            # collection: §5.3 resolves it where §6.9a says, in `contacts`.
+            _check_reference(part, "accommodation_uuid", known["contacts"], "contacts", part_path, issues)
 
     for index, site in enumerate(collections["sites"]):
         _check_location_bbox(site, f"sites/{index}", issues)
@@ -337,6 +342,7 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
             record, "gear_service_schedule_uuid", known["gear_service_schedules"],
             "gear_service_schedules", here, issues,
         )
+        _check_reference(record, "contact_uuid", known["contacts"], "contacts", here, issues)
 
     for index, course in enumerate(collections["courses"]):
         if _present(course, "starts_on") and _present(course, "ends_on"):
@@ -345,10 +351,12 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
                     issues.append(Issue(f"courses/{index}", "ends_on precedes starts_on"))
             except TypeError:
                 pass
+        _check_reference(course, "contact_uuid", known["contacts"], "contacts", f"courses/{index}", issues)
 
     for index, certification in enumerate(collections["certifications"]):
         here = f"certifications/{index}"
         _check_reference(certification, "course_uuid", known["courses"], "courses", here, issues)
+        _check_reference(certification, "contact_uuid", known["contacts"], "contacts", here, issues)
         for member in ("front_file", "back_file"):
             stored = certification.get(member)
             if isinstance(stored, dict):

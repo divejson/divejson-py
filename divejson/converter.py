@@ -71,7 +71,7 @@ from __future__ import annotations
 import re
 import sys
 import uuid as uuid_pkg
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
@@ -108,6 +108,8 @@ __all__ = [
     "UnsupportedSourceError",
     "Written",
     "capped",
+    "contact_members",
+    "contact_roles",
     "channel_floor",
     "deco_model",
     "decimal_of",
@@ -124,6 +126,7 @@ __all__ = [
     "recorded",
     "recording",
     "recording_members",
+    "roles_in_order",
     "rounded",
     "shared_readout",
     "zero_is_an_answer",
@@ -305,8 +308,14 @@ class Scope:
     def where(self, path: str) -> str:
         return path if self.member is None else f"{self.member}/{path}"
 
-    def positional(self, index: int) -> str:
-        """The stand-in source id for a record the source gave none."""
+    def positional(self, index: int | str) -> str:
+        """The stand-in source id for a record the source gave none.
+
+        The record's position in the list it was read from, or a path into the source where
+        one kind is read from several lists: a UDDF contact with no id takes its path when it
+        is a base, a shop or a purchase's shop, so that none of them shares the plain count an
+        operator takes from its trip part.
+        """
         return f"#{index}" if self.member is None else f"{self.member}#{index}"
 
     @property
@@ -860,6 +869,37 @@ def shared_readout(stated: str, count: int) -> str:
     )
 
 
+# -- contacts -------------------------------------------------------------------------
+
+
+@cache
+def contact_roles() -> tuple[str, ...]:
+    """§6.18's role vocabulary in the order its table gives, off the schema's `enum`.
+
+    `roles` is a set, so the order a reader writes one in is not a fact about any file —
+    `docs/uddf-mapping.md` fixes it to §6.18's table so that two readers' pairs agree, and
+    the writer's report names roles in the same order.
+    """
+    return tuple(load_schema()["$defs"]["contact"]["properties"]["roles"]["items"]["enum"])
+
+
+def roles_in_order(roles: Iterable[str]) -> list[str]:
+    """A set of roles as §6.18 lists them, a value it does not know being dropped (§5.6)."""
+    held = set(roles)
+    return [role for role in contact_roles() if role in held]
+
+
+@cache
+def contact_members() -> tuple[str, ...]:
+    """§6.18's Contact members in the section's own order, off the schema.
+
+    A contact a reader builds gains members out of order — an inline shape folding into a
+    base fills whatever the base lacked — and is put back in the section's order before it
+    is written, as a recording is.
+    """
+    return tuple(load_schema()["$defs"]["contact"]["properties"])
+
+
 # -- identity ------------------------------------------------------------------------
 
 _UUID_TEXT = re.compile(r"\A[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\Z")
@@ -904,7 +944,9 @@ class Identities:
         self._scope = scope
         self._note = note
 
-    def for_record(self, kind: str, source_id: str | None, where: str, index: int) -> tuple[str | None, bool]:
+    def for_record(
+        self, kind: str, source_id: str | None, where: str, index: int | str
+    ) -> tuple[str | None, bool]:
         """A record's stable UUID, and whether **this** file is the one that carries it.
 
         Three outcomes, and the middle one is the whole of what an archive needs.

@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<uddf xmlns="http://www.streit.cc/uddf/3.2/" version="3.2.2">
+  <generator>
+    <name>DiveJSON fixtures</name>
+  </generator>
+  <business>
+    <shop id="shop-reefside">
+      <name>Reefside Dive Supplies</name>
+      <address>
+        <street>14 Harbour Road</street>
+        <city>Hurghada</city>
+        <country>Egypt</country>
+        <province>Red Sea</province>
+      </address>
+      <contact>
+        <mobilephone>+20 100 555 0142</mobilephone>
+        <homepage>www.reefside.example</homepage>
+      </contact>
+      <notes>
+        <para>Regulator servicing; closed on Fridays.</para>
+      </notes>
+    </shop>
+  </business>
+  <divesite>
+    <divebase id="allbase">
+      <name>Subsurface Divebase</name>
+    </divebase>
+    <divebase id="base-bluehole">
+      <name>Blue Hole Divers</name>
+      <aliasname>BHD</aliasname>
+      <address>
+        <street>Mashraba</street>
+        <city>Dahab</city>
+        <postcode>46617</postcode>
+        <country>Egypt</country>
+        <province>South Sinai</province>
+      </address>
+      <contact>
+        <phone>+20 69 555 0199</phone>
+        <email>desk@bluehole.example</email>
+        <email>boats@bluehole.example</email>
+        <homepage>https://bluehole.example/</homepage>
+      </contact>
+      <priceperdive currency="EUR">35</priceperdive>
+      <rating>
+        <ratingvalue>9</ratingvalue>
+      </rating>
+      <notes>
+        <para>Shore dives from the house reef, and jeeps to the Blue Hole.</para>
+      </notes>
+    </divebase>
+    <site id="site-canyon">
+      <name>The Canyon</name>
+      <geography>
+        <location>Dahab, Egypt</location>
+        <latitude>28.5585</latitude>
+        <longitude>34.5212</longitude>
+      </geography>
+    </site>
+    <site id="site-el-mina">
+      <name>El Mina</name>
+      <geography>
+        <location>Hurghada, Egypt</location>
+        <latitude>27.2295</latitude>
+        <longitude>33.8472</longitude>
+      </geography>
+    </site>
+  </divesite>
+  <divetrip>
+    <trip id="trip-red-sea">
+      <name>Red Sea, spring</name>
+      <trippart type="individual">
+        <name>Hurghada</name>
+        <dateoftrip startdate="2026-03-01T00:00:00" enddate="2026-03-02T00:00:00"/>
+        <accomodation id="stay-grandma-1">
+          <name>Grandma's house</name>
+        </accomodation>
+      </trippart>
+      <trippart type="hotel">
+        <name>Dahab</name>
+        <dateoftrip startdate="2026-03-02T00:00:00" enddate="2026-03-06T00:00:00"/>
+        <accomodation id="stay-bluehole">
+          <name> blue hole divers</name>
+          <category>hotel</category>
+        </accomodation>
+        <link ref="base-bluehole"/>
+      </trippart>
+      <trippart type="boat">
+        <name>Brothers Islands</name>
+        <dateoftrip startdate="2026-03-06T00:00:00" enddate="2026-03-13T00:00:00"/>
+        <operator>
+          <name>Northern Star Liveaboards</name>
+          <address>
+            <city>Hurghada</city>
+          </address>
+          <contact>
+            <phone>+20 65 555 0123</phone>
+          </contact>
+          <notes>
+            <para>Seven nights aboard, nitrox included.</para>
+          </notes>
+        </operator>
+        <vessel id="vessel-northern-star">
+          <name>MV Northern Star</name>
+          <shiptype>motor yacht</shiptype>
+          <marina>Hurghada Marina</marina>
+          <shipdimension>
+            <length>38</length>
+          </shipdimension>
+        </vessel>
+      </trippart>
+      <trippart>
+        <name>Hurghada</name>
+        <dateoftrip startdate="2026-03-13T00:00:00" enddate="2026-03-14T00:00:00"/>
+        <accomodation id="stay-grandma-2">
+          <name>Grandma's House </name>
+        </accomodation>
+      </trippart>
+    </trip>
+  </divetrip>
+  <profiledata>
+    <repetitiongroup id="rg-1">
+      <dive id="dive-1">
+        <informationbeforedive>
+          <link ref="site-canyon"/>
+          <link ref="base-bluehole"/>
+          <divenumber>1</divenumber>
+          <datetime>2026-03-03T09:10:00+02:00</datetime>
+          <tripmembership ref="trip-red-sea"/>
+        </informationbeforedive>
+        <informationafterdive>
+          <greatestdepth>24.6</greatestdepth>
+          <diveduration>2940</diveduration>
+        </informationafterdive>
+      </dive>
+    </repetitiongroup>
+    <repetitiongroup id="rg-2">
+      <dive id="dive-2">
+        <informationbeforedive>
+          <link ref="site-el-mina"/>
+          <link ref="shop-reefside"/>
+          <divenumber>2</divenumber>
+          <datetime>2026-03-14T10:05:00+02:00</datetime>
+          <tripmembership ref="trip-red-sea"/>
+        </informationbeforedive>
+        <informationafterdive>
+          <greatestdepth>18.2</greatestdepth>
+          <diveduration>3120</diveduration>
+        </informationafterdive>
+      </dive>
+    </repetitiongroup>
+  </profiledata>
+</uddf>

@@ -236,6 +236,79 @@ def test_a_record_two_members_share_is_carried_once_and_referred_to_by_both() ->
     assert not any("not a dive site this converter carries" in note.message for note in conversion.notes)
 
 
+def test_a_contact_a_dive_links_survives_the_merge_and_is_carried_once() -> None:
+    """The merge concatenates the collections it knows, and the validation after it resolves
+    every reference — so a collection missing from that list leaves each `contact_uuid`
+    dangling, and the archive fails as a whole where either file alone converts."""
+    def logbook(dive_id: str) -> bytes:
+        return uddf(
+            "<divesite><divebase id='b1'><name>Blue Hole Divers</name><aliasname>BHD</aliasname>"
+            "</divebase></divesite>"
+            f"<profiledata><repetitiongroup><dive id='{dive_id}'><informationbeforedive>"
+            "<link ref='b1'/><datetime>2026-04-17T09:00:00+02:00</datetime>"
+            "</informationbeforedive></dive></repetitiongroup></profiledata>"
+        )
+
+    conversion = convert(_zip({"a.uddf": logbook("d1"), "b.uddf": logbook("d2")}), exported_at=EXPORTED_AT)
+    (contact,) = conversion.document["contacts"]
+    assert [dive["contact_uuid"] for dive in conversion.document["dives"]] == [contact["uuid"]] * 2
+    # What the base carries that the format does not is reported by the file that carries it.
+    assert [note.where for note in conversion.notes if "<aliasname>" in note.message] == ["a.uddf/divebase/0"]
+
+
+def test_a_contact_only_a_repeated_trip_or_piece_holds_is_carried_once() -> None:
+    """A per-dive export repeats its trip and its kit, and a stay or a shop inside a repeat is
+    the first file's to read: an `<operator>` has no id, so a second reading would be a
+    second contact for one boat, referenced by nothing."""
+    def logbook(dive_id: str) -> bytes:
+        return uddf(
+            "<diver><owner id='owner'><personal><firstname>A</firstname><lastname>B</lastname></personal>"
+            "<equipment><regulator id='r'><name>Reg</name><purchase><shop><name>Mail order</name></shop>"
+            "</purchase></regulator></equipment></owner></diver>"
+            "<divetrip><trip id='t1'><name>Brothers</name><trippart><name>Aboard</name>"
+            "<operator><name>Northern Star</name></operator><vessel id='v'><name>MV</name></vessel>"
+            "</trippart></trip></divetrip>"
+            f"<profiledata><repetitiongroup><dive id='{dive_id}'><informationbeforedive>"
+            "<datetime>2026-04-17T09:00:00+02:00</datetime><tripmembership ref='t1'/>"
+            "</informationbeforedive></dive></repetitiongroup></profiledata>"
+        )
+
+    document = convert(_zip({"a.uddf": logbook("d1"), "b.uddf": logbook("d2")}), exported_at=EXPORTED_AT).document
+    assert [contact["name"] for contact in document["contacts"]] == ["Northern Star", "Mail order"]
+    assert document["trips"][0]["parts"][0]["accommodation_uuid"] == document["contacts"][0]["uuid"]
+
+
+def test_a_stay_folding_into_a_contact_another_file_carries_is_compared_and_reported() -> None:
+    """The second file's copy of the base is read, report held, so a stay there that names it
+    is compared against what the base holds — and what the stay adds, the role included,
+    is named as not carried, the base's row being the first file's."""
+    def logbook(dive_id: str, stay: str = "") -> bytes:
+        trip = (
+            f"<divetrip><trip id='t-{dive_id}'><name>Spring</name><trippart><name>Dahab</name>{stay}"
+            "</trippart></trip></divetrip>"
+            if stay
+            else ""
+        )
+        return uddf(
+            "<divesite><divebase id='b1'><name>Blue Hole Divers</name><contact><phone>+1 555</phone>"
+            "</contact></divebase></divesite>" + trip
+            + f"<profiledata><repetitiongroup><dive id='{dive_id}'><informationbeforedive>"
+            "<link ref='b1'/><datetime>2026-04-17T09:00:00+02:00</datetime>"
+            "</informationbeforedive></dive></repetitiongroup></profiledata>"
+        )
+
+    stay = (
+        "<accomodation id='a'><name>Blue Hole Divers</name>"
+        "<contact><phone>+2 999</phone></contact></accomodation>"
+    )
+    conversion = convert(_zip({"a.uddf": logbook("d1"), "b.uddf": logbook("d2", stay)}), exported_at=EXPORTED_AT)
+    (contact,) = conversion.document["contacts"]
+    assert contact["phone"] == "+1 555" and contact["roles"] == ["dive_center"]
+    found = [note.message for note in conversion.notes if note.where == "b.uddf/trip/0/trippart/0/accomodation"]
+    assert any("states its phone as '+2 999' where the contact has '+1 555'" in message for message in found)
+    assert any("what it adds there — the role accommodation — is not carried" in message for message in found)
+
+
 def test_one_file_naming_two_records_the_same_is_still_a_source_defect() -> None:
     """The opposite case, and the one the collision rule was written for.
 

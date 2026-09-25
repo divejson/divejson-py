@@ -25,7 +25,13 @@ _WHERES_SHOWN = 3
 _KIND_WIDTH = max(len(kind) for kind in NOTE_KINDS)
 
 # The collections a converted document can carry, with how to count them.
-_COUNTED = (("dives", "dive", "dives"), ("trips", "trip", "trips"), ("sites", "site", "sites"), ("gear", "gear item", "gear items"))
+_COUNTED = (
+    ("dives", "dive", "dives"),
+    ("trips", "trip", "trips"),
+    ("sites", "site", "sites"),
+    ("gear", "gear item", "gear items"),
+    ("contacts", "contact", "contacts"),
+)
 
 
 def main(argv: list[str] | None = None) -> int:
