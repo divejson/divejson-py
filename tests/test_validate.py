@@ -10,8 +10,8 @@ that it does.
 
 So these, and deliberately nothing else: the channels §6.4 added, the gradient-factor
 ordering §3 rule 6 states, what §3 rule 4 accepts as a recording's content, the one member
-that may hold a date as well as a date-time, the member order the validator no longer
-checks — no `invalid/` document can pin an absence of a rule — and the one uuid claim whose
+that may hold a date as well as a date-time, the member order the validator does not
+check — no `invalid/` document can pin an absence of a rule — and the one uuid claim whose
 fixture is refused for another reason by any validator that does not know its member.
 Everything already covered by a pair stays covered by the pair.
 """
