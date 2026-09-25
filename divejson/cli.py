@@ -30,7 +30,7 @@ _COUNTED = (
     ("trips", "trip", "trips"),
     ("sites", "site", "sites"),
     ("gear", "gear item", "gear items"),
-    ("centers", "center", "centers"),
+    ("contacts", "contact", "contacts"),
 )
 
 

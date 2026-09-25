@@ -455,15 +455,15 @@ class _DeviceRecord:
         )
 
 
-# What a center goes out with, and what its address does. `roles` is carried in the sense
-# that it is reported by value rather than by name (`center_element`).
-_CENTER_CARRIED = frozenset({"uuid", "name", "roles", "phone", "email", "website", "address", "notes"})
+# What a contact goes out with, and what its address does. `roles` is carried in the sense
+# that it is reported by value rather than by name (`contact_element`).
+_CONTACT_CARRIED = frozenset({"uuid", "name", "roles", "phone", "email", "website", "address", "notes"})
 _ADDRESS_CARRIED = frozenset({"street", "city", "postcode", "region", "country"})
 
 
-def _is_shop(center: dict[str, Any]) -> bool:
-    """Whether a center goes out as a `<shop>`: its roles exactly `["shop"]`, and nothing else."""
-    return center.get("roles") == ["shop"]
+def _is_shop(contact: dict[str, Any]) -> bool:
+    """Whether a contact goes out as a `<shop>`: its roles exactly `["shop"]`, and nothing else."""
+    return contact.get("roles") == ["shop"]
 
 
 def _gas_name(key: _MixKey) -> str:
@@ -503,12 +503,12 @@ class _Writer:
         # `(dive index, recording index)` to the `xs:ID` of the element that recording's
         # device took, for the dives that have to link it.
         self.device_links: dict[tuple[int, int], str] = {}
-        # The document's centers by uuid, and the uuids of those a written `<accomodation>`
-        # copies, both filled by `plan_centers`: a center's own report turns on whether a
+        # The document's contacts by uuid, and the uuids of those a written `<accomodation>`
+        # copies, both filled by `plan_contacts`: a contact's own report turns on whether a
         # part's copy will name it, and the parts are written after it.
-        self.centers: dict[str, dict[str, Any]] = {}
+        self.contacts: dict[str, dict[str, Any]] = {}
         self.copied: set[str] = set()
-        # The trimmed, case-folded names two centers share, and the centers a dive links.
+        # The trimmed, case-folded names two contacts share, and the contacts a dive links.
         self.shared: set[str] = set()
         self.linked: set[str] = set()
         # How many `<accomodation>` copies have been written, which numbers the next one's id.
@@ -562,7 +562,7 @@ class _Writer:
 
         self.plan_mixes()
         self.plan_computers()
-        self.plan_centers()
+        self.plan_contacts()
         self.unmapped(
             "$",
             self.document,
@@ -578,7 +578,7 @@ class _Writer:
                     "trips",
                     "sites",
                     "gear",
-                    "centers",
+                    "contacts",
                 }
             ),
         )
@@ -969,62 +969,62 @@ class _Writer:
                     self.computer_element(equipment, record)
         return equipment
 
-    # -- centers -----------------------------------------------------------------
+    # -- contacts -----------------------------------------------------------------
 
-    def indexed_centers(self) -> list[tuple[int, dict[str, Any]]]:
-        return list(enumerate(self.document.get("centers") or []))
+    def indexed_contacts(self) -> list[tuple[int, dict[str, Any]]]:
+        return list(enumerate(self.document.get("contacts") or []))
 
-    def plan_centers(self) -> None:
-        """Decide, before anything is written, which parts get a copy of their center.
+    def plan_contacts(self) -> None:
+        """Decide, before anything is written, which parts get a copy of their contact.
 
         A part's accommodation goes out as an inline `<accomodation>` copy, which a reader
-        folds back into its center **by name**, having nothing else to go on — so where two
-        centers share a trimmed, case-folded name, a copy of either would come back as
+        folds back into its contact **by name**, having nothing else to go on — so where two
+        contacts share a trimmed, case-folded name, a copy of either would come back as
         whichever the reader met first, and a part staying at one of them gets no copy
-        (`stay_of`). Planned ahead because a center's own report turns on it: a name-only
+        (`stay_of`). Planned ahead because a contact's own report turns on it: a name-only
         `<divebase>` comes back only where something in the file points at it, and a copy
         carrying its name is one of those things.
         """
-        centers = [center for _, center in self.indexed_centers()]
-        self.centers = {center["uuid"]: center for center in centers if isinstance(center.get("uuid"), str)}
-        names = Counter(_folded(center.get("name")) for center in centers)
+        contacts = [contact for _, contact in self.indexed_contacts()]
+        self.contacts = {contact["uuid"]: contact for contact in contacts if isinstance(contact.get("uuid"), str)}
+        names = Counter(_folded(contact.get("name")) for contact in contacts)
         self.shared = {name for name, count in names.items() if name is not None and count > 1}
         self.copied = {
-            center["uuid"]
+            contact["uuid"]
             for trip in self.document.get("trips") or []
             for part in trip.get("parts") or []
-            if (center := self.stay_of(part)) is not None
+            if (contact := self.stay_of(part)) is not None
         }
-        self.linked = {dive["center_uuid"] for dive in self.document.get("dives") or [] if dive.get("center_uuid")}
+        self.linked = {dive["contact_uuid"] for dive in self.document.get("dives") or [] if dive.get("contact_uuid")}
 
     def stay_of(self, part: dict[str, Any]) -> dict[str, Any] | None:
-        """The center a part's copy is made of, or nothing where the part gets none."""
-        center = self.centers.get(part.get("accommodation_uuid") or "")
-        if center is None or _folded(center.get("name")) in self.shared:
+        """The contact a part's copy is made of, or nothing where the part gets none."""
+        contact = self.contacts.get(part.get("accommodation_uuid") or "")
+        if contact is None or _folded(contact.get("name")) in self.shared:
             return None
-        return center
+        return contact
 
     def business_element(self) -> ET.Element | None:
-        """`<business>`, holding every center whose roles are exactly `["shop"]`.
+        """`<business>`, holding every contact whose roles are exactly `["shop"]`.
 
-        `<shop>` is the one slot that says its role back, so a center that is a shop and
-        nothing else takes it, and every other center is a `<divebase>` (`divesite_element`).
+        `<shop>` is the one slot that says its role back, so a contact that is a shop and
+        nothing else takes it, and every other contact is a `<divebase>` (`divesite_element`).
         """
-        shops = [(index, center) for index, center in self.indexed_centers() if _is_shop(center)]
+        shops = [(index, contact) for index, contact in self.indexed_contacts() if _is_shop(contact)]
         if not shops:
             return None
         business = ET.Element("business")
-        for index, center in shops:
-            self.center_element(business, "shop", index, center)
+        for index, contact in shops:
+            self.contact_element(business, "shop", index, contact)
         return business
 
-    def center_element(self, parent: ET.Element, tag: str, index: int, center: dict[str, Any]) -> None:
-        """One center as a `<divebase>` or a `<shop>`, and what UDDF cannot hold of it reported.
+    def contact_element(self, parent: ET.Element, tag: str, index: int, contact: dict[str, Any]) -> None:
+        """One contact as a `<divebase>` or a `<shop>`, and what UDDF cannot hold of it reported.
 
-        **`roles` is not written**, UDDF having no element for one, but the slots a center
+        **`roles` is not written**, UDDF having no element for one, but the slots a contact
         goes out in say roles back to a reader: `dive_center` for a `<divebase>`, `shop` for
         a `<shop>`, and `accommodation` for each part's copy. Where those are not exactly the
-        center's own, the roles are reported — a center recording none included, which comes
+        contact's own, the roles are reported — a contact recording none included, which comes
         back a `dive_center`.
 
         **A `<divebase>` carrying nothing but a name, which no dive links and no copy names,
@@ -1032,51 +1032,51 @@ class _Writer:
         (`docs/uddf-mapping.md`), and it is reported here. The ordinary case is a school only
         a course or a card references, those records having no slot at all.
         """
-        where = f"centers/{index}"
-        self.unmapped(where, center, _CENTER_CARRIED)
-        element = _sub(parent, tag, id=_uddf_id("center", center["uuid"]))
-        _sub(element, "name", str(center.get("name") or ""))
-        carries = self.center_contents(element, center, where)
+        where = f"contacts/{index}"
+        self.unmapped(where, contact, _CONTACT_CARRIED)
+        element = _sub(parent, tag, id=_uddf_id("contact", contact["uuid"]))
+        _sub(element, "name", str(contact.get("name") or ""))
+        carries = self.contact_contents(element, contact, where)
 
         implied = {"shop"} if tag == "shop" else {"dive_center"}
-        if center["uuid"] in self.copied:
+        if contact["uuid"] in self.copied:
             implied.add("accommodation")
-        roles = center.get("roles") or []
+        roles = contact.get("roles") or []
         if set(roles) != implied:
             said = ", ".join(roles_in_order(implied))
             self.note(
                 where,
                 (
-                    f"UDDF has no element for roles, and the center records none; the <{tag}> it goes out as "
+                    f"UDDF has no element for roles, and the contact records none; the <{tag}> it goes out as "
                     f"reads back as {said}"
                     if not roles
-                    else f"UDDF has no element for roles, and the slots the center goes out in say only {said} "
+                    else f"UDDF has no element for roles, and the slots the contact goes out in say only {said} "
                     "back; its roles are not written"
                 ),
                 "dropped",
             )
-        if tag == "divebase" and not carries and center["uuid"] not in self.linked | self.copied:
+        if tag == "divebase" and not carries and contact["uuid"] not in self.linked | self.copied:
             self.note(
                 where,
-                "the center carries nothing UDDF holds but its name, and no dive links it and no part's copy "
+                "the contact carries nothing UDDF holds but its name, and no dive links it and no part's copy "
                 "names it — the shape a reader skips as a writer's placeholder <divebase>; it does not come back",
                 "dropped",
             )
 
-    def center_contents(
-        self, element: ET.Element, center: dict[str, Any], where: str, *, report: bool = True
+    def contact_contents(
+        self, element: ET.Element, contact: dict[str, Any], where: str, *, report: bool = True
     ) -> bool:
-        """A center's `<address>`, `<contact>` and `<notes>`, and whether any was written.
+        """A contact's `<address>`, `<contact>` and `<notes>`, and whether any was written.
 
-        The three children every shape a center goes out as shares, in the order each of
+        The three children every shape a contact goes out as shares, in the order each of
         them declares: a base, a shop and a part's copy. `report` is off for a copy, whose
-        center has already been reported where it was written as itself. One `<contact>`
+        contact has already been reported where it was written as itself. One `<contact>`
         holds whichever of the phone, the email and the website are present. That is not the
-        diver's own contact block, which `diver_element` writes on its own terms: a center's
-        is its listing, the kind printed on its sign, and the diver chose to record it.
+        diver's own contact block, which `diver_element` writes on its own terms: this block is
+        the record's listing, the kind printed on its sign, and the diver chose to record it.
         """
         wrote = False
-        address = center.get("address")
+        address = contact.get("address")
         if isinstance(address, dict) and address:
             if report:
                 self.unmapped(f"{where}/address", address, _ADDRESS_CARRIED)
@@ -1100,68 +1100,68 @@ class _Writer:
                     "dropped",
                 )
         # `contactType` is an `xs:sequence`, and this is its order.
-        contacts = [
-            (tag, center.get(member))
+        fields = [
+            (tag, contact.get(member))
             for member, tag in (("phone", "phone"), ("email", "email"), ("website", "homepage"))
         ]
-        if any(value for _, value in contacts):
-            contact = _sub(element, "contact")
-            for tag, value in contacts:
+        if any(value for _, value in fields):
+            block = _sub(element, "contact")
+            for tag, value in fields:
                 if value:
-                    _sub(contact, tag, str(value))
+                    _sub(block, tag, str(value))
             wrote = True
         if report:
-            return self.notes_of(element, where, center) or wrote
-        return _notes(element, center.get("notes")) or wrote
+            return self.notes_of(element, where, contact) or wrote
+        return _notes(element, contact.get("notes")) or wrote
 
     def accommodation(self, part: ET.Element, where: str, record: dict[str, Any]) -> None:
-        """A part's `accommodation_uuid` as an `<accomodation>` copy of its center, and its `type`.
+        """A part's `accommodation_uuid` as an `<accomodation>` copy of its contact, and its `type`.
 
         `trippartType` holds the accommodation inside the part rather than linking to one,
         so each part gets its own copy — spelled as the XSD spells it, with one m — under
         `accommodation-<n>`, numbered over the copies in document order: document-unique as
-        `xs:ID` requires, and not the center's own id, which its base holds. The part's
-        `type` is `boat` where the center is a liveaboard and `hotel` otherwise. A liveaboard
+        `xs:ID` requires, and not the contact's own id, which its base holds. The part's
+        `type` is `boat` where the contact is a liveaboard and `hotel` otherwise. A liveaboard
         goes out this way too rather than as `<operator>` and `<vessel>`: the vessel is
         mandatory beside the operator, and §6.18 has no boat to put in it.
         """
         uuid = record.get("accommodation_uuid")
         if uuid is None:
             return
-        center = self.stay_of(record)
-        if center is None:
+        contact = self.stay_of(record)
+        if contact is None:
             self.note(
                 where,
                 (
-                    "the part's center shares its name with another center, and a reader folds a copy back into "
-                    "a center by name alone, so a copy would come back as whichever it met first; no copy is "
+                    "the part's contact shares its name with another contact, and a reader folds a copy back into "
+                    "a contact by name alone, so a copy would come back as whichever it met first; no copy is "
                     "written and accommodation_uuid is not carried"
-                    if uuid in self.centers
-                    else "accommodation_uuid names no center in the document; it is not written"
+                    if uuid in self.contacts
+                    else "accommodation_uuid names no contact in the document; it is not written"
                 ),
                 "dropped",
             )
             return
         copy = _sub(part, "accomodation", id=f"accommodation-{self.copies}")
         self.copies += 1
-        _sub(copy, "name", str(center.get("name") or ""))
-        self.center_contents(copy, center, where, report=False)
-        part.set("type", "boat" if "liveaboard" in (center.get("roles") or []) else "hotel")
+        _sub(copy, "name", str(contact.get("name") or ""))
+        self.contact_contents(copy, contact, where, report=False)
+        part.set("type", "boat" if "liveaboard" in (contact.get("roles") or []) else "hotel")
 
     # -- sites -------------------------------------------------------------------
 
     def divesite_element(self) -> ET.Element | None:
-        """`<divesite>`: every center that is not a shop as a `<divebase>`, then the sites.
+        """`<divesite>`: every contact that is not a shop as a `<divebase>`, then the sites.
 
         In that order because `<divesite>` is an `xs:sequence` of bases and then sites.
         """
         sites = self.document.get("sites") or []
-        bases = [(index, center) for index, center in self.indexed_centers() if not _is_shop(center)]
+        bases = [(index, contact) for index, contact in self.indexed_contacts() if not _is_shop(contact)]
         if not (sites or bases):
             return None
         divesite = ET.Element("divesite")
-        for index, center in bases:
-            self.center_element(divesite, "divebase", index, center)
+        for index, contact in bases:
+            self.contact_element(divesite, "divebase", index, contact)
         for index, site in enumerate(sites):
             where = f"sites/{index}"
             self.unmapped(where, site, frozenset({"uuid", "name", "location", "position", "notes"}))
@@ -1419,7 +1419,7 @@ class _Writer:
                     "weight",
                     "altitude",
                     "trip_uuid",
-                    "center_uuid",
+                    "contact_uuid",
                     "site_uuids",
                     "gear_uuids",
                     "cylinders",
@@ -1437,11 +1437,11 @@ class _Writer:
         before = _sub(element, "informationbeforedive")
         for site_uuid in dive.get("site_uuids") or []:
             _sub(before, "link", ref=_uddf_id("site", site_uuid))
-        if dive.get("center_uuid"):
+        if dive.get("contact_uuid"):
             # After the sites, never beside them: UDDF's prose lists buddies and sites as this
             # link's targets and its XSD takes any id, and an importer reading one link takes
             # the first as the dive's site — so the primary site leads.
-            _sub(before, "link", ref=_uddf_id("center", dive["center_uuid"]))
+            _sub(before, "link", ref=_uddf_id("contact", dive["contact_uuid"]))
         number = dive.get("number")
         if number is not None:
             if number > 0:

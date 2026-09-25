@@ -236,9 +236,9 @@ def test_a_record_two_members_share_is_carried_once_and_referred_to_by_both() ->
     assert not any("not a dive site this converter carries" in note.message for note in conversion.notes)
 
 
-def test_a_center_a_dive_links_survives_the_merge_and_is_carried_once() -> None:
+def test_a_contact_a_dive_links_survives_the_merge_and_is_carried_once() -> None:
     """The merge concatenates the collections it knows, and the validation after it resolves
-    every reference — so a collection missing from that list leaves each `center_uuid`
+    every reference — so a collection missing from that list leaves each `contact_uuid`
     dangling, and the archive fails as a whole where either file alone converts."""
     def logbook(dive_id: str) -> bytes:
         return uddf(
@@ -250,16 +250,16 @@ def test_a_center_a_dive_links_survives_the_merge_and_is_carried_once() -> None:
         )
 
     conversion = convert(_zip({"a.uddf": logbook("d1"), "b.uddf": logbook("d2")}), exported_at=EXPORTED_AT)
-    (center,) = conversion.document["centers"]
-    assert [dive["center_uuid"] for dive in conversion.document["dives"]] == [center["uuid"]] * 2
+    (contact,) = conversion.document["contacts"]
+    assert [dive["contact_uuid"] for dive in conversion.document["dives"]] == [contact["uuid"]] * 2
     # What the base carries that the format does not is reported by the file that carries it.
     assert [note.where for note in conversion.notes if "<aliasname>" in note.message] == ["a.uddf/divebase/0"]
 
 
-def test_a_center_only_a_repeated_trip_or_piece_holds_is_carried_once() -> None:
+def test_a_contact_only_a_repeated_trip_or_piece_holds_is_carried_once() -> None:
     """A per-dive export repeats its trip and its kit, and a stay or a shop inside a repeat is
     the first file's to read: an `<operator>` has no id, so a second reading would be a
-    second center for one boat, referenced by nothing."""
+    second contact for one boat, referenced by nothing."""
     def logbook(dive_id: str) -> bytes:
         return uddf(
             "<diver><owner id='owner'><personal><firstname>A</firstname><lastname>B</lastname></personal>"
@@ -274,11 +274,11 @@ def test_a_center_only_a_repeated_trip_or_piece_holds_is_carried_once() -> None:
         )
 
     document = convert(_zip({"a.uddf": logbook("d1"), "b.uddf": logbook("d2")}), exported_at=EXPORTED_AT).document
-    assert [center["name"] for center in document["centers"]] == ["Northern Star", "Mail order"]
-    assert document["trips"][0]["parts"][0]["accommodation_uuid"] == document["centers"][0]["uuid"]
+    assert [contact["name"] for contact in document["contacts"]] == ["Northern Star", "Mail order"]
+    assert document["trips"][0]["parts"][0]["accommodation_uuid"] == document["contacts"][0]["uuid"]
 
 
-def test_a_stay_folding_into_a_center_another_file_carries_is_compared_and_reported() -> None:
+def test_a_stay_folding_into_a_contact_another_file_carries_is_compared_and_reported() -> None:
     """The second file's copy of the base is read, report held, so a stay there that names it
     is compared against what the base holds — and what the stay adds, the role included,
     is named as not carried, the base's row being the first file's."""
@@ -302,10 +302,10 @@ def test_a_stay_folding_into_a_center_another_file_carries_is_compared_and_repor
         "<contact><phone>+2 999</phone></contact></accomodation>"
     )
     conversion = convert(_zip({"a.uddf": logbook("d1"), "b.uddf": logbook("d2", stay)}), exported_at=EXPORTED_AT)
-    (center,) = conversion.document["centers"]
-    assert center["phone"] == "+1 555" and center["roles"] == ["dive_center"]
+    (contact,) = conversion.document["contacts"]
+    assert contact["phone"] == "+1 555" and contact["roles"] == ["dive_center"]
     found = [note.message for note in conversion.notes if note.where == "b.uddf/trip/0/trippart/0/accomodation"]
-    assert any("states its phone as '+2 999' where the center has '+1 555'" in message for message in found)
+    assert any("states its phone as '+2 999' where the contact has '+1 555'" in message for message in found)
     assert any("what it adds there — the role accommodation — is not carried" in message for message in found)
 
 

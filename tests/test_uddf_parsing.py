@@ -615,10 +615,10 @@ def test_a_parts_end_before_its_start_is_dropped_from_that_part() -> None:
     assert [message for message in messages if "before it starts on 2026-04-18" in message]
 
 
-# -- centers ---------------------------------------------------------------------------
+# -- contacts ---------------------------------------------------------------------------
 
 
-def centers_of(header: str, dives: str = "") -> tuple[dict, list[tuple[str, str]]]:
+def contacts_of(header: str, dives: str = "") -> tuple[dict, list[tuple[str, str]]]:
     """A document built from `header` and `dives`, and its report as `(where, message)`."""
     body = header + (
         f'<profiledata><repetitiongroup id="rg">{dives}</repetitiongroup></profiledata>' if dives else ""
@@ -632,45 +632,45 @@ def dive_linking(*refs: str, dive_id: str = "d1") -> str:
     return f'<dive id="{dive_id}">' + before("".join(f'<link ref="{ref}"/>' for ref in refs)) + "</dive>"
 
 
-def test_a_base_and_a_shop_are_centers_with_the_role_their_slot_implies() -> None:
-    document, _ = centers_of(
+def test_a_base_and_a_shop_are_contacts_with_the_role_their_slot_implies() -> None:
+    document, _ = contacts_of(
         "<business><shop id='shop'><name>Reefside</name></shop></business>"
         "<divesite><divebase id='base'><name>Blue Hole Divers</name></divebase></divesite>",
         dive_linking("base"),
     )
-    assert [(center["name"], center["roles"]) for center in document["centers"]] == [
+    assert [(contact["name"], contact["roles"]) for contact in document["contacts"]] == [
         ("Blue Hole Divers", ["dive_center"]),
         ("Reefside", ["shop"]),
     ]
 
 
-def test_a_dive_linking_a_base_or_a_shop_carries_it_as_its_center_and_not_as_a_site() -> None:
+def test_a_dive_linking_a_base_or_a_shop_carries_it_as_its_contact_and_not_as_a_site() -> None:
     """The link names buddies and sites in UDDF's prose and any id in its XSD (§6.2)."""
-    document, report = centers_of(
+    document, report = contacts_of(
         "<business><shop id='shop'><name>Reefside</name></shop></business>"
         "<divesite><divebase id='base'><name>Blue Hole Divers</name></divebase>"
         "<site id='site'><name>The Canyon</name></site></divesite>",
         dive_linking("site", "shop", "base"),
     )
     dive = document["dives"][0]
-    shop, base = (center["uuid"] for center in reversed(document["centers"]))
+    shop, base = (contact["uuid"] for contact in reversed(document["contacts"]))
     assert dive["site_uuids"] == [document["sites"][0]["uuid"]]
-    assert dive["center_uuid"] == shop
+    assert dive["contact_uuid"] == shop
     assert base != shop
     assert (
         "dive/0",
-        "the dive links 2 centers and §6.2 carries one; the first is kept and the rest are dropped",
+        "the dive links 2 contacts and §6.2 carries one; the first is kept and the rest are dropped",
     ) in report
     assert not [message for _, message in report if "not a dive site" in message]
 
 
 def test_the_placeholder_base_a_writer_emits_is_skipped_and_reported() -> None:
-    """Subsurface writes one into every export, and a center nobody dived with is a lie."""
-    document, report = centers_of(
+    """Subsurface writes one into every export, and a dive center nobody dived with is a lie."""
+    document, report = contacts_of(
         "<divesite><divebase id='allbase'><name>Subsurface Divebase</name></divebase></divesite>",
         dive_linking(),
     )
-    assert "centers" not in document
+    assert "contacts" not in document
     assert [where for where, message in report if "placeholder" in message] == ["divebase/0"]
 
 
@@ -689,10 +689,10 @@ def one_part(part: str) -> str:
     ids=["a-dive-links-it", "a-part-links-it", "an-accommodation-names-it", "an-operator-names-it"],
 )
 def test_a_name_only_base_is_kept_where_anything_points_at_it(header: str, dives: str) -> None:
-    document, report = centers_of(
+    document, report = contacts_of(
         "<divesite><divebase id='base'><name>Blue Hole Divers</name></divebase></divesite>" + header, dives
     )
-    assert [center["name"] for center in document["centers"]] == ["Blue Hole Divers"]
+    assert [contact["name"] for contact in document["contacts"]] == ["Blue Hole Divers"]
     assert not [message for _, message in report if "placeholder" in message]
 
 
@@ -706,18 +706,18 @@ def test_a_name_only_base_is_kept_where_anything_points_at_it(header: str, dives
     ids=["address", "contact", "notes"],
 )
 def test_a_base_carrying_more_than_its_name_is_kept_whatever_links_it(carried: str) -> None:
-    document, _ = centers_of(
+    document, _ = contacts_of(
         f"<divesite><divebase id='base'><name>Blue Hole Divers</name>{carried}</divebase></divesite>"
     )
-    assert len(document["centers"]) == 1
+    assert len(document["contacts"]) == 1
 
 
-def test_a_center_with_no_name_is_dropped_and_the_link_to_it_with_it() -> None:
-    document, report = centers_of(
+def test_a_contact_with_no_name_is_dropped_and_the_link_to_it_with_it() -> None:
+    document, report = contacts_of(
         "<divesite><divebase id='base'><name> </name><notes><para>Jeeps.</para></notes></divebase></divesite>",
         dive_linking("base"),
     )
-    assert "centers" not in document and "center_uuid" not in document["dives"][0]
+    assert "contacts" not in document and "contact_uuid" not in document["dives"][0]
     assert any(where == "divebase/0" and "has no name" in message for where, message in report)
     assert any(where == "dive/0" and "which is not read" in message for where, message in report)
 
@@ -728,7 +728,7 @@ def test_an_inline_accommodation_folds_into_the_base_it_names() -> None:
     Trimmed and case-insensitively, and a member both state differently keeps the base's
     and reports the stay's — a file gives a reader nothing else to fold by.
     """
-    document, report = centers_of(
+    document, report = contacts_of(
         "<divesite><divebase id='base'><name>Blue Hole Divers</name>"
         "<contact><phone>+20 69 555 0199</phone></contact></divebase></divesite>"
         '<divetrip><trip id="t"><name>Spring</name><trippart><name>Dahab</name>'
@@ -736,19 +736,19 @@ def test_an_inline_accommodation_folds_into_the_base_it_names() -> None:
         "<address><city>Dahab</city><country>Egypt</country></address>"
         "<contact><phone>+20 69 555 0100</phone></contact></accomodation></trippart></trip></divetrip>",
     )
-    (center,) = document["centers"]
-    assert center["roles"] == ["dive_center", "accommodation"]
-    assert center["phone"] == "+20 69 555 0199"
-    assert center["address"] == {"city": "Dahab", "country": "Egypt"}
-    assert document["trips"][0]["parts"][0]["accommodation_uuid"] == center["uuid"]
+    (contact,) = document["contacts"]
+    assert contact["roles"] == ["dive_center", "accommodation"]
+    assert contact["phone"] == "+20 69 555 0199"
+    assert contact["address"] == {"city": "Dahab", "country": "Egypt"}
+    assert document["trips"][0]["parts"][0]["accommodation_uuid"] == contact["uuid"]
     assert any(
         where == "trip/0/trippart/0/accomodation" and "states its phone as '+20 69 555 0100'" in message
         for where, message in report
     )
 
 
-def test_two_parts_at_one_place_are_one_center() -> None:
-    document, _ = centers_of(
+def test_two_parts_at_one_place_are_one_contact() -> None:
+    document, _ = contacts_of(
         '<divetrip><trip id="t"><name>Spring</name>'
         "<trippart><name>Hurghada</name>"
         "<accomodation id='a1'><name>Grandma's house</name></accomodation></trippart>"
@@ -756,48 +756,48 @@ def test_two_parts_at_one_place_are_one_center() -> None:
         "<accommodation id='a2'><name>GRANDMA'S HOUSE</name></accommodation></trippart>"
         "</trip></divetrip>",
     )
-    (center,) = document["centers"]
-    assert center["name"] == "Grandma's house" and center["roles"] == ["accommodation"]
-    assert [part["accommodation_uuid"] for part in document["trips"][0]["parts"]] == [center["uuid"]] * 2
+    (contact,) = document["contacts"]
+    assert contact["name"] == "Grandma's house" and contact["roles"] == ["accommodation"]
+    assert [part["accommodation_uuid"] for part in document["trips"][0]["parts"]] == [contact["uuid"]] * 2
 
 
 def test_an_operators_identity_is_its_parts_position_among_every_part_in_the_file() -> None:
     """`operatorType` carries no id, and a part's index within its own trip would repeat."""
-    document, report = centers_of(
+    document, report = contacts_of(
         '<divetrip><trip id="t1"><name>One</name><trippart><name>Dahab</name></trippart></trip>'
         '<trip id="t2"><name>Two</name><trippart><name>Brothers</name><operator><name>Northern Star</name>'
         "</operator><vessel id='v'><name>MV Northern Star</name><shiptype>motor yacht</shiptype></vessel>"
         "</trippart></trip></divetrip>",
     )
-    (center,) = document["centers"]
-    assert center["uuid"] == str(uuid.uuid5(UDDF_ID_NAMESPACE, "center:#1"))
-    assert center["roles"] == ["liveaboard"]
+    (contact,) = document["contacts"]
+    assert contact["uuid"] == str(uuid.uuid5(UDDF_ID_NAMESPACE, "contact:#1"))
+    assert contact["roles"] == ["liveaboard"]
     assert any(where == "trip/1/trippart/0/vessel" and "MV Northern Star" in message for where, message in report)
 
 
 def test_a_part_that_records_only_where_the_diver_stayed_is_a_part() -> None:
-    document, _ = centers_of(
+    document, _ = contacts_of(
         '<divetrip><trip id="t"><name>Spring</name><trippart><name></name>'
         "<accomodation id='a'><name>Grandma's house</name></accomodation></trippart></trip></divetrip>",
     )
-    assert document["trips"][0]["parts"] == [{"accommodation_uuid": document["centers"][0]["uuid"]}]
+    assert document["trips"][0]["parts"] == [{"accommodation_uuid": document["contacts"][0]["uuid"]}]
 
 
 def test_a_parts_type_and_its_link_to_a_base_are_reported() -> None:
     """§6.9a records where the diver slept; whom a dive was with is the dive's (§6.2)."""
-    _, report = centers_of(
+    _, report = contacts_of(
         "<divesite><divebase id='base'><name>Blue Hole Divers</name></divebase></divesite>"
         '<divetrip><trip id="t"><name>Spring</name><trippart type="hotel"><name>Dahab</name>'
         '<link ref="base"/></trippart></trip></divetrip>',
     )
     at_part = [message for where, message in report if where == "trip/0/trippart/0"]
     assert any("type 'hotel'" in message for message in at_part)
-    assert any("links the center 'base'" in message for message in at_part)
+    assert any("links the contact 'base'" in message for message in at_part)
 
 
-def test_the_centers_come_out_bases_then_shops_then_parts_then_purchases() -> None:
+def test_the_contacts_come_out_bases_then_shops_then_parts_then_purchases() -> None:
     """The order `docs/uddf-mapping.md` fixes, so that two readers' pairs agree."""
-    document, report = centers_of(
+    document, report = contacts_of(
         "<business><shop id='s'><name>Shop</name></shop></business>"
         "<diver><owner id='owner'><personal><firstname>A</firstname><lastname>B</lastname></personal>"
         "<equipment><regulator id='r'><name>Reg</name><purchase><price currency='EUR'>400</price>"
@@ -806,20 +806,20 @@ def test_the_centers_come_out_bases_then_shops_then_parts_then_purchases() -> No
         '<divetrip><trip id="t"><name>Spring</name><trippart><name>Dahab</name>'
         "<accomodation id='a'><name>Hotel</name></accomodation></trippart></trip></divetrip>",
     )
-    assert [center["name"] for center in document["centers"]] == ["Base", "Shop", "Hotel", "Mail order"]
-    assert document["centers"][3]["roles"] == ["shop"]
+    assert [contact["name"] for contact in document["contacts"]] == ["Base", "Shop", "Hotel", "Mail order"]
+    assert document["contacts"][3]["roles"] == ["shop"]
     assert any(where == "gear/0/purchase/0" and "<purchase>" in message for where, message in report)
 
 
 def test_two_purchases_under_one_piece_are_two_places_in_the_report_and_two_shops() -> None:
     """The XSD allows a piece one, and a shop with no id is identified by where it sits — so a
     file holding two has to put them at two places."""
-    document, report = centers_of(
+    document, report = contacts_of(
         "<diver><owner id='owner'><personal><firstname>A</firstname><lastname>B</lastname></personal>"
         "<equipment><regulator id='r'><name>Reg</name><purchase><shop><name>One</name></shop></purchase>"
         "<purchase><shop><name>Two</name></shop></purchase></regulator></equipment></owner></diver>",
     )
-    assert [center["name"] for center in document["centers"]] == ["One", "Two"]
+    assert [contact["name"] for contact in document["contacts"]] == ["One", "Two"]
     assert [where for where, message in report if "<purchase>" in message] == [
         "gear/0/purchase/0",
         "gear/0/purchase/1",
@@ -829,17 +829,17 @@ def test_two_purchases_under_one_piece_are_two_places_in_the_report_and_two_shop
 def test_a_dropped_pieces_purchase_goes_with_it() -> None:
     """A `<camera>` has no `<name>` and is no gear item, so where its body was bought is not
     read either — the camera's own finding covers everything under it."""
-    document, report = centers_of(
+    document, report = contacts_of(
         "<diver><owner id='owner'><personal><firstname>A</firstname><lastname>B</lastname></personal>"
         "<equipment><camera id='c'><body id='b'><name>Body</name><purchase><shop id='s'><name>One</name>"
         "</shop></purchase></body></camera></equipment></owner></diver>",
     )
-    assert "centers" not in document
+    assert "contacts" not in document
     assert [where for where, message in report if "no name" in message] == ["gear/0"]
 
 
-def test_a_centers_roles_come_in_the_order_its_section_lists_them() -> None:
-    document, _ = centers_of(
+def test_a_contacts_roles_come_in_the_order_its_section_lists_them() -> None:
+    document, _ = contacts_of(
         "<business><shop id='s'><name>Resort</name></shop></business>"
         '<divetrip><trip id="t"><name>Spring</name>'
         "<trippart><name>Aboard</name><operator><name>resort</name></operator>"
@@ -847,13 +847,13 @@ def test_a_centers_roles_come_in_the_order_its_section_lists_them() -> None:
         "<trippart><name>Ashore</name><accomodation id='a'><name>Resort</name></accomodation></trippart>"
         "</trip></divetrip>",
     )
-    assert document["centers"][0]["roles"] == ["shop", "accommodation", "liveaboard"]
+    assert document["contacts"][0]["roles"] == ["shop", "accommodation", "liveaboard"]
 
 
-def test_a_centers_contact_is_read_on_the_owners_terms_and_what_it_cannot_hold_reported() -> None:
+def test_a_contacts_phone_email_and_website_are_read_on_the_owners_terms_and_the_rest_reported() -> None:
     """One phone, one email, one website — each the first, each dropped rather than cut."""
     long_phone = "+" + "1" * 40
-    document, report = centers_of(
+    document, report = contacts_of(
         "<divesite><divebase id='base'><name>Blue Hole Divers</name><aliasname>BHD</aliasname>"
         "<contact><language>en</language><phone>" + long_phone + "</phone><mobilephone>+20 100</mobilephone>"
         "<fax>+20 69</fax><email>n/a</email><email>desk@bluehole.example</email>"
@@ -861,8 +861,8 @@ def test_a_centers_contact_is_read_on_the_owners_terms_and_what_it_cannot_hold_r
         "<rating><ratingvalue>9</ratingvalue></rating></divebase></divesite>",
         dive_linking("base"),
     )
-    (center,) = document["centers"]
-    assert {"phone", "email", "website"}.isdisjoint(center)
+    (contact,) = document["contacts"]
+    assert {"phone", "email", "website"}.isdisjoint(contact)
     reported = "\n".join(message for where, message in report if where == "divebase/0")
     for said in ("<aliasname> 'BHD'", "<rating>", "<contact><language>", "<contact><fax>", "'+20 100'",
                  "'desk@bluehole.example' is not read", "'https://bluehole.example/' is not read",
@@ -871,13 +871,13 @@ def test_a_centers_contact_is_read_on_the_owners_terms_and_what_it_cannot_hold_r
 
 
 def test_an_address_with_no_country_is_dropped_and_its_parts_are_capped() -> None:
-    document, report = centers_of(
+    document, report = contacts_of(
         "<divesite><divebase id='one'><name>One</name><address><city>Dahab</city></address>"
         "<notes><para>x</para></notes></divebase>"
         f"<divebase id='two'><name>Two</name><address><postcode>{'9' * 40}</postcode>"
         "<country>Egypt</country><province>South Sinai</province></address></divebase></divesite>",
     )
-    one, two = document["centers"]
+    one, two = document["contacts"]
     assert "address" not in one
     assert two["address"] == {"postcode": "9" * 32, "region": "South Sinai", "country": "Egypt"}
     assert any(where == "divebase/0" and "no <country>" in message for where, message in report)

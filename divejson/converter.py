@@ -108,8 +108,8 @@ __all__ = [
     "UnsupportedSourceError",
     "Written",
     "capped",
-    "center_members",
-    "center_roles",
+    "contact_members",
+    "contact_roles",
     "channel_floor",
     "deco_model",
     "decimal_of",
@@ -312,7 +312,7 @@ class Scope:
         """The stand-in source id for a record the source gave none.
 
         The record's position in the list it was read from, or a path into the source where
-        one kind is read from several lists: a UDDF center with no id takes its path when it
+        one kind is read from several lists: a UDDF contact with no id takes its path when it
         is a base, a shop or a purchase's shop, so that none of them shares the plain count an
         operator takes from its trip part.
         """
@@ -869,35 +869,35 @@ def shared_readout(stated: str, count: int) -> str:
     )
 
 
-# -- centers -------------------------------------------------------------------------
+# -- contacts -------------------------------------------------------------------------
 
 
 @cache
-def center_roles() -> tuple[str, ...]:
+def contact_roles() -> tuple[str, ...]:
     """§6.18's role vocabulary in the order its table gives, off the schema's `enum`.
 
     `roles` is a set, so the order a reader writes one in is not a fact about any file —
     `docs/uddf-mapping.md` fixes it to §6.18's table so that two readers' pairs agree, and
     the writer's report names roles in the same order.
     """
-    return tuple(load_schema()["$defs"]["center"]["properties"]["roles"]["items"]["enum"])
+    return tuple(load_schema()["$defs"]["contact"]["properties"]["roles"]["items"]["enum"])
 
 
 def roles_in_order(roles: Iterable[str]) -> list[str]:
     """A set of roles as §6.18 lists them, a value it does not know being dropped (§5.6)."""
     held = set(roles)
-    return [role for role in center_roles() if role in held]
+    return [role for role in contact_roles() if role in held]
 
 
 @cache
-def center_members() -> tuple[str, ...]:
-    """§6.18's Center members in the section's own order, off the schema.
+def contact_members() -> tuple[str, ...]:
+    """§6.18's Contact members in the section's own order, off the schema.
 
-    A center a reader builds gains members out of order — an inline shape folding into a
+    A contact a reader builds gains members out of order — an inline shape folding into a
     base fills whatever the base lacked — and is put back in the section's order before it
     is written, as a recording is.
     """
-    return tuple(load_schema()["$defs"]["center"]["properties"])
+    return tuple(load_schema()["$defs"]["contact"]["properties"])
 
 
 # -- identity ------------------------------------------------------------------------
