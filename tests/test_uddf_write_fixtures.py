@@ -127,6 +127,9 @@ LOST: dict[str, frozenset[str]] = {
             "trips/0/notes",
             # `<setmarker>` is one string, so a labelled bookmark keeps the type.
             "dives/0/recordings/0/profile/events/6/label",
+            # The third dive's one recording carries a CNS end and nothing else, and UDDF
+            # has no slot for it, so none of the recording is written and none comes back.
+            "dives/2/recordings",
             # UDDF records no cylinder numbering, so the labels come back as positions.
             *(f"dives/0/cylinders/{index}/gas_number" for index in range(4)),
             *(f"dives/0/recordings/0/profile/pressures/{index}/gas_number" for index in range(4)),
@@ -287,12 +290,53 @@ def test_the_report_names_everything_that_changed(source) -> None:
     written = write_uddf(document)
     read_back = convert(written.data, format="uddf").document
 
+    before, after = _compared(document), _compared(read_back)
     unreported = [
         path
-        for path in _differences(_compared(document), _compared(read_back))
-        if path not in RETURNED[source.stem] and not _reported(path, written.notes)
+        for path in _differences(before, after)
+        if path not in RETURNED[source.stem]
+        and not _reported(path, written.notes)
+        and not _wholly_reported(path, before, after, written.notes)
     ]
     assert unreported == []
+
+
+def _at(document: Any, path: str) -> Any:
+    """The value at a `dives/2/recordings` path, or `_MISSING` where there is none."""
+    node = document
+    for part in path.split("/"):
+        if isinstance(node, dict) and part in node:
+            node = node[part]
+        elif isinstance(node, list) and part.isdigit() and int(part) < len(node):
+            node = node[int(part)]
+        else:
+            return _MISSING
+    return node
+
+
+_MISSING = object()
+
+
+def _leaves(value: Any, path: str) -> list[str]:
+    if isinstance(value, dict):
+        return [leaf for key, child in value.items() for leaf in _leaves(child, f"{path}/{key}")]
+    if isinstance(value, list):
+        return [leaf for index, child in enumerate(value) for leaf in _leaves(child, f"{path}/{index}")]
+    return [path]
+
+
+def _wholly_reported(path: str, before: Any, after: Any, notes) -> bool:
+    """A record that did not come back at all is accounted for when everything it carried is.
+
+    `_differences` names a vanished member by its own path, and a writer reports from the
+    record — a readout-only recording's `cns_end`, one level down — so a member absent from
+    the read-back is matched on its leaves. A member that came back *changed* is not: it has
+    to be named where it differs.
+    """
+    if _at(after, path) is not _MISSING:
+        return False
+    leaves = _leaves(_at(before, path), path)
+    return bool(leaves) and all(_reported(leaf, notes) for leaf in leaves)
 
 
 # -- agreement with the reference writer ------------------------------------------------
