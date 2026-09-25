@@ -43,6 +43,24 @@
     </owner>
   </diver>
   <divesite>
+    <divebase id="center-0198a6f0-1111-7095-8000-000000000095">
+      <name>Deep South Divers</name>
+      <address>
+        <street>1 Deepwater Basin Road</street>
+        <city>Milford Sound</city>
+        <postcode>9679</postcode>
+        <country>New Zealand</country>
+        <province>Southland</province>
+      </address>
+      <contact>
+        <phone>+64 3 555 0187</phone>
+        <email>desk@deepsouth.example</email>
+        <homepage>https://deepsouth.example/</homepage>
+      </contact>
+      <notes>
+        <para>Runs the fiord boat, fills trimix, and has bunks above the shop.</para>
+      </notes>
+    </divebase>
     <site id="site-0198a6f0-1111-7040-8000-000000000040">
       <name>Harrys Wall</name>
       <geography>
@@ -61,7 +79,7 @@
   <divetrip>
     <trip id="trip-0198a6f0-1111-7030-8000-000000000030">
       <name>Fiordland tech week</name>
-      <trippart>
+      <trippart type="hotel">
         <name>Milford Sound</name>
         <dateoftrip startdate="2026-07-01T00:00:00" enddate="2026-07-04T00:00:00" />
         <geography>
@@ -69,6 +87,24 @@
           <latitude>-44.6414</latitude>
           <longitude>167.8974</longitude>
         </geography>
+        <accomodation id="accommodation-0">
+          <name>Deep South Divers</name>
+          <address>
+            <street>1 Deepwater Basin Road</street>
+            <city>Milford Sound</city>
+            <postcode>9679</postcode>
+            <country>New Zealand</country>
+            <province>Southland</province>
+          </address>
+          <contact>
+            <phone>+64 3 555 0187</phone>
+            <email>desk@deepsouth.example</email>
+            <homepage>https://deepsouth.example/</homepage>
+          </contact>
+          <notes>
+            <para>Runs the fiord boat, fills trimix, and has bunks above the shop.</para>
+          </notes>
+        </accomodation>
       </trippart>
       <trippart>
         <name>Chatham Rise crossing</name>
@@ -115,6 +151,7 @@
         <informationbeforedive>
           <link ref="site-0198a6f0-1111-7040-8000-000000000040" />
           <link ref="site-0198a6f0-1111-7041-8000-000000000041" />
+          <link ref="center-0198a6f0-1111-7095-8000-000000000095" />
           <divenumber>412</divenumber>
           <internaldivenumber>87</internaldivenumber>
           <datetime>2026-07-03T09:14:00+12:45</datetime>

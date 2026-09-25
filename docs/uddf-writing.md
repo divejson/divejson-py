@@ -416,12 +416,12 @@ no part, and no part is what comes back.
 
 **A part with no `location` gets that same empty `<name>`, and it is reported `absent`**,
 `simpleNamedType` making `<name>` mandatory where the part has nothing for it. The finding
-says what a reader will take the placeholder as, and that turns on the rest of the part:
-one that has dates or an accommodation comes back as the placeless part it was, and one
-carrying **none** of a location, a date and an accommodation does not come back at all,
-being indistinguishable from the floor above.
-That second case is the one shape of part the self round trip loses, and naming it in the
-report is what `writing.md` asks of a loss.
+says what a reader will take the placeholder as, and that turns on what else the part is
+written with: one given dates or a copy of where the diver stayed (*Centers* below) comes
+back as the placeless part it was, and one given **none** of a place, a date and a copy does
+not come back at all, being indistinguishable from the floor above. That second case is the
+one shape of written part the self round trip loses, and naming it in the report is what
+`writing.md` asks of a loss.
 
 The trip's **note** goes on the first `<trippart>` and nowhere else, since a reader joins
 every part's notes: writing it on each would hand back a note repeated once per part. A
