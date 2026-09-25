@@ -278,6 +278,37 @@ def test_a_center_only_a_repeated_trip_or_piece_holds_is_carried_once() -> None:
     assert document["trips"][0]["parts"][0]["accommodation_uuid"] == document["centers"][0]["uuid"]
 
 
+def test_a_stay_folding_into_a_center_another_file_carries_is_compared_and_reported() -> None:
+    """The second file's copy of the base is read, report held, so a stay there that names it
+    is compared against what the base holds — and what the stay adds, the role included,
+    is named as not carried, the base's row being the first file's."""
+    def logbook(dive_id: str, stay: str = "") -> bytes:
+        trip = (
+            f"<divetrip><trip id='t-{dive_id}'><name>Spring</name><trippart><name>Dahab</name>{stay}"
+            "</trippart></trip></divetrip>"
+            if stay
+            else ""
+        )
+        return uddf(
+            "<divesite><divebase id='b1'><name>Blue Hole Divers</name><contact><phone>+1 555</phone>"
+            "</contact></divebase></divesite>" + trip
+            + f"<profiledata><repetitiongroup><dive id='{dive_id}'><informationbeforedive>"
+            "<link ref='b1'/><datetime>2026-04-17T09:00:00+02:00</datetime>"
+            "</informationbeforedive></dive></repetitiongroup></profiledata>"
+        )
+
+    stay = (
+        "<accomodation id='a'><name>Blue Hole Divers</name>"
+        "<contact><phone>+2 999</phone></contact></accomodation>"
+    )
+    conversion = convert(_zip({"a.uddf": logbook("d1"), "b.uddf": logbook("d2", stay)}), exported_at=EXPORTED_AT)
+    (center,) = conversion.document["centers"]
+    assert center["phone"] == "+1 555" and center["roles"] == ["dive_center"]
+    found = [note.message for note in conversion.notes if note.where == "b.uddf/trip/0/trippart/0/accomodation"]
+    assert any("states its phone as '+2 999' where the center has '+1 555'" in message for message in found)
+    assert any("what it adds there — the role accommodation — is not carried" in message for message in found)
+
+
 def test_one_file_naming_two_records_the_same_is_still_a_source_defect() -> None:
     """The opposite case, and the one the collision rule was written for.
 

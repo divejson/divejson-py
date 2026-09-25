@@ -517,6 +517,10 @@ class _Converter:
         # inline shape has to be folded by.
         self.centers: list[dict[str, Any]] = []
         self.center_names: dict[str, dict[str, Any]] = {}
+        # The uuids of the centers this file carries, which a fold into one it does not is
+        # told apart by; and whether the report is held while such a center is read.
+        self.carried_centers: set[str] = set()
+        self.muted = False
         self.local_clock_with_z = self.generator_writes_a_local_z()
         self.percent_gradient_factors = self.generator_writes_percent_gradient_factors()
         self.reported_gradient_scale = False
@@ -525,7 +529,8 @@ class _Converter:
 
     def note(self, where: str, message: str, kind: NoteKind) -> None:
         """One line of the report, at a path into the source this conversion read."""
-        self.notes.append(Note(self.scope.where(where), message, kind))
+        if not self.muted:
+            self.notes.append(Note(self.scope.where(where), message, kind))
 
     # -- the generator table -----------------------------------------------------
 
@@ -980,10 +985,12 @@ class _Converter:
             return None
         standing = self.center_names.get(name.casefold())
         if standing is not None:
+            added = [] if role in standing["roles"] else [f"the role {role}"]
             standing["roles"] = roles_in_order([*standing["roles"], role])
             for member, value in self.center_contents(element, where).items():
                 if member not in standing:
                     standing[member] = value
+                    added.append(member)
                 elif standing[member] != value:
                     self.note(
                         where,
@@ -991,6 +998,13 @@ class _Converter:
                         f"as {value!r} where the center has {standing[member]!r}; the center's stands",
                         "dropped",
                     )
+            if added and standing["uuid"] not in self.carried_centers:
+                self.note(
+                    where,
+                    f"the <{tag}> folds into the center {standing['name']!r}, which another file of the archive "
+                    f"carries, and what it adds there — {', '.join(added)} — is not carried",
+                    "dropped",
+                )
             return str(standing["uuid"])
         claimed, carried = self.uuid_for("center", _attr(element, "id"), where, position)
         if claimed is None:
@@ -999,13 +1013,25 @@ class _Converter:
         return claimed
 
     def add_center(self, element: ET.Element, uuid: str, carried: bool, name: str, role: str, where: str) -> None:
-        """A center read from `element`, or — where another archive member carries it — only
-        what a later shape needs to fold into it by name, that member reporting the rest."""
-        center: dict[str, Any] = {"uuid": uuid, "name": name, "roles": [role]}
+        """A center read from `element`.
+
+        Where another archive member carries it, it is still read — a later shape in this
+        file folds into it by name, and is compared against what it holds — but with the
+        report held, that member reporting what the record carries.
+        """
+        self.muted = not carried
+        try:
+            center: dict[str, Any] = {
+                "uuid": uuid,
+                "name": self.capped(name, MAX_NAME, where, "the center's name"),
+                "roles": [role],
+                **self.center_contents(element, where),
+            }
+        finally:
+            self.muted = False
         if carried:
-            center["name"] = self.capped(name, MAX_NAME, where, "the center's name")
-            center.update(self.center_contents(element, where))
             self.centers.append(center)
+            self.carried_centers.add(uuid)
         # The first of two centers of one name is the one a later shape folds into — a file
         # gives a reader nothing else to tell them apart by.
         self.center_names.setdefault(name.casefold(), center)
