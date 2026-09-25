@@ -1319,9 +1319,11 @@ class _Converter:
                 if computer_id:
                     self.computers[computer_id] = element
             # Before the name test too: where a piece was bought is a center whether or not
-            # the piece is a gear item. `iter`, because a camera's body and lens each carry one.
-            for purchase in (child for child in element.iter() if local_name(child) == "purchase"):
-                self.read_purchase(purchase, f"{where}/purchase")
+            # the piece is a gear item. `iter`, and numbered, because a camera's body and lens
+            # each carry one.
+            purchases = (child for child in element.iter() if local_name(child) == "purchase")
+            for number, purchase in enumerate(purchases):
+                self.read_purchase(purchase, f"{where}/purchase/{number}")
             name = _text_of(element, "name")
             if not name:
                 self.note(
@@ -1609,8 +1611,8 @@ class _Converter:
         trip_uuid = self.reference(_attr(_kid(before, "tripmembership"), "ref"), self.trip_uuids, where, "trip")
         if trip_uuid:
             dive["trip_uuid"] = trip_uuid
-        # A site first where an id names both, as it did before a link could name a center —
-        # a source id is not unique within a file (the module docstring).
+        # A site first where an id names both a site and a center — a source id is not unique
+        # within a file (the module docstring).
         links = [_attr(link, "ref") for link in _kids(before, "link")]
         to_centers = [
             ref

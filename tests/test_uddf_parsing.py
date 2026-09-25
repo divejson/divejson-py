@@ -808,7 +808,23 @@ def test_the_centers_come_out_bases_then_shops_then_parts_then_purchases() -> No
     )
     assert [center["name"] for center in document["centers"]] == ["Base", "Shop", "Hotel", "Mail order"]
     assert document["centers"][3]["roles"] == ["shop"]
-    assert any(where == "gear/0/purchase" and "<purchase>" in message for where, message in report)
+    assert any(where == "gear/0/purchase/0" and "<purchase>" in message for where, message in report)
+
+
+def test_two_purchases_under_one_piece_are_two_places_in_the_report_and_two_shops() -> None:
+    """A camera's body and lens each carry a purchase, and a shop with no id is identified by
+    where it sits — so the two have to sit at two places."""
+    document, report = centers_of(
+        "<diver><owner id='owner'><personal><firstname>A</firstname><lastname>B</lastname></personal>"
+        "<equipment><camera id='c'><body id='b'><name>Body</name><purchase><shop><name>One</name></shop>"
+        "</purchase></body><lens id='l'><name>Lens</name><purchase><shop><name>Two</name></shop></purchase>"
+        "</lens></camera></equipment></owner></diver>",
+    )
+    assert [center["name"] for center in document["centers"]] == ["One", "Two"]
+    assert [where for where, message in report if "<purchase>" in message] == [
+        "gear/0/purchase/0",
+        "gear/0/purchase/1",
+    ]
 
 
 def test_a_centers_roles_come_in_the_order_its_section_lists_them() -> None:
