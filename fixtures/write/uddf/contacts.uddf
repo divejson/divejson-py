@@ -7,7 +7,7 @@
     <datetime>2026-09-25T09:00:00+00:00</datetime>
   </generator>
   <business>
-    <shop id="center-019fed00-5c3a-7000-8000-0000000000a3">
+    <shop id="contact-019fed00-5c3a-7000-8000-0000000000a3">
       <name>Reefside</name>
       <address>
         <street>14 Harbour Road</street>
@@ -34,7 +34,7 @@
     </owner>
   </diver>
   <divesite>
-    <divebase id="center-019fed00-5c3a-7000-8000-0000000000a1">
+    <divebase id="contact-019fed00-5c3a-7000-8000-0000000000a1">
       <name>Blue Hole Divers</name>
       <address>
         <street>Mashraba</street>
@@ -52,10 +52,10 @@
         <para>Shore dives from the house reef, and jeeps to the Blue Hole.</para>
       </notes>
     </divebase>
-    <divebase id="center-019fed00-5c3a-7000-8000-0000000000a2">
+    <divebase id="contact-019fed00-5c3a-7000-8000-0000000000a2">
       <name>Grandma's house</name>
     </divebase>
-    <divebase id="center-019fed00-5c3a-7000-8000-0000000000a4">
+    <divebase id="contact-019fed00-5c3a-7000-8000-0000000000a4">
       <name>Northern Star Liveaboards</name>
       <contact>
         <phone>+20 65 555 0123</phone>
@@ -64,7 +64,7 @@
         <para>Seven nights aboard, nitrox included.</para>
       </notes>
     </divebase>
-    <divebase id="center-019fed00-5c3a-7000-8000-0000000000a5">
+    <divebase id="contact-019fed00-5c3a-7000-8000-0000000000a5">
       <name>Reefside</name>
     </divebase>
     <site id="site-019fed00-5c3a-7000-8000-000000000020">
@@ -139,7 +139,7 @@
       <dive id="dive-019fed00-5c3a-7000-8000-000000000010">
         <informationbeforedive>
           <link ref="site-019fed00-5c3a-7000-8000-000000000020" />
-          <link ref="center-019fed00-5c3a-7000-8000-0000000000a1" />
+          <link ref="contact-019fed00-5c3a-7000-8000-0000000000a1" />
           <divenumber>118</divenumber>
           <datetime>2026-03-03T09:10:00+02:00</datetime>
           <equipmentused>

@@ -43,7 +43,7 @@
     </owner>
   </diver>
   <divesite>
-    <divebase id="center-0198a6f0-1111-7095-8000-000000000095">
+    <divebase id="contact-0198a6f0-1111-7095-8000-000000000095">
       <name>Deep South Divers</name>
       <address>
         <street>1 Deepwater Basin Road</street>
@@ -151,7 +151,7 @@
         <informationbeforedive>
           <link ref="site-0198a6f0-1111-7040-8000-000000000040" />
           <link ref="site-0198a6f0-1111-7041-8000-000000000041" />
-          <link ref="center-0198a6f0-1111-7095-8000-000000000095" />
+          <link ref="contact-0198a6f0-1111-7095-8000-000000000095" />
           <divenumber>412</divenumber>
           <internaldivenumber>87</internaldivenumber>
           <datetime>2026-07-03T09:14:00+12:45</datetime>
