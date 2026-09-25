@@ -242,15 +242,18 @@ def test_a_center_a_dive_links_survives_the_merge_and_is_carried_once() -> None:
     dangling, and the archive fails as a whole where either file alone converts."""
     def logbook(dive_id: str) -> bytes:
         return uddf(
-            "<divesite><divebase id='b1'><name>Blue Hole Divers</name></divebase></divesite>"
+            "<divesite><divebase id='b1'><name>Blue Hole Divers</name><aliasname>BHD</aliasname>"
+            "</divebase></divesite>"
             f"<profiledata><repetitiongroup><dive id='{dive_id}'><informationbeforedive>"
             "<link ref='b1'/><datetime>2026-04-17T09:00:00+02:00</datetime>"
             "</informationbeforedive></dive></repetitiongroup></profiledata>"
         )
 
-    document = convert(_zip({"a.uddf": logbook("d1"), "b.uddf": logbook("d2")}), exported_at=EXPORTED_AT).document
-    (center,) = document["centers"]
-    assert [dive["center_uuid"] for dive in document["dives"]] == [center["uuid"]] * 2
+    conversion = convert(_zip({"a.uddf": logbook("d1"), "b.uddf": logbook("d2")}), exported_at=EXPORTED_AT)
+    (center,) = conversion.document["centers"]
+    assert [dive["center_uuid"] for dive in conversion.document["dives"]] == [center["uuid"]] * 2
+    # What the base carries that the format does not is reported by the file that carries it.
+    assert [note.where for note in conversion.notes if "<aliasname>" in note.message] == ["a.uddf/divebase/0"]
 
 
 def test_a_center_only_a_repeated_trip_or_piece_holds_is_carried_once() -> None:

@@ -954,7 +954,7 @@ class _Converter:
             # another archive member's record is not carried again, and this file's
             # references to it still have to resolve to the one that is.
             self.center_uuids[source_id] = claimed
-        self.add_center(claimed, carried, name, role, self.center_contents(element, where), where)
+        self.add_center(element, claimed, carried, name, role, where)
 
     def read_inline(self, element: ET.Element, role: str, where: str, position: int | str) -> str | None:
         """A shape held inside another element — a part's stay, a purchase's shop — as a center.
@@ -978,11 +978,10 @@ class _Converter:
                 "dropped",
             )
             return None
-        contents = self.center_contents(element, where)
         standing = self.center_names.get(name.casefold())
         if standing is not None:
             standing["roles"] = roles_in_order([*standing["roles"], role])
-            for member, value in contents.items():
+            for member, value in self.center_contents(element, where).items():
                 if member not in standing:
                     standing[member] = value
                 elif standing[member] != value:
@@ -996,23 +995,20 @@ class _Converter:
         claimed, carried = self.uuid_for("center", _attr(element, "id"), where, position)
         if claimed is None:
             return None
-        self.add_center(claimed, carried, name, role, contents, where)
+        self.add_center(element, claimed, carried, name, role, where)
         return claimed
 
-    def add_center(
-        self, uuid: str, carried: bool, name: str, role: str, contents: dict[str, Any], where: str
-    ) -> None:
-        center: dict[str, Any] = {
-            "uuid": uuid,
-            "name": self.capped(name, MAX_NAME, where, "the center's name"),
-            "roles": [role],
-            **contents,
-        }
+    def add_center(self, element: ET.Element, uuid: str, carried: bool, name: str, role: str, where: str) -> None:
+        """A center read from `element`, or — where another archive member carries it — only
+        what a later shape needs to fold into it by name, that member reporting the rest."""
+        center: dict[str, Any] = {"uuid": uuid, "name": name, "roles": [role]}
+        if carried:
+            center["name"] = self.capped(name, MAX_NAME, where, "the center's name")
+            center.update(self.center_contents(element, where))
+            self.centers.append(center)
         # The first of two centers of one name is the one a later shape folds into — a file
         # gives a reader nothing else to tell them apart by.
         self.center_names.setdefault(name.casefold(), center)
-        if carried:
-            self.centers.append(center)
 
     def center_contents(self, element: ET.Element, where: str) -> dict[str, Any]:
         """What a center's shape says beyond its name, reporting what §6.18 does not carry.
