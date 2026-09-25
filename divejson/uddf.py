@@ -1329,9 +1329,6 @@ class _Converter:
                     "(spec §6.12)",
                     "dropped",
                 )
-                # Where it was bought is a center all the same: a `<camera>` never has a name,
-                # and its body and lens each carry a purchase.
-                self.read_purchases(element, where)
                 continue
             claimed, carried = self.uuid_for("gear", _attr(element, "id"), where, index)
             if claimed is None:
@@ -1344,8 +1341,9 @@ class _Converter:
                 self.gear_uuids[source_id] = claimed
             if not carried:
                 continue
-            # Only here, a repeat of another archive member's piece being that member's to
-            # read: a shop with no id would be a second center for one shop.
+            # Only for a piece this file carries: a dropped piece's purchase goes with it, and
+            # a repeat of another archive member's is that member's to read — a shop with no
+            # id would be a second center for one shop.
             self.read_purchases(element, where)
 
             item: dict[str, Any] = {"uuid": claimed, "name": self.capped(name, MAX_NAME, where, "the gear name")}
@@ -1372,9 +1370,9 @@ class _Converter:
         return gear
 
     def read_purchases(self, element: ET.Element, where: str) -> None:
-        """Every `<purchase>` under one piece, numbered — a camera's body and lens each carry one."""
-        purchases = (child for child in element.iter() if local_name(child) == "purchase")
-        for number, purchase in enumerate(purchases):
+        """A piece's `<purchase>`, numbered: the XSD allows one, and a file holding two keeps
+        each shop apart by where it sits."""
+        for number, purchase in enumerate(_kids(element, "purchase")):
             self.read_purchase(purchase, f"{where}/purchase/{number}")
 
     def read_purchase(self, purchase: ET.Element, where: str) -> None:

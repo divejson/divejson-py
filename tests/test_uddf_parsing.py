@@ -812,19 +812,30 @@ def test_the_centers_come_out_bases_then_shops_then_parts_then_purchases() -> No
 
 
 def test_two_purchases_under_one_piece_are_two_places_in_the_report_and_two_shops() -> None:
-    """A camera's body and lens each carry a purchase, and a shop with no id is identified by
-    where it sits — so the two have to sit at two places."""
+    """The XSD allows a piece one, and a shop with no id is identified by where it sits — so a
+    file holding two has to put them at two places."""
     document, report = centers_of(
         "<diver><owner id='owner'><personal><firstname>A</firstname><lastname>B</lastname></personal>"
-        "<equipment><camera id='c'><body id='b'><name>Body</name><purchase><shop><name>One</name></shop>"
-        "</purchase></body><lens id='l'><name>Lens</name><purchase><shop><name>Two</name></shop></purchase>"
-        "</lens></camera></equipment></owner></diver>",
+        "<equipment><regulator id='r'><name>Reg</name><purchase><shop><name>One</name></shop></purchase>"
+        "<purchase><shop><name>Two</name></shop></purchase></regulator></equipment></owner></diver>",
     )
     assert [center["name"] for center in document["centers"]] == ["One", "Two"]
     assert [where for where, message in report if "<purchase>" in message] == [
         "gear/0/purchase/0",
         "gear/0/purchase/1",
     ]
+
+
+def test_a_dropped_pieces_purchase_goes_with_it() -> None:
+    """A `<camera>` has no `<name>` and is no gear item, so where its body was bought is not
+    read either — the camera's own finding covers everything under it."""
+    document, report = centers_of(
+        "<diver><owner id='owner'><personal><firstname>A</firstname><lastname>B</lastname></personal>"
+        "<equipment><camera id='c'><body id='b'><name>Body</name><purchase><shop id='s'><name>One</name>"
+        "</shop></purchase></body></camera></equipment></owner></diver>",
+    )
+    assert "centers" not in document
+    assert [where for where, message in report if "no name" in message] == ["gear/0"]
 
 
 def test_a_centers_roles_come_in_the_order_its_section_lists_them() -> None:
