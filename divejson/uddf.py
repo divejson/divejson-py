@@ -1405,12 +1405,11 @@ class _Converter:
         member until §6.12 records one.
         """
         shop = _kid(purchase, "shop")
-        if shop is not None:
-            self.read_inline(shop, "shop", f"{where}/shop", f"{where}/shop")
+        read = shop is not None and self.read_inline(shop, "shop", f"{where}/shop", f"{where}/shop") is not None
         self.note(
             where,
             "§6.12 has no member for the piece's <purchase>, its price and its date; it is not read"
-            + (", and the shop it names is read as a contact" if shop is not None else ""),
+            + (", and the shop it names is read as a contact" if read else ""),
             "dropped",
         )
 

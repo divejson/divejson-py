@@ -826,6 +826,17 @@ def test_two_purchases_under_one_piece_are_two_places_in_the_report_and_two_shop
     ]
 
 
+def test_a_purchase_whose_shop_is_no_contact_does_not_say_it_is_one() -> None:
+    document, report = contacts_of(
+        "<diver><owner id='owner'><personal><firstname>A</firstname><lastname>B</lastname></personal>"
+        "<equipment><regulator id='r'><name>Reg</name><purchase><shop id='s'><name> </name></shop>"
+        "</purchase></regulator></equipment></owner></diver>",
+    )
+    assert "contacts" not in document
+    (said,) = [message for where, message in report if where == "gear/0/purchase/0"]
+    assert "read as a contact" not in said
+
+
 def test_a_dropped_pieces_purchase_goes_with_it() -> None:
     """A `<camera>` has no `<name>` and is no gear item, so where its body was bought is not
     read either — the camera's own finding covers everything under it."""
