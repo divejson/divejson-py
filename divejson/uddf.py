@@ -1132,7 +1132,6 @@ class _Converter:
                 self.note(where, "the trip has no name, which the format requires of one; it is dropped (spec §6.8)", "dropped")
                 continue
 
-            parts, notes = self.read_trip_parts(element, where, first)
             claimed, carried = self.uuid_for("trip", _attr(element, "id"), where, index)
             if claimed is None:
                 continue
@@ -1143,8 +1142,12 @@ class _Converter:
                 # references to it still have to resolve to the one that is.
                 self.trip_uuids[source_id] = claimed
             if not carried:
+                # The parts are read only for a trip this file carries: a part's stay mints a
+                # center, and an `<operator>` has no id, so a repeat's would be a second
+                # center for one boat.
                 continue
 
+            parts, notes = self.read_trip_parts(element, where, first)
             trip: dict[str, Any] = {"uuid": claimed, "name": self.capped(name, MAX_NAME, where, "the trip name")}
             if parts:
                 trip["parts"] = parts
@@ -1318,12 +1321,6 @@ class _Converter:
                 computer_id = _attr(element, "id")
                 if computer_id:
                     self.computers[computer_id] = element
-            # Before the name test too: where a piece was bought is a center whether or not
-            # the piece is a gear item. `iter`, and numbered, because a camera's body and lens
-            # each carry one.
-            purchases = (child for child in element.iter() if local_name(child) == "purchase")
-            for number, purchase in enumerate(purchases):
-                self.read_purchase(purchase, f"{where}/purchase/{number}")
             name = _text_of(element, "name")
             if not name:
                 self.note(
@@ -1332,6 +1329,9 @@ class _Converter:
                     "(spec §6.12)",
                     "dropped",
                 )
+                # Where it was bought is a center all the same: a `<camera>` never has a name,
+                # and its body and lens each carry a purchase.
+                self.read_purchases(element, where)
                 continue
             claimed, carried = self.uuid_for("gear", _attr(element, "id"), where, index)
             if claimed is None:
@@ -1344,6 +1344,9 @@ class _Converter:
                 self.gear_uuids[source_id] = claimed
             if not carried:
                 continue
+            # Only here, a repeat of another archive member's piece being that member's to
+            # read: a shop with no id would be a second center for one shop.
+            self.read_purchases(element, where)
 
             item: dict[str, Any] = {"uuid": claimed, "name": self.capped(name, MAX_NAME, where, "the gear name")}
             brand = _text_of(element, "manufacturer", "name")
@@ -1367,6 +1370,12 @@ class _Converter:
 
             gear.append(item)
         return gear
+
+    def read_purchases(self, element: ET.Element, where: str) -> None:
+        """Every `<purchase>` under one piece, numbered — a camera's body and lens each carry one."""
+        purchases = (child for child in element.iter() if local_name(child) == "purchase")
+        for number, purchase in enumerate(purchases):
+            self.read_purchase(purchase, f"{where}/purchase/{number}")
 
     def read_purchase(self, purchase: ET.Element, where: str) -> None:
         """A `<purchase>`'s own `<shop>` as a center, and the purchase reported.

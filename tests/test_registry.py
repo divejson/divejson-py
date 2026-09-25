@@ -253,6 +253,28 @@ def test_a_center_a_dive_links_survives_the_merge_and_is_carried_once() -> None:
     assert [dive["center_uuid"] for dive in document["dives"]] == [center["uuid"]] * 2
 
 
+def test_a_center_only_a_repeated_trip_or_piece_holds_is_carried_once() -> None:
+    """A per-dive export repeats its trip and its kit, and a stay or a shop inside a repeat is
+    the first file's to read: an `<operator>` has no id, so a second reading would be a
+    second center for one boat, referenced by nothing."""
+    def logbook(dive_id: str) -> bytes:
+        return uddf(
+            "<diver><owner id='owner'><personal><firstname>A</firstname><lastname>B</lastname></personal>"
+            "<equipment><regulator id='r'><name>Reg</name><purchase><shop><name>Mail order</name></shop>"
+            "</purchase></regulator></equipment></owner></diver>"
+            "<divetrip><trip id='t1'><name>Brothers</name><trippart><name>Aboard</name>"
+            "<operator><name>Northern Star</name></operator><vessel id='v'><name>MV</name></vessel>"
+            "</trippart></trip></divetrip>"
+            f"<profiledata><repetitiongroup><dive id='{dive_id}'><informationbeforedive>"
+            "<datetime>2026-04-17T09:00:00+02:00</datetime><tripmembership ref='t1'/>"
+            "</informationbeforedive></dive></repetitiongroup></profiledata>"
+        )
+
+    document = convert(_zip({"a.uddf": logbook("d1"), "b.uddf": logbook("d2")}), exported_at=EXPORTED_AT).document
+    assert [center["name"] for center in document["centers"]] == ["Northern Star", "Mail order"]
+    assert document["trips"][0]["parts"][0]["accommodation_uuid"] == document["centers"][0]["uuid"]
+
+
 def test_one_file_naming_two_records_the_same_is_still_a_source_defect() -> None:
     """The opposite case, and the one the collision rule was written for.
 
