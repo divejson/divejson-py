@@ -14,7 +14,7 @@
       "duration": 2940,
       "max_depth": 24.6,
       "trip_uuid": "7e61f622-466a-582d-9ee7-33b924019256",
-      "center_uuid": "7d4ab530-b21f-5b3a-b348-19dad162d07c",
+      "contact_uuid": "9f11d32a-6d82-5ec3-95b0-831dde23cda1",
       "site_uuids": [
         "cd4adc13-b149-5d0f-b848-616287cbb95e"
       ]
@@ -26,7 +26,7 @@
       "duration": 3120,
       "max_depth": 18.2,
       "trip_uuid": "7e61f622-466a-582d-9ee7-33b924019256",
-      "center_uuid": "97501f25-fceb-5aff-88f9-a006669d069c",
+      "contact_uuid": "9488e0a5-13e9-53bd-b994-4df9d05f08e0",
       "site_uuids": [
         "447128d7-b7c4-5f94-9da1-9379a41c415c"
       ]
@@ -43,7 +43,7 @@
           "location": {
             "name": "Hurghada"
           },
-          "accommodation_uuid": "b7db002a-3c9f-58a9-9017-15e51624e032"
+          "accommodation_uuid": "c34ec92c-8d08-5057-9af5-ba92b10617af"
         },
         {
           "starts_on": "2026-03-02",
@@ -51,7 +51,7 @@
           "location": {
             "name": "Dahab"
           },
-          "accommodation_uuid": "7d4ab530-b21f-5b3a-b348-19dad162d07c"
+          "accommodation_uuid": "9f11d32a-6d82-5ec3-95b0-831dde23cda1"
         },
         {
           "starts_on": "2026-03-06",
@@ -59,7 +59,7 @@
           "location": {
             "name": "Brothers Islands"
           },
-          "accommodation_uuid": "575cea74-03c9-5162-be51-94ff7a7e1808"
+          "accommodation_uuid": "b62202ee-bbc0-5250-ad1e-b385b5fa5deb"
         },
         {
           "starts_on": "2026-03-13",
@@ -67,7 +67,7 @@
           "location": {
             "name": "Hurghada"
           },
-          "accommodation_uuid": "b7db002a-3c9f-58a9-9017-15e51624e032"
+          "accommodation_uuid": "c34ec92c-8d08-5057-9af5-ba92b10617af"
         }
       ]
     }
@@ -96,9 +96,9 @@
       }
     }
   ],
-  "centers": [
+  "contacts": [
     {
-      "uuid": "7d4ab530-b21f-5b3a-b348-19dad162d07c",
+      "uuid": "9f11d32a-6d82-5ec3-95b0-831dde23cda1",
       "name": "Blue Hole Divers",
       "roles": [
         "dive_center",
@@ -117,7 +117,7 @@
       "notes": "Shore dives from the house reef, and jeeps to the Blue Hole."
     },
     {
-      "uuid": "97501f25-fceb-5aff-88f9-a006669d069c",
+      "uuid": "9488e0a5-13e9-53bd-b994-4df9d05f08e0",
       "name": "Reefside Dive Supplies",
       "roles": [
         "shop"
@@ -132,14 +132,14 @@
       "notes": "Regulator servicing; closed on Fridays."
     },
     {
-      "uuid": "b7db002a-3c9f-58a9-9017-15e51624e032",
+      "uuid": "c34ec92c-8d08-5057-9af5-ba92b10617af",
       "name": "Grandma's house",
       "roles": [
         "accommodation"
       ]
     },
     {
-      "uuid": "575cea74-03c9-5162-be51-94ff7a7e1808",
+      "uuid": "b62202ee-bbc0-5250-ad1e-b385b5fa5deb",
       "name": "Northern Star Liveaboards",
       "roles": [
         "liveaboard"

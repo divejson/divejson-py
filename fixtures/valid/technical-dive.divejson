@@ -54,7 +54,7 @@
       },
       "trip_uuid": "0198a6f0-1111-7030-8000-000000000030",
       "course_uuid": "0198a6f0-1111-7090-8000-000000000090",
-      "center_uuid": "0198a6f0-1111-7095-8000-000000000095",
+      "contact_uuid": "0198a6f0-1111-7095-8000-000000000095",
       "site_uuids": [
         "0198a6f0-1111-7040-8000-000000000040",
         "0198a6f0-1111-7041-8000-000000000041"
@@ -546,7 +546,7 @@
       "starts_on": "2026-06-30",
       "ends_on": "2026-07-05",
       "instructor_name": "J. Harbord",
-      "center_uuid": "0198a6f0-1111-7095-8000-000000000095",
+      "contact_uuid": "0198a6f0-1111-7095-8000-000000000095",
       "notes": "Four training dives; the wall dive was the final assessment.",
       "created_at": "2026-06-01T09:00:00+12:00"
     },
@@ -673,7 +673,7 @@
       "serviced_on": "2025-11-10",
       "dive_count_at_service": 84,
       "performed_by": "M. Rewi",
-      "center_uuid": "0198a6f0-1111-7095-8000-000000000095",
+      "contact_uuid": "0198a6f0-1111-7095-8000-000000000095",
       "notes": "Passed.",
       "created_at": "2025-11-10T15:00:00+13:00"
     }
@@ -687,7 +687,7 @@
       "number": "NZT-2044",
       "certified_on": "2025-03-14",
       "instructor_name": "J. Harbord",
-      "center_uuid": "0198a6f0-1111-7095-8000-000000000095",
+      "contact_uuid": "0198a6f0-1111-7095-8000-000000000095",
       "course_uuid": "0198a6f0-1111-7090-8000-000000000090",
       "notes": "",
       "front_file": {
@@ -713,7 +713,7 @@
       "certified_on": "2024-11-09"
     }
   ],
-  "centers": [
+  "contacts": [
     {
       "uuid": "0198a6f0-1111-7095-8000-000000000095",
       "name": "Deep South Divers",

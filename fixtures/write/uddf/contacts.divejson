@@ -18,7 +18,7 @@
       "max_depth": 24.6,
       "trip_uuid": "019fed00-5c3a-7000-8000-000000000030",
       "course_uuid": "019fed00-5c3a-7000-8000-000000000040",
-      "center_uuid": "019fed00-5c3a-7000-8000-0000000000a1",
+      "contact_uuid": "019fed00-5c3a-7000-8000-0000000000a1",
       "site_uuids": [
         "019fed00-5c3a-7000-8000-000000000020"
       ],
@@ -83,7 +83,7 @@
       "status": "completed",
       "starts_on": "2026-03-03",
       "ends_on": "2026-03-05",
-      "center_uuid": "019fed00-5c3a-7000-8000-0000000000a1"
+      "contact_uuid": "019fed00-5c3a-7000-8000-0000000000a1"
     }
   ],
   "sites": [
@@ -113,14 +113,14 @@
       "type": "service",
       "serviced_on": "2026-03-05",
       "performed_by": "Ahmed",
-      "center_uuid": "019fed00-5c3a-7000-8000-0000000000a1"
+      "contact_uuid": "019fed00-5c3a-7000-8000-0000000000a1"
     },
     {
       "uuid": "019fed00-5c3a-7000-8000-000000000071",
       "gear_uuid": "019fed00-5c3a-7000-8000-000000000060",
       "type": "visual_inspection",
       "serviced_on": "2026-03-14",
-      "center_uuid": "019fed00-5c3a-7000-8000-0000000000a3"
+      "contact_uuid": "019fed00-5c3a-7000-8000-0000000000a3"
     }
   ],
   "certifications": [
@@ -130,10 +130,10 @@
       "name": "Advanced Open Water Diver",
       "certified_on": "2026-03-05",
       "course_uuid": "019fed00-5c3a-7000-8000-000000000040",
-      "center_uuid": "019fed00-5c3a-7000-8000-0000000000a1"
+      "contact_uuid": "019fed00-5c3a-7000-8000-0000000000a1"
     }
   ],
-  "centers": [
+  "contacts": [
     {
       "uuid": "019fed00-5c3a-7000-8000-0000000000a1",
       "name": "Blue Hole Divers",

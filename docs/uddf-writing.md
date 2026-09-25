@@ -79,9 +79,9 @@ else. A round trip through that would hand the diver back a location they never 
 `writing.md` has the kinds and what a `where` is. In this format `absent` is an element UDDF
 requires that the document had nothing for, and `dropped` is a member UDDF has nowhere to
 put — or, in the two findings *Devices* below describes, a fact about the order a dive's
-recordings come back in, which the file has nowhere to carry either, and in the one *Centers*
-describes, a center a reader will take for a placeholder; the paths are `dives/0`,
-`dives/0/cylinders/1`, `trips/0/parts/1`, `centers/0` and `$`.
+recordings come back in, which the file has nowhere to carry either, and in the one *Contacts*
+describes, a contact a reader will take for a placeholder; the paths are `dives/0`,
+`dives/0/cylinders/1`, `trips/0/parts/1`, `contacts/0` and `$`.
 
 A member with nowhere to go is reported from the record itself and not from a list
 (`writing.md`), so **the tables below are a description of what a writer does and not the
@@ -115,9 +115,9 @@ Ids are written `<kind>-<uuid>` — `dive-019fec36-b9ec-71c6-a03e-64f59b8b92b1` 
 `xs:ID` is an `NCName` and cannot begin with a digit, which a hex UUID regularly does.
 `converting.md`'s identity rule reads a short alphabetic prefix back off, so an id written
 this way returns as the UUID it was and a logbook that went out through UDDF comes back with
-the identities it left with. The prefixes are `dive`, `site`, `trip`, `gear`, `center`,
+the identities it left with. The prefixes are `dive`, `site`, `trip`, `gear`, `contact`,
 `diver` and `mfr`. The one element that holds a copy of another's record rather than a record
-of its own — a part's accommodation, *Centers* below — gets a numbered id instead.
+of its own — a part's accommodation, *Contacts* below — gets a numbered id instead.
 
 `<owner id>` is `diver-<uuid>` where the document records anything about the person this
 direction maps, and the bare string `owner` otherwise — the latter being what every UDDF
@@ -407,7 +407,7 @@ this document gets: both formats model a trip as a sequence of stretches, each c
 own dates and its own place, so a part goes out whole instead of having its dates lifted to
 the trip. A part's `location.name` is the `<name>`, its `location.full_name` the
 `<geography><location>`, its own dates the `<dateoftrip>`, and its `accommodation_uuid` an
-`<accomodation>` — *Centers* below.
+`<accomodation>` — *Contacts* below.
 
 **A trip with no parts still needs one `<trippart>`** — `tripType` requires at least one —
 and gets a nameless, dateless one, an empty `<name>` being a valid `xs:string` that reads
@@ -417,7 +417,7 @@ no part, and no part is what comes back.
 **A part with no `location` gets that same empty `<name>`, and it is reported `absent`**,
 `simpleNamedType` making `<name>` mandatory where the part has nothing for it. The finding
 says what a reader will take the placeholder as, and that turns on what else the part is
-written with: one given dates or a copy of where the diver stayed (*Centers* below) comes
+written with: one given dates or a copy of where the diver stayed (*Contacts* below) comes
 back as the placeless part it was, and one given **none** of a place, a date and a copy does
 not come back at all, being indistinguishable from the floor above. That second case is the
 one shape of written part the self round trip loses, and naming it in the report is what
@@ -450,68 +450,69 @@ element it has to share. A site's `<name>` is the site's own, so the locality ha
 dropped. A part gives the same element to its `full_name` and so loses only its box, which
 is the asymmetry [`uddf-mapping.md`](uddf-mapping.md) describes from the reading side.
 
-### Centers
+### Contacts
 
-A center goes out as **one element of its own**, and its roles choose which:
+A contact goes out as **one element of its own**, and its roles choose which:
 
 | DiveJSON | UDDF |
 | --- | --- |
-| a center whose `roles` are exactly `["shop"]` | `<business><shop id="center-<uuid>">` |
-| every other center | `<divesite><divebase id="center-<uuid>">`, before the `<site>`s |
+| a contact whose `roles` are exactly `["shop"]` | `<business><shop id="contact-<uuid>">` |
+| every other contact | `<divesite><divebase id="contact-<uuid>">`, before the `<site>`s |
 | `name`, `notes` | `<name>`, `<notes><para>` |
 | `address` | `<address>`, `region` as `<province>` |
 | `phone`, `email`, `website` | one `<contact>` holding `<phone>`, `<email>` and `<homepage>`, whichever are present, in that order |
-| `dives[].center_uuid` | `<informationbeforedive><link ref="center-<uuid>">`, after the dive's site links |
-| `trips[].parts[].accommodation_uuid` | an `<accomodation id="accommodation-<n>">` copy of the center inside the part, and the part's `type` |
+| `dives[].contact_uuid` | `<informationbeforedive><link ref="contact-<uuid>">`, after the dive's site links |
+| `trips[].parts[].accommodation_uuid` | an `<accomodation id="accommodation-<n>">` copy of the contact inside the part, and the part's `type` |
 
-**`<shop>` is the one slot that says its role back**, so a center that is a shop and nothing
-else takes it. Every other center — a dive center, a school, a hotel, a club, one recording
-no role at all — goes to `<divebase>`, the only other slot that holds an address, a contact
-and notes and that anything may link to. `<divesite>` is an `xs:sequence` of bases and then
-sites, so the bases come first; `<business>` goes before `<diver>` by choice, the root being
-an `xs:all`. `addressType` requires its `<country>` as §6.19 does, so an address goes out
-whole.
+**`<shop>` is the one slot that says its role back**, so a contact that is a shop and nothing
+else takes it. Every other contact — a dive center, a school, a hotel, a club, one recording
+no role at all — goes to `<divebase>`, the only other slot that holds an `<address>`, a
+`<contact>` and `<notes>` and that anything may link to. `<divesite>` is an `xs:sequence` of
+bases and then sites, so the bases come first; `<business>` goes before `<diver>` by choice,
+the root being an `xs:all`. `addressType` requires its `<country>` as §6.19 does, so an
+address goes out whole.
 
-**`roles` is not written**, UDDF having no element for one — but the slots a center goes out
+**`roles` is not written**, UDDF having no element for one — but the slots a contact goes out
 in imply roles on the way back: `dive_center` for a `<divebase>`, `shop` for a `<shop>`,
 `accommodation` for each `<accomodation>` copy. Where the roles those imply are not exactly
-the center's own, `roles` is reported `dropped`. That includes a center recording none, which
-comes back a `dive_center`, the one slot open to it.
+the contact's own, `roles` is reported `dropped`. That includes a contact recording none,
+which comes back a `dive_center`, the one slot open to it.
 
-**A dive's link to its center goes after its site links.** UDDF's prose names buddies and
+**A dive's link to its contact goes after its site links.** UDDF's prose names buddies and
 sites as the targets of this `<link>` and its XSD takes any id, so the link is schema-valid
 and a reader resolves it ([`uddf-mapping.md`](uddf-mapping.md)). After rather than beside:
 an importer reading one link takes the first as the dive's site, which is why the primary
-site leads, and a center ahead of it would be read as the site.
+site leads, and a contact ahead of it would be read as the site.
 
 **A part's accommodation is a copy.** `trippartType` holds an `<accomodation>` inside the
-part rather than linking to one, so each part gets its own copy of the center — `<name>`,
+part rather than linking to one, so each part gets its own copy of the contact — `<name>`,
 `<address>`, `<contact>` and `<notes>` — spelled as the XSD spells it, with one m. Its `id` is
 `accommodation-<n>`, numbered from 0 over the copies in document order: document-unique, as
-`xs:ID` requires, and not the center's `center-<uuid>`, which its base already holds. A
-reader folds each copy back into the base by name, so two parts at one center come back as
-one center. The part's `type` is `boat` where the center's roles include `liveaboard` and
+`xs:ID` requires, and not the contact's `contact-<uuid>`, which its base already holds. A
+reader folds each copy back into the base by name, so two parts staying at one contact come
+back as one. The part's `type` is `boat` where the contact's roles include `liveaboard` and
 `hotel` otherwise, and a part with no accommodation gets none. A liveaboard goes out this way
 too rather than as UDDF's `<operator>` with a `<vessel>`: the vessel is mandatory beside the
 operator, and §6.18 has no boat to put in it.
 
-**A part whose center shares its name with another center gets no copy.** A reader has
-nothing but the name to fold a copy by, so where two centers in the document have one name —
+**A part whose accommodation shares its name with another contact gets no copy.** A reader has
+nothing but the name to fold a copy by, so where two contacts in the document have one name —
 trimmed and case-insensitively, a chain's two branches — a copy of either comes back as
 whichever the reader meets first, and hands that one whatever of the other's it lacks. Such a
 part is written with no `<accomodation>` and no `type`, and its `accommodation_uuid` is
 reported `dropped`: a part that comes back without its accommodation is a loss the report names,
 where one pointing at the other branch is a wrong answer nothing would.
 
-**A name-only `<divebase>` nothing in the file points at does not come back.** A center with
-nothing to write but its name — no address, contact or notes, its roles and `created_at`
-having no slot — goes out as exactly the shape [`uddf-mapping.md`](uddf-mapping.md) skips as
-a placeholder wherever no dive links it and no `<accomodation>` copy carries its name, and
-there it is reported `dropped`. The ordinary case is a school only a course or a card names,
-those records having no slot at all; the other is a center only parts stay at, whose copies
-the rule above withholds. Everything else comes back: every center a dive links or a copy
-names and every shop, with its name, contact, address and notes, and its roles as its slots
-imply them — and every part's accommodation but the ones the rule above reports.
+**A name-only `<divebase>` nothing in the file points at does not come back.** A contact with
+nothing to write but its name — no address, phone, email, website or notes, its roles and
+`created_at` having no slot — goes out as exactly the shape
+[`uddf-mapping.md`](uddf-mapping.md) skips as a placeholder wherever no dive links it and no
+`<accomodation>` copy carries its name, and there it is reported `dropped`. The ordinary case
+is a school only a course or a card names, those records having no slot at all; the other is
+a contact only parts stay at, whose copies the rule above withholds. Everything else comes
+back: every contact a dive links or a copy names and every shop, with its name, phone, email,
+website, address and notes, and its roles as its slots imply them — and every part's
+accommodation but the ones the rule above reports.
 
 ### Dives
 
@@ -527,7 +528,7 @@ a dive of no length.
 
 `informationbeforediveType` is an `xs:sequence`: `<link>`s first, then `<divenumber>`,
 `<internaldivenumber>`, `<datetime>`, `<altitude>`, `<equipmentused>`, `<tripmembership>`,
-`<surfacepressure>`. Among the links the sites lead and the center follows (*Centers*
+`<surfacepressure>`. Among the links the sites lead and the contact follows (*Contacts*
 above) — a link to a base or a shop being one UDDF's prose does not list and its XSD
 allows. `informationafterdiveType` is an `xs:all` and its order is free.
 
@@ -748,8 +749,8 @@ once per record that carries it, and none of them has anywhere in UDDF to go:
 | a recording's `source_files`, `started_at`, `salinity` and oxygen clocks, its device's `firmware`, and every recording after the first, its `surface_pressure` included | UDDF gives a dive one `<samples>` and one `<surfacepressure>`, `equipmentPieceType` no firmware element, and nothing at all a salinity setting or an oxygen clock's two ends could go in — *Devices* and *Dives* above have each answer, and why the device of a dropped recording is kept even so |
 | `trips[].parts[].location.bbox` | `geographyType` carries a point, not a box |
 | `sites[].location.full_name`, `position` and `bbox` | a site's `<name>` is its own, so the locality gets only `<geography><location>` and that slot holds `location.name`; `<geography>`'s coordinates are the site's pin, and the box has nowhere either — *Sites and trips* above has the asymmetry with a part |
-| `centers[].roles` | no element; *Centers* above says when it is reported |
-| `center_uuid` on a course, a certification or a service record | the record has no slot (above), and its reference goes with it |
+| `contacts[].roles` | no element; *Contacts* above says when it is reported |
+| `contact_uuid` on a course, a certification or a service record | the record has no slot (above), and its reference goes with it |
 | a record's `extensions` | producer-defined members (§5.5) |
 
 An **empty** note — `notes: ""` — is not written either: `<para></para>` and no `<notes>` at

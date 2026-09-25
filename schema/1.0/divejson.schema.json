@@ -20,7 +20,7 @@
     "gear_service_schedules": { "type": "array", "items": { "$ref": "#/$defs/gear_service_schedule" } },
     "gear_service_records": { "type": "array", "items": { "$ref": "#/$defs/gear_service_record" } },
     "certifications": { "type": "array", "items": { "$ref": "#/$defs/certification" } },
-    "centers": { "type": "array", "items": { "$ref": "#/$defs/center" } },
+    "contacts": { "type": "array", "items": { "$ref": "#/$defs/contact" } },
     "extensions": { "$ref": "#/$defs/extensions" }
   },
   "required": ["format", "version", "exported_at"],
@@ -149,7 +149,7 @@
         "exit_position": { "$ref": "#/$defs/position" },
         "trip_uuid": { "$ref": "#/$defs/uuid" },
         "course_uuid": { "$ref": "#/$defs/uuid" },
-        "center_uuid": { "$ref": "#/$defs/uuid" },
+        "contact_uuid": { "$ref": "#/$defs/uuid" },
         "site_uuids": { "$ref": "#/$defs/uuid_list" },
         "gear_uuids": { "$ref": "#/$defs/uuid_list" },
         "species_uuids": { "$ref": "#/$defs/uuid_list" },
@@ -387,7 +387,7 @@
         "ends_on": { "$ref": "#/$defs/date" },
         "instructor_name": { "type": "string", "maxLength": 255 },
         "instructor_number": { "type": "string", "maxLength": 64 },
-        "center_uuid": { "$ref": "#/$defs/uuid" },
+        "contact_uuid": { "$ref": "#/$defs/uuid" },
         "notes": { "$ref": "#/$defs/notes" },
         "created_at": { "$ref": "#/$defs/date_time" },
         "extensions": { "$ref": "#/$defs/extensions" }
@@ -518,7 +518,7 @@
         "dive_count_at_service": { "type": "integer", "minimum": 0 },
         "label": { "type": "string", "maxLength": 120 },
         "performed_by": { "type": "string", "maxLength": 255 },
-        "center_uuid": { "$ref": "#/$defs/uuid" },
+        "contact_uuid": { "$ref": "#/$defs/uuid" },
         "notes": { "$ref": "#/$defs/notes" },
         "created_at": { "$ref": "#/$defs/date_time" },
         "extensions": { "$ref": "#/$defs/extensions" }
@@ -546,7 +546,7 @@
         "expires_on": { "$ref": "#/$defs/date" },
         "instructor_name": { "type": "string", "maxLength": 255 },
         "instructor_number": { "type": "string", "maxLength": 64 },
-        "center_uuid": { "$ref": "#/$defs/uuid" },
+        "contact_uuid": { "$ref": "#/$defs/uuid" },
         "course_uuid": { "$ref": "#/$defs/uuid" },
         "notes": { "$ref": "#/$defs/notes" },
         "front_file": { "$ref": "#/$defs/stored_file" },
@@ -567,7 +567,7 @@
         "not": { "required": ["agency_other"] }
       }
     },
-    "center": {
+    "contact": {
       "type": "object",
       "properties": {
         "uuid": { "$ref": "#/$defs/uuid" },

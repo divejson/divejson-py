@@ -3915,7 +3915,7 @@
       "visibility": 15,
       "weight": 8.0,
       "trip_uuid": "019fec36-b88f-714d-a52f-2360218753b8",
-      "center_uuid": "019fec36-b8a4-7c51-9e0b-5d3f2a7c4e18",
+      "contact_uuid": "019fec36-b8a4-7c51-9e0b-5d3f2a7c4e18",
       "species_uuids": [],
       "created_at": "2026-08-10T15:07:17.278050Z",
       "started_at": "2026-07-07T10:05:00+01:00",
@@ -3948,7 +3948,7 @@
       "visibility": 12,
       "weight": 8.0,
       "trip_uuid": "019fec36-b88f-714d-a52f-2360218753b8",
-      "center_uuid": "019fec36-b8a4-7c51-9e0b-5d3f2a7c4e18",
+      "contact_uuid": "019fec36-b8a4-7c51-9e0b-5d3f2a7c4e18",
       "species_uuids": [],
       "created_at": "2026-08-10T15:07:17.304509Z",
       "started_at": "2026-07-09T11:20:00+01:00",
@@ -3981,7 +3981,7 @@
       "visibility": 18,
       "weight": 8.0,
       "trip_uuid": "019fec36-b88f-714d-a52f-2360218753b8",
-      "center_uuid": "019fec36-b8a4-7c51-9e0b-5d3f2a7c4e18",
+      "contact_uuid": "019fec36-b8a4-7c51-9e0b-5d3f2a7c4e18",
       "species_uuids": [],
       "created_at": "2026-08-10T15:07:17.326317Z",
       "started_at": "2026-07-11T09:45:00+01:00",
@@ -4169,7 +4169,7 @@
       "dive_count_at_service": 0,
       "label": "Annual service",
       "performed_by": "C. Díaz",
-      "center_uuid": "019fec36-b8a4-7c51-9e0b-5d3f2a7c4e18",
+      "contact_uuid": "019fec36-b8a4-7c51-9e0b-5d3f2a7c4e18",
       "notes": "",
       "created_at": "2026-08-10T15:07:17.131702Z",
       "type": "service",
@@ -4183,7 +4183,7 @@
       "name": "Open Water Diver",
       "number": "2206140042",
       "certified_on": "2022-06-14",
-      "center_uuid": "019fec36-b8a4-7c51-9e0b-5d3f2a7c4e18",
+      "contact_uuid": "019fec36-b8a4-7c51-9e0b-5d3f2a7c4e18",
       "notes": "",
       "created_at": "2026-08-10T15:07:17.144421Z"
     },
@@ -4193,7 +4193,7 @@
       "name": "Advanced Open Water Diver",
       "number": "2305020017",
       "certified_on": "2023-05-02",
-      "center_uuid": "019fec36-b8a4-7c51-9e0b-5d3f2a7c4e18",
+      "contact_uuid": "019fec36-b8a4-7c51-9e0b-5d3f2a7c4e18",
       "notes": "",
       "created_at": "2026-08-10T15:07:17.152291Z"
     },
@@ -4206,7 +4206,7 @@
       "created_at": "2026-08-10T15:07:17.158668Z"
     }
   ],
-  "centers": [
+  "contacts": [
     {
       "uuid": "019fec36-b8a4-7c51-9e0b-5d3f2a7c4e18",
       "name": "Blue Lagoon Divers",
