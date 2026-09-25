@@ -400,7 +400,9 @@ of day reported absent — `converting.md`'s rule, and not midnight, which neith
 states. Subsurface emits the first for a midnight dive, its stylesheet building the string
 with an unguarded concatenation; a dive that really began at midnight therefore comes back as
 its date, which is that writer's loss rather than a reading this reader could recover.
-Dropping the dive over either would lose a dive to a writer's typo.
+Dropping the dive over either would lose a dive to a writer's typo. A bare date carrying an
+offset, `2002-06-18+02:00`, reads as the same date-only start, with the offset reported
+dropped: an offset places an instant, and a day with no time of day has none to place.
 
 **`<surfacepressure>` is the dive's element and a recording's figure.** §6.4a puts the
 surface pressure a computer used on that computer's recording, and UDDF states one per dive,

@@ -4,7 +4,7 @@
   "exported_at": "2026-09-05T00:00:00+00:00",
   "generator": {
     "name": "divejson convert",
-    "version": "0.2.0"
+    "version": "0.12.0"
   },
   "dives": [
     {
@@ -28,12 +28,12 @@
             "name": "Suunto Ocean"
           },
           "profile": {
-            "duration": 4230,
+            "duration": 4229970,
             "depth": {
               "times": [
-                0,
-                1560,
-                3880
+                90,
+                1560000,
+                3880180
               ],
               "values": [
                 122,
@@ -44,10 +44,10 @@
             "pressures": [
               {
                 "times": [
-                  0,
-                  1560,
-                  3880,
-                  4230
+                  90,
+                  1560000,
+                  3880180,
+                  4229970
                 ],
                 "values": [
                   2047,
@@ -60,7 +60,7 @@
             ],
             "events": [
               {
-                "time": 0,
+                "time": 90,
                 "type": "gas_switch",
                 "gas_number": 0
               }

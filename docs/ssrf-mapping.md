@@ -212,8 +212,9 @@ and cost the whole logbook.
 records no starting pair, so `cns_start` and `otu_start` have no source here. They sit on the
 `<dive>` rather than on a `<divecomputer>`, so they go where `converting.md` sends a
 dive-level readout: onto the primary recording, reported `resolved` where the dive has more
-than one, and onto a recording of their own where no `<divecomputer>` yields one. No pair
-here carries either figure on a two-computer dive.
+than one, and onto a recording of their own where no `<divecomputer>` yields one —
+`fixtures/ssrf/trip-grouping.ssrf`'s third dive is that case. No pair here carries either
+figure on a two-computer dive.
 
 Zero is read two different ways, which is `converting.md`'s zero rule meeting two members
 with different constraints. A `<depth @max>` or `@mean` of `0.0 m` is **not recorded** —
@@ -282,7 +283,7 @@ This format carries no device name and no device counter: `@diveid` is a per-div
 than a counter, and there is nowhere at all for a name — nothing in a `.ssrf` records what
 the diver called their computer.
 
-## This format settles no ambiguity
+## What this format leaves open
 
 `converting.md` defines a `resolved` finding for a value the source recorded whose scale,
 units or *meaning* are genuinely in doubt. **This reader emits one, and it is not about a
@@ -291,8 +292,8 @@ the file does not say whose figures they are. Past that the absence is a propert
 format rather than an omission. There is no scale to settle: every measurement states
 its unit, so there is no fraction-or-percent and no litres-or-cubic-metres for a magnitude
 test to reach. Where UDDF's `<o2>0.32</o2>` and `<o2>34</o2>` are both schema-valid and mean
-the same gas, `.ssrf` writes `o2='32.0%'` and there is nothing left to decide. And there is
-no meaning to settle either, so this document carries no generator table: one application
+the same gas, `.ssrf` writes `o2='32.0%'` and there is nothing left to decide. And no
+writer's meaning needs settling either, so this document carries no generator table: one application
 writes this format, its `<divelog @program>` says so on every file, and a table keyed on the
 writer needs two writers to tell apart.
 

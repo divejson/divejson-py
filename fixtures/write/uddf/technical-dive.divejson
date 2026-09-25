@@ -479,6 +479,11 @@
       "site_uuids": [
         "0198a6f0-1111-7040-8000-000000000040"
       ],
+      "recordings": [
+        {
+          "cns_end": 14.0
+        }
+      ],
       "notes": "Logged by hand on the boat: the day, and no time of day."
     }
   ],

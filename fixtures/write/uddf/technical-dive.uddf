@@ -3,7 +3,7 @@
   <generator>
     <name>divejson convert</name>
     <type>converter</type>
-    <version>0.3.0</version>
+    <version>0.12.0</version>
     <datetime>2026-08-28T12:00:00Z</datetime>
   </generator>
   <diver>
@@ -307,6 +307,19 @@
             <para>Converted from a legacy log: no offset, no duration recorded.</para>
           </notes>
           <diveduration>0</diveduration>
+        </informationafterdive>
+      </dive>
+      <dive id="dive-0198a6f0-1111-7012-8000-000000000012">
+        <informationbeforedive>
+          <link ref="site-0198a6f0-1111-7040-8000-000000000040" />
+          <datetime>2026-07-05</datetime>
+        </informationbeforedive>
+        <informationafterdive>
+          <greatestdepth>21.5</greatestdepth>
+          <notes>
+            <para>Logged by hand on the boat: the day, and no time of day.</para>
+          </notes>
+          <diveduration>2880</diveduration>
         </informationafterdive>
       </dive>
     </repetitiongroup>
