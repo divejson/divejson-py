@@ -248,8 +248,9 @@ address has nowhere valid to go — and an `address` without its anchor would fa
 converter's own output validation and take the whole file with it.
 
 **A `<purchase>`'s own `<shop>` is read as a contact** where no contact read before it has its
-name, by the inline rule under *Trips* below; the purchase itself — a piece of kit's price
-and date, and the link to where it was bought — has no member and is reported.
+name, by the inline rule under *Trips* below, on a piece that is itself read (*Gear* below);
+the purchase itself — a piece of kit's price and date, and the link to where it was bought —
+has no member and is reported.
 
 ### Trips — `/uddf/divetrip/trip`
 
@@ -313,6 +314,15 @@ is a contact of its own: an `<accomodation>` under its `@id`, like any record, a
 positional identity `converting.md` gives a record without one, its position being its
 `<trippart>`'s among every `<trippart>` in the file, counted from 0.
 
+**In an archive, a shape can fold into a contact another member carries.** A record two
+members define under one id is written by one of them (`converting.md`, *A container is one
+logbook*), and the others resolve their references to it. A repeated `<trip>`'s parts are
+not read, so their stays mint no contacts — an `<operator>` has no id, and would be a second
+contact for one boat. A repeated `<divebase>` or `<shop>` is read with its findings held, the
+carrying member reporting them, and that copy is what a shape in the same file folds into and
+is compared against. Whatever the fold would add to it — its slot's role, or a member the
+copy lacks — is reported as not carried, the contact's row being the other member's.
+
 **The operator is the contact, and the vessel is not read.** Its `<name>`, `<address>`,
 `<contact>` and `<notes>` are the contact's, with `roles: ["liveaboard"]`; the `<vessel>` —
 its name, and everything about the boat — is dropped and reported.
@@ -323,7 +333,13 @@ base itself is read, the link being what keeps a name-only one from being skippe
 placeholder, and the link is reported dropped.
 
 UDDF also allows the opposite direction — `trippart/relateddives/link` pointing from the
-trip at its dives. It is not read, because no writer in the corpus emits it.
+trip at its dives. It is neither read nor reported, no writer in the corpus emitting it.
+
+**The rest of what a trip or a part records is dropped without a finding.** A trip's
+`<aliasname>` and `<rating>`, and a part's `<aliasname>`, `<rating>`, `<priceperdive>` and
+`<pricedivepackage>`, have no member in §6.8 or §6.9a and are not reported. A contact's shape
+is the other way round, every child it does not read being reported by its tag (*Contacts*
+above); of a part's, only `@type`, the `<vessel>` and the `<link>` are.
 
 ### Gear — `/uddf/diver/owner/equipment`
 
@@ -331,6 +347,15 @@ The element's own name is the type. `name` is REQUIRED by §6.12, so a nameless 
 dropped; `manufacturer/name` becomes `brand`, `serialnumber` becomes `serial` and
 `notes/para` becomes `notes`. A dive's
 `informationbeforedive/equipmentused/link/@ref` becomes `dives[].gear_uuids`.
+
+**A piece that is not read takes its `<purchase>` with it.** A nameless piece, or a second
+one using an id another piece in the file already has, is dropped with the one finding that
+says so, and its `<purchase>` goes with it: the purchase gets no finding of its own, and its
+`<shop>` is no contact. A `<camera>` or `<videocamera>` as the 3.2.2 XSD declares it is
+always nameless — `cameraType` and `videocameraType` extend `ID_TYPE` rather than
+`namedType`, and hold only named parts, a `<body>`, a `<lens>` and the rest, which are not
+read either. A piece another member of an archive carries is not written again, and its
+purchase is that member's to read (*Trips* above).
 
 `<serialnumber>` is on `equipmentPieceType`, so it is read for **every** gear type that
 carries one and not only for a computer — which is what §6.12's own member says. On a
@@ -785,12 +810,13 @@ writes all three that way.
 | `<informationbeforedive><surfaceintervalbeforedive>` | no core member. |
 | `<informationafterdive><rating>`, `<current>`, `<problems>` | no core member. |
 | `<site><ecology>` | site-level flora and fauna, where §6.11's species are per-dive sightings. |
-| `<trippart><relateddives>` | the reverse of `<tripmembership>`; no writer in the corpus emits it. |
+| `<trippart><relateddives>` | the reverse of `<tripmembership>`; no writer in the corpus emits it. Not reported. |
+| a trip's `<aliasname>` and `<rating>`; a part's `<aliasname>`, `<rating>`, `<priceperdive>` and `<pricedivepackage>` | §6.8 and §6.9a carry none of them. None is reported (*Trips* above). |
 | `<trippart @type>` | `boat`, `hotel`, `individual` or `organized`, and reported. What a part gained was a reference, not a type: the contact its `accommodation_uuid` names says whether the diver slept aboard (`liveaboard`) or ashore (`accommodation`), and `individual` and `organized` say how the trip was booked, which nothing stores ([divejson/divejson's CONTRIBUTING.md](https://github.com/divejson/divejson/blob/main/CONTRIBUTING.md#proposing-additions-to-the-data-model)). A reader that wants it has `extensions`. |
 | a contact's `<aliasname>` and `<rating>`; a base's `<priceperdive>`, `<pricedivepackage>`, `<guide>` and `<link>`; an accommodation's `<category>` | §6.18 carries none of them, and says so under *Deferred*. Each is reported. |
 | `<contact><language>`, `<fax>` on any shape a contact is read from | no member. Each is reported. |
 | `<vessel>`, with its `<shiptype>`, `<marina>` and `<shipdimension>` | a boat, which §6.18 does not model: the operator is the contact and the vessel is reported. |
-| `<purchase>` | a piece of kit's price, date and shop. Its inline `<shop>` is read as a contact (*Contacts* above) and the purchase is reported. |
+| `<purchase>` | a piece of kit's price, date and shop. Its inline `<shop>` is read as a contact (*Contacts* above) and the purchase is reported — on a piece that is read; a dropped piece's goes with it (*Gear* above). |
 | `<mix><n2>`, `<ar>`, `<h2>` | §6.3 models the remainder as nitrogen and does not model argon or trace gases. |
 | `courses`, `certifications`, `gear_sets`, `gear service` | UDDF has no slot for any of them. |
 | `<insurance><aliasname>`, `<issuedate>`, `<notes>` | §6.1's Insurance holds the insurer, the diver's identifier with it and the last day of cover, and none of these is any of the three. Each is reported. |

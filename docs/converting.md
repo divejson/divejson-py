@@ -397,6 +397,10 @@ not a source format: it has no registry id, no identity namespace, and no mappin
 - **`where` paths and positional identities are prefixed by the member's name**, so a
   finding points at a file inside the container and a record with no id of its own is
   identified within its member rather than within the container.
+- **A record two members define under one id is one record**, the ordinary shape of a
+  per-dive export that repeats its site and its gear in every file. The first member to define
+  it, in member-name order, writes its row, the rest resolve their references to it, and
+  nothing is reported. Two records of one id inside one file are still *Identity*'s rule 5.
 - **The caller sets the caps** — how many members, and how large a member may be once
   inflated — and the reader walks the members one at a time, **refusing before it inflates**
   rather than after. A converter that read a container whole would hand an application a
