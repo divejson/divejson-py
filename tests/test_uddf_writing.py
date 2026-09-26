@@ -1237,13 +1237,15 @@ def test_a_role_uddf_cannot_spell_on_a_dive_is_a_plain_link_and_says_so(schema, 
     ]
 
 
-def test_a_reference_with_no_role_comes_back_a_buddy_which_is_a_gain_and_silent(schema) -> None:
-    """A plain link reads as a buddy, so "was there" returns with a role it never had — gained
-    rather than lost, and a report says what was lost."""
+def test_a_reference_with_no_role_comes_back_a_buddy_and_says_so(schema) -> None:
+    """A plain link reads as a buddy, so "was there" cannot survive it — and a companion who
+    stayed on the boat did not dive alongside anyone."""
     source = with_people(one_dive(people=[{"person_uuid": PERSON_UUID}]), person())
     written(source, schema)
     assert read_back(source)["dives"][0]["people"] == [{"person_uuid": PERSON_UUID, "role": "buddy"}]
-    assert [where for _, where, _ in notes(source) if "people" in where] == []
+    assert [(kind, where) for kind, where, _ in notes(source) if "people" in where] == [
+        ("dropped", "dives/0/people/0")
+    ]
 
 
 def test_a_role_this_version_does_not_define_is_read_as_none() -> None:
@@ -1251,7 +1253,9 @@ def test_a_role_this_version_does_not_define_is_read_as_none() -> None:
     and goes out as one with no role would."""
     source = with_people(one_dive(people=[{"person_uuid": PERSON_UUID, "role": "assistant"}]), person())
     assert f'<link ref="person-{PERSON_UUID}" />' in written(source)
-    assert messages(source, "dives/0/people/0") == []
+    assert messages(source, "dives/0/people/0") == [
+        "the reference records no role, and the plain link it goes out as reads back as buddy"
+    ]
 
 
 def test_a_references_extensions_have_no_slot_and_are_reported(schema) -> None:

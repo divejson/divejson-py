@@ -13,7 +13,7 @@ between them would be a bug in whichever was read last. So the bar here is two t
 a written pair in `fixtures/write/uddf/`, compared as canonical XML with `<generator>`
 ignored, and the **self round trip** — reading a written file back through `uddf.py` returns
 the document it was written from, on every member `docs/uddf-mapping.md`'s element map
-carries, but for two documented gains below. Everything else is named in the report, and
+carries, with one documented exception below. Everything else is named in the report, and
 the report is half the output here exactly as it is on the way in.
 
 The round trip is also **the only thing that checks a scale both directions agree on**.
@@ -30,9 +30,8 @@ this direction has to put both into one element wherever it can, and `plan_compu
 the fold that decides where it can. Writing the same computer twice would put two kit items
 in a reader's gear list where the diver owns one and give one machine two `xs:ID`s. A
 device that folds into nothing takes an element of its own with a non-UUID id, which reads
-back as a gear item the document never had: a written file returning *more* than it was
-written from. The other such gain is a person reference with no role, which goes out as the
-plain link a reader takes as a buddy (`person_link`).
+back as a gear item the document never had: the one documented exception to the self round
+trip, and the one place a written file returns *more* than it was written from.
 
 **The XSD is the referee.** `informationbeforedive` and `waypoint` are `xs:sequence`, so
 their children go in the schema's order and not in one that reads well; `equipment` is a
@@ -785,11 +784,13 @@ class _Writer:
         """One Person Reference as a dive's `<link>`: to the person's `<buddy>`, or to its `<guide>`.
 
         A reader takes a plain link to a buddy as `buddy`, so that role goes out as one and
-        loses nothing, and a reference with no role goes out as one and comes back a buddy —
-        a role gained rather than lost, and like every gain not reported. A `guide` goes out
-        through its base's `<guide>` (`plan_people`), and on a dive with no base to hold one as
-        a plain link with the role reported; so does every other role, UDDF having no spelling
-        for one on a dive. A role this version's vocabulary does not hold is read as none (§5.6).
+        loses nothing. A reference with no role goes out as one too and comes back a buddy,
+        which is reported the way a contact recording no roles is: an absent role says only
+        that the person was there, and a companion who stayed on the boat did not dive
+        alongside anyone. A `guide` goes out through its base's `<guide>` (`plan_people`), and
+        on a dive with no base to hold one as a plain link with the role reported; so does
+        every other role, UDDF having no spelling for one on a dive. A role this version's
+        vocabulary does not hold is read as none (§5.6).
         """
         self.unmapped(where, reference, frozenset({"person_uuid", "role"}))
         uuid, role = reference.get("person_uuid"), reference.get("role")
@@ -800,7 +801,13 @@ class _Writer:
             _sub(before, "link", ref=guide)
             return
         _sub(before, "link", ref=_uddf_id("person", str(uuid)))
-        if role == "guide":
+        if role is None:
+            self.note(
+                where,
+                "the reference records no role, and the plain link it goes out as reads back as buddy",
+                "dropped",
+            )
+        elif role == "guide":
             self.note(
                 where,
                 "UDDF records a guide under the dive base the dive links, and this dive links none; the "

@@ -32,10 +32,9 @@ this file is about the package, whose version moves independently.
   `<owner>`, its name split at the first space into `<firstname>` and `<lastname>`, with its
   phone, email and notes. A dive links its people after its sites and its contact: a `buddy`
   as a plain link, and a `guide` through a `<guide id="guide-<n>">` under the `<divebase>` the
-  dive links. A `guide` with no base to hold it and every other role go out as a plain link that
-  reads back as `buddy`, and each is reported, as are a trip's and a course's people, which UDDF
-  has no slot for. A reference with no role goes out as the same link and comes back a `buddy`,
-  a gain the report does not name.
+  dive links. A `guide` with no base to hold it, every other role and a reference with no role
+  go out as a plain link that reads back as `buddy`, and each is reported, as are a trip's and a
+  course's people, which UDDF has no slot for.
 
 - **The Subsurface reader reads a dive's buddies and divemaster.** `<buddy>` is split on
   commas and each trimmed name is a `buddy`; `<divemaster>`, or `<diveguide>`, is one name and

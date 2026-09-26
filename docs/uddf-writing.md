@@ -79,8 +79,10 @@ else. A round trip through that would hand the diver back a location they never 
 `writing.md` has the kinds and what a `where` is. In this format `absent` is an element UDDF
 requires that the document had nothing for, and `dropped` is a member UDDF has nowhere to
 put — or, in the two findings *Devices* below describes, a fact about the order a dive's
-recordings come back in, which the file has nowhere to carry either, and in the one *Contacts*
-describes, a contact a reader will take for a placeholder; the paths are `dives/0`,
+recordings come back in, which the file has nowhere to carry either, in the one *Contacts*
+describes, a contact a reader will take for a placeholder, and in the two *People* describes,
+a reference with no role that a reader will take for a buddy and a person whose name is
+whitespace alone, whom a reader drops; the paths are `dives/0`,
 `dives/0/cylinders/1`, `dives/0/people/1`, `trips/0/parts/1`, `contacts/0`, `people/0` and
 `$`.
 
@@ -541,9 +543,11 @@ at all.
 the rest, and a one-word name leaves `<lastname>` empty, `personalType` requiring it. A reader
 joins the non-empty parts with single spaces ([`uddf-mapping.md`](uddf-mapping.md)), so a
 name whose words are separated by single spaces, with none around them, comes back
-byte-identical, and any other whitespace in a name is normalised to that on the way out. The
-first space is where Subsurface's and Bubbletrail's UDDF exports split a name too, so a reader
-of either that re-joins the two elements sees the same string. A buddy's children run in
+byte-identical. Any other whitespace in a name goes out normalised to that and is reported,
+and a name of whitespace alone goes out empty, which a reader drops along with every
+reference to the person, and is reported too. The first space is where Subsurface's and
+Bubbletrail's UDDF exports split a name, so a reader of either that re-joins the two
+elements sees the same string. A buddy's children run in
 `personType`'s order: `<personal>`, `<contact>`, `<notes>`.
 
 **A dive's people are linked in the dive's own order, after its sites and its contact**
@@ -551,8 +555,9 @@ of either that re-joins the two elements sees the same string. A buddy's childre
 
 **`buddy` and no role at all are one plain link**, and a plain link reads back as `buddy`,
 which is UDDF's own reading of a dive linking a buddy directly. So a reference with no role
-returns with one: a role the document never had, gained rather than lost, and like every
-gain not reported.
+comes back with one the document never had, and it is reported, as a contact recording no
+roles is (*Contacts* above): an absent role says only that the person was there, and `buddy`
+says they dived alongside the diver, which a companion who stayed on the boat did not.
 
 **`guide` is the one other role UDDF can say, and only through a dive base.** `<guide>` is a
 child of `<divebase>`, holding nothing but an id and a `<link>` to a buddy, so a guide
