@@ -1007,7 +1007,6 @@ def test_a_dive_linking_a_buddy_names_it_as_a_buddy() -> None:
     )
     assert references(document) == [("Kim", "buddy"), ("Ada Lovelace", "buddy")]
     assert document["dives"][0]["site_uuids"] == [document["sites"][0]["uuid"]]
-    # The link used to be dropped as no dive site this converter carries.
     assert not [message for _, message in report if "not a dive site" in message]
 
 
@@ -1073,7 +1072,7 @@ def test_a_guide_whose_link_names_no_buddy_that_is_read_takes_the_reference_with
 
 
 def test_a_link_to_something_no_reader_carries_is_still_reported() -> None:
-    """The note that used to cover a buddy keeps firing for everything else a link can name."""
+    """A link to an id this reader carries nowhere — here the owner's — is dropped with a note."""
     _, report = contacts_of(buddies(buddy("b1", "Moh")), dive_linking("owner", "b1"))
     assert ("dive/0", "a link points at 'owner', which is not a dive site this converter carries; the reference is "
             "dropped") in report
