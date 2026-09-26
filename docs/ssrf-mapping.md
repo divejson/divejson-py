@@ -162,6 +162,7 @@ and no version.
 | `<divecomputer><depth @max>`, `@mean` | `max_depth`, `avg_depth` — **the first element's only**, see below |
 | `<divecomputer><temperature @water>` | `bottom_temperature` — the first element's only |
 | `<divecomputer><sample>` | that element's `recordings[].profile` |
+| `<buddy>`, `<divemaster>` | `people` — *People* below |
 
 **Three of those rows are dive-level and the element they sit on is not**, and this is the
 one place the plural recording forces a choice. `max_depth`, `avg_depth` and
@@ -283,6 +284,39 @@ This format carries no device name and no device counter: `@diveid` is a per-div
 than a counter, and there is nowhere at all for a name — nothing in a `.ssrf` records what
 the diver called their computer.
 
+### People — `dive/buddy` and `dive/divemaster`
+
+| `.ssrf` | DiveJSON |
+| --- | --- |
+| `<buddy>` | a person per name in it, each referenced from the dive's `people` with the role `buddy` |
+| `<divemaster>`, or `<diveguide>` | a person referenced from the dive's `people` with the role `guide` |
+
+Both are child elements of the `<dive>` rather than attributes: `core/save-xml.cpp` writes
+them that way, the divemaster first. `<diveguide>` is the spelling Subsurface's own parser
+accepts beside `<divemaster>`, the one it writes, and it is read the same way.
+
+**The buddy field is a list separated by commas**, which is Subsurface's own rule — its manual
+describes the field that way, and its UDDF export splits it on the same character. Each name
+is trimmed, and an empty one is skipped.
+
+**A name is a person across the whole file.** A `.ssrf` has no record for a person, only names
+on dives, so each distinct name — trimmed and case-folded — is one person, named as it is
+first written. Its identity is `converting.md`'s rule 2 with the case-folded name standing in
+for the id the format does not give it, under the kind `person`: the same name in two files
+of one archive is one person, as the same id would be.
+
+**A dive's `people` is its buddy field in order, then its divemaster**, each buddy with the
+role `buddy` and the divemaster with the role `guide`. A divemaster who is also named in the
+buddy field is one reference rather than two, at the buddy's position and with the role
+`guide` — a dive names a person once (§3), and the more specific role is the one written
+(§6.20) — and a name repeated within the buddy field is one reference too, the repeat
+reported. `people[]` lists the people in the order they are first met: dive by dive in file
+order, each dive's buddy field before its divemaster.
+
+**Subsurface's UDDF export writes a dive's buddies and never its divemaster**, so a logbook
+converted by that route has no guides at all
+([`uddf-mapping.md`](uddf-mapping.md), *People*). The save file is where a guide survives.
+
 ## What this format leaves open
 
 `converting.md` defines a `resolved` finding for a value the source recorded whose scale,
@@ -351,7 +385,7 @@ one, so nothing about it could be checked against output Subsurface actually pro
 | `<settings>` | Subsurface's per-computer device records, keyed by the `@deviceid` a `<divecomputer>` carries. §6.4b now *does* have members for what they hold, so this stopped being "no core member" and became the highest-value entry in this table: a document-level table resolving a dive's computer to a model, a serial and a firmware is exactly a device, and reading it would be a second source for the §6.4b members a `<divecomputer>`'s own attributes cannot reach. It waits on a file: `<settings>` is empty in every fixture that has the element and absent from the rest, so neither the child element's spelling nor its attribute names can be checked against output Subsurface actually produces. Until then a serial and a firmware come from the `Serial` and `FW Version` `<extradata>` children, which `fixtures/ssrf/two-computers.ssrf` does carry. |
 | the logbook's owner | the format records nothing about one, so no `diver` member is written (§6.1). Minting an identity for one would be §5.4's fabrication applied to people. |
 | `courses`, `certifications`, `gear`, `gear_sets`, `species` | `.ssrf` has no slot for any of them. |
-| `contacts`, and every reference to one | Subsurface has no field for a dive center, a shop or a place stayed: the people a dive records are a buddy and a divemaster, and its one place is the site. Its UDDF export writes one placeholder `<divebase>` per file for want of one ([`uddf-mapping.md`](uddf-mapping.md), *Contacts*). |
+| `contacts`, and every reference to one | Subsurface has no field for a dive center, a shop or a place stayed: its divemaster is a person (*People* above) rather than the operator, and its one place is the site. Its UDDF export writes one placeholder `<divebase>` per file for want of one ([`uddf-mapping.md`](uddf-mapping.md), *Contacts*). |
 
 ## Where the two readings differ
 

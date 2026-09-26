@@ -21,6 +21,7 @@
     "gear_service_records": { "type": "array", "items": { "$ref": "#/$defs/gear_service_record" } },
     "certifications": { "type": "array", "items": { "$ref": "#/$defs/certification" } },
     "contacts": { "type": "array", "items": { "$ref": "#/$defs/contact" } },
+    "people": { "type": "array", "items": { "$ref": "#/$defs/person" } },
     "extensions": { "$ref": "#/$defs/extensions" }
   },
   "required": ["format", "version", "exported_at"],
@@ -153,6 +154,7 @@
         "site_uuids": { "$ref": "#/$defs/uuid_list" },
         "gear_uuids": { "$ref": "#/$defs/uuid_list" },
         "species_uuids": { "$ref": "#/$defs/uuid_list" },
+        "people": { "$ref": "#/$defs/people" },
         "cylinders": { "type": "array", "items": { "$ref": "#/$defs/cylinder" } },
         "recordings": { "type": "array", "items": { "$ref": "#/$defs/recording" } },
         "created_at": { "$ref": "#/$defs/date_time" },
@@ -321,6 +323,7 @@
         "uuid": { "$ref": "#/$defs/uuid" },
         "name": { "type": "string", "minLength": 1, "maxLength": 255 },
         "parts": { "type": "array", "items": { "$ref": "#/$defs/trip_part" } },
+        "people": { "$ref": "#/$defs/people" },
         "notes": { "$ref": "#/$defs/notes" },
         "created_at": { "$ref": "#/$defs/date_time" },
         "extensions": { "$ref": "#/$defs/extensions" }
@@ -385,9 +388,9 @@
         },
         "starts_on": { "$ref": "#/$defs/date" },
         "ends_on": { "$ref": "#/$defs/date" },
-        "instructor_name": { "type": "string", "maxLength": 255 },
         "instructor_number": { "type": "string", "maxLength": 64 },
         "contact_uuid": { "$ref": "#/$defs/uuid" },
+        "people": { "$ref": "#/$defs/people" },
         "notes": { "$ref": "#/$defs/notes" },
         "created_at": { "$ref": "#/$defs/date_time" },
         "extensions": { "$ref": "#/$defs/extensions" }
@@ -544,7 +547,7 @@
         "number": { "type": "string", "maxLength": 64 },
         "certified_on": { "$ref": "#/$defs/date" },
         "expires_on": { "$ref": "#/$defs/date" },
-        "instructor_name": { "type": "string", "maxLength": 255 },
+        "instructor_uuid": { "$ref": "#/$defs/uuid" },
         "instructor_number": { "type": "string", "maxLength": 64 },
         "contact_uuid": { "$ref": "#/$defs/uuid" },
         "course_uuid": { "$ref": "#/$defs/uuid" },
@@ -588,6 +591,35 @@
         "extensions": { "$ref": "#/$defs/extensions" }
       },
       "required": ["uuid", "name"],
+      "additionalProperties": false
+    },
+    "person": {
+      "type": "object",
+      "properties": {
+        "uuid": { "$ref": "#/$defs/uuid" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "email": { "type": "string", "format": "email", "maxLength": 255 },
+        "phone": { "type": "string", "maxLength": 32 },
+        "notes": { "$ref": "#/$defs/notes" },
+        "created_at": { "$ref": "#/$defs/date_time" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["uuid", "name"],
+      "additionalProperties": false
+    },
+    "people": {
+      "description": "A host's references to people, in the diver's own order. That no person appears twice is a rule the validator checks: uniqueItems compares whole references, and two references to one person under two roles are two different objects to it.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/person_reference" }
+    },
+    "person_reference": {
+      "type": "object",
+      "properties": {
+        "person_uuid": { "$ref": "#/$defs/uuid" },
+        "role": { "enum": ["buddy", "guide", "instructor", "student", "companion"] },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["person_uuid"],
       "additionalProperties": false
     }
   }

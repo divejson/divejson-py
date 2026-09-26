@@ -252,6 +252,53 @@ name, by the inline rule under *Trips* below, on a piece that is itself read (*G
 the purchase itself — a piece of kit's price and date, and the link to where it was bought —
 has no member and is reported.
 
+### People — `/uddf/diver/buddy`, and a dive base's `<guide>`
+
+| UDDF | DiveJSON |
+| --- | --- |
+| `personal/firstname` + `middlename` + `lastname` | `people[].name`, joined with single spaces, an empty one skipped — REQUIRED, so a buddy with no name at all is no person: it is reported, and every link to it goes with it |
+| `contact/email` | `people[].email` — the first |
+| `contact/phone`, else `contact/mobilephone` | `people[].phone` — the first `<phone>`, or the first `<mobilephone>` where there is none |
+| `notes/para` | `people[].notes`, paragraphs joined with blank lines |
+| `@id` | `people[].uuid`, under the kind `person` |
+| a dive's `informationbeforedive/link/@ref` naming a buddy | a reference in `dives[].people`, with the role `buddy` — or `student`, where the buddy carries `<student/>` |
+| a dive's `informationbeforedive/link/@ref` naming a `divebase/guide` | a reference to the buddy the guide links, with the role `guide` |
+
+`people[]` lists the buddies in file order, and a dive's `people` its links in the order the
+dive gives them.
+
+**A buddy a dive links directly is that dive's buddy.** That is UDDF's own reading — its
+documentation of `<guide>` says a dive linking a buddy directly means the person is simply a
+buddy — and it is what Subsurface's UDDF export means by one: it writes a `<buddy>` per name
+in a dive's buddy field and links each from the dive. A buddy carrying `<student/>` is the
+owner's student, so a dive linking it directly references it as `student` instead.
+
+**A `<guide>` is a buddy leading dives for a dive base.** `guideType` is an id and one
+`<link>`, to a buddy, and a dive may link the guide's id rather than the buddy's: that is a
+reference to the buddy with the role `guide`, which wins over `student` as it wins over
+`buddy`. The guide names a person and not an operator, so the dive's `contact_uuid` comes from
+its own link to the base, where it has one, and never from the guide's.
+
+**A dive names a person once** (§3). A dive linking one buddy twice — directly and through a
+guide, or directly twice — keeps one reference, at the first link's position, with the role
+`guide` where either link carried it, and the other link is reported.
+
+**`<owner>` stays the diver.** UDDF's documentation says an owner's id lets an imported owner
+be managed as a buddy, but whose logbook is being imported into whose is the importing
+application's to decide, so the owner is read as *Diver* above says and never as a person.
+
+**Everything else a buddy carries is reported rather than dropped in silence**, the rule a
+contact's shape keeps: `<address>`, `<equipment>`, `<medical>`, `<education>`,
+`<divepermissions>` and `<diveinsurances>`, `<personal>`'s children beyond the three names,
+and, in its `<contact>`, every `<email>` and phone but the ones read, a `<homepage>`, a
+`<fax>` and a `<language>`. §6.20 carries a name, an email, a phone and notes, and names what
+it leaves out under *Deferred*. A buddy's `<equipment>` in particular is somebody else's kit,
+and never a gear item (*Gear* below reads only the owner's).
+
+**Every string meets its member's bound**, as a contact's does: a name past 255 characters is
+cut to it and reported, and a phone past 32 or an email past 255 is dropped and reported
+instead. `<email>` takes the owner's guard (*Diver* above).
+
 ### Trips — `/uddf/divetrip/trip`
 
 | UDDF | DiveJSON |
@@ -327,10 +374,10 @@ copy lacks — is reported as not carried, the contact's row being the other mem
 `<contact>` and `<notes>` are the contact's, with `roles: ["liveaboard"]`; the `<vessel>` —
 its name, and everything about the boat — is dropped and reported.
 
-**A part's `<link>` to a base is not a member.** It says the diver dived with that base
-during the part, and §6.9a records where the diver stayed and not whom they dived with. The
-base itself is read, the link being what keeps a name-only one from being skipped as a
-placeholder, and the link is reported dropped.
+**A part's `<link>` to a base is not a member.** It says the base ran the diver's dives
+during the part, and §6.9a records where the diver stayed and not who they dived with, which
+is each dive's `people` and `contact_uuid`. The base itself is read, the link being what
+keeps a name-only one from being skipped as a placeholder, and the link is reported dropped.
 
 UDDF also allows the opposite direction — `trippart/relateddives/link` pointing from the
 trip at its dives. It is neither read nor reported, no writer in the corpus emitting it.
@@ -502,6 +549,7 @@ carries nothing this format records.
 | `informationbeforedive/divenumber` | `number` |
 | `informationbeforedive/link/@ref` | `site_uuids`, in source order, the first being the primary site |
 | `informationbeforedive/link/@ref` naming a `<divebase>` or a `<shop>` | `contact_uuid` |
+| `informationbeforedive/link/@ref` naming a `<buddy>` or a `<guide>` | `people` — *People* above |
 | `informationbeforedive/altitude` | `altitude` |
 | `informationbeforedive/surfacepressure` | the primary recording's `surface_pressure` — see below |
 | `informationbeforedive/equipmentused/leadquantity` | `weight` |
@@ -544,13 +592,14 @@ loss on Subsurface's side, and reading it any other way would discard a genuine 
 from every other writer.
 
 A `<link>` under `informationbeforedive` addresses a site, a `<decomodel>` child (*The
-decompression model* below) or a contact — a `<divebase>` or a `<shop>`, which becomes the
-dive's `contact_uuid`. UDDF's prose names buddies and sites as this link's targets, while
-`informationbeforediveType`'s `<link>` is a bare `xs:IDREF` that may name any id, so a reader
-resolving a base or a shop loses nothing and a writer linking one stays schema-valid. A dive
-linking two contacts keeps the first and reports the rest, §6.2 carrying one. A link that
-resolves to anything else — a buddy — is dropped with a note, and one that resolves to
-nothing at all is reported as a source defect.
+decompression model* below), a contact — a `<divebase>` or a `<shop>`, which becomes the
+dive's `contact_uuid` — or a person: a `<buddy>`, or a base's `<guide>`, each a reference in
+the dive's `people` (*People* above). UDDF's prose names buddies and sites as this link's
+targets, while `informationbeforediveType`'s `<link>` is a bare `xs:IDREF` that may name any
+id, so a reader resolving a base or a shop loses nothing and a writer linking one stays
+schema-valid. A dive linking two contacts keeps the first and reports the rest, §6.2
+carrying one. A link that resolves to anything else is dropped with a note, and one that
+resolves to nothing at all is reported as a source defect.
 
 ### Cylinders — `dive/tankdata`
 
@@ -813,15 +862,17 @@ writes all three that way.
 | `<trippart><relateddives>` | the reverse of `<tripmembership>`; no writer in the corpus emits it. Not reported. |
 | a trip's `<aliasname>` and `<rating>`; a part's `<aliasname>`, `<rating>`, `<priceperdive>` and `<pricedivepackage>` | §6.8 and §6.9a carry none of them. None is reported (*Trips* above). |
 | `<trippart @type>` | `boat`, `hotel`, `individual` or `organized`, and reported. What a part gained was a reference, not a type: the contact its `accommodation_uuid` names says whether the diver slept aboard (`liveaboard`) or ashore (`accommodation`), and `individual` and `organized` say how the trip was booked, which nothing stores ([divejson/divejson's CONTRIBUTING.md](https://github.com/divejson/divejson/blob/main/CONTRIBUTING.md#proposing-additions-to-the-data-model)). A reader that wants it has `extensions`. |
-| a contact's `<aliasname>` and `<rating>`; a base's `<priceperdive>`, `<pricedivepackage>`, `<guide>` and `<link>`; an accommodation's `<category>` | §6.18 carries none of them, and says so under *Deferred*. Each is reported. |
-| `<contact><language>`, `<fax>` on any shape a contact is read from | no member. Each is reported. |
+| a contact's `<aliasname>` and `<rating>`; a base's `<priceperdive>`, `<pricedivepackage>` and `<link>`; an accommodation's `<category>` | §6.18 carries none of them, and says so under *Deferred*. Each is reported. |
+| a base's `<guide>` that no dive links | a buddy on the base's staff with no dive to have led: §6.18 defers a base's guides, and a person's role lives on a reference, which needs an occasion to sit on. Reported. A guide a dive links is read (*People* above). |
+| a buddy's `<address>`, `<equipment>`, `<medical>`, `<education>`, `<divepermissions>`, `<diveinsurances>`, its `<personal>` beyond the three names, and its `<contact><homepage>` | §6.20 carries a name, an email, a phone and notes, and names the rest under *Deferred*. Each is reported (*People* above). |
+| `<contact><language>`, `<fax>` on any shape a contact or a person is read from | no member. Each is reported. |
 | `<vessel>`, with its `<shiptype>`, `<marina>` and `<shipdimension>` | a boat, which §6.18 does not model: the operator is the contact and the vessel is reported. |
 | `<purchase>` | a piece of kit's price, date and shop. Its inline `<shop>` is read as a contact (*Contacts* above) and the purchase is reported — on a piece that is read; a dropped piece's goes with it (*Gear* above). |
 | `<mix><n2>`, `<ar>`, `<h2>` | §6.3 models the remainder as nitrogen and does not model argon or trace gases. |
 | `courses`, `certifications`, `gear_sets`, `gear service` | UDDF has no slot for any of them. |
 | `<insurance><aliasname>`, `<issuedate>`, `<notes>` | §6.1's Insurance holds the insurer, the diver's identifier with it and the last day of cover, and none of these is any of the three. Each is reported. |
 | `<personal><membership>` | an organisation and a member id, which may be a club, a federation or an insurer, and nothing in the element says which: UDDF's own sample document gives it a diving federation. Read as an insurance, a club membership would come back as a policy nobody holds. |
-| every `<phone>` and `<mobilephone>` but the one read | §6.1 carries one phone, the way it carries one email. Each other is reported. |
+| every `<phone>` and `<mobilephone>` but the one read | §6.1 carries one phone, the way it carries one email, and so do §6.18 and §6.20. Each other is reported. |
 
 ## Known writer artefacts
 

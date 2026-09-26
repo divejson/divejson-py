@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<uddf xmlns="http://www.streit.cc/uddf/3.2/" version="3.2.2">
+  <generator>
+    <name>DiveJSON fixtures</name>
+  </generator>
+  <diver>
+    <owner id="owner">
+      <personal>
+        <firstname/>
+        <lastname/>
+      </personal>
+    </owner>
+    <buddy id="buddy-mona">
+      <personal>
+        <firstname>Mona</firstname>
+        <middlename>A.</middlename>
+        <lastname>Salem</lastname>
+        <membership organisation="Dahab Dive Club" memberid="DDC-0042"/>
+      </personal>
+      <address>
+        <city>Dahab</city>
+        <country>Egypt</country>
+      </address>
+      <contact>
+        <phone>+20 100 555 0177</phone>
+        <email>mona@example.com</email>
+        <email>mona.salem@example.org</email>
+      </contact>
+      <equipment>
+        <fins id="buddy-mona-fins">
+          <name>Split fins</name>
+        </fins>
+      </equipment>
+      <notes>
+        <para>Guides at Blue Hole Divers; dives a rebreather off duty.</para>
+      </notes>
+    </buddy>
+    <buddy id="buddy-karim">
+      <personal>
+        <firstname>Karim</firstname>
+        <lastname/>
+      </personal>
+      <student/>
+    </buddy>
+  </diver>
+  <divesite>
+    <divebase id="base-bluehole">
+      <name>Blue Hole Divers</name>
+      <guide id="guide-mona">
+        <link ref="buddy-mona"/>
+      </guide>
+    </divebase>
+    <site id="site-canyon">
+      <name>The Canyon</name>
+      <geography>
+        <location>Dahab, Egypt</location>
+        <latitude>28.5585</latitude>
+        <longitude>34.5212</longitude>
+      </geography>
+    </site>
+  </divesite>
+  <profiledata>
+    <repetitiongroup id="rg-1">
+      <dive id="dive-1">
+        <informationbeforedive>
+          <link ref="site-canyon"/>
+          <link ref="buddy-mona"/>
+          <link ref="buddy-karim"/>
+          <divenumber>1</divenumber>
+          <datetime>2026-03-03T09:10:00+02:00</datetime>
+        </informationbeforedive>
+        <informationafterdive>
+          <greatestdepth>18.4</greatestdepth>
+          <diveduration>2760</diveduration>
+        </informationafterdive>
+      </dive>
+    </repetitiongroup>
+    <repetitiongroup id="rg-2">
+      <dive id="dive-2">
+        <informationbeforedive>
+          <link ref="site-canyon"/>
+          <link ref="base-bluehole"/>
+          <link ref="guide-mona"/>
+          <divenumber>2</divenumber>
+          <datetime>2026-03-04T08:40:00+02:00</datetime>
+        </informationbeforedive>
+        <informationafterdive>
+          <greatestdepth>27.1</greatestdepth>
+          <diveduration>2520</diveduration>
+        </informationafterdive>
+      </dive>
+    </repetitiongroup>
+    <repetitiongroup id="rg-3">
+      <dive id="dive-3">
+        <informationbeforedive>
+          <link ref="site-canyon"/>
+          <link ref="buddy-mona"/>
+          <link ref="buddy-karim"/>
+          <link ref="guide-mona"/>
+          <link ref="buddy-karim"/>
+          <divenumber>3</divenumber>
+          <datetime>2026-03-05T10:15:00+02:00</datetime>
+        </informationbeforedive>
+        <informationafterdive>
+          <greatestdepth>22.8</greatestdepth>
+          <diveduration>3000</diveduration>
+        </informationafterdive>
+      </dive>
+    </repetitiongroup>
+  </profiledata>
+</uddf>

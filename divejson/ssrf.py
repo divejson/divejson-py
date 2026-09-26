@@ -577,43 +577,45 @@ class _Converter:
     # -- people ------------------------------------------------------------------
 
     def read_people(self, element: ET.Element, where: str) -> list[dict[str, Any]]:
-        """A dive's `<buddy>` and `<divemaster>` as its §6.2 `people`, in the order the file names them.
+        """A dive's `<buddy>` and `<divemaster>` as its §6.2 `people`: the buddies, then the guide.
 
-        Child elements, which is what Subsurface writes, and `<diveguide>` beside
-        `<divemaster>` where a file carries the newer spelling. The buddy field is a list on
-        Subsurface's own terms — split on commas, each name trimmed — and every name is a
-        `buddy`; the divemaster is one name, and a `guide`. A person named twice on one dive is
-        listed once, where the file first names them, as `guide` if either naming was the
-        divemaster — the more specific of two roles — and the repeat is reported.
+        Child elements, which is what Subsurface writes, divemaster first, and `<diveguide>`
+        beside `<divemaster>` where a file carries the spelling Subsurface's parser also
+        accepts. The buddy field is a list on Subsurface's own terms — split on commas, each
+        name trimmed — and every name is a `buddy`; the divemaster is one name, and a `guide`.
+        The buddies come first whatever order the file writes the two in, and a divemaster
+        also named among them is that one reference made the `guide`, the more specific of
+        two roles; a name the buddy field repeats is one reference too, and the repeat is
+        reported.
         """
         people: list[dict[str, Any]] = []
         held: dict[str, dict[str, Any]] = {}
         repeated: dict[str, str] = {}
-        for field in element:
-            tag = local_name(field)
-            if tag == "buddy":
-                names, role = (text(field) or "").split(","), "buddy"
-            elif tag in ("divemaster", "diveguide"):
-                names, role = [text(field) or ""], "guide"
-            else:
+        named = [
+            (name.strip(), "buddy")
+            for field in children(element, "buddy")
+            for name in (text(field) or "").split(",")
+        ] + [
+            (text(field) or "", "guide")
+            for field in element
+            if local_name(field) in ("divemaster", "diveguide")
+        ]
+        for name, role in named:
+            uuid = self.person(name, where) if name else None
+            if uuid is None:
                 continue
-            for raw in names:
-                name = raw.strip()
-                uuid = self.person(name, where) if name else None
-                if uuid is None:
-                    continue
-                if uuid not in held:
-                    held[uuid] = {"person_uuid": uuid, "role": role}
-                    people.append(held[uuid])
-                    continue
+            if uuid not in held:
+                held[uuid] = {"person_uuid": uuid, "role": role}
+                people.append(held[uuid])
+            elif role == "guide":
+                held[uuid]["role"] = "guide"
+            else:
                 repeated[uuid] = name
-                if role == "guide":
-                    held[uuid]["role"] = "guide"
-        for uuid, name in repeated.items():
+        for name in repeated.values():
             self.note(
                 where,
-                f"the dive names {name!r} more than once, and a person is listed on a dive once; one reference is "
-                f"kept, as {held[uuid]['role']}",
+                f"the dive's buddies name {name!r} more than once, and a person is listed on a dive once; the "
+                "repeat is dropped",
                 "dropped",
             )
         return people

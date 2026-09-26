@@ -381,17 +381,31 @@ def test_the_divemaster_is_one_name_and_a_guide(tag: str) -> None:
     assert named(document) == [("Moh, the Elder", "guide")]
 
 
-def test_a_divemaster_among_the_buddies_is_one_reference_and_a_guide() -> None:
-    """The more specific of two roles wins, where the file first names the person, and the
-    buddy it was also named as is reported."""
-    document, report = people_of("<divemaster>Bo</divemaster><buddy>Ann Lee, bo</buddy>")
-    assert named(document) == [("Bo", "guide"), ("Ann Lee", "buddy")]
-    assert len(document["people"]) == 2
-    assert ("dive/0", "the dive names 'bo' more than once, and a person is listed on a dive once; one reference "
-            "is kept, as guide") in report
+def test_the_buddies_come_before_the_divemaster_whatever_order_the_file_writes() -> None:
+    """Subsurface writes `<divemaster>` first; a dive's `people` is its buddy field, then its guide,
+    and the file's people are met in that order too."""
+    document, _ = people_of("<divemaster>Moh</divemaster><buddy>Ann Lee, Bo</buddy>")
+    assert named(document) == [("Ann Lee", "buddy"), ("Bo", "buddy"), ("Moh", "guide")]
+    assert [person["name"] for person in document["people"]] == ["Ann Lee", "Bo", "Moh"]
 
-    document, _ = people_of("<buddy>Ann Lee, Bo</buddy><divemaster>BO</divemaster>")
+
+def test_a_divemaster_among_the_buddies_is_that_reference_made_the_guide() -> None:
+    """One reference, at the buddy's place, as the more specific of two roles — and not a loss
+    the report has to name."""
+    document, report = people_of("<divemaster>BO</divemaster><buddy>Ann Lee, Bo</buddy>")
     assert named(document) == [("Ann Lee", "buddy"), ("Bo", "guide")]
+    assert len(document["people"]) == 2
+    assert not [message for _, message in report if "more than once" in message]
+
+
+def test_a_name_the_buddy_field_repeats_is_one_reference_and_the_repeat_is_reported() -> None:
+    document, report = people_of("<buddy>Ann Lee, ann lee </buddy>")
+    assert named(document) == [("Ann Lee", "buddy")]
+    assert (
+        "dive/0",
+        "the dive's buddies name 'ann lee' more than once, and a person is listed on a dive once; the repeat is "
+        "dropped",
+    ) in report
 
 
 def test_a_single_word_is_a_name() -> None:

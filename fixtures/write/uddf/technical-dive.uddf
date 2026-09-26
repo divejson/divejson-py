@@ -3,7 +3,7 @@
   <generator>
     <name>divejson convert</name>
     <type>converter</type>
-    <version>0.13.0</version>
+    <version>0.14.0</version>
     <datetime>2026-08-28T12:00:00Z</datetime>
   </generator>
   <diver>
@@ -41,6 +41,40 @@
         </insurance>
       </diveinsurances>
     </owner>
+    <buddy id="person-0198a6f0-1111-70a0-8000-0000000000a0">
+      <personal>
+        <firstname>J.</firstname>
+        <lastname>Harbord</lastname>
+      </personal>
+      <contact>
+        <phone>+64 27 555 0142</phone>
+        <email>jo@deepsouth.example</email>
+      </contact>
+      <notes>
+        <para>Taught the trimix course and signs the society's cards.</para>
+      </notes>
+    </buddy>
+    <buddy id="person-0198a6f0-1111-70a1-8000-0000000000a1">
+      <personal>
+        <firstname>Ana</firstname>
+        <lastname>Ruiz</lastname>
+      </personal>
+    </buddy>
+    <buddy id="person-0198a6f0-1111-70a2-8000-0000000000a2">
+      <personal>
+        <firstname>Wiremu</firstname>
+        <lastname />
+      </personal>
+      <notes>
+        <para>Came for the fiord and stayed on the boat.</para>
+      </notes>
+    </buddy>
+    <buddy id="person-0198a6f0-1111-70a3-8000-0000000000a3">
+      <personal>
+        <firstname>T.</firstname>
+        <lastname>Mahuta</lastname>
+      </personal>
+    </buddy>
   </diver>
   <divesite>
     <divebase id="contact-0198a6f0-1111-7095-8000-000000000095">
@@ -152,6 +186,8 @@
           <link ref="site-0198a6f0-1111-7040-8000-000000000040" />
           <link ref="site-0198a6f0-1111-7041-8000-000000000041" />
           <link ref="contact-0198a6f0-1111-7095-8000-000000000095" />
+          <link ref="person-0198a6f0-1111-70a0-8000-0000000000a0" />
+          <link ref="person-0198a6f0-1111-70a1-8000-0000000000a1" />
           <divenumber>412</divenumber>
           <internaldivenumber>87</internaldivenumber>
           <datetime>2026-07-03T09:14:00+12:45</datetime>
@@ -332,6 +368,7 @@
       <dive id="dive-0198a6f0-1111-7011-8000-000000000011">
         <informationbeforedive>
           <link ref="site-0198a6f0-1111-7040-8000-000000000040" />
+          <link ref="person-0198a6f0-1111-70a1-8000-0000000000a1" />
           <datetime>2026-07-04T10:02:00</datetime>
         </informationbeforedive>
         <tankdata>
@@ -349,6 +386,7 @@
       <dive id="dive-0198a6f0-1111-7012-8000-000000000012">
         <informationbeforedive>
           <link ref="site-0198a6f0-1111-7040-8000-000000000040" />
+          <link ref="person-0198a6f0-1111-70a1-8000-0000000000a1" />
           <datetime>2026-07-05</datetime>
         </informationbeforedive>
         <informationafterdive>

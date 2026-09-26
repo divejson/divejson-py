@@ -66,6 +66,16 @@
       "species_uuids": [
         "0198a6f0-1111-7060-8000-000000000060"
       ],
+      "people": [
+        {
+          "person_uuid": "0198a6f0-1111-70a0-8000-0000000000a0",
+          "role": "instructor"
+        },
+        {
+          "person_uuid": "0198a6f0-1111-70a1-8000-0000000000a1",
+          "role": "student"
+        }
+      ],
       "cylinders": [
         {
           "volume": 12.0,
@@ -465,6 +475,12 @@
       "species_uuids": [
         "0198a6f0-1111-7061-8000-000000000061"
       ],
+      "people": [
+        {
+          "person_uuid": "0198a6f0-1111-70a1-8000-0000000000a1",
+          "role": "buddy"
+        }
+      ],
       "cylinders": [
         {
           "oxygen": 32.0
@@ -479,6 +495,11 @@
       "max_depth": 21.5,
       "site_uuids": [
         "0198a6f0-1111-7040-8000-000000000040"
+      ],
+      "people": [
+        {
+          "person_uuid": "0198a6f0-1111-70a1-8000-0000000000a1"
+        }
       ],
       "recordings": [
         {
@@ -532,6 +553,16 @@
           "ends_on": "2026-07-09"
         }
       ],
+      "people": [
+        {
+          "person_uuid": "0198a6f0-1111-70a1-8000-0000000000a1",
+          "role": "buddy"
+        },
+        {
+          "person_uuid": "0198a6f0-1111-70a2-8000-0000000000a2",
+          "role": "companion"
+        }
+      ],
       "notes": "",
       "created_at": "2026-06-01T08:00:00+12:00"
     }
@@ -545,8 +576,17 @@
       "status": "completed",
       "starts_on": "2026-06-30",
       "ends_on": "2026-07-05",
-      "instructor_name": "J. Harbord",
       "contact_uuid": "0198a6f0-1111-7095-8000-000000000095",
+      "people": [
+        {
+          "person_uuid": "0198a6f0-1111-70a0-8000-0000000000a0",
+          "role": "instructor"
+        },
+        {
+          "person_uuid": "0198a6f0-1111-70a1-8000-0000000000a1",
+          "role": "student"
+        }
+      ],
       "notes": "Four training dives; the wall dive was the final assessment.",
       "created_at": "2026-06-01T09:00:00+12:00"
     },
@@ -563,7 +603,12 @@
       "status": "completed",
       "starts_on": "2026-08-14",
       "ends_on": "2026-08-16",
-      "instructor_name": "T. Mahuta",
+      "people": [
+        {
+          "person_uuid": "0198a6f0-1111-70a3-8000-0000000000a3",
+          "role": "instructor"
+        }
+      ],
       "notes": "Taught privately over two weekends; no agency issued it."
     }
   ],
@@ -686,7 +731,7 @@
       "name": "Normoxic Trimix Diver",
       "number": "NZT-2044",
       "certified_on": "2025-03-14",
-      "instructor_name": "J. Harbord",
+      "instructor_uuid": "0198a6f0-1111-70a0-8000-0000000000a0",
       "contact_uuid": "0198a6f0-1111-7095-8000-000000000095",
       "course_uuid": "0198a6f0-1111-7090-8000-000000000090",
       "notes": "",
@@ -740,6 +785,34 @@
           "rating": 4
         }
       }
+    }
+  ],
+  "people": [
+    {
+      "uuid": "0198a6f0-1111-70a0-8000-0000000000a0",
+      "name": "J. Harbord",
+      "email": "jo@deepsouth.example",
+      "phone": "+64 27 555 0142",
+      "notes": "Taught the trimix course and signs the society's cards.",
+      "created_at": "2026-06-01T09:05:00+12:00",
+      "extensions": {
+        "com.example.divekit": {
+          "account_uuid": "0198a6f0-2222-7000-8000-000000000001"
+        }
+      }
+    },
+    {
+      "uuid": "0198a6f0-1111-70a1-8000-0000000000a1",
+      "name": "Ana Ruiz"
+    },
+    {
+      "uuid": "0198a6f0-1111-70a2-8000-0000000000a2",
+      "name": "Wiremu",
+      "notes": "Came for the fiord and stayed on the boat."
+    },
+    {
+      "uuid": "0198a6f0-1111-70a3-8000-0000000000a3",
+      "name": "T. Mahuta"
     }
   ],
   "extensions": {

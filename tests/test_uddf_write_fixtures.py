@@ -145,6 +145,16 @@ LOST: dict[str, frozenset[str]] = {
             "contacts/0/roles",
             "contacts/0/created_at",
             "contacts/0/extensions",
+            # An `instructor` and a `student` have no spelling on a dive and come back as
+            # buddies, and the third dive's role-less reference gains `buddy` (`RETURNED`). A
+            # trip's people have no slot; the courses' go with the courses, and J. Harbord's
+            # `created_at` and producer extension with nothing, as the contact's do.
+            "dives/0/people/0/role",
+            "dives/0/people/1/role",
+            "dives/2/people/0/role",
+            "trips/0/people",
+            "people/0/created_at",
+            "people/0/extensions",
         }
     ),
     "contacts": frozenset(
@@ -167,15 +177,39 @@ LOST: dict[str, frozenset[str]] = {
             "contacts/4",
         }
     ),
+    "people": frozenset(
+        {
+            "courses",
+            "certifications",
+            "dives/2/course_uuid",
+            "trips/0/people",
+            "people/0/created_at",
+            "people/0/extensions",
+            # Written with two spaces between the names, which `<firstname>` and `<lastname>`
+            # give back as one.
+            "people/2/name",
+            # The role-less reference that comes back a `buddy` (`RETURNED`); a `student`, an
+            # `instructor` and a `companion`, which UDDF has no spelling for on a dive; and a
+            # `guide` on the dive whose contact is a shop and on the one with no contact, with
+            # no `<divebase>` to hold a `<guide>`. Each of the last five comes back a buddy.
+            "dives/0/people/2/role",
+            "dives/1/people/0/role",
+            "dives/2/people/0/role",
+            "dives/2/people/1/role",
+            "dives/3/people/0/role",
+            "dives/3/people/1/role",
+        }
+    ),
 }
 
-# The one documented exception to the self round trip (`docs/uddf-writing.md`), and the one
-# place a written file returns **more** than it was written from: a device that folded into
-# no gear item — or into one its dive does not link — takes a `<divecomputer
-# id="device-<n>">` of its own, and that element reads back as a gear item the input never
-# had, with a link from the dive that used it. `technical-dive`'s gear list holds no
-# computer at all, so it is that half of the fold; `opendiving`'s dive lists its computer
+# The places a written file returns **more** than it was written from (`docs/uddf-writing.md`).
+# A device that folded into no gear item — or into one its dive does not link — takes a
+# `<divecomputer id="device-<n>">` of its own, and that element reads back as a gear item the
+# input never had, with a link from the dive that used it. `technical-dive`'s gear list holds
+# no computer at all, so it is that half of the fold; `opendiving`'s dive lists its computer
 # and carries the same serial on both records, so the fold fires and it is the other half.
+# And a person reference with no role goes out as the plain link a reader takes as a buddy,
+# so it comes back with the role `buddy` it never had.
 #
 # Exempt from the report check below and from nothing else. The report is what says a value
 # was **lost**, and nothing was: a writer reporting a gain would be describing a document it
@@ -183,8 +217,9 @@ LOST: dict[str, frozenset[str]] = {
 RETURNED: dict[str, frozenset[str]] = {
     "opendiving": frozenset(),
     "owner-profile-only": frozenset(),
-    "technical-dive": frozenset({"gear", "dives/0/gear_uuids"}),
+    "technical-dive": frozenset({"gear", "dives/0/gear_uuids", "dives/2/people/0/role"}),
     "contacts": frozenset(),
+    "people": frozenset({"dives/0/people/2/role"}),
 }
 
 
