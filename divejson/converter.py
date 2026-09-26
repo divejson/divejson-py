@@ -110,6 +110,8 @@ __all__ = [
     "capped",
     "contact_members",
     "contact_roles",
+    "person_members",
+    "person_roles",
     "channel_floor",
     "deco_model",
     "decimal_of",
@@ -898,6 +900,26 @@ def contact_members() -> tuple[str, ...]:
     is written, as a recording is.
     """
     return tuple(load_schema()["$defs"]["contact"]["properties"])
+
+
+# -- people ---------------------------------------------------------------------------
+
+
+@cache
+def person_roles() -> tuple[str, ...]:
+    """The role vocabulary a Person Reference takes, in the order its section lists it.
+
+    OPTIONAL and growing in minor versions (§7), so a reader meeting a value outside it
+    treats `role` as absent and keeps the reference (§5.6).
+    """
+    return tuple(load_schema()["$defs"]["person_reference"]["properties"]["role"]["enum"])
+
+
+@cache
+def person_members() -> tuple[str, ...]:
+    """A Person's members in the section's own order, off the schema, for the reason
+    `contact_members` gives."""
+    return tuple(load_schema()["$defs"]["person"]["properties"])
 
 
 # -- identity ------------------------------------------------------------------------

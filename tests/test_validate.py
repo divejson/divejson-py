@@ -12,9 +12,10 @@ So these, and deliberately nothing else: the channels §6.4 added, the gradient-
 ordering §3 rule 6 states, what §3 rule 4 accepts as a recording's content, the one member
 that may hold a date as well as a date-time, the member order the validator does not
 check — no `invalid/` document can pin an absence of a rule — the one uuid claim whose
-fixture is refused for another reason by any validator that does not know its member, and
-the hosts a contact reference sits on, the corpus holding a dangling one on a trip part
-alone.
+fixture is refused for another reason by any validator that does not know its member, the
+hosts a contact reference sits on, the corpus holding a dangling one on a trip part alone,
+and the hosts a person reference sits on, the corpus holding its defects on a dive and a
+certification alone.
 Everything already covered by a pair stays covered by the pair.
 """
 
@@ -230,4 +231,56 @@ def test_a_parts_accommodation_resolves_in_contacts_though_it_is_not_named_after
     trip["parts"].append({"accommodation_uuid": NOWHERE})
     assert [str(issue) for issue in validate_document(_referencing("trips", trip))] == [
         f"trips/0/parts/1/accommodation_uuid: references {NOWHERE}, not present in contacts"
+    ]
+
+
+# -- §3 rule 1 reaches every person reference, and a person is on a host once -------------------
+
+PERSON = "0198a6f0-9999-7030-8000-000000000030"
+PEOPLE_HOSTS = {host: REFERENCING[host] for host in ("dives", "courses")} | {
+    "trips": {"uuid": "0198a6f0-9999-7003-8000-000000000003", "name": "Spring"},
+}
+
+
+def _with_people(host: str, references: list[dict]) -> dict:
+    document = _referencing(host, {**PEOPLE_HOSTS[host], "people": references})
+    document["people"] = [{"uuid": PERSON, "name": "Ada Lovelace"}]
+    return document
+
+
+@pytest.mark.parametrize("host", PEOPLE_HOSTS)
+def test_a_person_reference_resolves_in_people_on_every_host(host: str) -> None:
+    assert validate_document(_with_people(host, [{"person_uuid": PERSON, "role": "buddy"}])) == []
+    dangling = _with_people(host, [{"person_uuid": PERSON}, {"person_uuid": NOWHERE, "role": "guide"}])
+    assert [str(issue) for issue in validate_document(dangling)] == [
+        f"{host}/0/people/1/person_uuid: references {NOWHERE}, not present in people"
+    ]
+
+
+@pytest.mark.parametrize("host", PEOPLE_HOSTS)
+def test_a_person_is_listed_on_a_host_once_whatever_the_roles_say(host: str) -> None:
+    """Two references differing in their role are two objects to `uniqueItems`, so the schema
+    passes them and only this rule refuses them."""
+    twice = _with_people(host, [{"person_uuid": PERSON, "role": "buddy"}, {"person_uuid": PERSON, "role": "guide"}])
+    assert [str(issue) for issue in validate_document(twice)] == [
+        f"{host}/0/people/1: person {PERSON} is already listed at {host}/0/people/0"
+    ]
+
+
+def test_a_certifications_instructor_resolves_in_people_though_it_is_not_named_after_them() -> None:
+    card = {**REFERENCING["certifications"], "instructor_uuid": PERSON}
+    document = _referencing("certifications", card)
+    document["people"] = [{"uuid": PERSON, "name": "J. Harbord"}]
+    assert validate_document(document) == []
+    card["instructor_uuid"] = NOWHERE
+    assert [str(issue) for issue in validate_document(document)] == [
+        f"certifications/0/instructor_uuid: references {NOWHERE}, not present in people"
+    ]
+
+
+def test_a_person_shares_the_documents_one_identifier_space() -> None:
+    document = _with_people("dives", [])
+    document["people"][0]["uuid"] = CONTACT
+    assert [str(issue) for issue in validate_document(document)] == [
+        f"people/0: uuid {CONTACT} already used at contacts/0"
     ]
