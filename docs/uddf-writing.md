@@ -624,7 +624,7 @@ been checked.
 recording under *What is never written*.
 
 Members with no UDDF slot anywhere: `water_type`, `entry_position`, `exit_position`,
-`course_uuid`, `species_uuids`, `created_at`, and — on the recording rather than the dive —
+`course_uuid`, `created_at`, and — on the recording rather than the dive —
 `recordings[].salinity`, `recordings[].cns_start`, `cns_end`, `otu_start` and `otu_end`,
 `recordings[].source_files`, `recordings[].started_at` and
 **`recordings[].device.firmware`**, `equipmentPieceType` carrying no firmware element, so a
@@ -632,6 +632,9 @@ Members with no UDDF slot anywhere: `water_type`, `entry_position`, `exit_positi
 reasoning for the last three. UDDF's per-waypoint `<cns>` is a channel and not the clock's
 two ends, and its one density element sits on a recalculated profile rather than on the dive
 (`uddf-mapping.md`, *Deliberately not mapped*), so neither is a home for these.
+
+A dive's `sightings` are not on that list: `<informationafterdive><observations>` is their
+slot. They are not written even so, and *What is never written* says why.
 
 ### Cylinders and gases
 
@@ -795,8 +798,9 @@ read back, where the join returns as a single event whose label is two labels.
 
 ## What is never written
 
-The members `uddf-mapping.md` lists as slotless, from the writing side. Each is reported
-once per record that carries it, and none of them has anywhere in UDDF to go:
+The members this writer never writes. Each is reported once per record that carries it,
+and most have nowhere in UDDF to go; the three rows that say *not written* have a slot this
+writer leaves empty:
 
 | DiveJSON | why not |
 | --- | --- |
@@ -804,7 +808,7 @@ once per record that carries it, and none of them has anywhere in UDDF to go:
 | `certifications` | not written — see the note below |
 | `gear_sets` | `<equipmentconfiguration>` describes how pieces are rigged together, which is not a named set of them |
 | `gear_service_schedules`, `gear_service_records` | not written — see the note below |
-| `species` | `<site><ecology>` is site-level flora and fauna where §6.11's species are per-dive sightings |
+| `species`, and every dive's `sightings` | not written. The slot is `<informationafterdive><observations>`, whose `<species>` would carry a sighting's count as `<abundance>` and its note as `<notes>` — but a `<species>` sits under a class inside `<vertebrata>`, `<invertebrata>` or `<flora>`, and even the catch-all each group ends in, `<vertebratavarious>`, `<invertebratavarious>` or `<floravarious>`, is a choice among the three. §6.11 carries no classification, so a writer choosing one invents it (§5.4). The spelling UDDF gives for animals whose class is not known, their names in a `<fauna><notes>` paragraph, carries no count and no note and reads back as a remark, the reason an insurance's `number` is not written to `<notes>` either. `<site><ecology>` is no home for them: it is what a site is known for, where a sighting is what one dive saw |
 | a record's `created_at` | no slot on any of them |
 | `gear` `rented`, `archived`, `archived_at`, `dive_count` | no slot |
 | `diver.username` | `<owner id>` is an XML id and not a handle |
@@ -825,8 +829,9 @@ all are the same file to every reader, every XML reader here taking an empty ele
 absent. It is a value UDDF has no spelling for rather than one a writer chose to drop, and
 it is reported.
 
-**Two of those rows are "not written" rather than "no slot", and it is worth being exact
-about which.** `uddf-mapping.md`'s *Deliberately not mapped* table groups `courses`,
+**Three of those rows are "not written" rather than "no slot", and it is worth being exact
+about which.** The species row carries its own reason. For the other two,
+`uddf-mapping.md`'s *Deliberately not mapped* table groups `courses`,
 `certifications`, `gear_sets` and gear service under one reason, which is the right summary
 for a **reader**: nothing in the corpus emits any of them, so there is nothing to read.
 Going out, the schema does carry `<owner><education><certification>` and a pair of

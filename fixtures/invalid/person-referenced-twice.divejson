@@ -63,8 +63,12 @@
         "0198a6f0-1111-7050-8000-000000000050",
         "0198a6f0-1111-7051-8000-000000000051"
       ],
-      "species_uuids": [
-        "0198a6f0-1111-7060-8000-000000000060"
+      "sightings": [
+        {
+          "species_uuid": "0198a6f0-1111-7060-8000-000000000060",
+          "count": 3,
+          "notes": "Under the overhang below the chimney, polyps white in the torchlight."
+        }
       ],
       "people": [
         {
@@ -476,8 +480,10 @@
       "site_uuids": [
         "0198a6f0-1111-7040-8000-000000000040"
       ],
-      "species_uuids": [
-        "0198a6f0-1111-7061-8000-000000000061"
+      "sightings": [
+        {
+          "species_uuid": "0198a6f0-1111-7061-8000-000000000061"
+        }
       ],
       "people": [
         {
