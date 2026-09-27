@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.15.0
+
 - **Breaking: people are records.** §6.20 of
   [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) adds a
   top-level `people` collection — a name, and optionally an email, a phone and notes —
