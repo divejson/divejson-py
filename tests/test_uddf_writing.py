@@ -1287,6 +1287,28 @@ def test_a_trips_and_a_courses_people_have_no_slot_and_go_with_them(schema) -> N
     assert "people" not in back["trips"][0] and back["people"] == source["people"]
 
 
+# -- sightings ------------------------------------------------------------------------------
+
+SPECIES_UUID = "0198a6f0-9999-7040-8000-000000000040"
+
+
+def test_sightings_have_a_slot_and_are_not_written_into_it(schema) -> None:
+    """`<observations>` is where a dive's sightings would go, so the report cannot say there
+    is no slot, as it says of every member it has nowhere to put. What stops the writer is the
+    class a `<species>` sits under, which §6.11 does not carry, and the class-free spelling,
+    which keeps neither the count nor the note."""
+    source = one_dive(sightings=[{"species_uuid": SPECIES_UUID, "count": 3, "notes": "Under the wreck"}])
+    source["species"] = [{"uuid": SPECIES_UUID, "scientific_name": "Pterois volitans"}]
+    text = written(source, schema)
+    assert "<observations" not in text and "Pterois" not in text
+    for where, member in (("dives/0/sightings", "sightings"), ("$", "species")):
+        (message,) = [message for message in messages(source, where) if "species" in message]
+        assert "under a class" in message and message.endswith(f"the {member} are not written")
+        assert "no slot" not in message
+    back = read_back(source)
+    assert "sightings" not in back["dives"][0] and "species" not in back
+
+
 # -- the file itself -------------------------------------------------------------------
 
 

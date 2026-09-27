@@ -46,7 +46,7 @@
       "bottom_temperature": 22.35,
       "visibility": 20,
       "weight": 6.0,
-      "species_uuids": [],
+      "sightings": [],
       "recordings": [
         {
           "device": {
@@ -3787,7 +3787,7 @@
       "visibility": 25,
       "weight": 6.0,
       "trip_uuid": "019fec36-b882-7e23-97fa-9e297e8c9701",
-      "species_uuids": [],
+      "sightings": [],
       "created_at": "2026-08-10T15:07:17.168304Z",
       "started_at": "2026-04-19T08:12:00+02:00",
       "site_uuids": [
@@ -3819,7 +3819,7 @@
       "visibility": 20,
       "weight": 6.0,
       "trip_uuid": "019fec36-b882-7e23-97fa-9e297e8c9701",
-      "species_uuids": [],
+      "sightings": [],
       "created_at": "2026-08-10T15:07:17.206204Z",
       "started_at": "2026-04-19T13:40:00+02:00",
       "site_uuids": [
@@ -3851,7 +3851,7 @@
       "visibility": 30,
       "weight": 6.0,
       "trip_uuid": "019fec36-b882-7e23-97fa-9e297e8c9701",
-      "species_uuids": [],
+      "sightings": [],
       "created_at": "2026-08-10T15:07:17.231446Z",
       "started_at": "2026-04-21T07:55:00+02:00",
       "site_uuids": [
@@ -3883,7 +3883,7 @@
       "visibility": 35,
       "weight": 6.0,
       "trip_uuid": "019fec36-b882-7e23-97fa-9e297e8c9701",
-      "species_uuids": [],
+      "sightings": [],
       "created_at": "2026-08-10T15:07:17.254602Z",
       "started_at": "2026-04-23T09:30:00+02:00",
       "site_uuids": [
@@ -3916,7 +3916,7 @@
       "weight": 8.0,
       "trip_uuid": "019fec36-b88f-714d-a52f-2360218753b8",
       "contact_uuid": "019fec36-b8a4-7c51-9e0b-5d3f2a7c4e18",
-      "species_uuids": [],
+      "sightings": [],
       "people": [
         {
           "person_uuid": "019fec36-b8c1-7d4e-8a2b-3f5e6c7d8e91",
@@ -3955,7 +3955,7 @@
       "weight": 8.0,
       "trip_uuid": "019fec36-b88f-714d-a52f-2360218753b8",
       "contact_uuid": "019fec36-b8a4-7c51-9e0b-5d3f2a7c4e18",
-      "species_uuids": [],
+      "sightings": [],
       "created_at": "2026-08-10T15:07:17.304509Z",
       "started_at": "2026-07-09T11:20:00+01:00",
       "site_uuids": [
@@ -3988,7 +3988,7 @@
       "weight": 8.0,
       "trip_uuid": "019fec36-b88f-714d-a52f-2360218753b8",
       "contact_uuid": "019fec36-b8a4-7c51-9e0b-5d3f2a7c4e18",
-      "species_uuids": [],
+      "sightings": [],
       "created_at": "2026-08-10T15:07:17.326317Z",
       "started_at": "2026-07-11T09:45:00+01:00",
       "site_uuids": [

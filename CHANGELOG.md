@@ -7,6 +7,22 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Breaking: a dive's sightings carry a count and a note.** §6.3a of
+  [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md)
+  replaces a dive's `species_uuids` with `sightings`, a list of `{ species_uuid, count, notes }`
+  in the diver's own order, whose optional `count` is a positive integer and absent when the
+  diver did not count. `divejson validate` refuses `species_uuids` as an undefined member,
+  resolves each sighting's `species_uuid` in `species`, and refuses a species named in two
+  sightings of one dive: §3's rule 7 now holds every list of embedded references to what it
+  held a `people` list to, two sightings with different counts being two different objects
+  to the schema's `uniqueItems`.
+
+- **The UDDF writer says why it writes no sightings.** A dive's sightings and the `species`
+  collection are reported with the reason they stay out of `<observations>`, the slot UDDF
+  has for them: a `<species>` sits under a class inside `<vertebrata>`, `<invertebrata>` or
+  `<flora>`, which the format does not record, and UDDF's spelling for animals of no known
+  class, their names in a `<fauna><notes>` paragraph, carries no count and no note.
+
 ## 0.15.0
 
 - **Breaking: people are records.** §6.20 of

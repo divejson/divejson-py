@@ -464,6 +464,16 @@ _ADDRESS_CARRIED = frozenset({"street", "city", "postcode", "region", "country"}
 # What a person goes out with as a `<buddy>`.
 _PERSON_CARRIED = frozenset({"uuid", "name", "email", "phone", "notes"})
 
+# Why neither a dive's sightings nor the species they reference are written, though the slot
+# exists — `docs/uddf-writing.md`'s *What is never written* has the reason in full. Not
+# `unmapped`'s line, which would say there is no slot.
+_NO_SPECIES = (
+    "UDDF's <observations> holds a <species> only under a class inside <vertebrata>, <invertebrata> or "
+    "<flora>, which this format does not record and a writer would have to invent, and its spelling for "
+    "animals of no known class, names in a <fauna><notes> paragraph, carries no count and no note and "
+    "reads back as a remark"
+)
+
 
 def _is_shop(contact: dict[str, Any]) -> bool:
     """Whether a contact goes out as a `<shop>`: its roles exactly `["shop"]`, and nothing else."""
@@ -590,9 +600,12 @@ class _Writer:
                     "gear",
                     "contacts",
                     "people",
+                    "species",
                 }
             ),
         )
+        if self.document.get("species"):
+            self.note("$", f"{_NO_SPECIES}; the species are not written", "dropped")
         if self.document.get("extensions"):
             # Named on its own rather than through `unmapped`, because "no slot" is not
             # quite what happens to it. A converted document keeps the *source* file's
@@ -1565,11 +1578,14 @@ class _Writer:
                     "site_uuids",
                     "gear_uuids",
                     "people",
+                    "sightings",
                     "cylinders",
                     "recordings",
                 }
             ),
         )
+        if dive.get("sightings"):
+            self.note(f"{where}/sightings", f"{_NO_SPECIES}; the sightings are not written", "dropped")
         recordings = dive.get("recordings") or []
         element = ET.Element("dive", {"id": _uddf_id("dive", dive["uuid"])})
 

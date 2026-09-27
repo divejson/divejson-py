@@ -153,7 +153,7 @@
         "contact_uuid": { "$ref": "#/$defs/uuid" },
         "site_uuids": { "$ref": "#/$defs/uuid_list" },
         "gear_uuids": { "$ref": "#/$defs/uuid_list" },
-        "species_uuids": { "$ref": "#/$defs/uuid_list" },
+        "sightings": { "type": "array", "items": { "$ref": "#/$defs/sighting" } },
         "people": { "$ref": "#/$defs/people" },
         "cylinders": { "type": "array", "items": { "$ref": "#/$defs/cylinder" } },
         "recordings": { "type": "array", "items": { "$ref": "#/$defs/recording" } },
@@ -161,6 +161,18 @@
         "extensions": { "$ref": "#/$defs/extensions" }
       },
       "required": ["uuid", "started_at"],
+      "additionalProperties": false
+    },
+    "sighting": {
+      "description": "One species seen on one dive. That a dive's sightings name a species at most once is a rule the validator checks: uniqueItems compares whole sightings, and two sightings of one species with different counts are two different objects to it.",
+      "type": "object",
+      "properties": {
+        "species_uuid": { "$ref": "#/$defs/uuid" },
+        "count": { "type": "integer", "exclusiveMinimum": 0 },
+        "notes": { "$ref": "#/$defs/notes" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["species_uuid"],
       "additionalProperties": false
     },
     "cylinder": {

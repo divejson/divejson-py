@@ -3,9 +3,9 @@
 Two passes, mirroring §3 of the specification: the JSON Schema (types, required members,
 enums, ranges, lengths, and the structural rules like Position objects), then the
 semantic requirements the schema cannot express — identifier uniqueness, referential
-closure, a person listed once per host, cross-member arithmetic, profile-series integrity
-and span, what a recording carries, the offset requirement on ``exported_at``, and the
-gradient-factor order.
+closure, a record listed once in a list of references, cross-member arithmetic,
+profile-series integrity and span, what a recording carries, the offset requirement on
+``exported_at``, and the gradient-factor order.
 
 §4's member order is a SHOULD, not a requirement on the document: a generic
 re-serialisation commonly sorts an object's members, and a document it produced is as
@@ -23,7 +23,7 @@ import re
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from jsonschema import Draft202012Validator, FormatChecker
 from jsonschema.exceptions import best_match
@@ -166,6 +166,25 @@ READOUTS = ("surface_pressure", "cns_start", "cns_end", "otu_start", "otu_end")
 # describes no record of one.
 RECORDING_CONTENT = ("device", "profile", "source_files", *READOUTS)
 
+# Every top-level collection §4 defines, in its own order: the records whose uuids share one
+# identifier space (§5.3) and that references resolve in. A collection missing from this
+# tuple is one whose duplicate uuids nothing sees and whose `created_at` nothing checks.
+# Wider than `registry.COLLECTIONS`, which is what a converted document can carry.
+COLLECTIONS = (
+    "dives",
+    "trips",
+    "courses",
+    "sites",
+    "species",
+    "gear",
+    "gear_sets",
+    "gear_service_schedules",
+    "gear_service_records",
+    "certifications",
+    "contacts",
+    "people",
+)
+
 
 def _present(obj: dict[str, Any], member: str) -> bool:
     return obj.get(member) is not None
@@ -207,21 +226,7 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
         _check_datetime(diver, "created_at", "diver", issues)
 
     collections = {
-        name: [row for row in doc.get(name) or [] if isinstance(row, dict)]
-        for name in (
-            "dives",
-            "trips",
-            "courses",
-            "sites",
-            "species",
-            "gear",
-            "gear_sets",
-            "gear_service_schedules",
-            "gear_service_records",
-            "certifications",
-            "contacts",
-            "people",
-        )
+        name: [row for row in doc.get(name) or [] if isinstance(row, dict)] for name in COLLECTIONS
     }
 
     for name, rows in collections.items():
@@ -251,8 +256,8 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
         _check_reference(dive, "contact_uuid", known["contacts"], "contacts", here, issues)
         _check_reference_list(dive, "site_uuids", known["sites"], "sites", here, issues)
         _check_reference_list(dive, "gear_uuids", known["gear"], "gear", here, issues)
-        _check_reference_list(dive, "species_uuids", known["species"], "species", here, issues)
-        _check_people(dive, known["people"], here, issues)
+        _check_embedded_references(dive, "people", known, here, issues)
+        _check_embedded_references(dive, "sightings", known, here, issues)
 
         for cyl_index, cylinder in enumerate(dive.get("cylinders") or []):
             if not isinstance(cylinder, dict):
@@ -309,7 +314,7 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
 
     for index, trip in enumerate(collections["trips"]):
         here = f"trips/{index}"
-        _check_people(trip, known["people"], here, issues)
+        _check_embedded_references(trip, "people", known, here, issues)
         for part_index, part in enumerate(trip.get("parts") or []):
             if not isinstance(part, dict):
                 continue
@@ -355,7 +360,7 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
             except TypeError:
                 pass
         _check_reference(course, "contact_uuid", known["contacts"], "contacts", f"courses/{index}", issues)
-        _check_people(course, known["people"], f"courses/{index}", issues)
+        _check_embedded_references(course, "people", known, f"courses/{index}", issues)
 
     for index, certification in enumerate(collections["certifications"]):
         here = f"certifications/{index}"
@@ -417,27 +422,46 @@ def _check_reference_list(
             )
 
 
-def _check_people(host: dict[str, Any], targets: set[str], path: str, issues: list[Issue]) -> None:
-    """A host's `people`: each reference resolves in `people`, and no person is listed twice.
+class _EmbeddedReference(NamedTuple):
+    member: str  # the embedded object's own member that references a record
+    collection: str  # where that record resolves
+    noun: str  # what the record is, singular, as an issue names it
 
-    The schema cannot say the second. Two references to one person differing in their `role`
-    are two distinct objects to `uniqueItems`, and a person is on one occasion in one
-    capacity — the reason the role is a single value rather than a set.
+
+# Each list of embedded objects that reference a record (§5.3), by the list's member name.
+_EMBEDDED_REFERENCES = {
+    "people": _EmbeddedReference("person_uuid", "people", "person"),
+    "sightings": _EmbeddedReference("species_uuid", "species", "species"),
+}
+
+
+def _check_embedded_references(
+    host: dict[str, Any], member: str, known: dict[str, set[str]], path: str, issues: list[Issue]
+) -> None:
+    """A host's list of embedded references: each resolves, and no record is listed twice.
+
+    The schema cannot say the second. Two items referencing one record are two distinct
+    objects to `uniqueItems` once anything else in them differs — a person's `role`, a
+    sighting's `count`. A person is on one occasion in one capacity, and two sightings of
+    one species on one dive would be two ways to say how many were seen.
     """
-    references = host.get("people")
-    if not isinstance(references, list):
+    items = host.get(member)
+    if not isinstance(items, list):
         return
+    reference = _EMBEDDED_REFERENCES[member]
     listed: dict[str, int] = {}
-    for index, reference in enumerate(references):
-        if not isinstance(reference, dict):
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
             continue
-        here = f"{path}/people/{index}"
-        _check_reference(reference, "person_uuid", targets, "people", here, issues)
-        value = reference.get("person_uuid")
+        here = f"{path}/{member}/{index}"
+        _check_reference(item, reference.member, known[reference.collection], reference.collection, here, issues)
+        value = item.get(reference.member)
         if not isinstance(value, str):
             continue
         if value in listed:
-            issues.append(Issue(here, f"person {value} is already listed at {path}/people/{listed[value]}"))
+            issues.append(
+                Issue(here, f"{reference.noun} {value} is already listed at {path}/{member}/{listed[value]}")
+            )
         else:
             listed[value] = index
 
