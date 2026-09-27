@@ -14,8 +14,9 @@ that may hold a date as well as a date-time, the member order the validator does
 check — no `invalid/` document can pin an absence of a rule — the one uuid claim whose
 fixture is refused for another reason by any validator that does not know its member, the
 hosts a contact reference sits on, the corpus holding a dangling one on a trip part alone,
-and the hosts a person reference sits on, the corpus holding its defects on a dive and a
-certification alone.
+the hosts a person reference sits on, the corpus holding its defects on a dive and a
+certification alone, what a sighting's two defects are reported as, and the collections the
+validator walks, which the schema can gain one of without it.
 Everything already covered by a pair stays covered by the pair.
 """
 
@@ -26,7 +27,7 @@ import json
 import pytest
 from helpers import FIXTURES
 
-from divejson.validate import CHANNELS, READOUTS, validate_document
+from divejson.validate import CHANNELS, COLLECTIONS, READOUTS, validate_document
 
 
 def document(recording: dict) -> dict:
@@ -79,6 +80,16 @@ def test_the_validators_channel_list_is_the_schemas() -> None:
         if str(definition.get("$ref", "")).endswith(("/series", "/unsigned_series"))
     }
     assert set(CHANNELS) == series
+
+
+def test_the_validators_collection_list_is_the_schemas() -> None:
+    """The same drift as the channels', and as silent: a collection the schema gains and the
+    list does not is one whose duplicate uuids nothing sees and whose `created_at` nothing
+    checks, and no document fails for it."""
+    from divejson.validate import load_schema
+
+    properties = load_schema()["properties"]
+    assert set(COLLECTIONS) == {name for name, definition in properties.items() if definition.get("type") == "array"}
 
 
 def test_a_gradient_factor_low_above_the_high_is_rejected() -> None:
@@ -284,3 +295,49 @@ def test_a_person_shares_the_documents_one_identifier_space() -> None:
     assert [str(issue) for issue in validate_document(document)] == [
         f"people/0: uuid {CONTACT} already used at contacts/0"
     ]
+
+
+# -- §3 rule 1 reaches a dive's sightings, and a species is on a dive once -----------------------
+
+SPECIES = "0198a6f0-9999-7040-8000-000000000040"
+
+
+def _with_sightings(*sightings: list[dict]) -> dict:
+    """One dive per list of sightings, and the one species they can reference."""
+    dives = [
+        {
+            "uuid": f"0198a6f0-9999-7001-8000-00000000000{index}",
+            "started_at": "2026-04-17T11:49:23+02:00",
+            "sightings": listed,
+        }
+        for index, listed in enumerate(sightings)
+    ]
+    return {
+        "format": "divejson",
+        "version": "1.0",
+        "exported_at": "2026-09-05T00:00:00+00:00",
+        "dives": dives,
+        "species": [{"uuid": SPECIES, "scientific_name": "Pterois volitans"}],
+    }
+
+
+def test_a_sighting_resolves_in_species() -> None:
+    assert validate_document(_with_sightings([{"species_uuid": SPECIES, "count": 3, "notes": "Under the wreck"}])) == []
+    dangling = _with_sightings([{"species_uuid": SPECIES}, {"species_uuid": NOWHERE}])
+    assert [str(issue) for issue in validate_document(dangling)] == [
+        f"dives/0/sightings/1/species_uuid: references {NOWHERE}, not present in species"
+    ]
+
+
+def test_a_species_is_sighted_on_a_dive_once_whatever_the_counts_say() -> None:
+    """Two sightings differing in their count are two objects to `uniqueItems`, so the schema
+    passes them and only this rule refuses them."""
+    twice = _with_sightings([{"species_uuid": SPECIES, "count": 3}, {"species_uuid": SPECIES, "count": 1}])
+    assert [str(issue) for issue in validate_document(twice)] == [
+        f"dives/0/sightings/1: species {SPECIES} is already listed at dives/0/sightings/0"
+    ]
+
+
+def test_one_species_sighted_on_two_dives_is_two_sightings() -> None:
+    """The rule is per list: a lionfish seen on Monday and on Tuesday was seen twice."""
+    assert validate_document(_with_sightings([{"species_uuid": SPECIES}], [{"species_uuid": SPECIES}])) == []

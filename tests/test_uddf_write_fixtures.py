@@ -70,9 +70,14 @@ LOST: dict[str, frozenset[str]] = {
     "owner-profile-only": frozenset(),
     "technical-dive": frozenset(
         {
+            # A dive's `<observations>` holds a `<species>` only under a class this format does
+            # not carry, and its class-free notes paragraph holds no count and no note; so
+            # neither the species nor the sightings referencing them are written.
+            "species",
+            "dives/0/sightings",
+            "dives/1/sightings",
             # No slot anywhere in UDDF.
             "courses",
-            "species",
             "gear_sets",
             "gear_service_schedules",
             "gear_service_records",
@@ -106,9 +111,7 @@ LOST: dict[str, frozenset[str]] = {
             "dives/0/entry_position",
             "dives/0/exit_position",
             "dives/0/course_uuid",
-            "dives/0/species_uuids",
             "dives/0/created_at",
-            "dives/1/species_uuids",
             "dives/0/recordings/0/profile/ceiling",
             "dives/0/recordings/0/profile/extensions",
             # UDDF has no time-to-surface element and no surface gradient factor at all.
