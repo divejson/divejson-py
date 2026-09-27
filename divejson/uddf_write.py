@@ -464,13 +464,14 @@ _ADDRESS_CARRIED = frozenset({"street", "city", "postcode", "region", "country"}
 # What a person goes out with as a `<buddy>`.
 _PERSON_CARRIED = frozenset({"uuid", "name", "email", "phone", "notes"})
 
-# Why neither a dive's sightings nor the species they reference are written, though a dive's
-# `<observations>` is the slot: the class would be invented (§5.4), and the class-free
-# spelling loses the count and the note and reads back as a remark.
+# Why neither a dive's sightings nor the species they reference are written, though the slot
+# exists — `docs/uddf-writing.md`'s *What is never written* has the reason in full. Not
+# `unmapped`'s line, which would say there is no slot.
 _NO_SPECIES = (
-    "UDDF records a species as a <species> under a class inside <vertebrata>, <invertebrata> or <flora>, "
-    "a classification this format does not carry, and its class-free spelling, names in a <fauna><notes> "
-    "paragraph, carries no count and no note and reads back as a remark"
+    "UDDF's <observations> holds a <species> only under a class inside <vertebrata>, <invertebrata> or "
+    "<flora>, which this format does not record and a writer would have to invent, and its spelling for "
+    "animals of no known class, names in a <fauna><notes> paragraph, carries no count and no note and "
+    "reads back as a remark"
 )
 
 
