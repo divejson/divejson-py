@@ -1,0 +1,30 @@
+<divelog program='subsurface' version='3'>
+<settings>
+</settings>
+<divesites>
+<site uuid='4c2e9a71' name='Lighthouse Reef'>
+</site>
+</divesites>
+<dives>
+<dive number='101' divesiteid='4c2e9a71' date='2026-05-02' time='09:30:00' duration='48:00 min'>
+  <divemaster>Ahmed Fathy</divemaster>
+  <buddy>Mona Salem, Karim</buddy>
+  <divecomputer last-manual-time='48:00 min'>
+  <depth max='18.4 m' mean='11.2 m' />
+  </divecomputer>
+</dive>
+<dive number='102' divesiteid='4c2e9a71' date='2026-05-02' time='14:10:00' duration='52:00 min'>
+  <divemaster>Mona Salem</divemaster>
+  <buddy>karim, Mona Salem</buddy>
+  <divecomputer last-manual-time='52:00 min'>
+  <depth max='21.0 m' mean='12.9 m' />
+  </divecomputer>
+</dive>
+<dive number='103' divesiteid='4c2e9a71' date='2026-05-03' time='10:00:00' duration='40:00 min'>
+  <buddy> Karim ,Ahmed Fathy </buddy>
+  <divecomputer last-manual-time='40:00 min'>
+  <depth max='12.6 m' mean='8.0 m' />
+  </divecomputer>
+</dive>
+</dives>
+</divelog>

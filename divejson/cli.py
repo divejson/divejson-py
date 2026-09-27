@@ -31,6 +31,7 @@ _COUNTED = (
     ("sites", "site", "sites"),
     ("gear", "gear item", "gear items"),
     ("contacts", "contact", "contacts"),
+    ("people", "person", "people"),
 )
 
 

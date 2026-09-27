@@ -1,0 +1,107 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-26T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.15.0"
+  },
+  "dives": [
+    {
+      "uuid": "99ca578d-a074-52d2-9216-e98057a33dcb",
+      "number": 101,
+      "started_at": "2026-05-02T09:30:00",
+      "duration": 2880,
+      "site_uuids": [
+        "88a9bec6-606e-59aa-bff6-1ad55e7159bc"
+      ],
+      "max_depth": 18.4,
+      "avg_depth": 11.2,
+      "people": [
+        {
+          "person_uuid": "f904b566-13da-5b0d-920b-69f70763c705",
+          "role": "buddy"
+        },
+        {
+          "person_uuid": "62dc62bf-f5c4-5e36-b9fa-74e8600e7e34",
+          "role": "buddy"
+        },
+        {
+          "person_uuid": "480d1e0a-f9ec-5f76-baf6-88707f7b62c9",
+          "role": "guide"
+        }
+      ]
+    },
+    {
+      "uuid": "a27d7fb1-89c9-52aa-9531-4d33de232b2e",
+      "number": 102,
+      "started_at": "2026-05-02T14:10:00",
+      "duration": 3120,
+      "site_uuids": [
+        "88a9bec6-606e-59aa-bff6-1ad55e7159bc"
+      ],
+      "max_depth": 21.0,
+      "avg_depth": 12.9,
+      "people": [
+        {
+          "person_uuid": "62dc62bf-f5c4-5e36-b9fa-74e8600e7e34",
+          "role": "buddy"
+        },
+        {
+          "person_uuid": "f904b566-13da-5b0d-920b-69f70763c705",
+          "role": "guide"
+        }
+      ]
+    },
+    {
+      "uuid": "d51dfcdf-e98d-5027-9652-7a5a8a4b5224",
+      "number": 103,
+      "started_at": "2026-05-03T10:00:00",
+      "duration": 2400,
+      "site_uuids": [
+        "88a9bec6-606e-59aa-bff6-1ad55e7159bc"
+      ],
+      "max_depth": 12.6,
+      "avg_depth": 8.0,
+      "people": [
+        {
+          "person_uuid": "62dc62bf-f5c4-5e36-b9fa-74e8600e7e34",
+          "role": "buddy"
+        },
+        {
+          "person_uuid": "480d1e0a-f9ec-5f76-baf6-88707f7b62c9",
+          "role": "buddy"
+        }
+      ]
+    }
+  ],
+  "sites": [
+    {
+      "uuid": "88a9bec6-606e-59aa-bff6-1ad55e7159bc",
+      "name": "Lighthouse Reef"
+    }
+  ],
+  "people": [
+    {
+      "uuid": "f904b566-13da-5b0d-920b-69f70763c705",
+      "name": "Mona Salem"
+    },
+    {
+      "uuid": "62dc62bf-f5c4-5e36-b9fa-74e8600e7e34",
+      "name": "Karim"
+    },
+    {
+      "uuid": "480d1e0a-f9ec-5f76-baf6-88707f7b62c9",
+      "name": "Ahmed Fathy"
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "ssrf",
+      "ssrf_version": "3",
+      "source_generator": {
+        "name": "subsurface"
+      }
+    }
+  }
+}

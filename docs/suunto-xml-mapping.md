@@ -534,9 +534,11 @@ refusals and the second out of the silently unmapped, both into the device map a
   *Device* above; §9 covers what publishing a document with one in it means.
 - **`<Boat>`, `<Master>`, `<Partner>`, `<DiveTags>`, `<Deleted>`, `<BatteryLevel>`** — a
   boat name, a dive master, a buddy, a tag list, a deletion flag and a battery reading. Nil
-  or empty on all 384, so there is nothing to carry from this corpus. `<Boat>`, `<Master>`
-  and `<Partner>` have no §6.2 member; a file that filled `<DiveTags>` in would be worth
-  revisiting against §6.2's `notes`, and none in hand does.
+  or empty on all 384, so there is nothing to carry from this corpus. `<Master>` and
+  `<Partner>` would map to §6.2's `people`, as a person with the role `guide` and one with
+  the role `buddy`, and wait for a file that fills them in: a rule written against no file
+  is speculation. `<Boat>` has no §6.2 member; a file that filled `<DiveTags>` in would be
+  worth revisiting against §6.2's `notes`, and none in hand does.
 - **The filename** — above, under *Identity*.
 
 ## The pairs

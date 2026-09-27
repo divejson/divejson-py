@@ -7,6 +7,40 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Breaking: people are records.** §6.20 of
+  [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) adds a
+  top-level `people` collection — a name, and optionally an email, a phone and notes —
+  referenced from a dive, a trip and a course by a `people` list of `{ person_uuid, role }`,
+  whose optional `role` is `buddy`, `guide`, `instructor`, `student` or `companion`, and from a
+  certification by `instructor_uuid`. `instructor_name` is gone from a course and a
+  certification, so `divejson validate` refuses it as an undefined member; it resolves every
+  person reference in `people` and refuses a person listed twice on one host. An archive's
+  merge carries the collection, and `converter.person_roles` and `person_members` read the
+  vocabulary and the member order off the schema.
+
+- **The UDDF reader reads people.** A `<diver><buddy>` is a person named by `<personal>`'s
+  first, middle and last names joined with single spaces, with `<contact>`'s first email and
+  first phone and its `<notes>`; a buddy with no name is dropped, and what a buddy carries that
+  a person does not — an address, a kit list, a medical record, a membership, a second email —
+  is reported. A dive's `<link>` to a buddy names it as a `buddy`, or a `student` where the
+  buddy carries `<student/>`, and a link to a dive base's `<guide>` names the guide's buddy as
+  the dive's `guide`; a person linked twice is listed once, as `guide` if either link was one,
+  and the repeat is reported. A guide no dive links is still reported with its base, and the
+  owner is still the diver and never a person.
+
+- **The UDDF writer writes them.** A person is a `<buddy id="person-<uuid>">` after the
+  `<owner>`, its name split at the first space into `<firstname>` and `<lastname>`, with its
+  phone, email and notes. A dive links its people after its sites and its contact: a `buddy`
+  as a plain link, and a `guide` through a `<guide id="guide-<n>">` under the `<divebase>` the
+  dive links. A `guide` with no base to hold it, every other role and a reference with no role
+  go out as a plain link that reads back as `buddy`, and each is reported, as are a trip's and a
+  course's people, which UDDF has no slot for.
+
+- **The Subsurface reader reads a dive's buddies and divemaster.** `<buddy>` is split on
+  commas and each trimmed name is a `buddy`; `<divemaster>`, or `<diveguide>`, is one name and
+  a `guide`, and makes a buddy of the same name the dive's guide. One person per trimmed,
+  case-folded name across the file.
+
 ## 0.14.0
 
 - **Breaking: contacts are records.** §6.18 and §6.19 of

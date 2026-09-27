@@ -12,7 +12,7 @@ import json
 import uuid
 
 import pytest
-from helpers import STARTED_AT, before, device_of, one_dive, profile_of, uddf
+from helpers import FIXTURES, STARTED_AT, before, device_of, one_dive, profile_of, uddf
 
 from divejson import DoctypeRefusedError, MalformedUddfError, convert
 from divejson.uddf import LOCAL_CLOCK_NOTE, UDDF_ID_NAMESPACE
@@ -893,6 +893,197 @@ def test_an_address_with_no_country_is_dropped_and_its_parts_are_capped() -> Non
     assert two["address"] == {"postcode": "9" * 32, "region": "South Sinai", "country": "Egypt"}
     assert any(where == "divebase/0" and "no <country>" in message for where, message in report)
     assert any(where == "divebase/1" and "postcode" in message for where, message in report)
+
+
+# -- people ----------------------------------------------------------------------------
+
+
+def buddies(*buddy: str, owner_id: str = "owner") -> str:
+    """A `<diver>` holding an owner and each `buddy` body, in order."""
+    return (
+        f"<diver><owner id='{owner_id}'><personal><firstname>Sam</firstname><lastname>Reef</lastname></personal>"
+        "</owner>" + "".join(buddy) + "</diver>"
+    )
+
+
+def buddy(buddy_id: str | None, first: str = "", last: str = "", rest: str = "", *, middle: str = "") -> str:
+    ident = f" id='{buddy_id}'" if buddy_id else ""
+    names = f"<firstname>{first}</firstname>" + (f"<middlename>{middle}</middlename>" if middle else "")
+    return f"<buddy{ident}><personal>{names}<lastname>{last}</lastname></personal>{rest}</buddy>"
+
+
+def references(document: dict, index: int = 0) -> list[tuple[str, str]]:
+    """One dive's people as `(name, role)`, in the dive's order."""
+    names = {person["uuid"]: person["name"] for person in document.get("people") or []}
+    return [(names[ref["person_uuid"]], ref["role"]) for ref in document["dives"][index].get("people") or []]
+
+
+def test_a_buddy_is_a_person_named_by_its_parts_joined() -> None:
+    """`<firstname>`, `<middlename>` and `<lastname>`, single spaces, empties skipped — the way
+    the owner's name is read — and the identity is the buddy's own id."""
+    document, report = contacts_of(
+        buddies(
+            buddy(
+                "b1",
+                "Ada",
+                "Lovelace",
+                "<contact><phone>+44 1</phone><email>ada@example.org</email></contact>"
+                "<notes><para>Night dives.</para></notes>",
+                middle="King",
+            ),
+            buddy("b2", "Kim"),
+        )
+    )
+    assert document["people"] == [
+        {
+            "uuid": str(uuid.uuid5(UDDF_ID_NAMESPACE, "person:b1")),
+            "name": "Ada King Lovelace",
+            "email": "ada@example.org",
+            "phone": "+44 1",
+            "notes": "Night dives.",
+        },
+        {"uuid": str(uuid.uuid5(UDDF_ID_NAMESPACE, "person:b2")), "name": "Kim"},
+    ]
+    assert not [where for where, _ in report if where.startswith("buddy/")]
+
+
+def test_the_owner_is_the_diver_and_never_a_person() -> None:
+    """UDDF lets an imported owner be managed as a buddy; whose logbook is imported into whose is
+    the application's decision, not the converter's."""
+    document, _ = contacts_of(buddies())
+    assert document["diver"]["name"] == "Sam Reef" and "people" not in document
+
+
+def test_a_buddy_with_no_name_is_dropped_and_every_link_to_it_with_it() -> None:
+    document, report = contacts_of(
+        buddies("<buddy id='b1'><personal><firstname/><lastname> </lastname></personal>"
+                "<contact><email>a@example.org</email></contact></buddy>", "<buddy><personal/></buddy>"),
+        dive_linking("b1"),
+    )
+    assert "people" not in document and "people" not in document["dives"][0]
+    assert [where for where, message in report if "the buddy has no name" in message] == ["buddy/0", "buddy/1"]
+    assert ("dive/0", "a link points at the buddy 'b1', which is not read; the reference goes with it") in report
+
+
+def test_what_a_person_does_not_carry_is_reported_and_never_dropped_in_silence() -> None:
+    """The first email and the first phone are read; every other child, `<personal>`'s beyond
+    the names and `<contact>`'s beyond the three it reads are named, as a contact's are."""
+    document, report = contacts_of(
+        buddies(
+            buddy(
+                "b1",
+                "Ada",
+                "Lovelace",
+                "<address><city>London</city><country>UK</country></address>"
+                "<contact><language>en</language><phone>+44 1</phone><mobilephone>+44 2</mobilephone>"
+                "<email>ada@example.org</email><email>ada@work.example</email><homepage>https://ada.example/</homepage>"
+                "</contact><equipment><fins id='f'><name>Fins</name></fins></equipment>"
+                "<medical><examination><doctor id='d'><personal><firstname>X</firstname><lastname>Y</lastname>"
+                "</personal></doctor></examination></medical>"
+                "<education><certification><level>OWD</level></certification></education>"
+                "<divepermissions><permit><name>Reserve</name></permit></divepermissions>"
+                "<diveinsurances><insurance><name>DAN</name></insurance></diveinsurances>",
+            ).replace("<lastname>Lovelace</lastname>", "<lastname>Lovelace</lastname><membership organisation='PADI'/>"
+                      "<birthdate><datetime>1815-12-10</datetime></birthdate><sex/>")
+        )
+    )
+    (person,) = document["people"]
+    assert (person["email"], person["phone"]) == ("ada@example.org", "+44 1")
+    reported = [message for where, message in report if where == "buddy/0"]
+    for said in ("<address>", "<equipment>", "<medical>", "<education>", "<divepermissions>", "<diveinsurances>",
+                 "<personal><membership>", "<personal><birthdate>", "<contact><language>", "<contact><homepage>",
+                 "'+44 2' is not read", "'ada@work.example' is not read"):
+        assert sum(said in message for message in reported) == 1, said
+    # An empty `<sex/>` records nothing, so there is nothing to report.
+    assert not [message for message in reported if "<sex>" in message]
+
+
+def test_a_dive_linking_a_buddy_names_it_as_a_buddy() -> None:
+    """UDDF's own reading of a direct link: "the cross-referenced person is simply a buddy"."""
+    document, report = contacts_of(
+        buddies(buddy("b1", "Ada", "Lovelace"), buddy("b2", "Kim"))
+        + "<divesite><site id='s'><name>Canyon</name></site></divesite>",
+        dive_linking("s", "b2", "b1"),
+    )
+    assert references(document) == [("Kim", "buddy"), ("Ada Lovelace", "buddy")]
+    assert document["dives"][0]["site_uuids"] == [document["sites"][0]["uuid"]]
+    assert not [message for _, message in report if "not a dive site" in message]
+
+
+def test_a_student_buddy_is_a_student_on_every_dive_that_links_it_directly() -> None:
+    document, _ = contacts_of(
+        buddies(buddy("b1", "Kim", rest="<student/>")),
+        dive_linking("b1") + dive_linking("b1", dive_id="d2"),
+    )
+    assert references(document, 0) == references(document, 1) == [("Kim", "student")]
+    assert document["people"] == [{"uuid": str(uuid.uuid5(UDDF_ID_NAMESPACE, "person:b1")), "name": "Kim"}]
+
+
+GUIDED = (
+    "<divesite><divebase id='base'><name>Blue Hole Divers</name>"
+    "<guide id='g1'><link ref='b1'/></guide><guide id='g2'><link ref='b2'/></guide></divebase></divesite>"
+)
+
+
+def test_a_dive_linking_a_bases_guide_names_its_buddy_as_the_guide() -> None:
+    """A guide no dive links is still reported with its base; one a dive links is read."""
+    document, report = contacts_of(
+        buddies(buddy("b1", "Moh"), buddy("b2", "Kim", rest="<student/>")) + GUIDED,
+        dive_linking("base", "g1"),
+    )
+    assert references(document) == [("Moh", "guide")]
+    assert document["dives"][0]["contact_uuid"] == document["contacts"][0]["uuid"]
+    assert [message for where, message in report if where == "divebase/0"] == [
+        "§6.18 has no member for <guide>; it is not read"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("links", "expected"),
+    [
+        (("b1", "g1"), [("Moh", "guide")]),
+        (("g1", "b1"), [("Moh", "guide")]),
+        (("b1", "b1"), [("Moh", "buddy")]),
+        (("b2", "g2", "b1"), [("Kim", "guide"), ("Moh", "buddy")]),
+    ],
+    ids=["direct-then-guide", "guide-then-direct", "twice-directly", "a-students-guide-link-wins"],
+)
+def test_a_person_linked_twice_is_one_reference_at_the_first_links_place(links, expected) -> None:
+    document, report = contacts_of(
+        buddies(buddy("b1", "Moh"), buddy("b2", "Kim", rest="<student/>")) + GUIDED, dive_linking(*links)
+    )
+    assert references(document) == expected
+    (repeat,) = [message for where, message in report if where == "dive/0" and "times" in message]
+    assert f"one reference is kept, as {expected[0][1]}, and the rest are dropped" in repeat
+
+
+def test_a_guide_whose_link_names_no_buddy_that_is_read_takes_the_reference_with_it() -> None:
+    document, report = contacts_of(
+        buddies(buddy("b1", "Moh"))
+        + "<divesite><divebase id='base'><name>Blue Hole Divers</name><guide id='g1'><link ref='gone'/></guide>"
+        "</divebase><site id='gone'><name>Canyon</name></site></divesite>",
+        dive_linking("base", "g1"),
+    )
+    assert "people" not in document["dives"][0]
+    assert (
+        "dive/0",
+        "a link points at the guide 'g1', whose own link names no buddy that is read; the reference goes with it",
+    ) in report
+
+
+def test_a_link_to_something_no_reader_carries_is_still_reported() -> None:
+    """A link to an id this reader carries nowhere — here the owner's — is dropped with a note."""
+    _, report = contacts_of(buddies(buddy("b1", "Moh")), dive_linking("owner", "b1"))
+    assert ("dive/0", "a link points at 'owner', which is not a dive site this converter carries; the reference is "
+            "dropped") in report
+
+
+def test_the_empty_buddy_shearwater_cloud_writes_is_reported() -> None:
+    """`<buddy><personal /></buddy>`, with no id: the expected document is unchanged, the
+    report says what became of it."""
+    conversion = convert((FIXTURES / "uddf" / "shearwater-cloud-cns.uddf").read_bytes())
+    assert "people" not in conversion.document
+    assert [note.where for note in conversion.notes if "the buddy has no name" in note.message] == ["buddy/0"]
 
 
 # -- identity ------------------------------------------------------------------------

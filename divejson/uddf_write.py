@@ -90,6 +90,7 @@ from .converter import (
     NoteKind,
     Written,
     in_seconds,
+    person_roles,
     roles_in_order,
 )
 from .uddf import (
@@ -460,6 +461,9 @@ class _DeviceRecord:
 _CONTACT_CARRIED = frozenset({"uuid", "name", "roles", "phone", "email", "website", "address", "notes"})
 _ADDRESS_CARRIED = frozenset({"street", "city", "postcode", "region", "country"})
 
+# What a person goes out with as a `<buddy>`.
+_PERSON_CARRIED = frozenset({"uuid", "name", "email", "phone", "notes"})
+
 
 def _is_shop(contact: dict[str, Any]) -> bool:
     """Whether a contact goes out as a `<shop>`: its roles exactly `["shop"]`, and nothing else."""
@@ -513,6 +517,11 @@ class _Writer:
         self.linked: set[str] = set()
         # How many `<accomodation>` copies have been written, which numbers the next one's id.
         self.copies = 0
+        # The document's people by uuid, and the `<guide>` id each pair of a base and a person
+        # goes out under, both filled by `plan_people`: a guide sits inside its `<divebase>`,
+        # which is written before any dive that links it.
+        self.people: dict[str, dict[str, Any]] = {}
+        self.guide_ids: dict[tuple[str, str], str] = {}
 
     # -- reporting ---------------------------------------------------------------
 
@@ -563,6 +572,7 @@ class _Writer:
         self.plan_mixes()
         self.plan_computers()
         self.plan_contacts()
+        self.plan_people()
         self.unmapped(
             "$",
             self.document,
@@ -579,6 +589,7 @@ class _Writer:
                     "sites",
                     "gear",
                     "contacts",
+                    "people",
                 }
             ),
         )
@@ -633,16 +644,17 @@ class _Writer:
     # -- diver -------------------------------------------------------------------
 
     def diver_element(self) -> ET.Element | None:
-        """`<diver><owner>`, which is also the only place a logbook's gear can live.
+        """`<diver><owner>`, which is also the only place a logbook's gear and people can live.
 
-        So the element is written whenever there is either an owner to describe — any member
-        this maps, `uuid` aside — or a piece of kit to hang on one, and the two are
-        independent: `<equipment>` sits inside `<owner>`, and a logbook with gear and no
-        diver would otherwise lose the whole list to a member it has nothing to do with. A
-        diver with no `name` gets both names empty, `personalType` requiring them whatever
-        else the owner carries — valid `xs:string`s, which the reader reads back as a
-        nameless diver beside anything else this maps and as no diver at all beside a kit
-        list alone.
+        So the element is written whenever there is an owner to describe — any member this
+        maps, `uuid` aside — a piece of kit to hang on one, or a person to follow it as a
+        `<buddy>`, and the three are independent: `<equipment>` sits inside `<owner>`,
+        `diverType` requires the `<owner>` before any `<buddy>`, and a logbook with gear or
+        people and no diver would otherwise lose them to a member they have nothing to do
+        with. A diver with no `name` gets both names empty, `personalType` requiring them
+        whatever else the owner carries — valid `xs:string`s, which the reader reads back as
+        a nameless diver beside anything else this maps and as no diver at all beside a kit
+        list or buddies alone.
 
         The owner's children go in the XSD's order, `<owner>`'s type extending the one UDDF
         gives every person: `personal`, then `contact`, then `equipment`, then
@@ -652,8 +664,9 @@ class _Writer:
         name, email, phone, born_on = (diver.get(member) for member in ("name", "email", "phone", "born_on"))
         insurances = diver.get("insurances") or []
         gear = self.equipment_element()
+        people = self.document.get("people") or []
         described = bool(name or email or phone or born_on or insurances)
-        if not (described or gear is not None):
+        if not (described or gear is not None or people):
             if diver:
                 self.note(
                     "diver",
@@ -694,7 +707,120 @@ class _Writer:
                 _sub(policy, "name", str(insurance["provider"]))
                 if insurance.get("expires_on"):
                     _sub(_sub(policy, "validdate"), "datetime", f"{insurance['expires_on']}T00:00:00")
+        for index, person in enumerate(people):
+            self.buddy_element(element, index, person)
         return element
+
+    # -- people ------------------------------------------------------------------
+
+    def plan_people(self) -> None:
+        """Decide, before anything is written, which guide references get a `<guide>`.
+
+        A `guide` reference on a dive whose contact goes out as a `<divebase>` is the one role
+        besides `buddy` that UDDF can say: a `<guide>` under that base, linking the buddy, and
+        the dive linking the guide. One per base and person, numbered `guide-<n>` over the
+        dives' references in document order — document-unique as `xs:ID` requires, and planned
+        ahead because the bases are written before the dives that decide what they hold.
+        """
+        people = self.document.get("people") or []
+        self.people = {person["uuid"]: person for person in people if isinstance(person.get("uuid"), str)}
+        for dive in self.document.get("dives") or []:
+            base = self.guide_base(dive)
+            if base is None:
+                continue
+            for reference in dive.get("people") or []:
+                if reference.get("role") == "guide" and reference.get("person_uuid") in self.people:
+                    self.guide_ids.setdefault((base, reference["person_uuid"]), f"guide-{len(self.guide_ids)}")
+
+    def guide_base(self, dive: dict[str, Any]) -> str | None:
+        """The contact a dive's guide goes out under: the dive's own, where it is a `<divebase>`."""
+        contact = self.contacts.get(dive.get("contact_uuid") or "")
+        if contact is None or _is_shop(contact):
+            return None
+        return str(contact["uuid"])
+
+    def buddy_element(self, parent: ET.Element, index: int, person: dict[str, Any]) -> None:
+        """One person as a `<buddy>`, and what UDDF cannot hold of it reported.
+
+        `personalType`'s mandatory pair is the name split at its first space, the split
+        Subsurface's and Bubbletrail's writers make, so a reader joining the two sees the same
+        string: a name with one space between its words and none around it comes back byte
+        for byte, and other whitespace comes back as that, reported. Then `<contact>` and
+        `<notes>`, in `personType`'s order.
+        """
+        where = f"people/{index}"
+        self.unmapped(where, person, _PERSON_CARRIED)
+        element = _sub(parent, "buddy", id=_uddf_id("person", person["uuid"]))
+        name = str(person.get("name") or "")
+        first, last = _person_names(name)
+        personal = _sub(element, "personal")
+        _sub(personal, "firstname", first)
+        _sub(personal, "lastname", last)
+        if not first:
+            self.note(
+                where,
+                "the name is whitespace alone, and a reader drops a buddy with no name; the person does not "
+                "come back, and neither does any reference to it",
+                "dropped",
+            )
+        elif " ".join(name.split()) != name:
+            self.note(
+                where,
+                "the name's whitespace goes out as one space between its words, which is all <firstname> and "
+                "<lastname> give back",
+                "dropped",
+            )
+        phone, email = person.get("phone"), person.get("email")
+        if phone or email:
+            contact = _sub(element, "contact")
+            # `contactType` is a sequence, and `<phone>` comes before `<email>` in it.
+            if phone:
+                _sub(contact, "phone", str(phone))
+            if email:
+                _sub(contact, "email", str(email))
+        self.notes_of(element, where, person)
+
+    def person_link(self, before: ET.Element, dive: dict[str, Any], reference: dict[str, Any], where: str) -> None:
+        """One Person Reference as a dive's `<link>`: to the person's `<buddy>`, or to its `<guide>`.
+
+        A reader takes a plain link to a buddy as `buddy`, so that role goes out as one and
+        loses nothing. A reference with no role goes out as one too and comes back a buddy,
+        which is reported the way a contact recording no roles is: an absent role says only
+        that the person was there, and a companion who stayed on the boat did not dive
+        alongside anyone. A `guide` goes out through its base's `<guide>` (`plan_people`), and
+        on a dive with no base to hold one as a plain link with the role reported; so does
+        every other role, UDDF having no spelling for one on a dive. A role this version's
+        vocabulary does not hold is read as none (§5.6).
+        """
+        self.unmapped(where, reference, frozenset({"person_uuid", "role"}))
+        uuid, role = reference.get("person_uuid"), reference.get("role")
+        if role not in person_roles():
+            role = None
+        guide = self.guide_ids.get((self.guide_base(dive) or "", str(uuid)))
+        if role == "guide" and guide is not None:
+            _sub(before, "link", ref=guide)
+            return
+        _sub(before, "link", ref=_uddf_id("person", str(uuid)))
+        if role is None:
+            self.note(
+                where,
+                "the reference records no role, and the plain link it goes out as reads back as buddy",
+                "dropped",
+            )
+        elif role == "guide":
+            self.note(
+                where,
+                "UDDF records a guide under the dive base the dive links, and this dive links none; the "
+                "reference goes out as a plain link and comes back as buddy",
+                "dropped",
+            )
+        elif role not in (None, "buddy"):
+            self.note(
+                where,
+                f"UDDF has no spelling for the role {role} on a dive; the reference goes out as a plain link "
+                "and comes back as buddy",
+                "dropped",
+            )
 
     # -- computers ---------------------------------------------------------------
 
@@ -1036,7 +1162,12 @@ class _Writer:
         self.unmapped(where, contact, _CONTACT_CARRIED)
         element = _sub(parent, tag, id=_uddf_id("contact", contact["uuid"]))
         _sub(element, "name", str(contact.get("name") or ""))
-        carries = self.contact_contents(element, contact, where)
+        guides = [
+            (guide_id, person)
+            for (base, person), guide_id in self.guide_ids.items()
+            if tag == "divebase" and base == contact["uuid"]
+        ]
+        carries = self.contact_contents(element, contact, where, guides=guides)
 
         implied = {"shop"} if tag == "shop" else {"dive_center"}
         if contact["uuid"] in self.copied:
@@ -1064,7 +1195,13 @@ class _Writer:
             )
 
     def contact_contents(
-        self, element: ET.Element, contact: dict[str, Any], where: str, *, report: bool = True
+        self,
+        element: ET.Element,
+        contact: dict[str, Any],
+        where: str,
+        *,
+        report: bool = True,
+        guides: list[tuple[str, str]] | None = None,
     ) -> bool:
         """A contact's `<address>`, `<contact>` and `<notes>`, and whether any was written.
 
@@ -1074,6 +1211,9 @@ class _Writer:
         holds whichever of the phone, the email and the website are present. That is not the
         diver's own contact block, which `diver_element` writes on its own terms: this block is
         the record's listing, the kind printed on its sign, and the diver chose to record it.
+
+        A base's `guides` — `(guide id, person uuid)` pairs from `plan_people` — go between
+        the `<contact>` and the `<notes>`, where `divebaseType`'s sequence puts them.
         """
         wrote = False
         address = contact.get("address")
@@ -1110,6 +1250,8 @@ class _Writer:
                 if value:
                     _sub(block, tag, str(value))
             wrote = True
+        for guide_id, person in guides or ():
+            _sub(_sub(element, "guide", id=guide_id), "link", ref=_uddf_id("person", person))
         if report:
             return self.notes_of(element, where, contact) or wrote
         return _notes(element, contact.get("notes")) or wrote
@@ -1422,6 +1564,7 @@ class _Writer:
                     "contact_uuid",
                     "site_uuids",
                     "gear_uuids",
+                    "people",
                     "cylinders",
                     "recordings",
                 }
@@ -1442,6 +1585,9 @@ class _Writer:
             # link's targets and its XSD takes any id, and an importer reading one link takes
             # the first as the dive's site — so the primary site leads.
             _sub(before, "link", ref=_uddf_id("contact", dive["contact_uuid"]))
+        # The people after both, in the dive's own order, for the same reason.
+        for position, reference in enumerate(dive.get("people") or []):
+            self.person_link(before, dive, reference, f"{where}/people/{position}")
         number = dive.get("number")
         if number is not None:
             if number > 0:

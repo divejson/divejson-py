@@ -1087,6 +1087,206 @@ def test_a_contact_reference_on_a_record_uddf_has_no_slot_for_goes_with_the_reco
     assert read_back(source)["contacts"][0]["phone"] == "+20 69"
 
 
+# -- people -------------------------------------------------------------------------------
+
+PERSON_UUID = "0198a6f0-9999-7030-8000-000000000030"
+OTHER_PERSON_UUID = "0198a6f0-9999-7031-8000-000000000031"
+
+
+def person(uuid: str = PERSON_UUID, **members: Any) -> dict[str, Any]:
+    return {"uuid": uuid, "name": "Ada Lovelace", **members}
+
+
+def with_people(source: dict[str, Any], *people: dict[str, Any]) -> dict[str, Any]:
+    source["people"] = list(people)
+    return source
+
+
+def test_a_person_is_a_buddy_after_the_owner_and_comes_back_whole(schema) -> None:
+    """`diverType` is the owner and then the buddies; `personType` runs `personal`, `contact`
+    and on to `notes`, and inside `<contact>` `<phone>` comes before `<email>`."""
+    source = with_people(
+        document(diver={"name": "Sam Reef"}),
+        person(email="ada@example.org", phone="+44 20 7946 0000", notes="Night dives."),
+    )
+    text = written(source, schema)
+    assert text.index("<owner") < text.index(f'<buddy id="person-{PERSON_UUID}">')
+    assert re.search(r"<firstname>Ada</firstname>\s*<lastname>Lovelace</lastname>", text)
+    assert text.index("<phone>") < text.index("<email>") < text.index("<notes>")
+    assert read_back(source)["people"] == source["people"]
+    assert notes(source) == []
+
+
+@pytest.mark.parametrize(
+    ("name", "first", "last"),
+    [("Ada King Lovelace", "Ada", "King Lovelace"), ("Kim", "Kim", "")],
+    ids=["split-at-the-first-space", "one-word"],
+)
+def test_a_name_splits_at_its_first_space_and_comes_back_byte_for_byte(schema, name, first, last) -> None:
+    source = with_people(document(), person(name=name))
+    text = written(source, schema)
+    assert f"<firstname>{first}</firstname>" in text
+    assert (f"<lastname>{last}</lastname>" if last else "<lastname />") in text
+    assert read_back(source)["people"][0]["name"] == name
+    assert messages(source, "people/0") == []
+
+
+def test_other_whitespace_in_a_name_comes_back_as_single_spaces_and_says_so(schema) -> None:
+    source = with_people(document(), person(name=" Ada  King\tLovelace "))
+    written(source, schema)
+    assert read_back(source)["people"][0]["name"] == "Ada King Lovelace"
+    assert any("one space between its words" in message for message in messages(source, "people/0"))
+
+
+def test_people_alone_write_an_owner_that_reads_back_as_no_diver(schema) -> None:
+    """`<buddy>` cannot come before an `<owner>`, which is mandatory in `<diver>`."""
+    source = with_people(document(), person())
+    assert '<owner id="owner">' in written(source, schema)
+    back = read_back(source)
+    assert "diver" not in back and back["people"] == source["people"]
+
+
+def test_what_a_person_holds_beyond_its_slot_is_reported_from_the_record(schema) -> None:
+    source = with_people(
+        document(),
+        person(created_at="2026-03-02T18:00:00+02:00", notes="", extensions={"com.example": {"linked": True}}),
+    )
+    written(source, schema)
+    assert messages(source, "people/0") == [
+        "UDDF has no slot for created_at; it is not written",
+        "UDDF has no slot for extensions; it is not written",
+        "the note is empty, and an empty <para> reads back as no note at all; nothing is written for it",
+    ]
+
+
+def test_a_dive_links_its_people_after_its_sites_and_its_contact(schema) -> None:
+    """In the dive's own order, and a `buddy` reference is the plain link that loses nothing."""
+    source = one_dive(
+        site_uuids=[SITE_UUID],
+        contact_uuid=CONTACT_UUID,
+        people=[{"person_uuid": OTHER_PERSON_UUID, "role": "buddy"}, {"person_uuid": PERSON_UUID, "role": "buddy"}],
+    )
+    source["sites"] = [{"uuid": SITE_UUID, "name": "The Canyon"}]
+    source["contacts"] = [contact(roles=["dive_center"])]
+    with_people(source, person(), person(OTHER_PERSON_UUID, name="Kim"))
+    text = written(source, schema)
+    assert (
+        text.index(f'<link ref="site-{SITE_UUID}"')
+        < text.index(f'<link ref="contact-{CONTACT_UUID}"')
+        < text.index(f'<link ref="person-{OTHER_PERSON_UUID}"')
+        < text.index(f'<link ref="person-{PERSON_UUID}"')
+    )
+    assert read_back(source)["dives"][0]["people"] == source["dives"][0]["people"]
+    assert [where for _, where, _ in notes(source) if "people" in where] == []
+
+
+def test_a_guide_goes_out_under_the_base_the_dive_links_and_comes_back_a_guide(schema) -> None:
+    """One `<guide>` per base and person, between the base's `<contact>` and its `<notes>`,
+    which is where `divebaseType`'s sequence puts it — and the dives link the guide."""
+    guide = {"person_uuid": PERSON_UUID, "role": "guide"}
+    source = document(
+        dives=[
+            {"uuid": DIVE_UUID, "started_at": STARTED_AT, "contact_uuid": CONTACT_UUID, "people": [guide]},
+            {
+                "uuid": "0198a6f0-9999-7011-8000-000000000011",
+                "started_at": STARTED_AT,
+                "contact_uuid": CONTACT_UUID,
+                "people": [{"person_uuid": OTHER_PERSON_UUID, "role": "buddy"}, guide],
+            },
+        ],
+        contacts=[contact(roles=["dive_center"], phone="+20 69", notes="Jeeps.")],
+        people=[person(), person(OTHER_PERSON_UUID, name="Kim")],
+    )
+    text = written(source, schema)
+    assert re.findall(r'<guide id="([\w-]+)">', text) == ["guide-0"]
+    assert text.index("<phone>+20 69") < text.index('<guide id="guide-0">') < text.index("<para>Jeeps.")
+    assert text.count('<link ref="guide-0" />') == 2
+    back = read_back(source)
+    assert [dive["people"] for dive in back["dives"]] == [dive["people"] for dive in source["dives"]]
+    assert back["contacts"] == source["contacts"]
+    # The dives' depths and durations, and nothing about the people.
+    assert {where for _, where, _ in notes(source)} == {"dives/0", "dives/1"}
+
+
+@pytest.mark.parametrize(
+    "contacts",
+    [[], [contact(roles=["shop"])]],
+    ids=["no-contact", "a-shop"],
+)
+def test_a_guide_with_no_base_to_hold_it_is_a_plain_link_and_says_so(schema, contacts) -> None:
+    """A `<shop>` has no `<guide>` in UDDF, and a dive with no contact has nothing to put one in."""
+    source = one_dive(people=[{"person_uuid": PERSON_UUID, "role": "guide"}])
+    if contacts:
+        source["dives"][0]["contact_uuid"] = CONTACT_UUID
+        source["contacts"] = contacts
+    with_people(source, person())
+    text = written(source, schema)
+    assert "<guide " not in text and f'<link ref="person-{PERSON_UUID}"' in text
+    assert read_back(source)["dives"][0]["people"] == [{"person_uuid": PERSON_UUID, "role": "buddy"}]
+    assert any("this dive links none" in message for message in messages(source, "dives/0/people/0"))
+
+
+@pytest.mark.parametrize("role", ["instructor", "student", "companion"])
+def test_a_role_uddf_cannot_spell_on_a_dive_is_a_plain_link_and_says_so(schema, role) -> None:
+    source = with_people(one_dive(people=[{"person_uuid": PERSON_UUID, "role": role}]), person())
+    written(source, schema)
+    assert read_back(source)["dives"][0]["people"] == [{"person_uuid": PERSON_UUID, "role": "buddy"}]
+    assert messages(source, "dives/0/people/0") == [
+        f"UDDF has no spelling for the role {role} on a dive; the reference goes out as a plain link and comes "
+        "back as buddy"
+    ]
+
+
+def test_a_reference_with_no_role_comes_back_a_buddy_and_says_so(schema) -> None:
+    """A plain link reads as a buddy, so "was there" cannot survive it — and a companion who
+    stayed on the boat did not dive alongside anyone."""
+    source = with_people(one_dive(people=[{"person_uuid": PERSON_UUID}]), person())
+    written(source, schema)
+    assert read_back(source)["dives"][0]["people"] == [{"person_uuid": PERSON_UUID, "role": "buddy"}]
+    assert [(kind, where) for kind, where, _ in notes(source) if "people" in where] == [
+        ("dropped", "dives/0/people/0")
+    ]
+
+
+def test_a_role_this_version_does_not_define_is_read_as_none() -> None:
+    """§5.6, for a document from a later minor whose vocabulary has grown: the reference is kept
+    and goes out as one with no role would."""
+    source = with_people(one_dive(people=[{"person_uuid": PERSON_UUID, "role": "assistant"}]), person())
+    assert f'<link ref="person-{PERSON_UUID}" />' in written(source)
+    assert messages(source, "dives/0/people/0") == [
+        "the reference records no role, and the plain link it goes out as reads back as buddy"
+    ]
+
+
+def test_a_references_extensions_have_no_slot_and_are_reported(schema) -> None:
+    reference = {"person_uuid": PERSON_UUID, "role": "buddy", "extensions": {"com.example": {"signed": True}}}
+    source = with_people(one_dive(people=[reference]), person())
+    written(source, schema)
+    assert messages(source, "dives/0/people/0") == ["UDDF has no slot for extensions; it is not written"]
+
+
+def test_a_trips_and_a_courses_people_have_no_slot_and_go_with_them(schema) -> None:
+    """`<trippart>` links only a dive base, and UDDF has no course."""
+    source = with_people(
+        document(
+            trips=[{"uuid": TRIP_UUID, "name": "Spring", "people": [{"person_uuid": PERSON_UUID, "role": "companion"}]}],
+            courses=[
+                {
+                    "uuid": "0198a6f0-9999-7022-8000-000000000022",
+                    "name": "AOW",
+                    "people": [{"person_uuid": PERSON_UUID, "role": "instructor"}],
+                }
+            ],
+        ),
+        person(),
+    )
+    written(source, schema)
+    assert messages(source, "trips/0") == ["UDDF has no slot for people; it is not written"]
+    assert ("dropped", "$", "UDDF has no slot for courses; it is not written") in notes(source)
+    back = read_back(source)
+    assert "people" not in back["trips"][0] and back["people"] == source["people"]
+
+
 # -- the file itself -------------------------------------------------------------------
 
 

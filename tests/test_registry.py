@@ -256,6 +256,28 @@ def test_a_contact_a_dive_links_survives_the_merge_and_is_carried_once() -> None
     assert [note.where for note in conversion.notes if "<aliasname>" in note.message] == ["a.uddf/divebase/0"]
 
 
+def test_a_person_a_dive_links_survives_the_merge_and_is_carried_once() -> None:
+    """The contacts' case for `people`: each file repeats the buddy its dive links, and the
+    merge has to carry the collection or every `person_uuid` dangles."""
+    def logbook(dive_id: str) -> bytes:
+        return uddf(
+            "<diver><owner id='owner'><personal><firstname>A</firstname><lastname>B</lastname></personal></owner>"
+            "<buddy id='b1'><personal><firstname>Ada</firstname><lastname>Lovelace</lastname></personal>"
+            "<address><country>UK</country></address></buddy></diver>"
+            f"<profiledata><repetitiongroup><dive id='{dive_id}'><informationbeforedive>"
+            "<link ref='b1'/><datetime>2026-04-17T09:00:00+02:00</datetime>"
+            "</informationbeforedive></dive></repetitiongroup></profiledata>"
+        )
+
+    conversion = convert(_zip({"a.uddf": logbook("d1"), "b.uddf": logbook("d2")}), exported_at=EXPORTED_AT)
+    (person,) = conversion.document["people"]
+    assert [dive["people"] for dive in conversion.document["dives"]] == [
+        [{"person_uuid": person["uuid"], "role": "buddy"}]
+    ] * 2
+    # What the buddy carries that a person does not is reported by the file that carries it.
+    assert [note.where for note in conversion.notes if "<address>" in note.message] == ["a.uddf/buddy/0"]
+
+
 def test_a_contact_only_a_repeated_trip_or_piece_holds_is_carried_once() -> None:
     """A per-dive export repeats its trip and its kit, and a stay or a shop inside a repeat is
     the first file's to read: an `<operator>` has no id, so a second reading would be a

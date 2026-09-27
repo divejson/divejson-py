@@ -79,9 +79,12 @@ else. A round trip through that would hand the diver back a location they never 
 `writing.md` has the kinds and what a `where` is. In this format `absent` is an element UDDF
 requires that the document had nothing for, and `dropped` is a member UDDF has nowhere to
 put — or, in the two findings *Devices* below describes, a fact about the order a dive's
-recordings come back in, which the file has nowhere to carry either, and in the one *Contacts*
-describes, a contact a reader will take for a placeholder; the paths are `dives/0`,
-`dives/0/cylinders/1`, `trips/0/parts/1`, `contacts/0` and `$`.
+recordings come back in, which the file has nowhere to carry either, in the one *Contacts*
+describes, a contact a reader will take for a placeholder, and in the two *People* describes,
+a reference with no role that a reader will take for a buddy and a person whose name is
+whitespace alone, whom a reader drops; the paths are `dives/0`,
+`dives/0/cylinders/1`, `dives/0/people/1`, `trips/0/parts/1`, `contacts/0`, `people/0` and
+`$`.
 
 A member with nowhere to go is reported from the record itself and not from a list
 (`writing.md`), so **the tables below are a description of what a writer does and not the
@@ -116,8 +119,9 @@ Ids are written `<kind>-<uuid>` — `dive-019fec36-b9ec-71c6-a03e-64f59b8b92b1` 
 `converting.md`'s identity rule reads a short alphabetic prefix back off, so an id written
 this way returns as the UUID it was and a logbook that went out through UDDF comes back with
 the identities it left with. The prefixes are `dive`, `site`, `trip`, `gear`, `contact`,
-`diver` and `mfr`. The one element that holds a copy of another's record rather than a record
-of its own — a part's accommodation, *Contacts* below — gets a numbered id instead.
+`person`, `diver` and `mfr`. The two elements that stand for another's record rather than
+being a record of their own — a part's accommodation, *Contacts* below, and a base's guide,
+*People* below — get a numbered id instead.
 
 `<owner id>` is `diver-<uuid>` where the document records anything about the person this
 direction maps, and the bare string `owner` otherwise — the latter being what every UDDF
@@ -125,10 +129,12 @@ writer in the corpus emits and what a reader is careful never to read as an iden
 
 ### Diver and gear
 
-A document's gear lives inside `<diver><owner><equipment>`, so `<diver>` is written whenever
-there is either an owner to describe — any member the table below maps, `uuid` aside —
-**or** a piece of kit to hang on one. A diver recording only what UDDF has no element for,
-such as `emergency_contacts`, therefore gets no `<diver>`, and the report says so.
+A document's gear lives inside `<diver><owner><equipment>` and its people beside the owner as
+`<buddy>`s, so `<diver>` is written whenever there is an owner to describe — any member the
+table below maps, `uuid` aside — **or** a piece of kit to hang on one, **or** a person to
+write beside it. A diver recording only what UDDF has no element for, such as
+`emergency_contacts`, in a document with no gear and no people, therefore gets no `<diver>`,
+and the report says so.
 
 | DiveJSON | UDDF |
 | --- | --- |
@@ -478,11 +484,12 @@ in imply roles on the way back: `dive_center` for a `<divebase>`, `shop` for a `
 the contact's own, `roles` is reported `dropped`. That includes a contact recording none,
 which comes back a `dive_center`, the one slot open to it.
 
-**A dive's link to its contact goes after its site links.** UDDF's prose names buddies and
-sites as the targets of this `<link>` and its XSD takes any id, so the link is schema-valid
-and a reader resolves it ([`uddf-mapping.md`](uddf-mapping.md)). After rather than beside:
-an importer reading one link takes the first as the dive's site, which is why the primary
-site leads, and a contact ahead of it would be read as the site.
+**A dive's link to its contact goes after its site links**, and its people's after that
+(*People* below). UDDF's prose names buddies and sites as the targets of this `<link>` and
+its XSD takes any id, so the link is schema-valid and a reader resolves it
+([`uddf-mapping.md`](uddf-mapping.md)). After rather than beside: an importer reading one
+link takes the first as the dive's site, which is why the primary site leads, and a contact
+ahead of it would be read as the site.
 
 **A part's accommodation is a copy.** `trippartType` holds an `<accomodation>` inside the
 part rather than linking to one, so each part gets its own copy of the contact — `<name>`,
@@ -514,6 +521,63 @@ back: every contact a dive links or a copy names and every shop, with its name, 
 website, address and notes, and its roles as its slots imply them — and every part's
 accommodation but the ones the rule above reports.
 
+### People
+
+| DiveJSON | UDDF |
+| --- | --- |
+| a person | `<diver><buddy id="person-<uuid>">`, after the `<owner>`, one per person in document order |
+| `name` | `personal/firstname` + `lastname`, split as below |
+| `phone`, `email` | one `<contact>` holding `<phone>` and `<email>`, whichever are present, in that order |
+| `notes` | `<notes><para>` |
+| a dive's reference with the role `buddy`, or with none | `<informationbeforedive><link ref="person-<uuid>">` |
+| a dive's reference with the role `guide`, on a dive whose contact goes out as a `<divebase>` | a `<guide id="guide-<n>">` under that base linking the person's `<buddy>`, and a `<link>` from the dive to the guide |
+
+**Every person goes out, whatever references them.** The `<buddy>` elements are the
+logbook's people rather than any one dive's, so a person only a trip or a course names is
+written too, and comes back as a person nothing references. A document with no owner to
+describe still gets its `<owner>`, which `<diver>` requires ahead of any `<buddy>`, as the
+bare `owner` with the empty names *Diver and gear* describes: a reader takes that as no diver
+at all.
+
+**A name is split at its first space.** `<firstname>` takes the first word and `<lastname>`
+the rest, and a one-word name leaves `<lastname>` empty, `personalType` requiring it. A reader
+joins the non-empty parts with single spaces ([`uddf-mapping.md`](uddf-mapping.md)), so a
+name whose words are separated by single spaces, with none around them, comes back
+byte-identical. Any other whitespace in a name goes out normalised to that and is reported,
+and a name of whitespace alone goes out empty, which a reader drops along with every
+reference to the person, and is reported too. The first space is where Subsurface's and
+Bubbletrail's UDDF exports split a name, so a reader of either that re-joins the two
+elements sees the same string. A buddy's children run in
+`personType`'s order: `<personal>`, `<contact>`, `<notes>`.
+
+**A dive's people are linked in the dive's own order, after its sites and its contact**
+(*Contacts* above), each reference one `<link>`.
+
+**`buddy` and no role at all are one plain link**, and a plain link reads back as `buddy`,
+which is UDDF's own reading of a dive linking a buddy directly. So a reference with no role
+comes back with one the document never had, and it is reported, as a contact recording no
+roles is (*Contacts* above): an absent role says only that the person was there, and `buddy`
+says they dived alongside the diver, which a companion who stayed on the boat did not.
+
+**`guide` is the one other role UDDF can say, and only through a dive base.** `<guide>` is a
+child of `<divebase>`, holding nothing but an id and a `<link>` to a buddy, so a guide
+reference on a dive whose contact goes out as a `<divebase>` becomes a `<guide>` under that
+base, and the dive links the guide where it would have linked the buddy. A base carries one
+`<guide>` per person, however many of its dives that person led, numbered from 0 over the
+document's guides in the order they are first needed. On a dive whose contact is a `<shop>`,
+or which has none, there is no base to hang a guide on: the reference is a plain link and
+its role is reported.
+
+**Every other role is reported, and its reference still goes out as a plain link**, which
+reads back as `buddy`: `instructor`, `student` and `companion` have no UDDF spelling on a
+dive. `<student/>` is not one for `student` — it is a flag on the buddy, saying the person
+is the owner's student on every dive that links them, where a role is one dive's.
+
+**A trip's people and a course's are not written**, `<trippart>` linking only a dive base and
+UDDF having no course, and each is reported; a certification's `instructor_uuid` goes with
+the certification (*What is never written*). A person's `created_at` and `extensions` have no
+slot, as a contact's do not.
+
 ### Dives
 
 `<divenumber>` is an `xs:positiveInteger` where §6.2 puts no floor under `number`, so a
@@ -528,9 +592,10 @@ a dive of no length.
 
 `informationbeforediveType` is an `xs:sequence`: `<link>`s first, then `<divenumber>`,
 `<internaldivenumber>`, `<datetime>`, `<altitude>`, `<equipmentused>`, `<tripmembership>`,
-`<surfacepressure>`. Among the links the sites lead and the contact follows (*Contacts*
-above) — a link to a base or a shop being one UDDF's prose does not list and its XSD
-allows. `informationafterdiveType` is an `xs:all` and its order is free.
+`<surfacepressure>`. Among the links the sites lead, the contact follows (*Contacts* above)
+and the people come last (*People* above) — a link to a base or a shop being one UDDF's
+prose does not list and its XSD allows. `informationafterdiveType` is an `xs:all` and its
+order is free.
 
 `started_at` is written **exactly as recorded**, offset and sub-second fraction and all;
 §5.2's rule that an offset is never supplied applies as much to a writer as to a reader.
@@ -750,7 +815,9 @@ once per record that carries it, and none of them has anywhere in UDDF to go:
 | `trips[].parts[].location.bbox` | `geographyType` carries a point, not a box |
 | `sites[].location.full_name`, `position` and `bbox` | a site's `<name>` is its own, so the locality gets only `<geography><location>` and that slot holds `location.name`; `<geography>`'s coordinates are the site's pin, and the box has nowhere either — *Sites and trips* above has the asymmetry with a part |
 | `contacts[].roles` | no element; *Contacts* above says when it is reported |
-| `contact_uuid` on a course, a certification or a service record | the record has no slot (above), and its reference goes with it |
+| `contact_uuid` on a course, a certification or a service record, and a certification's `instructor_uuid` | the record has no slot (above), and its reference goes with it |
+| `trips[].people`, `courses[].people` | `<trippart>` links only a dive base, and UDDF has no course; *People* above |
+| a dive's person reference with a role other than `buddy` or `guide`, or with `guide` where the dive has no `<divebase>` | the role has no spelling there; the reference goes out as a plain link, and *People* above says why |
 | a record's `extensions` | producer-defined members (§5.5) |
 
 An **empty** note — `notes: ""` — is not written either: `<para></para>` and no `<notes>` at

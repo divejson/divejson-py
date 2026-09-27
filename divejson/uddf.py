@@ -92,6 +92,7 @@ from .converter import (
     header,
     integer_of,
     milliseconds,
+    person_members,
     position,
     record_inferred,
     recorded,
@@ -183,6 +184,12 @@ _ADDRESS = (
 # a rating, a guide, a hotel's category — is never dropped in silence.
 _SHAPE_READ = {"name", "address", "contact", "notes"}
 _CONTACT_BLOCK_READ = {"phone", "mobilephone", "email", "homepage"}
+
+# `<personal>`'s names, in the order a person's `name` joins them; a `<buddy>`'s children and
+# its `<contact>` block's that §6.20 reads. Every other one is reported, as a contact's are.
+_NAME_PARTS = ("firstname", "middlename", "lastname")
+_PERSON_READ = {"personal", "contact", "notes", "student"}
+_PERSON_CONTACT_READ = {"phone", "mobilephone", "email"}
 
 # Where a part's diver slept, and the role each shape gives its contact. The accommodation is
 # read under both spellings — the XSD declares `<accomodation>`, the documentation writes
@@ -471,6 +478,15 @@ def _carries(element: ET.Element | None) -> bool:
     return element is not None and any(text.strip() for text in element.itertext())
 
 
+def _states(element: ET.Element) -> bool:
+    """Whether an element records anything at all: text, or an attribute, anywhere beneath it.
+
+    `_carries` with attributes counted, for the residue of a `<personal>` — whose
+    `<membership organisation>` and `<numberofdives>` hold what they say in attributes alone.
+    """
+    return _carries(element) or any(node.attrib for node in element.iter())
+
+
 def _has_offset(value: str) -> bool:
     _, _, time_part = value.partition("T")
     return time_part.endswith(("Z", "z")) or "+" in time_part or "-" in time_part
@@ -521,6 +537,16 @@ class _Converter:
         # told apart by; and whether the report is held while such a contact is read.
         self.carried_contacts: set[str] = set()
         self.muted = False
+        # A `<buddy>`'s `@id` to its person, for a dive's link to one, recorded whether or not
+        # this file carries the row like the tables above; the ids of a buddy that was not
+        # read, so a link to one says why it went; and the buddies flagged `<student/>`.
+        self.person_uuids: dict[str, str] = {}
+        self.unread_people: set[str] = set()
+        self.students: set[str] = set()
+        # A `<divebase><guide>`'s `@id` to the buddy id its one `<link>` names, and the guide
+        # ids a dive links — each read as that dive's guide, and not reported with its base.
+        self.guides: dict[str, str | None] = {}
+        self.linked_guides: set[str] = set()
         self.local_clock_with_z = self.generator_writes_a_local_z()
         self.percent_gradient_factors = self.generator_writes_percent_gradient_factors()
         self.reported_gradient_scale = False
@@ -678,15 +704,18 @@ class _Converter:
                 self.source_ids.add(source_id)
 
         # Order matters: the dives resolve links into the tables the calls above them fill,
+        # the guides come before the contacts whose report passes over the ones a dive links,
         # the contacts come before the trip parts and the kit list whose inline shapes fold
         # into them, and the diver is last only so its identity yields to a real record's on
         # the vanishingly rare id collision.
         self.read_mixes()
         self.read_deco_models()
+        self.read_guides()
         sites = self.read_sites()
         self.read_contacts()
         trips = self.read_trips()
         gear = self.read_gear()
+        people = self.read_people()
         dives = self.read_dives()
         diver = self.read_diver()
         contacts = [{member: row[member] for member in contact_members() if member in row} for row in self.contacts]
@@ -694,7 +723,14 @@ class _Converter:
         document: dict[str, Any] = header(self.exported_at)
         if diver:
             document["diver"] = diver
-        collections = (("dives", dives), ("trips", trips), ("sites", sites), ("gear", gear), ("contacts", contacts))
+        collections = (
+            ("dives", dives),
+            ("trips", trips),
+            ("sites", sites),
+            ("gear", gear),
+            ("contacts", contacts),
+            ("people", people),
+        )
         for member, rows in collections:
             if rows:
                 document[member] = rows
@@ -823,6 +859,100 @@ class _Converter:
                 self.note(here, f"§6.1's Insurance has no member for {what}; it is not read", "dropped")
             insurances.append(insurance)
         return insurances
+
+    # -- people ------------------------------------------------------------------
+
+    def read_people(self) -> list[dict[str, Any]]:
+        """`<diver><buddy>` as §6.20 people, in file order, before the dives that link them.
+
+        Read the way the contacts are read before the trips: a dive's `<link>` names a buddy
+        by its `@id`, so the table has to be full before any dive is. A buddy whose
+        `<personal>` holds no name at all is dropped, a name being the one thing a person
+        must have, and every link to it goes with it.
+
+        `<student/>` is kept aside rather than read into the person: it says the buddy is the
+        owner's student, which is a role, and §6.20 keeps a role on the reference — so it is
+        the role a dive linking the buddy directly gives it (`dive_people`).
+        """
+        people: list[dict[str, Any]] = []
+        for index, element in enumerate(_kids(_kid(self.root, "diver"), "buddy")):
+            where = f"buddy/{index}"
+            source_id = _attr(element, "id")
+            names = [text for text in (_text_of(element, "personal", part) for part in _NAME_PARTS) if text]
+            if not names:
+                self.note(
+                    where,
+                    "the buddy has no name, which the format requires of a person; it is dropped, and every "
+                    "link to it with it (spec §6.20)",
+                    "dropped",
+                )
+                if source_id:
+                    self.unread_people.add(source_id)
+                continue
+            claimed, carried = self.uuid_for("person", source_id, where, index)
+            if claimed is None:
+                if source_id:
+                    self.unread_people.add(source_id)
+                continue
+            if source_id:
+                # Recorded before the row is written, and whether or not it is, for the reason
+                # a site's id is.
+                self.person_uuids[source_id] = claimed
+                if _kid(element, "student") is not None:
+                    self.students.add(source_id)
+            if carried:
+                people.append(self.person(element, claimed, " ".join(names), where))
+        return people
+
+    def person(self, element: ET.Element, uuid: str, name: str, where: str) -> dict[str, Any]:
+        """One `<buddy>` as a person, and what §6.20 does not carry of it reported.
+
+        `<contact>`'s first email and first phone, on the owner's terms, and `<notes>`. Every
+        other child — an address, a kit list, a medical history, a certification, insurance —
+        is reported by its tag, derived from the element rather than listed, and so are
+        `<personal>`'s beyond the names and `<contact>`'s beyond the three it reads: the rule
+        `contact_contents` keeps for a contact.
+        """
+        contact = _kid(element, "contact")
+        recorded: dict[str, Any] = {
+            "uuid": uuid,
+            "name": self.capped(name, MAX_NAME, where, "the person's name"),
+            "email": self.contact_email(contact, where, section="§6.20", whose="the person"),
+            "phone": self.phone(contact, where, section="§6.20", whose="the person"),
+            "notes": self.notes_text(element),
+        }
+        for child in element:
+            tag = local_name(child)
+            if tag not in _PERSON_READ:
+                self.note(where, f"§6.20 has no member for <{tag}>; it is not read", "dropped")
+        personal = _kid(element, "personal")
+        for child in personal if personal is not None else ():
+            tag = local_name(child)
+            if tag not in _NAME_PARTS and _states(child):
+                self.note(where, f"§6.20 has no member for <personal><{tag}>; it is not read", "dropped")
+        for child in contact if contact is not None else ():
+            tag = local_name(child)
+            if tag not in _PERSON_CONTACT_READ and _carries(child):
+                self.note(where, f"§6.20 has no member for <contact><{tag}>; it is not read", "dropped")
+        return {member: recorded[member] for member in person_members() if recorded.get(member)}
+
+    def read_guides(self) -> None:
+        """Every `<divebase><guide>` by its `@id`, to the buddy its one `<link>` names.
+
+        `guideType` is an id and a link to a `<buddy>`, and a dive links the guide where the
+        buddy led it for that base. Read before the contacts, whose report passes over a guide
+        a dive links — it is read, as that dive's guide — and names one no dive does.
+        """
+        for base in _kids(_kid(self.root, "divesite"), "divebase"):
+            for guide in _kids(base, "guide"):
+                guide_id = _attr(guide, "id")
+                if guide_id:
+                    self.guides[guide_id] = _attr(_kid(guide, "link"), "ref")
+        for dive in self.dive_elements():
+            for link in _kids(_kid(dive, "informationbeforedive"), "link"):
+                ref = _attr(link, "ref")
+                if ref in self.guides:
+                    self.linked_guides.add(ref)
 
     # -- sites -------------------------------------------------------------------
 
@@ -1054,7 +1184,7 @@ class _Converter:
         }
         for child in element:
             tag = local_name(child)
-            if tag in _SHAPE_READ:
+            if tag in _SHAPE_READ or (tag == "guide" and _attr(child, "id") in self.linked_guides):
                 continue
             said = f"<{tag}> {_text(child)!r}" if tag == "aliasname" and _text(child) else f"<{tag}>"
             self.note(where, f"§6.18 has no member for {said}; it is not read", "dropped")
@@ -1064,12 +1194,14 @@ class _Converter:
                 self.note(where, f"§6.18 has no member for <contact><{tag}>; it is not read", "dropped")
         return {member: value for member, value in contents.items() if value}
 
-    def contact_email(self, contact: ET.Element | None, where: str) -> str | None:
+    def contact_email(
+        self, contact: ET.Element | None, where: str, *, section: str = "§6.18", whose: str = "the contact"
+    ) -> str | None:
         """The first `<email>`, on the owner's terms (`email`), reporting every other one."""
         recorded = [value for value in (_text(kid) for kid in _kids(contact, "email")) if value]
         for value in recorded[1:]:
             self.note(
-                where, f"§6.18 carries one email, the first the contact records; {value!r} is not read", "dropped"
+                where, f"{section} carries one email, the first {whose} records; {value!r} is not read", "dropped"
             )
         return self.email(recorded[0], where) if recorded else None
 
@@ -1639,8 +1771,8 @@ class _Converter:
         trip_uuid = self.reference(_attr(_kid(before, "tripmembership"), "ref"), self.trip_uuids, where, "trip")
         if trip_uuid:
             dive["trip_uuid"] = trip_uuid
-        # A site first where an id names both a site and a contact — a source id is not unique
-        # within a file (the module docstring).
+        # A site first where an id names both a site and a contact, and a contact before a
+        # person — a source id is not unique within a file (the module docstring).
         links = [_attr(link, "ref") for link in _kids(before, "link")]
         to_contacts = [
             ref
@@ -1649,17 +1781,27 @@ class _Converter:
             and ref not in self.site_uuids
             and (ref in self.contact_uuids or ref in self.unread_contacts)
         ]
+        to_people = [
+            ref
+            for ref in links
+            if ref is not None
+            and ref not in self.site_uuids
+            and ref not in to_contacts
+            and (ref in self.person_uuids or ref in self.unread_people or ref in self.guides)
+        ]
         contact_uuid = self.dive_contact(to_contacts, where)
         if contact_uuid:
             dive["contact_uuid"] = contact_uuid
-        site_uuids = self.references(
-            [ref for ref in links if ref not in to_contacts], self.site_uuids, where, "dive site"
-        )
+        to_sites = [ref for ref in links if ref not in to_contacts and ref not in to_people]
+        site_uuids = self.references(to_sites, self.site_uuids, where, "dive site")
         if site_uuids:
             dive["site_uuids"] = site_uuids
         gear_uuids = self.references([_attr(link, "ref") for link in _kids(used, "link")], self.gear_uuids, where, "gear item")
         if gear_uuids:
             dive["gear_uuids"] = gear_uuids
+        people = self.dive_people(to_people, where)
+        if people:
+            dive["people"] = people
 
         cylinders, mix_refs = self.read_cylinders(element, where)
         profile, needs_gas_numbers, mode = self.read_profile(element, where, mix_refs)
@@ -1871,6 +2013,57 @@ class _Converter:
             )
         return found[0] if found else None
 
+    def dive_people(self, refs: list[str], where: str) -> list[dict[str, Any]]:
+        """The people a dive's `<link>`s name, each once, with the role each link gives.
+
+        A link to a buddy reads as UDDF's own prose reads it — "the cross-referenced person is
+        simply a buddy" — so its role is `buddy`, or `student` where the buddy carries
+        `<student/>`; a link to a base's `<guide>` names that guide's buddy, as the dive's
+        `guide`. A person linked twice, directly and through a guide or twice directly, keeps
+        one reference at the first link's place, `guide` if either link was one — the more
+        specific of two roles wins — and the repeat is reported.
+        """
+        people: list[dict[str, Any]] = []
+        held: dict[str, dict[str, Any]] = {}
+        repeated: dict[str, tuple[str, int]] = {}
+        for ref in refs:
+            if ref in self.guides:
+                buddy, role = self.guides[ref], "guide"
+                if buddy is None or buddy not in self.person_uuids:
+                    self.note(
+                        where,
+                        f"a link points at the guide {ref!r}, whose own link names no buddy that is read; the "
+                        "reference goes with it",
+                        "dropped",
+                    )
+                    continue
+            elif ref in self.person_uuids:
+                buddy, role = ref, "student" if ref in self.students else "buddy"
+            else:
+                self.note(
+                    where,
+                    f"a link points at the buddy {ref!r}, which is not read; the reference goes with it",
+                    "dropped",
+                )
+                continue
+            uuid = self.person_uuids[buddy]
+            if uuid not in held:
+                held[uuid] = {"person_uuid": uuid, "role": role}
+                people.append(held[uuid])
+                continue
+            _, count = repeated.get(uuid, (buddy, 1))
+            repeated[uuid] = (buddy, count + 1)
+            if role == "guide":
+                held[uuid]["role"] = "guide"
+        for uuid, (buddy, count) in repeated.items():
+            self.note(
+                where,
+                f"the dive links the buddy {buddy!r} {count} times, and a person is listed on a dive once; one "
+                f"reference is kept, as {held[uuid]['role']}, and the rest are dropped",
+                "dropped",
+            )
+        return people
+
     def reference(self, ref: str | None, table: dict[str, str], where: str, kind: str) -> str | None:
         resolved = self.references([ref], table, where, kind)
         return resolved[0] if resolved else None
@@ -1892,11 +2085,11 @@ class _Converter:
                 self.note(where, f"a link points at {ref!r}, which nothing in the file defines; the reference is dropped", "dropped")
             elif ref not in self.mixes and ref not in self.deco_models:
                 # A `<link>` under `informationbeforedive` addresses a site here — a contact's
-                # was taken off before (`dive_contact`) — but the schema lets it address a
-                # buddy too, and one under `<equipmentused>` addresses a piece of kit. A
-                # reference to a record this converter carries nowhere is worth a note; a gas
-                # reference is not, and neither is a decompression model — that one resolves
-                # in `read_deco_model` and was reported there if it went nowhere.
+                # and a person's were taken off before (`dive_contact`, `dive_people`) — and one
+                # under `<equipmentused>` addresses a piece of kit. A reference to a record this
+                # converter carries nowhere is worth a note; a gas reference is not, and neither
+                # is a decompression model — that one resolves in `read_deco_model` and was
+                # reported there if it went nowhere.
                 self.note(where, f"a link points at {ref!r}, which is not a {kind} this converter carries; the reference is dropped", "dropped")
         return resolved
 

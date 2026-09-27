@@ -3,8 +3,9 @@
 Two passes, mirroring §3 of the specification: the JSON Schema (types, required members,
 enums, ranges, lengths, and the structural rules like Position objects), then the
 semantic requirements the schema cannot express — identifier uniqueness, referential
-closure, cross-member arithmetic, profile-series integrity and span, what a recording
-carries, the offset requirement on ``exported_at``, and the gradient-factor order.
+closure, a person listed once per host, cross-member arithmetic, profile-series integrity
+and span, what a recording carries, the offset requirement on ``exported_at``, and the
+gradient-factor order.
 
 §4's member order is a SHOULD, not a requirement on the document: a generic
 re-serialisation commonly sorts an object's members, and a document it produced is as
@@ -219,6 +220,7 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
             "gear_service_records",
             "certifications",
             "contacts",
+            "people",
         )
     }
 
@@ -250,6 +252,7 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
         _check_reference_list(dive, "site_uuids", known["sites"], "sites", here, issues)
         _check_reference_list(dive, "gear_uuids", known["gear"], "gear", here, issues)
         _check_reference_list(dive, "species_uuids", known["species"], "species", here, issues)
+        _check_people(dive, known["people"], here, issues)
 
         for cyl_index, cylinder in enumerate(dive.get("cylinders") or []):
             if not isinstance(cylinder, dict):
@@ -306,6 +309,7 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
 
     for index, trip in enumerate(collections["trips"]):
         here = f"trips/{index}"
+        _check_people(trip, known["people"], here, issues)
         for part_index, part in enumerate(trip.get("parts") or []):
             if not isinstance(part, dict):
                 continue
@@ -317,8 +321,7 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
                 except TypeError:
                     pass
             _check_location_bbox(part, part_path, issues)
-            # The one reference out of an embedded object, and the one not named after its
-            # collection: §5.3 resolves it where §6.9a says, in `contacts`.
+            # Named after no collection, so §5.3 resolves it where §6.9a says: in `contacts`.
             _check_reference(part, "accommodation_uuid", known["contacts"], "contacts", part_path, issues)
 
     for index, site in enumerate(collections["sites"]):
@@ -352,11 +355,14 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
             except TypeError:
                 pass
         _check_reference(course, "contact_uuid", known["contacts"], "contacts", f"courses/{index}", issues)
+        _check_people(course, known["people"], f"courses/{index}", issues)
 
     for index, certification in enumerate(collections["certifications"]):
         here = f"certifications/{index}"
         _check_reference(certification, "course_uuid", known["courses"], "courses", here, issues)
         _check_reference(certification, "contact_uuid", known["contacts"], "contacts", here, issues)
+        # Named after no collection either: §6.16's instructor is a person.
+        _check_reference(certification, "instructor_uuid", known["people"], "people", here, issues)
         for member in ("front_file", "back_file"):
             stored = certification.get(member)
             if isinstance(stored, dict):
@@ -409,6 +415,31 @@ def _check_reference_list(
             issues.append(
                 Issue(f"{path}/{member}/{index}", f"references {value}, not present in {collection}")
             )
+
+
+def _check_people(host: dict[str, Any], targets: set[str], path: str, issues: list[Issue]) -> None:
+    """A host's `people`: each reference resolves in `people`, and no person is listed twice.
+
+    The schema cannot say the second. Two references to one person differing in their `role`
+    are two distinct objects to `uniqueItems`, and a person is on one occasion in one
+    capacity — the reason the role is a single value rather than a set.
+    """
+    references = host.get("people")
+    if not isinstance(references, list):
+        return
+    listed: dict[str, int] = {}
+    for index, reference in enumerate(references):
+        if not isinstance(reference, dict):
+            continue
+        here = f"{path}/people/{index}"
+        _check_reference(reference, "person_uuid", targets, "people", here, issues)
+        value = reference.get("person_uuid")
+        if not isinstance(value, str):
+            continue
+        if value in listed:
+            issues.append(Issue(here, f"person {value} is already listed at {path}/people/{listed[value]}"))
+        else:
+            listed[value] = index
 
 
 def _check_profile(profile: Any, path: str, issues: list[Issue]) -> None:

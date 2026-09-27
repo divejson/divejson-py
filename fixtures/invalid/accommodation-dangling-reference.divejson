@@ -545,7 +545,6 @@
       "status": "completed",
       "starts_on": "2026-06-30",
       "ends_on": "2026-07-05",
-      "instructor_name": "J. Harbord",
       "contact_uuid": "0198a6f0-1111-7095-8000-000000000095",
       "notes": "Four training dives; the wall dive was the final assessment.",
       "created_at": "2026-06-01T09:00:00+12:00"
@@ -563,7 +562,6 @@
       "status": "completed",
       "starts_on": "2026-08-14",
       "ends_on": "2026-08-16",
-      "instructor_name": "T. Mahuta",
       "notes": "Taught privately over two weekends; no agency issued it."
     }
   ],
@@ -686,7 +684,6 @@
       "name": "Normoxic Trimix Diver",
       "number": "NZT-2044",
       "certified_on": "2025-03-14",
-      "instructor_name": "J. Harbord",
       "contact_uuid": "0198a6f0-1111-7095-8000-000000000095",
       "course_uuid": "0198a6f0-1111-7090-8000-000000000090",
       "notes": "",

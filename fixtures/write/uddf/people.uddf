@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<uddf xmlns="http://www.streit.cc/uddf/3.2/" version="3.2.2">
+  <generator>
+    <name>divejson convert</name>
+    <type>converter</type>
+    <version>0.14.0</version>
+    <datetime>2026-09-26T09:00:00+00:00</datetime>
+  </generator>
+  <business>
+    <shop id="contact-019fee00-7e0b-7000-8000-0000000000a2">
+      <name>Lighthouse Dive Shop</name>
+      <contact>
+        <phone>+20 69 555 0310</phone>
+      </contact>
+    </shop>
+  </business>
+  <diver>
+    <owner id="owner">
+      <personal>
+        <firstname />
+        <lastname />
+      </personal>
+    </owner>
+    <buddy id="person-019fee00-7e0b-7000-8000-0000000000b1">
+      <personal>
+        <firstname>Mona</firstname>
+        <lastname>Salem</lastname>
+      </personal>
+      <contact>
+        <phone>+20 100 555 0177</phone>
+        <email>mona@example.com</email>
+      </contact>
+      <notes>
+        <para>Guides at Blue Hole Divers.</para>
+      </notes>
+    </buddy>
+    <buddy id="person-019fee00-7e0b-7000-8000-0000000000b2">
+      <personal>
+        <firstname>Karim</firstname>
+        <lastname />
+      </personal>
+    </buddy>
+    <buddy id="person-019fee00-7e0b-7000-8000-0000000000b3">
+      <personal>
+        <firstname>Ahmed</firstname>
+        <lastname>Fathy</lastname>
+      </personal>
+    </buddy>
+    <buddy id="person-019fee00-7e0b-7000-8000-0000000000b4">
+      <personal>
+        <firstname>Leila</firstname>
+        <lastname>Ben Ali</lastname>
+      </personal>
+      <contact>
+        <email>leila@lighthouse.example</email>
+      </contact>
+    </buddy>
+    <buddy id="person-019fee00-7e0b-7000-8000-0000000000b5">
+      <personal>
+        <firstname>Nour</firstname>
+        <lastname>Haddad</lastname>
+      </personal>
+      <notes>
+        <para>Came for the week and snorkelled.</para>
+      </notes>
+    </buddy>
+  </diver>
+  <divesite>
+    <divebase id="contact-019fee00-7e0b-7000-8000-0000000000a1">
+      <name>Blue Hole Divers</name>
+      <address>
+        <city>Dahab</city>
+        <country>Egypt</country>
+      </address>
+      <guide id="guide-0">
+        <link ref="person-019fee00-7e0b-7000-8000-0000000000b1" />
+      </guide>
+    </divebase>
+    <site id="site-019fee00-7e0b-7000-8000-000000000020">
+      <name>Lighthouse Reef</name>
+      <geography>
+        <location>Dahab, Egypt</location>
+        <latitude>28.4953</latitude>
+        <longitude>34.5198</longitude>
+      </geography>
+    </site>
+  </divesite>
+  <divetrip>
+    <trip id="trip-019fee00-7e0b-7000-8000-000000000030">
+      <name>Dahab, May</name>
+      <trippart>
+        <name>Dahab</name>
+        <dateoftrip startdate="2026-05-01T00:00:00" enddate="2026-05-05T00:00:00" />
+      </trippart>
+    </trip>
+  </divetrip>
+  <profiledata>
+    <repetitiongroup id="rg-1">
+      <dive id="dive-019fee00-7e0b-7000-8000-000000000010">
+        <informationbeforedive>
+          <link ref="site-019fee00-7e0b-7000-8000-000000000020" />
+          <link ref="contact-019fee00-7e0b-7000-8000-0000000000a1" />
+          <link ref="guide-0" />
+          <link ref="person-019fee00-7e0b-7000-8000-0000000000b2" />
+          <link ref="person-019fee00-7e0b-7000-8000-0000000000b3" />
+          <divenumber>201</divenumber>
+          <datetime>2026-05-02T09:30:00+02:00</datetime>
+          <tripmembership ref="trip-019fee00-7e0b-7000-8000-000000000030" />
+        </informationbeforedive>
+        <informationafterdive>
+          <greatestdepth>18.4</greatestdepth>
+          <diveduration>2880</diveduration>
+        </informationafterdive>
+      </dive>
+      <dive id="dive-019fee00-7e0b-7000-8000-000000000011">
+        <informationbeforedive>
+          <link ref="site-019fee00-7e0b-7000-8000-000000000020" />
+          <link ref="contact-019fee00-7e0b-7000-8000-0000000000a1" />
+          <link ref="person-019fee00-7e0b-7000-8000-0000000000b2" />
+          <link ref="guide-0" />
+          <divenumber>202</divenumber>
+          <datetime>2026-05-02T14:10:00+02:00</datetime>
+          <tripmembership ref="trip-019fee00-7e0b-7000-8000-000000000030" />
+        </informationbeforedive>
+        <informationafterdive>
+          <greatestdepth>21</greatestdepth>
+          <diveduration>3120</diveduration>
+        </informationafterdive>
+      </dive>
+      <dive id="dive-019fee00-7e0b-7000-8000-000000000012">
+        <informationbeforedive>
+          <link ref="site-019fee00-7e0b-7000-8000-000000000020" />
+          <link ref="contact-019fee00-7e0b-7000-8000-0000000000a2" />
+          <link ref="person-019fee00-7e0b-7000-8000-0000000000b4" />
+          <link ref="person-019fee00-7e0b-7000-8000-0000000000b1" />
+          <divenumber>203</divenumber>
+          <datetime>2026-05-03T10:00:00+02:00</datetime>
+          <tripmembership ref="trip-019fee00-7e0b-7000-8000-000000000030" />
+        </informationbeforedive>
+        <informationafterdive>
+          <greatestdepth>12.6</greatestdepth>
+          <diveduration>2400</diveduration>
+        </informationafterdive>
+      </dive>
+      <dive id="dive-019fee00-7e0b-7000-8000-000000000013">
+        <informationbeforedive>
+          <link ref="site-019fee00-7e0b-7000-8000-000000000020" />
+          <link ref="person-019fee00-7e0b-7000-8000-0000000000b3" />
+          <link ref="person-019fee00-7e0b-7000-8000-0000000000b2" />
+          <divenumber>204</divenumber>
+          <datetime>2026-05-04T08:45:00+02:00</datetime>
+          <tripmembership ref="trip-019fee00-7e0b-7000-8000-000000000030" />
+        </informationbeforedive>
+        <informationafterdive>
+          <greatestdepth>16.2</greatestdepth>
+          <diveduration>2700</diveduration>
+        </informationafterdive>
+      </dive>
+    </repetitiongroup>
+  </profiledata>
+</uddf>

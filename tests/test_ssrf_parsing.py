@@ -14,6 +14,7 @@ reader produces, and it is reported rather than filled in.
 from __future__ import annotations
 
 import io
+import uuid
 import zipfile
 
 import pytest
@@ -334,6 +335,97 @@ def test_a_reference_to_a_site_nothing_defines_is_reported_as_the_source_defect_
     which of the two they have."""
     conversion = convert(one_ssrf_dive("divesiteid='deadbeef'", sites="<site uuid='s1' name='Blue Hole'/>"))
     assert any("<divesites> does not define" in message for message in messages(conversion))
+
+
+# -- people ---------------------------------------------------------------------------
+
+
+def people_of(*dives: str) -> tuple[dict, list[tuple[str, str]]]:
+    """A logbook of one dive per body, its document, and its report as `(where, message)`."""
+    bodies = "".join(f"<dive {SSRF_STARTED_AT}>{body}</dive>" for body in dives)
+    conversion = convert(ssrf(f"<dives>{bodies}</dives>"))
+    assert validate_document(conversion.document) == []
+    return conversion.document, [(note.where, note.message) for note in conversion.notes]
+
+
+def named(document: dict, index: int = 0) -> list[tuple[str, str]]:
+    """One dive's people as `(name, role)`, in the dive's order."""
+    names = {person["uuid"]: person["name"] for person in document["people"]}
+    return [(names[ref["person_uuid"]], ref["role"]) for ref in document["dives"][index].get("people") or []]
+
+
+def test_the_buddy_field_is_a_list_split_on_commas_and_every_name_a_buddy() -> None:
+    """Subsurface's own rule for the field, each name trimmed, and an empty one no name."""
+    document, _ = people_of("<buddy> Ann Lee,Bo , ,Cy,</buddy>")
+    assert named(document) == [("Ann Lee", "buddy"), ("Bo", "buddy"), ("Cy", "buddy")]
+    assert [person["name"] for person in document["people"]] == ["Ann Lee", "Bo", "Cy"]
+
+
+def test_one_name_is_one_person_across_the_file_whatever_its_case() -> None:
+    """Trimmed and case-folded, the name being all a `.ssrf` identifies a person by — and the
+    record is spelled the way the file first spelled it."""
+    document, _ = people_of("<buddy>Ann Lee</buddy>", "<buddy>ann lee , BO</buddy>")
+    assert [person["name"] for person in document["people"]] == ["Ann Lee", "BO"]
+    assert [ref["person_uuid"] for ref in document["dives"][1]["people"]][0] == document["people"][0]["uuid"]
+
+
+def test_a_persons_identity_is_the_record_path_over_the_case_folded_name() -> None:
+    document, _ = people_of("<buddy>Ann Lee</buddy>")
+    assert document["people"][0]["uuid"] == str(uuid.uuid5(SSRF_ID_NAMESPACE, "person:ann lee"))
+
+
+@pytest.mark.parametrize("tag", ["divemaster", "diveguide"])
+def test_the_divemaster_is_one_name_and_a_guide(tag: str) -> None:
+    """Not split: the field names a person, and a comma inside it is part of the name."""
+    document, _ = people_of(f"<{tag}>Moh, the Elder</{tag}>")
+    assert named(document) == [("Moh, the Elder", "guide")]
+
+
+def test_the_buddies_come_before_the_divemaster_whatever_order_the_file_writes() -> None:
+    """Subsurface writes `<divemaster>` first; a dive's `people` is its buddy field, then its guide,
+    and the file's people are met in that order too."""
+    document, _ = people_of("<divemaster>Moh</divemaster><buddy>Ann Lee, Bo</buddy>")
+    assert named(document) == [("Ann Lee", "buddy"), ("Bo", "buddy"), ("Moh", "guide")]
+    assert [person["name"] for person in document["people"]] == ["Ann Lee", "Bo", "Moh"]
+
+
+def test_a_divemaster_among_the_buddies_is_that_reference_made_the_guide() -> None:
+    """One reference, at the buddy's place, as the more specific of two roles — and not a loss
+    the report has to name."""
+    document, report = people_of("<divemaster>BO</divemaster><buddy>Ann Lee, Bo</buddy>")
+    assert named(document) == [("Ann Lee", "buddy"), ("Bo", "guide")]
+    assert len(document["people"]) == 2
+    assert not [message for _, message in report if "more than once" in message]
+
+
+def test_a_name_the_buddy_field_repeats_is_one_reference_and_the_repeat_is_reported() -> None:
+    document, report = people_of("<buddy>Ann Lee, ann lee </buddy>")
+    assert named(document) == [("Ann Lee", "buddy")]
+    assert (
+        "dive/0",
+        "the dive's buddies name 'ann lee' more than once, and a person is listed on a dive once; the repeat is "
+        "dropped",
+    ) in report
+
+
+def test_a_single_word_is_a_name() -> None:
+    document, _ = people_of("<buddy>Kim</buddy>")
+    assert document["people"] == [{"uuid": document["dives"][0]["people"][0]["person_uuid"], "name": "Kim"}]
+
+
+def test_a_dive_naming_nobody_carries_no_people() -> None:
+    document, _ = people_of("<buddy> , </buddy><divemaster/>")
+    assert "people" not in document and "people" not in document["dives"][0]
+
+
+def test_a_person_two_files_of_an_archive_name_is_carried_once() -> None:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("a.ssrf", ssrf(f"<dives><dive {SSRF_STARTED_AT}><buddy>Ann Lee</buddy></dive></dives>"))
+        archive.writestr("b.ssrf", ssrf(f"<dives><dive {SSRF_STARTED_AT}><buddy>ANN LEE</buddy></dive></dives>"))
+    document = convert(buffer.getvalue()).document
+    (person,) = document["people"]
+    assert [dive["people"] for dive in document["dives"]] == [[{"person_uuid": person["uuid"], "role": "buddy"}]] * 2
 
 
 # -- cylinders ------------------------------------------------------------------------

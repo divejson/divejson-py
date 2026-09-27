@@ -229,6 +229,10 @@ class _Converter:
         self.identities = Identities(SSRF_ID_NAMESPACE, scope, self.note)
         self.site_ids: set[str] = set()
         self.site_uuids: dict[str, str] = {}
+        # The people this file carries, in the order the dives first name them, and every
+        # person named, carried or not, by the trimmed case-folded name that is its identity.
+        self.people: list[dict[str, Any]] = []
+        self.person_uuids: dict[str, str] = {}
 
     # -- reporting ---------------------------------------------------------------
 
@@ -300,7 +304,7 @@ class _Converter:
         dives = self.read_dives()
 
         document: dict[str, Any] = header(self.exported_at)
-        for member, rows in (("dives", dives), ("sites", sites)):
+        for member, rows in (("dives", dives), ("sites", sites), ("people", self.people)):
             if rows:
                 document[member] = rows
         document["extensions"] = {PRODUCER_KEY: self.provenance()}
@@ -473,6 +477,9 @@ class _Converter:
         site_uuid = self.site_reference(attribute(element, "divesiteid"), where)
         if site_uuid:
             dive["site_uuids"] = [site_uuid]
+        people = self.read_people(element, where)
+        if people:
+            dive["people"] = people
 
         cylinders = self.read_cylinders(element, where)
         if cylinders:
@@ -566,6 +573,70 @@ class _Converter:
         else:
             self.note(where, f"the dive names the site {ref!r}, which <divesites> does not define; the reference is dropped", "dropped")
         return None
+
+    # -- people ------------------------------------------------------------------
+
+    def read_people(self, element: ET.Element, where: str) -> list[dict[str, Any]]:
+        """A dive's `<buddy>` and `<divemaster>` as its §6.2 `people`: the buddies, then the guide.
+
+        Child elements, which is what Subsurface writes, divemaster first, and `<diveguide>`
+        beside `<divemaster>` where a file carries the spelling Subsurface's parser also
+        accepts. The buddy field is a list on Subsurface's own terms — split on commas, each
+        name trimmed — and every name is a `buddy`; the divemaster is one name, and a `guide`.
+        The buddies come first whatever order the file writes the two in, and a divemaster
+        also named among them is that one reference made the `guide`, the more specific of
+        two roles; a name the buddy field repeats is one reference too, and the repeat is
+        reported.
+        """
+        people: list[dict[str, Any]] = []
+        held: dict[str, dict[str, Any]] = {}
+        repeated: dict[str, str] = {}
+        named = [
+            (name.strip(), "buddy")
+            for field in children(element, "buddy")
+            for name in (text(field) or "").split(",")
+        ] + [
+            (text(field) or "", "guide")
+            for field in element
+            if local_name(field) in ("divemaster", "diveguide")
+        ]
+        for name, role in named:
+            uuid = self.person(name, where) if name else None
+            if uuid is None:
+                continue
+            if uuid not in held:
+                held[uuid] = {"person_uuid": uuid, "role": role}
+                people.append(held[uuid])
+            elif role == "guide":
+                held[uuid]["role"] = "guide"
+            else:
+                repeated[uuid] = name
+        for name in repeated.values():
+            self.note(
+                where,
+                f"the dive's buddies name {name!r} more than once, and a person is listed on a dive once; the "
+                "repeat is dropped",
+                "dropped",
+            )
+        return people
+
+    def person(self, name: str, where: str) -> str | None:
+        """The person a trimmed name is, recorded the first time the file names them.
+
+        A `.ssrf` names people and never identifies them, so the name is the identity: one
+        person per trimmed, case-folded name across the file, through the shared record path
+        like a site's id, and spelled the way the file first spelled it.
+        """
+        key = name.casefold()
+        if key in self.person_uuids:
+            return self.person_uuids[key]
+        claimed, carried = self.identities.for_record("person", key, where, len(self.person_uuids))
+        if claimed is None:
+            return None
+        self.person_uuids[key] = claimed
+        if carried:
+            self.people.append({"uuid": claimed, "name": self.capped(name, MAX_NAME, where, "the person's name")})
+        return claimed
 
     # -- cylinders ---------------------------------------------------------------
 

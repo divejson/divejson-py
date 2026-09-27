@@ -145,6 +145,16 @@ LOST: dict[str, frozenset[str]] = {
             "contacts/0/roles",
             "contacts/0/created_at",
             "contacts/0/extensions",
+            # An `instructor` and a `student` have no spelling on a dive, and the third dive's
+            # reference records no role; all three come back as buddies. A trip's people have
+            # no slot; the courses' go with the courses, and J. Harbord's `created_at` and
+            # producer extension with nothing, as the contact's do.
+            "dives/0/people/0/role",
+            "dives/0/people/1/role",
+            "dives/2/people/0/role",
+            "trips/0/people",
+            "people/0/created_at",
+            "people/0/extensions",
         }
     ),
     "contacts": frozenset(
@@ -167,6 +177,29 @@ LOST: dict[str, frozenset[str]] = {
             "contacts/4",
         }
     ),
+    "people": frozenset(
+        {
+            "courses",
+            "certifications",
+            "dives/2/course_uuid",
+            "trips/0/people",
+            "people/0/created_at",
+            "people/0/extensions",
+            # Written with two spaces between the names, which `<firstname>` and `<lastname>`
+            # give back as one.
+            "people/2/name",
+            # A reference with no role; a `student`, an `instructor` and a `companion`, which
+            # UDDF has no spelling for on a dive; and a `guide` on the dive whose contact is a
+            # shop and on the one with no contact, with no `<divebase>` to hold a `<guide>`.
+            # Each comes back a buddy.
+            "dives/0/people/2/role",
+            "dives/1/people/0/role",
+            "dives/2/people/0/role",
+            "dives/2/people/1/role",
+            "dives/3/people/0/role",
+            "dives/3/people/1/role",
+        }
+    ),
 }
 
 # The one documented exception to the self round trip (`docs/uddf-writing.md`), and the one
@@ -185,6 +218,7 @@ RETURNED: dict[str, frozenset[str]] = {
     "owner-profile-only": frozenset(),
     "technical-dive": frozenset({"gear", "dives/0/gear_uuids"}),
     "contacts": frozenset(),
+    "people": frozenset(),
 }
 
 

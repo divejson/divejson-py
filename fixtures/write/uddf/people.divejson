@@ -1,0 +1,225 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-26T09:00:00+00:00",
+  "generator": {
+    "name": "DiveJSON fixtures"
+  },
+  "dives": [
+    {
+      "uuid": "019fee00-7e0b-7000-8000-000000000010",
+      "number": 201,
+      "started_at": "2026-05-02T09:30:00+02:00",
+      "duration": 2880,
+      "max_depth": 18.4,
+      "trip_uuid": "019fee00-7e0b-7000-8000-000000000030",
+      "contact_uuid": "019fee00-7e0b-7000-8000-0000000000a1",
+      "site_uuids": [
+        "019fee00-7e0b-7000-8000-000000000020"
+      ],
+      "people": [
+        {
+          "person_uuid": "019fee00-7e0b-7000-8000-0000000000b1",
+          "role": "guide"
+        },
+        {
+          "person_uuid": "019fee00-7e0b-7000-8000-0000000000b2",
+          "role": "buddy"
+        },
+        {
+          "person_uuid": "019fee00-7e0b-7000-8000-0000000000b3"
+        }
+      ]
+    },
+    {
+      "uuid": "019fee00-7e0b-7000-8000-000000000011",
+      "number": 202,
+      "started_at": "2026-05-02T14:10:00+02:00",
+      "duration": 3120,
+      "max_depth": 21.0,
+      "trip_uuid": "019fee00-7e0b-7000-8000-000000000030",
+      "contact_uuid": "019fee00-7e0b-7000-8000-0000000000a1",
+      "site_uuids": [
+        "019fee00-7e0b-7000-8000-000000000020"
+      ],
+      "people": [
+        {
+          "person_uuid": "019fee00-7e0b-7000-8000-0000000000b2",
+          "role": "student"
+        },
+        {
+          "person_uuid": "019fee00-7e0b-7000-8000-0000000000b1",
+          "role": "guide"
+        }
+      ]
+    },
+    {
+      "uuid": "019fee00-7e0b-7000-8000-000000000012",
+      "number": 203,
+      "started_at": "2026-05-03T10:00:00+02:00",
+      "duration": 2400,
+      "max_depth": 12.6,
+      "trip_uuid": "019fee00-7e0b-7000-8000-000000000030",
+      "course_uuid": "019fee00-7e0b-7000-8000-000000000040",
+      "contact_uuid": "019fee00-7e0b-7000-8000-0000000000a2",
+      "site_uuids": [
+        "019fee00-7e0b-7000-8000-000000000020"
+      ],
+      "people": [
+        {
+          "person_uuid": "019fee00-7e0b-7000-8000-0000000000b4",
+          "role": "instructor"
+        },
+        {
+          "person_uuid": "019fee00-7e0b-7000-8000-0000000000b1",
+          "role": "guide"
+        }
+      ]
+    },
+    {
+      "uuid": "019fee00-7e0b-7000-8000-000000000013",
+      "number": 204,
+      "started_at": "2026-05-04T08:45:00+02:00",
+      "duration": 2700,
+      "max_depth": 16.2,
+      "trip_uuid": "019fee00-7e0b-7000-8000-000000000030",
+      "site_uuids": [
+        "019fee00-7e0b-7000-8000-000000000020"
+      ],
+      "people": [
+        {
+          "person_uuid": "019fee00-7e0b-7000-8000-0000000000b3",
+          "role": "guide"
+        },
+        {
+          "person_uuid": "019fee00-7e0b-7000-8000-0000000000b2",
+          "role": "companion"
+        }
+      ]
+    }
+  ],
+  "trips": [
+    {
+      "uuid": "019fee00-7e0b-7000-8000-000000000030",
+      "name": "Dahab, May",
+      "parts": [
+        {
+          "starts_on": "2026-05-01",
+          "ends_on": "2026-05-05",
+          "location": {
+            "name": "Dahab"
+          }
+        }
+      ],
+      "people": [
+        {
+          "person_uuid": "019fee00-7e0b-7000-8000-0000000000b2",
+          "role": "buddy"
+        },
+        {
+          "person_uuid": "019fee00-7e0b-7000-8000-0000000000b5",
+          "role": "companion"
+        }
+      ]
+    }
+  ],
+  "courses": [
+    {
+      "uuid": "019fee00-7e0b-7000-8000-000000000040",
+      "name": "Rescue Diver",
+      "agency": "padi",
+      "status": "completed",
+      "instructor_number": "OWSI-418823",
+      "contact_uuid": "019fee00-7e0b-7000-8000-0000000000a2",
+      "people": [
+        {
+          "person_uuid": "019fee00-7e0b-7000-8000-0000000000b4",
+          "role": "instructor"
+        },
+        {
+          "person_uuid": "019fee00-7e0b-7000-8000-0000000000b2",
+          "role": "student"
+        }
+      ]
+    }
+  ],
+  "sites": [
+    {
+      "uuid": "019fee00-7e0b-7000-8000-000000000020",
+      "name": "Lighthouse Reef",
+      "location": {
+        "name": "Dahab, Egypt"
+      },
+      "position": {
+        "latitude": 28.4953,
+        "longitude": 34.5198
+      }
+    }
+  ],
+  "certifications": [
+    {
+      "uuid": "019fee00-7e0b-7000-8000-000000000050",
+      "agency": "padi",
+      "name": "Rescue Diver",
+      "certified_on": "2026-05-04",
+      "instructor_uuid": "019fee00-7e0b-7000-8000-0000000000b4",
+      "instructor_number": "OWSI-418823",
+      "contact_uuid": "019fee00-7e0b-7000-8000-0000000000a2",
+      "course_uuid": "019fee00-7e0b-7000-8000-000000000040"
+    }
+  ],
+  "contacts": [
+    {
+      "uuid": "019fee00-7e0b-7000-8000-0000000000a1",
+      "name": "Blue Hole Divers",
+      "roles": [
+        "dive_center"
+      ],
+      "address": {
+        "city": "Dahab",
+        "country": "Egypt"
+      }
+    },
+    {
+      "uuid": "019fee00-7e0b-7000-8000-0000000000a2",
+      "name": "Lighthouse Dive Shop",
+      "roles": [
+        "shop"
+      ],
+      "phone": "+20 69 555 0310"
+    }
+  ],
+  "people": [
+    {
+      "uuid": "019fee00-7e0b-7000-8000-0000000000b1",
+      "name": "Mona Salem",
+      "email": "mona@example.com",
+      "phone": "+20 100 555 0177",
+      "notes": "Guides at Blue Hole Divers.",
+      "created_at": "2026-05-02T18:00:00+02:00",
+      "extensions": {
+        "com.example.divekit": {
+          "account_uuid": "019fee00-7e0b-7000-8000-0000000000f1"
+        }
+      }
+    },
+    {
+      "uuid": "019fee00-7e0b-7000-8000-0000000000b2",
+      "name": "Karim"
+    },
+    {
+      "uuid": "019fee00-7e0b-7000-8000-0000000000b3",
+      "name": "Ahmed  Fathy"
+    },
+    {
+      "uuid": "019fee00-7e0b-7000-8000-0000000000b4",
+      "name": "Leila Ben Ali",
+      "email": "leila@lighthouse.example"
+    },
+    {
+      "uuid": "019fee00-7e0b-7000-8000-0000000000b5",
+      "name": "Nour Haddad",
+      "notes": "Came for the week and snorkelled."
+    }
+  ]
+}
