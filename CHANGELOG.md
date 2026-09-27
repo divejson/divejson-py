@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.16.0
+
 - **Breaking: a dive's sightings carry a count and a note.** §6.3a of
   [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md)
   replaces a dive's `species_uuids` with `sightings`, a list of `{ species_uuid, count, notes }`
