@@ -73,6 +73,7 @@ validator does not look.
 | `rating-out-of-range.divejson` | a dive's `rating` of `0`, the spelling some applications store for unrated, which here is absence | §5.4, §6.2 |
 | `tags-repeated.divejson` | a dive's `tags` carrying `wall` twice, byte for byte, which the schema's `uniqueItems` rejects | §6.2 |
 | `tags-repeated-by-case.divejson` | a dive's `tags` carrying `Großes Riff` and `GROSSES RIFF` — one tag once case-folded, `ß` folding to `ss`, and two different strings to `uniqueItems` and to a lowercasing, which keeps the `ß` | §3 rule 8, §6.2 |
+| `tags-repeated-by-whitespace.divejson` | a dive's `tags` carrying `"wall"` and `" wall "` — one tag once trimmed, and two different strings to `uniqueItems` | §3 rule 8, §6.2 |
 | `tag-empty.divejson` | an empty string among a dive's `tags` | §6.2 |
 | `tag-too-long.divejson` | a tag of 65 characters | §6.2 |
 | `current-unknown.divejson` | a dive's `current` of `"hard-current"`, UDDF's word for `strong` copied rather than read | §6.2 |

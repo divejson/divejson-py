@@ -569,7 +569,7 @@ carries nothing this format records.
 **Four of those rows read a closed vocabulary or a scale, and on two of them §6.2 has fewer
 steps than UDDF.** `<ratingvalue>` counts 1 to 10 and §6.2's `rating` 1 to 5, so a value reads as
 half of itself rounded up — ⌈n/2⌉, a `7` reading as `4` — reported `resolved` with both
-scales named, since the value written is no longer the source's own. `<current>` has six
+scales named: the value written is the source's own on fewer steps. `<current>` has six
 values and §6.2's five:
 
 | `<current>` | `current` |
@@ -904,7 +904,7 @@ writes all three that way.
 | `<calculateprofile><profile><density>` | a water density in kg/m³ — Shearwater Cloud Desktop writes `1030` — beside the recalculation's model, a route not read for the reason *The decompression model* gives. §6.4a's `salinity` is a named setting and carries no density: the two are different members, neither derivable from the other, and a density arrives in a minor version when a reader maps one. |
 | `<informationbeforedive><surfaceintervalbeforedive>`; `<informationafterdive><desaturationtime>`, `<noflighttime>` | no core member. |
 | `<informationafterdive><problems>` | no core member. |
-| `<informationbeforedive><purpose>`, `<informationafterdive><program>` | each a closed vocabulary holding one value — what the dive was for, `sightseeing`, `teaching` or `research`, and the programme it was dived under, `recreation`, `training` or `military` — which is the subject matter a diver's `tags` (§6.2) often carry, in a vocabulary the diver does not choose. A tag list is free text and neither element holds one, so a dive's `tags` are neither written into them nor read from them. |
+| `<informationbeforedive><purpose>`, `<informationafterdive><program>` | each a closed vocabulary holding one value — what the dive was for, `sightseeing`, `photography-videography` and `spearfishing` among nine, and the programme it was dived under, `recreation`, `training` and `military` among eight — which is the subject matter a diver's `tags` (§6.2) often carry, in a vocabulary the diver does not choose. A tag list is free text and neither element holds one, so a dive's `tags` are neither written into them nor read from them. |
 | `<informationafterdive><observations>` | a dive's `<fauna>` and `<flora>`, the slot a dive's `sightings` (§6.3a) would be read from, and no file in hand fills either. The corpus's two Shearwater Cloud files carry only its `<notes>`, the computer's mode markers (`-ShearwaterDiveModeType:6-`) rather than anything the diver wrote, and the dive's `notes` do not take them. A reading rule waits for a file that carries a species. Not reported. |
 | `<site><ecology>` | what is found at a site in general, where a sighting (§6.3a) is what one dive saw — the per-dive slot is `<observations>`, above. |
 | `<trippart><relateddives>` | the reverse of `<tripmembership>`; no writer in the corpus emits it. Not reported. |

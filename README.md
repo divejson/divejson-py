@@ -63,9 +63,10 @@ cylinder, and a Shearwater Cloud Desktop `<datetime>` suffixed `Z` is the wall c
 diver read off their wrist rather than an instant in UTC. A scale is settled on the value by
 a magnitude test; a *meaning* is settled on the writer, by a table of generators whose
 habits are known, or on the element, where one word covers two of the format's — UDDF's
-`rebreather` is closed and semi-closed circuit alike, and reads as closed. A value on a
-finer scale than the format's is `resolved` too, being no longer quite the source's own: a
-UDDF rating of 7 of 10 is 4 of the format's 5.
+`rebreather` is closed and semi-closed circuit alike, and reads as closed. A value read onto
+a coarser scale than the source's is `resolved` too — a UDDF rating of 7 of 10 is 4 of the
+format's 5 — and is still the source's own figure, on fewer steps: what is written comes
+from the value recorded and from nothing else.
 
 An `inferred` member is also listed under `extensions.divejson.inferred` in the document
 itself, so a reader can tell a derivation from a reading (spec §5.4). A `resolved` one is
