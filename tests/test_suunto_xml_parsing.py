@@ -99,7 +99,7 @@ def test_text_that_is_present_and_unreadable_is_reported() -> None:
         ("", None),
     ],
 )
-def test_every_mode_is_a_dive_and_the_recording_says_which_kind(mode: str, expected: str | None) -> None:
+def test_every_mode_is_a_dive_and_the_recording_says_which_mode(mode: str, expected: str | None) -> None:
     """0 and 1 are air and nitrox, both open circuit; 3 is a freedive, and a dive.
 
     A document that states none makes no claim at all — `converting.md`'s first rule is that

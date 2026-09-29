@@ -1,0 +1,44 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-29T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.17.0"
+  },
+  "dives": [
+    {
+      "uuid": "0198a6f0-7777-7010-8000-000000000010",
+      "number": 1,
+      "started_at": "2026-04-14T08:20:00+02:00",
+      "duration": 4380,
+      "notes": "A rebreather off a charter boat, rated seven of ten in a light drift.",
+      "type": "closed_circuit",
+      "rating": 4,
+      "max_depth": 42.6,
+      "air_temperature": 28.0,
+      "current": "light",
+      "entry_type": "boat"
+    },
+    {
+      "uuid": "0198a6f0-7777-7011-8000-000000000011",
+      "number": 2,
+      "started_at": "2026-04-15T10:05:00+02:00",
+      "duration": 2940,
+      "notes": "Open circuit from the beach, against a hard current, with no air temperature and no rating.",
+      "type": "open_circuit",
+      "max_depth": 19.8,
+      "current": "strong",
+      "entry_type": "shore"
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "uddf",
+      "uddf_version": "3.2.2",
+      "source_generator": {
+        "name": "DiveJSON fixtures"
+      }
+    }
+  }
+}

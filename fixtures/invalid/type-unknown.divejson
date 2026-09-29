@@ -37,7 +37,7 @@
       "started_at": "2026-07-03T09:14:00+12:45",
       "duration": 5520,
       "notes": "Trimix wall dive; two deco gases staged on the line.",
-      "type": "open_circuit",
+      "type": "gauge",
       "rating": 4,
       "tags": [
         "deep",

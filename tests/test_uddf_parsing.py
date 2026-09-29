@@ -1672,3 +1672,132 @@ def test_the_percent_gradient_rule_is_reported_once_per_file() -> None:
     )
     data = one_dive(f"{STARTED_AT}<samples>{samples}</samples>", header=SHEARWATER)
     assert len([note for note in convert(data).notes if "gradient factors in whole percent" in note.message]) == 1
+
+
+# -- the dive's type, rating, current and entry type -------------------------------------------
+
+
+def _after(extra: str) -> str:
+    return f"<informationafterdive><greatestdepth>18</greatestdepth>{extra}<diveduration>600</diveduration></informationafterdive>"
+
+
+def _reported(body: str) -> list[tuple[str, str]]:
+    return [(note.kind, note.message) for note in convert(one_dive(body)).notes]
+
+
+@pytest.mark.parametrize(
+    ("written", "dive_type", "kind"),
+    [
+        ("open-scuba", "open_circuit", None),
+        # UDDF's one word for closed and semi-closed circuits alike: a meaning settled.
+        ("rebreather", "closed_circuit", "resolved"),
+        ("surface-supplied", "surface_supplied", None),
+        ("chamber", None, "dropped"),
+        ("experimental", None, "dropped"),
+        # UDDF's documentation lists an `other` its XSD does not, and the format has none.
+        ("other", None, "dropped"),
+    ],
+)
+def test_the_apparatus_is_the_dives_type(written: str, dive_type: str | None, kind: str | None) -> None:
+    body = before(f"<apparatus>{written}</apparatus>")
+    assert dive(body).get("type") == dive_type
+    assert [found for found, message in _reported(body) if "<apparatus>" in message] == ([kind] if kind else [])
+
+
+@pytest.mark.parametrize(
+    ("written", "entry_type"),
+    [
+        ("beach-shore", "shore"),
+        ("landside", "shore"),
+        ("pier", "pier"),
+        ("small-boat", "boat"),
+        ("charter-boat", "boat"),
+        ("live-aboard", "boat"),
+        ("barge", "boat"),
+    ],
+)
+def test_a_platform_folds_onto_the_entry_type_in_silence(written: str, entry_type: str) -> None:
+    """A narrower word read as the wider one the format has, which settles nothing the file left
+    open — `apnoe` and `apnea` onto `freedive` are the precedent."""
+    body = before(f"<platform>{written}</platform>")
+    assert dive(body)["entry_type"] == entry_type
+    assert _reported(body) == []
+
+
+@pytest.mark.parametrize("written", ["hyperbaric-facility", "other"])
+def test_a_platform_the_format_has_no_entry_type_for_is_reported(written: str) -> None:
+    body = before(f"<platform>{written}</platform>")
+    assert "entry_type" not in dive(body)
+    assert _reported(body) == [
+        ("dropped", f"<platform> is {written!r}, which §6.2's entry_type has no value for; it is not read")
+    ]
+
+
+@pytest.mark.parametrize(
+    ("written", "current", "kind"),
+    [
+        ("no-current", "none", None),
+        # The sixth step, which the format's five have no room for.
+        ("very-mild-current", "light", "resolved"),
+        ("mild-current", "light", None),
+        ("moderate-current", "moderate", None),
+        ("hard-current", "strong", None),
+        ("very-hard-current", "extreme", None),
+        ("rip-current", None, "dropped"),
+    ],
+)
+def test_the_current_reads_six_steps_onto_five(written: str, current: str | None, kind: str | None) -> None:
+    body = STARTED_AT + _after(f"<current>{written}</current>")
+    assert dive(body).get("current") == current
+    assert [found for found, message in _reported(body) if "current" in message] == ([kind] if kind else [])
+
+
+@pytest.mark.parametrize(("written", "rating"), [(str(steps), (steps + 1) // 2) for steps in range(1, 11)])
+def test_a_rating_is_half_of_uddfs_rounded_up_and_says_so(written: str, rating: int) -> None:
+    """8 of 10 is 4 of 5, and so is 7 of 10: every read lands on the coarser scale, and the
+    report names both."""
+    body = STARTED_AT + _after(f"<rating><ratingvalue>{written}</ratingvalue></rating>")
+    assert dive(body)["rating"] == rating
+    assert _reported(body) == [
+        (
+            "resolved",
+            f"UDDF rates a dive 1 to 10 and the format 1 to 5; <ratingvalue> {written} is read as {rating}, half "
+            "of it rounded up (spec §6.2)",
+        )
+    ]
+
+
+@pytest.mark.parametrize("written", ["0", "11", "7.5", "-2"])
+def test_a_rating_outside_uddfs_whole_steps_is_dropped(written: str) -> None:
+    body = STARTED_AT + _after(f"<rating><ratingvalue>{written}</ratingvalue></rating>")
+    assert "rating" not in dive(body)
+    assert [kind for kind, _ in _reported(body)] == ["dropped"]
+
+
+def test_the_new_members_land_in_section_6_2s_order() -> None:
+    """The type and the rating after the notes, the conditions after the altitude."""
+    body = before(
+        "<airtemperature>297.45</airtemperature><altitude>120</altitude>"
+        "<apparatus>open-scuba</apparatus><platform>pier</platform>"
+    ) + _after("<current>hard-current</current><notes><para>Slack water</para></notes><rating><ratingvalue>8</ratingvalue></rating>")
+    assert [member for member in dive(body) if member not in ("uuid", "started_at")] == [
+        "duration",
+        "notes",
+        "type",
+        "rating",
+        "max_depth",
+        "altitude",
+        "air_temperature",
+        "current",
+        "entry_type",
+    ]
+
+
+def test_the_type_and_the_mode_are_never_read_across() -> None:
+    """§6.4a: a backup computer run in gauge mode was on an open-circuit dive, so neither says
+    the other."""
+    samples = '<samples><waypoint><depth>1</depth><divetime>0</divetime><divemode type="closedcircuit" /></waypoint></samples>'
+    assert "type" not in dive(STARTED_AT + samples)
+    found = dive(before("<apparatus>open-scuba</apparatus>") + ONE_SAMPLE)
+    assert found["type"] == "open_circuit"
+    assert "mode" not in found["recordings"][0]

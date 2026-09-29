@@ -37,6 +37,13 @@
       "started_at": "2026-07-03T09:14:00+12:45",
       "duration": 5520,
       "notes": "Trimix wall dive; two deco gases staged on the line.",
+      "type": "open_circuit",
+      "rating": 4,
+      "tags": [
+        "deep",
+        "wall",
+        "training"
+      ],
       "max_depth": 62.3,
       "avg_depth": 31.8,
       "bottom_temperature": 7.4,
@@ -44,6 +51,12 @@
       "weight": 0,
       "water_type": "salt",
       "altitude": 0,
+      "air_temperature": 11.5,
+      "current": "moderate",
+      "waves": "slight",
+      "weather": "overcast",
+      "entry_type": "boat",
+      "boat_name": "Taiaroa",
       "entry_position": {
         "latitude": -45.86055,
         "longitude": 170.66973

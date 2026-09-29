@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<uddf xmlns="http://www.streit.cc/uddf/3.2/" version="3.2.2">
+  <generator>
+    <name>DiveJSON fixtures</name>
+  </generator>
+  <profiledata>
+    <repetitiongroup id="rg-1">
+      <dive id="dive-0198a6f0-7777-7010-8000-000000000010">
+        <informationbeforedive>
+          <divenumber>1</divenumber>
+          <datetime>2026-04-14T08:20:00+02:00</datetime>
+          <airtemperature>301.15</airtemperature>
+          <apparatus>rebreather</apparatus>
+          <platform>charter-boat</platform>
+        </informationbeforedive>
+        <informationafterdive>
+          <greatestdepth>42.6</greatestdepth>
+          <current>very-mild-current</current>
+          <notes>
+            <para>A rebreather off a charter boat, rated seven of ten in a light drift.</para>
+          </notes>
+          <rating>
+            <ratingvalue>7</ratingvalue>
+          </rating>
+          <diveduration>4380</diveduration>
+        </informationafterdive>
+      </dive>
+    </repetitiongroup>
+    <repetitiongroup id="rg-2">
+      <dive id="dive-0198a6f0-7777-7011-8000-000000000011">
+        <informationbeforedive>
+          <divenumber>2</divenumber>
+          <datetime>2026-04-15T10:05:00+02:00</datetime>
+          <apparatus>open-scuba</apparatus>
+          <platform>beach-shore</platform>
+        </informationbeforedive>
+        <informationafterdive>
+          <greatestdepth>19.8</greatestdepth>
+          <current>hard-current</current>
+          <notes>
+            <para>Open circuit from the beach, against a hard current, with no air temperature and no rating.</para>
+          </notes>
+          <diveduration>2940</diveduration>
+        </informationafterdive>
+      </dive>
+    </repetitiongroup>
+  </profiledata>
+</uddf>

@@ -180,11 +180,12 @@ document. `exported_at` is the moment of conversion, always offset-aware.
   the activity in.
 
   **A freedive is a dive, and is carried.** This rule covered it until §6.4a gained `mode`,
-  on the ground that the format had no member for the kind of a dive and a carried freedive
-  would arrive indistinguishable from a scuba dive that recorded no gas and no algorithm.
-  There is a member now: the recording says `freedive` and nothing is mislabelled, so
-  skipping one would be the data loss this format exists to end rather than the guard
-  against it.
+  on the ground that nothing could say a computer had run in freedive mode, and a carried
+  freedive would arrive indistinguishable from a scuba dive that recorded no gas and no
+  algorithm. There is a member now: the recording says `freedive` and nothing is
+  mislabelled, so skipping one would be the data loss this format exists to end rather than
+  the guard against it. The dive's own `type` (§6.2) is the diver's statement and not the
+  device's, and a converter never fills it from the mode (§6.4a).
 - **A recording's `mode` comes from an explicit value only.** Several source formats
   document what an absent mode element means — UDDF glosses a first waypoint with no
   `<divemode>` as open circuit, and Subsurface writes no `dctype` for an open-circuit
@@ -426,7 +427,7 @@ from the file which you have; or a timestamp one writer stamps `Z` while meaning
 clock in front of the diver, which is a value whose scale is not in question at all and
 whose meaning is. None of those has a clean answer. Each is handled explicitly and reported
 when its heuristic fires — as a `resolved` finding, the kind *The report* below defines for
-exactly this — because a silent guess is the failure a converter exists to avoid. The
+it — because a silent guess is the failure a converter exists to avoid. The
 difference from the rule above is that the value **was** recorded and only its
 interpretation is in doubt, so a test interprets data rather than inventing it; dropping the
 member instead would lose a real reading from every file that writer produced.
@@ -464,12 +465,18 @@ Four, and the difference between them is what a diver needs from the report:
 | --- | --- |
 | `absent` | the source never recorded this |
 | `inferred` | the converter computed this from readings the source did record |
-| `resolved` | the source recorded the value and left its scale, its units or its **meaning** ambiguous; the converter decided only how to read it, and the value is still the source's own |
+| `resolved` | the source recorded the value and left its scale, its units or its **meaning** ambiguous, and the converter decided how to read it; or the source stated its scale and the converter read the value onto a **coarser** one, a rating of 7 of 10 becoming 4 of 5. Either way the value written comes from the one the source recorded and from nothing else |
 | `dropped` | the source recorded this and the converter could not carry it |
 
 They read in order of how much of the value the source itself supplied: nothing at all, the
-readings it was computed from, the value with its reading left open, and the whole thing,
-uncarriable.
+readings it was computed from, the value with its reading left open or its steps coarsened,
+and the whole thing, uncarriable.
+
+**A scale is not a vocabulary.** A rating or a current is a set of ordered steps, and
+reading one onto fewer steps decides where each of the source's lands, which is `resolved`.
+A vocabulary of kinds read into a broader word — three kinds of boat read as `boat` — decides
+nothing about the value: the source stated it and the format names it more broadly, so it
+carries no finding, as a rename or a synonym carries none.
 
 **An inferred value is emitted, and labelled.** A maximum depth computed from a dive's own
 depth samples is a summary of recorded readings rather than a fabrication under §5.4, and
@@ -485,13 +492,14 @@ produces exactly the document it would have produced without this rule.
 
 **A resolved value is not listed, and that is why it is its own kind.** The value a
 converter writes after settling an ambiguity is still the one the source recorded — only
-how to read it was in doubt — so there is no derivation for a downstream reader to be told
-about, and nothing goes under `extensions.divejson.inferred`. Keeping the two apart is what
-makes the coupling above exact in both directions: every `inferred` note's member is listed,
-and every listed member has an `inferred` note. Filing a resolution under `inferred`
-instead would break one direction or the other — either a member appears in the list with
-no derivation behind it, or the list acquires an exception, and an exception a port has to
-know about is one a port will get wrong.
+how to read it was in doubt — and one read onto a coarser scale is that one value on fewer
+steps, re-expressed as a unit conversion re-expresses it, so there is no derivation for a
+downstream reader to be told about, and nothing goes under `extensions.divejson.inferred`.
+Keeping the two apart is what makes the coupling above exact in both directions: every
+`inferred` note's member is listed, and every listed member has an `inferred` note. Filing a
+resolution under `inferred` instead would break one direction or the other — either a member
+appears in the list with no derivation behind it, or the list acquires an exception, and an
+exception a port has to know about is one a port will get wrong.
 
 **`profile.duration` is not inferred.** §6.4 defines it as the span of the profile's own
 samples, so a converter taking the largest sample time across every channel is reading a

@@ -3,9 +3,9 @@
 Two passes, mirroring §3 of the specification: the JSON Schema (types, required members,
 enums, ranges, lengths, and the structural rules like Position objects), then the
 semantic requirements the schema cannot express — identifier uniqueness, referential
-closure, a record listed once in a list of references, cross-member arithmetic,
-profile-series integrity and span, what a recording carries, the offset requirement on
-``exported_at``, and the gradient-factor order.
+closure, a record listed once in a list of references, a tag listed once on a dive when
+trimmed and case-folded, cross-member arithmetic, profile-series integrity and span, what a
+recording carries, the offset requirement on ``exported_at``, and the gradient-factor order.
 
 §4's member order is a SHOULD, not a requirement on the document: a generic
 re-serialisation commonly sorts an object's members, and a document it produced is as
@@ -258,6 +258,7 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
         _check_reference_list(dive, "gear_uuids", known["gear"], "gear", here, issues)
         _check_embedded_references(dive, "people", known, here, issues)
         _check_embedded_references(dive, "sightings", known, here, issues)
+        _check_tags(dive, here, issues)
 
         for cyl_index, cylinder in enumerate(dive.get("cylinders") or []):
             if not isinstance(cylinder, dict):
@@ -464,6 +465,42 @@ def _check_embedded_references(
             )
         else:
             listed[value] = index
+
+
+# Unicode's White_Space property (`PropList.txt`), which is what §3 rule 8 trims. Not what
+# `str.strip()` strips: Python also counts U+001C to U+001F as whitespace, and Unicode does not.
+WHITE_SPACE = (
+    "\t\n\v\f\r \x85\xa0\u1680"
+    "\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a"
+    "\u2028\u2029\u202f\u205f\u3000"
+)
+
+
+def _check_tags(dive: dict[str, Any], path: str, issues: list[Issue]) -> None:
+    """§3 rule 8: no tag twice on one dive, compared trimmed and case-folded.
+
+    The schema's `uniqueItems` compares bytes, so `night` beside `Night`, or `Großes Riff`
+    beside `GROSSES RIFF`, passes it. `str.casefold()` is Unicode full case folding, the C and
+    F mappings the rule names, under which `ß` and `ss` are one.
+    """
+    tags = dive.get("tags")
+    if not isinstance(tags, list):
+        return
+    listed: dict[str, int] = {}
+    for index, tag in enumerate(tags):
+        if not isinstance(tag, str):
+            continue
+        folded = tag.strip(WHITE_SPACE).casefold()
+        if folded in listed:
+            issues.append(
+                Issue(
+                    f"{path}/tags/{index}",
+                    f"tag {tag!r} is already listed at {path}/tags/{listed[folded]}, compared trimmed and "
+                    "case-folded (spec §3 rule 8)",
+                )
+            )
+        else:
+            listed[folded] = index
 
 
 def _check_profile(profile: Any, path: str, issues: list[Issue]) -> None:

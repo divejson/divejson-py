@@ -17,6 +17,7 @@ open.
 from __future__ import annotations
 
 import re
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -25,6 +26,7 @@ from helpers import ROOT, for_the_xsd
 
 from divejson import convert
 from divejson.uddf_write import compared, write_uddf
+from divejson.validate import load_schema
 
 STARTED_AT = "2026-04-17T11:49:23+02:00"
 
@@ -1307,6 +1309,126 @@ def test_sightings_have_a_slot_and_are_not_written_into_it(schema) -> None:
         assert "no slot" not in message
     back = read_back(source)
     assert "sightings" not in back["dives"][0] and "species" not in back
+
+
+# -- the type, the rating and the conditions ----------------------------------------------
+
+
+def _vocabulary(member: str) -> list[str]:
+    return load_schema()["$defs"]["dive"]["properties"][member]["enum"]
+
+
+def test_the_members_with_a_slot_go_where_the_xsd_puts_them_and_come_back(schema) -> None:
+    """`<airtemperature>` between `<datetime>` and `<altitude>`, `<apparatus>` and `<platform>`
+    between `<equipmentused>` and `<tripmembership>`: `informationbeforedive` is a sequence, so
+    the XSD pass is what holds each position."""
+    members = {
+        "type": "open_circuit",
+        "rating": 4,
+        "altitude": 120,
+        "air_temperature": 24.3,
+        "current": "strong",
+        "entry_type": "shore",
+        "weight": 4.0,
+    }
+    source = one_dive(**members)
+    source["trips"] = [{"uuid": TRIP_UUID, "name": "Weekend"}]
+    source["dives"][0]["trip_uuid"] = TRIP_UUID
+    text = written(source, schema)
+    order = ["<datetime>", "<airtemperature>297.45<", "<altitude>", "<equipmentused>", "<apparatus>open-scuba<", "<platform>beach-shore<", "<tripmembership"]
+    assert [text.index(tag) for tag in order] == sorted(text.index(tag) for tag in order)
+    assert "<current>hard-current</current>" in text
+    assert re.search(r"<rating>\s*<ratingvalue>8</ratingvalue>\s*</rating>", text)
+    back = read_back(source)["dives"][0]
+    assert {member: back.get(member) for member in members} == members
+    assert notes(source) == [
+        ("absent", "dives/0", "the dive records no maximum depth, and UDDF's <greatestdepth> is mandatory; 0 is written, which readers of this format take as not recorded"),
+        ("absent", "dives/0", "the dive records no duration, and UDDF's <diveduration> is mandatory; 0 is written, which readers of this format take as not recorded"),
+    ]
+
+
+@pytest.mark.parametrize("celsius", [24.3, 0, -1.7, 31.05])
+def test_the_air_temperature_goes_out_in_kelvin_and_comes_back_exactly(celsius: float, schema) -> None:
+    source = one_dive(air_temperature=celsius)
+    kelvin = Decimal(str(celsius)) + Decimal("273.15")
+    assert f"<airtemperature>{format(kelvin.normalize(), 'f')}</airtemperature>" in written(source, schema)
+    assert read_back(source)["dives"][0]["air_temperature"] == celsius
+
+
+@pytest.mark.parametrize("rating", range(1, 6))
+def test_a_rating_goes_out_doubled_and_comes_back_whole(rating: int, schema) -> None:
+    """Even steps only, so the reader's halving never rounds."""
+    source = one_dive(rating=rating)
+    assert f"<ratingvalue>{2 * rating}</ratingvalue>" in written(source, schema)
+    assert read_back(source)["dives"][0]["rating"] == rating
+
+
+@pytest.mark.parametrize(
+    ("member", "value", "tag", "text"),
+    [
+        ("type", "open_circuit", "apparatus", "open-scuba"),
+        ("type", "closed_circuit", "apparatus", "rebreather"),
+        ("type", "semi_closed", "apparatus", "rebreather"),
+        ("type", "surface_supplied", "apparatus", "surface-supplied"),
+        ("type", "freedive", "apparatus", None),
+        ("type", "snorkel", "apparatus", None),
+        ("entry_type", "shore", "platform", "beach-shore"),
+        ("entry_type", "pier", "platform", "pier"),
+        # UDDF's boats are each a kind of boat, and a plain one would be written as one of them.
+        ("entry_type", "boat", "platform", None),
+        ("entry_type", "pool", "platform", None),
+        ("current", "none", "current", "no-current"),
+        ("current", "light", "current", "mild-current"),
+        ("current", "moderate", "current", "moderate-current"),
+        ("current", "strong", "current", "hard-current"),
+        ("current", "extreme", "current", "very-hard-current"),
+    ],
+)
+def test_each_value_goes_out_as_its_uddf_element_or_not_at_all(
+    member: str, value: str, tag: str, text: str | None, schema
+) -> None:
+    file = written(one_dive(**{member: value}), schema)
+    if text is None:
+        assert f"<{tag}>" not in file
+    else:
+        assert f"<{tag}>{text}</{tag}>" in file
+
+
+@pytest.mark.parametrize(
+    ("member", "value"),
+    [(member, value) for member in ("type", "entry_type", "current") for value in _vocabulary(member)],
+)
+def test_every_value_comes_back_or_is_reported(member: str, value: str, schema) -> None:
+    """Read off the schema, so a value a later minor adds is held to this without a row here."""
+    source = one_dive(**{member: value})
+    written(source, schema)
+    came_back = read_back(source)["dives"][0].get(member)
+    reported = [(kind, message) for kind, where, message in notes(source) if where == f"dives/0/{member}"]
+    if came_back == value:
+        assert reported == []
+    else:
+        assert [kind for kind, _ in reported] == ["dropped"]
+
+
+def test_semi_closed_goes_out_as_the_rebreather_and_says_what_comes_back(schema) -> None:
+    source = one_dive(type="semi_closed")
+    written(source, schema)
+    assert read_back(source)["dives"][0]["type"] == "closed_circuit"
+    assert messages(source, "dives/0/type") == [
+        "UDDF's <apparatus> does not name 'semi_closed'; it is written as 'rebreather', which reads back as 'closed_circuit'"
+    ]
+
+
+def test_the_tags_the_waves_the_weather_and_the_boat_have_no_slot(schema) -> None:
+    source = one_dive(tags=["night", "wreck"], waves="slight", weather="overcast", boat_name="Legend")
+    text = written(source, schema)
+    assert "night" not in text and "Legend" not in text
+    assert messages(source, "dives/0") == [
+        f"UDDF has no slot for {member}; it is not written" for member in ("boat_name", "tags", "waves", "weather")
+    ] + [
+        "the dive records no maximum depth, and UDDF's <greatestdepth> is mandatory; 0 is written, which readers of this format take as not recorded",
+        "the dive records no duration, and UDDF's <diveduration> is mandatory; 0 is written, which readers of this format take as not recorded",
+    ]
 
 
 # -- the file itself -------------------------------------------------------------------

@@ -591,11 +591,39 @@ members, so a reader takes the zero back as "not recorded" rather than as the su
 a dive of no length.
 
 `informationbeforediveType` is an `xs:sequence`: `<link>`s first, then `<divenumber>`,
-`<internaldivenumber>`, `<datetime>`, `<altitude>`, `<equipmentused>`, `<tripmembership>`,
-`<surfacepressure>`. Among the links the sites lead, the contact follows (*Contacts* above)
-and the people come last (*People* above) — a link to a base or a shop being one UDDF's
-prose does not list and its XSD allows. `informationafterdiveType` is an `xs:all` and its
-order is free.
+`<internaldivenumber>`, `<datetime>`, `<airtemperature>`, `<altitude>`, `<equipmentused>`,
+`<apparatus>`, `<platform>`, `<tripmembership>`, `<surfacepressure>`. Among the links the
+sites lead, the contact follows (*Contacts* above) and the people come last (*People* above)
+— a link to a base or a shop being one UDDF's prose does not list and its XSD allows.
+`informationafterdiveType` is an `xs:all` and its order is free; this writer follows the
+order the type declares, which puts `<current>` after `<visibility>` and `<rating>` after
+`<notes>`.
+
+**`rating` is doubled** onto `<ratingvalue>`'s ten steps, and reads back as itself, half of
+an even number needing no rounding. `current` goes out on `uddf-mapping.md`'s table read
+backwards, `light` as `mild-current`, so `very-mild-current` is never written.
+
+**`type` and `entry_type` land in `<apparatus>` and `<platform>`, and neither vocabulary
+fits.** A value that does not come back as itself is reported, as a gear type is (*Diver
+and gear* above):
+
+| `type` | `<apparatus>` | comes back as |
+| --- | --- | --- |
+| `open_circuit` | `open-scuba` | itself |
+| `closed_circuit` | `rebreather` | itself |
+| `semi_closed` | `rebreather`, reported | `closed_circuit` |
+| `surface_supplied` | `surface-supplied` | itself |
+| `freedive`, `snorkel` | nothing, reported | absent |
+
+| `entry_type` | `<platform>` | comes back as |
+| --- | --- | --- |
+| `shore` | `beach-shore` | itself |
+| `pier` | `pier` | itself |
+| `boat`, `pool` | nothing, reported | absent |
+
+`<apparatus>` has no `other` to send a freedive or a snorkel to. UDDF's boats are a small
+boat, a charter boat, a live-aboard and a barge, and a plain `boat` written as any of them
+would describe a boat the diver never did, so none is written; a pool has no platform at all.
 
 `started_at` is written **exactly as recorded**, offset and sub-second fraction and all;
 §5.2's rule that an offset is never supplied applies as much to a writer as to a reader.
@@ -623,8 +651,9 @@ been checked.
 `<surfacepressure>` — UDDF states one per dive, and a later recording's goes with that
 recording under *What is never written*.
 
-Members with no UDDF slot anywhere: `water_type`, `entry_position`, `exit_position`,
-`course_uuid`, `created_at`, and — on the recording rather than the dive —
+Members with no UDDF slot anywhere: `water_type`, `tags`, `waves`, `weather`, `boat_name`,
+`entry_position`, `exit_position`, `course_uuid`, `created_at`, and — on the recording rather
+than the dive —
 `recordings[].salinity`, `recordings[].cns_start`, `cns_end`, `otu_start` and `otu_end`,
 `recordings[].source_files`, `recordings[].started_at` and
 **`recordings[].device.firmware`**, `equipmentPieceType` carrying no firmware element, so a

@@ -448,7 +448,8 @@ refusals and the second out of the silently unmapped, both into the device map a
 - **`<Visibility>`, `<Weather>`, `<Weight>`** — read and refused, each with a finding. They
   are the desktop application's dive-conditions panel and arrive as a block: 25 of the 384
   exports carry all three, 359 carry none, and every recorded value is `0`. None can be read
-  at a scale the file states. `<Weather>` is a code with no member in §6 at all.
+  at a scale the file states. `<Weather>` is an undocumented code, and though §6.2 has a
+  `weather` member, a `0` names none of its values.
   `<Visibility>` is the application's own rating where §6.2's is metres — the same refusal
   Subsurface's five-star `@visibility` gets. `<Weight>` reaches a §6.2 member measured in
   kilograms, but the export writes a bare number and neither it nor any companion file in
@@ -509,7 +510,10 @@ refusals and the second out of the silently unmapped, both into the device map a
   derived maximum of them is not a third reading.
 - **`<StartTemperature>` and `<EndTemperature>`** — §6.2 carries one water temperature,
   `bottom_temperature`, and `<BottomTemperature>` is the element that states it. The full
-  range is in the temperature channel, where a reader can see all of it.
+  range is in the temperature channel, where a reader can see all of it. Nor is
+  `<StartTemperature>` §6.2's `air_temperature`, though Subsurface reads it as the air's: on
+  every input in `fixtures/suunto_xml/` it is within a degree of the first sample's water
+  temperature.
 - **`<TissuePressuresNitrogenStart>` / `End`, `<TissuePressuresHeliumStart>` / `End` and the
   four `*Blob` elements beside them** — a tissue model's loading state, fifteen compartments
   each. §6.2 has no member for one, and a loading figure is only meaningful beside the
@@ -537,8 +541,8 @@ refusals and the second out of the silently unmapped, both into the device map a
   or empty on all 384, so there is nothing to carry from this corpus. `<Master>` and
   `<Partner>` would map to §6.2's `people`, as a person with the role `guide` and one with
   the role `buddy`, and wait for a file that fills them in: a rule written against no file
-  is speculation. `<Boat>` has no §6.2 member; a file that filled `<DiveTags>` in would be
-  worth revisiting against §6.2's `notes`, and none in hand does.
+  is speculation. `<Boat>` would map to §6.2's `boat_name` and `<DiveTags>` to its `tags`,
+  and both wait on the same terms.
 - **The filename** — above, under *Identity*.
 
 ## The pairs

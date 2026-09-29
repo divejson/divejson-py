@@ -95,13 +95,14 @@ def test_the_known_answer() -> None:
     assert dive["started_at"] == "2021-04-06T11:16:42.6"
 
 
-def test_a_freedive_is_a_dive_and_says_which_kind_it_is() -> None:
+def test_a_freedive_is_a_dive_and_its_recording_says_the_mode() -> None:
     """It converted to a logbook with no dives at all until §6.4a gained `mode`.
 
-    The reason for skipping it was that the format had no member for the kind of a dive, so
-    a carried freedive would arrive indistinguishable from a scuba dive that recorded no gas
-    and no algorithm. There is a member now, so skipping one would be the data loss this
-    format exists to end rather than the guard against it.
+    The reason for skipping it was that the format had no member for the mode a computer ran
+    in, so a carried freedive would arrive indistinguishable from a scuba dive that recorded
+    no gas and no algorithm. There is a member now, so skipping one would be the data loss
+    this format exists to end rather than the guard against it. **The dive's `type` stays
+    absent**: it is the diver's statement, and §6.4a forbids reading it off the mode.
 
     **No `deco_model` beside it**, though the file states a `<PersonalMode>`: a computer in
     freedive mode ran no decompression model, and an object carrying only a conservatism
@@ -113,6 +114,7 @@ def test_a_freedive_is_a_dive_and_says_which_kind_it_is() -> None:
     assert recording["mode"] == "freedive"
     assert "deco_model" not in recording
     assert "cylinders" not in conversion.document["dives"][0]
+    assert "type" not in conversion.document["dives"][0]
 
 
 def test_the_two_gas_dive_ties_its_channel_and_its_markers_to_the_right_cylinders() -> None:

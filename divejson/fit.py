@@ -734,8 +734,9 @@ class _Converter:
         beside it and produce a pair and no family, which is the honest shape.
 
         **§6.4a's `mode` has no source here.** `session.sub_sport` is the field that would
-        carry it and no file in hand writes one, so a FIT dive does not say what kind it is —
-        a freediving one included. The DM5 XML path says which, because its files state it.
+        carry it and no file in hand writes one, so a FIT recording does not say what mode its
+        computer ran in — a freediving one included. The DM5 XML path says which, because its
+        files state it.
         """
         model = _native(self.scan.settings, "model")
         return deco_model(

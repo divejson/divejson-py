@@ -56,7 +56,7 @@
       "waves": "slight",
       "weather": "overcast",
       "entry_type": "boat",
-      "boat_name": "Taiaroa",
+      "boat_name": "",
       "entry_position": {
         "latitude": -45.86055,
         "longitude": 170.66973

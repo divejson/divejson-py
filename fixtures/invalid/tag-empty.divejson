@@ -42,7 +42,8 @@
       "tags": [
         "deep",
         "wall",
-        "training"
+        "training",
+        ""
       ],
       "max_depth": 62.3,
       "avg_depth": 31.8,

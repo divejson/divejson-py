@@ -249,3 +249,17 @@ def test_depths_and_temperatures_match_the_reference_export() -> None:
     assert found["depth"]["values"] == [145, 183, 222, 257, 260, 332, 911, 0]
     assert found["temperature"]["times"] == [30_000, 80_000]
     assert found["temperature"]["values"] == [244, 240]
+
+
+@pytest.mark.parametrize(
+    ("kelvin", "celsius"),
+    [
+        ("297.45", 24.3),  # 297.45 - 273.15
+        ("273.15", 0.0),  # freezing air is a reading
+        ("263.15", -10.0),  # 263.15 - 273.15, a winter surface
+    ],
+)
+def test_air_temperature_is_plain_celsius(kelvin: str, celsius: float) -> None:
+    """The scalar shape, like `bottom_temperature`: no tenths scale."""
+    document = convert(one_dive(before(f"<airtemperature>{kelvin}</airtemperature>"))).document
+    assert document["dives"][0]["air_temperature"] == celsius

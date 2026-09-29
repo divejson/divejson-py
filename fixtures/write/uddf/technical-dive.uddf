@@ -191,6 +191,7 @@
           <divenumber>412</divenumber>
           <internaldivenumber>87</internaldivenumber>
           <datetime>2026-07-03T09:14:00+12:45</datetime>
+          <airtemperature>284.65</airtemperature>
           <altitude>0</altitude>
           <equipmentused>
             <leadquantity>0</leadquantity>
@@ -198,6 +199,7 @@
             <link ref="gear-0198a6f0-1111-7051-8000-000000000051" />
             <link ref="device-0" />
           </equipmentused>
+          <apparatus>open-scuba</apparatus>
           <tripmembership ref="trip-0198a6f0-1111-7030-8000-000000000030" />
           <surfacepressure>101300</surfacepressure>
         </informationbeforedive>
@@ -358,9 +360,13 @@
           <lowesttemperature>280.55</lowesttemperature>
           <greatestdepth>62.3</greatestdepth>
           <visibility>25</visibility>
+          <current>moderate-current</current>
           <notes>
             <para>Trimix wall dive; two deco gases staged on the line.</para>
           </notes>
+          <rating>
+            <ratingvalue>8</ratingvalue>
+          </rating>
           <diveduration>5520</diveduration>
           <averagedepth>31.8</averagedepth>
         </informationafterdive>

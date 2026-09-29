@@ -55,7 +55,11 @@ lists nothing, because there is no derivation for a reader to be told about. So 
 infers nothing and that list is absent from every document it produces, while its report
 still says out loud where it chose a scale. One `resolved` finding settles a meaning rather
 than a scale: a `<surfacepressure>` on a dive linking more than one computer, which the
-file states once for the dive and this reader gives to the first (`read_recordings`).
+file states once for the dive and this reader gives to the first (`read_recordings`); so
+does an `<apparatus>` of `rebreather`, which UDDF uses for closed and semi-closed circuits
+alike. And a value read onto a coarser scale than the source's — a `<ratingvalue>` of 7 of
+UDDF's ten steps as 4 of the format's five — is `resolved` as well: the source recorded it,
+and the converter decided where on the narrower scale it lands.
 
 That paragraph carried a count until this reader gained a third scale. It does not carry one
 now, for the reason `docs/uddf-mapping.md`'s own heading gives: one more ambiguity is exactly
@@ -261,6 +265,60 @@ _DIVE_MODES = {
     "apnoe": "freedive",
     "apnea": "freedive",
 }
+
+# `<apparatus>`, `<platform>` and `<current>` onto §6.2's `type`, `entry_type` and `current`.
+# Public for the reason `GEAR_TYPE` is: the writer states which element it writes each value
+# as, and whether that value survives the round trip is what reading the element returns.
+#
+# **`rebreather` reads as `closed_circuit`, reported `resolved`**: UDDF names closed and
+# semi-closed circuits alike with it, and the format tells them apart. `chamber` and
+# `experimental` have no row and are reported, as is a `<platform>` of `hyperbaric-facility`
+# or `other`: the format has no "other", so an unlistable value is not recorded. The boats
+# and `landside` fold silently, as `apnoe` and `apnea` do above — a narrower word read as
+# the wider one the format has, which settles nothing the source left open.
+APPARATUS: dict[str, str] = {
+    "open-scuba": "open_circuit",
+    "rebreather": "closed_circuit",
+    "surface-supplied": "surface_supplied",
+}
+PLATFORM: dict[str, str] = {
+    "beach-shore": "shore",
+    "landside": "shore",
+    "pier": "pier",
+    "small-boat": "boat",
+    "charter-boat": "boat",
+    "live-aboard": "boat",
+    "barge": "boat",
+}
+# Six steps onto five. **`very-mild-current` reads as `light`, reported `resolved`**, beside
+# `mild-current`: it is the one step the format's scale has no room for, and reading it
+# silently would hide that two of the source's values became one.
+CURRENT: dict[str, str] = {
+    "no-current": "none",
+    "very-mild-current": "light",
+    "mild-current": "light",
+    "moderate-current": "moderate",
+    "hard-current": "strong",
+    "very-hard-current": "extreme",
+}
+
+# The reads above that decide something, and what the report says of each.
+_RESOLVED_READS = {
+    ("apparatus", "rebreather"): (
+        "UDDF's <apparatus> 'rebreather' names closed and semi-closed circuits alike; read as "
+        "'closed_circuit' (spec §6.2)"
+    ),
+    ("current", "very-mild-current"): (
+        "UDDF's <current> has six steps and the format's five; 'very-mild-current' is read as 'light', "
+        "beside 'mild-current' (spec §6.2)"
+    ),
+}
+
+# `ratingvalueType`'s range. The format rates a dive 1 to 5, so a UDDF rating reads as half of
+# itself rounded up — 8 as 4 and 7 as 4 too — reported `resolved`: every read lands the value
+# on a coarser scale than the one the source stated it on.
+MIN_UDDF_RATING = 1
+MAX_UDDF_RATING = 10
 
 # `<calculatedpo2>` at or below this is bar; above it is the Pascal the documentation
 # states. Three orders of magnitude separate the two spellings and a breathable ppO₂ lives
@@ -1712,6 +1770,15 @@ class _Converter:
         if notes:
             dive["notes"] = notes
 
+        # The diver's statement of what kind of dive it was, and never the recording's `mode`
+        # read across: a backup computer in gauge mode was on an open-circuit dive (§6.4a).
+        dive_type = self.enumerated(before, "apparatus", APPARATUS, where, "type")
+        if dive_type is not None:
+            dive["type"] = dive_type
+        rating = self.rating(after, where)
+        if rating is not None:
+            dive["rating"] = rating
+
         max_depth = self.positive(decimal_of(_text_of(after, "greatestdepth")), where, "<greatestdepth>", "max_depth")
         avg_depth = self.positive(decimal_of(_text_of(after, "averagedepth")), where, "<averagedepth>", "avg_depth")
         if max_depth is not None and avg_depth is not None and avg_depth > max_depth:
@@ -1756,6 +1823,16 @@ class _Converter:
                 dive["altitude"] = altitude
             else:
                 self.note(where, f"<altitude> is {altitude} m, outside the -450 to 6500 the format allows; dropped", "dropped")
+
+        air = decimal_of(_text_of(before, "airtemperature"))
+        if air is not None:
+            dive["air_temperature"] = float(air - KELVIN_OFFSET)
+        current = self.enumerated(after, "current", CURRENT, where, "current")
+        if current is not None:
+            dive["current"] = current
+        entry_type = self.enumerated(before, "platform", PLATFORM, where, "entry_type")
+        if entry_type is not None:
+            dive["entry_type"] = entry_type
 
         # §6.4a's readout rather than a member of the dive, and it is read here only
         # because it is a child of the dive: `read_recordings` is where it goes.
@@ -1822,6 +1899,48 @@ class _Converter:
         if recordings:
             dive["recordings"] = recordings
         return dive
+
+    def enumerated(
+        self, parent: ET.Element | None, tag: str, table: dict[str, str], where: str, member: str
+    ) -> str | None:
+        """One of §6.2's vocabularies off a UDDF enumeration, through its table above.
+
+        A value with no row is reported rather than read as the nearest: UDDF's own values the
+        format has no word for, and a value UDDF does not spell, alike.
+        """
+        stated = _text_of(parent, tag)
+        if stated is None:
+            return None
+        value = table.get(stated)
+        if value is None:
+            self.note(where, f"<{tag}> is {stated!r}, which §6.2's {member} has no value for; it is not read", "dropped")
+            return None
+        resolved = _RESOLVED_READS.get((tag, stated))
+        if resolved is not None:
+            self.note(where, resolved, "resolved")
+        return value
+
+    def rating(self, after: ET.Element | None, where: str) -> int | None:
+        """`<rating><ratingvalue>` on the format's 1 to 5, as half of UDDF's 1 to 10 rounded up."""
+        stated = decimal_of(_text_of(after, "rating", "ratingvalue"))
+        if stated is None:
+            return None
+        if stated != stated.to_integral_value() or not MIN_UDDF_RATING <= stated <= MAX_UDDF_RATING:
+            self.note(
+                where,
+                f"<ratingvalue> is {stated}, and UDDF rates a dive in whole steps from 1 to 10; dropped",
+                "dropped",
+            )
+            return None
+        steps = int(stated)
+        rating = (steps + 1) // 2
+        self.note(
+            where,
+            f"UDDF rates a dive 1 to 10 and the format 1 to 5; <ratingvalue> {steps} is read as {rating}, half "
+            "of it rounded up (spec §6.2)",
+            "resolved",
+        )
+        return rating
 
     def read_recordings(
         self,

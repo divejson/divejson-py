@@ -455,10 +455,10 @@ def test_a_device_that_wrote_no_dive_settings_gets_no_deco_model() -> None:
     assert "deco_model" not in _recording(dive_file())
 
 
-def test_a_fit_dive_does_not_say_what_kind_of_dive_it_is() -> None:
+def test_a_fit_recording_does_not_say_what_mode_its_computer_ran_in() -> None:
     """`session.sub_sport` is the field §6.4a's `mode` would come from and no file in hand
-    writes one, so a FIT dive is carried without saying which kind it is — a freediving one
-    included. The DM5 XML path says which, because its files state it."""
+    writes one, so a FIT recording is carried without saying which mode it ran in — a
+    freediving one included. The DM5 XML path says which, because its files state it."""
     assert "mode" not in _recording(dive_file(message("dive_settings", gf_low=30, gf_high=85)))
 
 
