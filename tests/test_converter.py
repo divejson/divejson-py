@@ -171,6 +171,8 @@ def test_the_header_opens_with_the_two_members_section_4_asks_for_first() -> Non
         ("dive", "altitude", True),
         ("cylinder", "end_pressure", True),
         ("cylinder", "oxygen", True),
+        # No floor at all: a zero is freezing air, which the diver can have recorded too.
+        ("dive", "air_temperature", True),
         # A floor above zero: a zero is below it, so it is no more an answer than a
         # placeholder is.
         ("recording", "surface_pressure", False),

@@ -7,6 +7,27 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **A dive carries its type, rating, tags and conditions.** §6.2 of
+  [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) adds
+  `type`, `rating`, `tags`, `air_temperature`, `current`, `waves`, `weather`, `entry_type` and
+  `boat_name`, each OPTIONAL. `divejson validate` refuses a tag listed twice on one dive once
+  both are trimmed and case-folded — `night` beside `Night`, `Großes Riff` beside
+  `GROSSES RIFF` — which is §3's rule 8 and which the schema's `uniqueItems`, comparing bytes,
+  cannot see. The trim is Unicode's White_Space, not what `str.strip()` removes.
+
+- **The UDDF reader reads what UDDF holds of them.** `<airtemperature>` in Kelvin,
+  `<apparatus>` as the type, `<platform>` as the entry type, `<current>` and `<rating>`. A
+  rating is half of UDDF's 1 to 10, rounded up; an odd one, `very-mild-current` read as
+  `light` and `rebreather` read as `closed_circuit` are reported `resolved`, the kind now
+  naming a value read onto a coarser scale than the source's. UDDF's boats and `landside`
+  fold silently, and `chamber`, `experimental`, `hyperbaric-facility` and `other` are reported
+  and not read. No reader derives a dive's type from a recording's mode.
+
+- **The UDDF writer writes them back**, the rating doubled, and reports what UDDF cannot
+  spell: `semi_closed` goes out as `rebreather`, which reads back as `closed_circuit`; a
+  `freedive` or `snorkel` type and a `boat` or `pool` entry are not written; and the tags, the
+  waves, the weather and the boat's name have no slot.
+
 ## 0.16.0
 
 - **Breaking: a dive's sightings carry a count and a note.** §6.3a of

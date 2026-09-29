@@ -94,11 +94,14 @@ from .converter import (
     roles_in_order,
 )
 from .uddf import (
+    APPARATUS,
+    CURRENT,
     FORMAT,
     GEAR_TYPE,
     KELVIN_OFFSET,
     LITRES_PER_CUBIC_METRE,
     PASCAL_PER_BAR,
+    PLATFORM,
     MalformedUddfError,
 )
 from .xmlsource import local_name, parse_xml
@@ -201,6 +204,28 @@ _DIVE_MODES = {
     "closed_circuit": "closedcircuit",
     "semi_closed": "semiclosedcircuit",
     "freedive": "apnoe",
+}
+
+# §6.2's `type`, `entry_type` and `current` in UDDF's spelling. A value with no row is not
+# written and is reported: `<apparatus>` has no value for a freedive or a snorkel outing and
+# none meaning "other", and `<platform>`'s boats are each a kind of boat — small, charter,
+# live-aboard, a barge — so writing a plain `boat` as any of them would state one the diver
+# never did; it has no pool either. `semi_closed` goes out as `rebreather`, UDDF's one word for
+# both circuits, and is reported, the reader taking that back as `closed_circuit`: whether a
+# value survives is read off the reader's tables, as a gear type's is.
+_APPARATUS = {
+    "open_circuit": "open-scuba",
+    "closed_circuit": "rebreather",
+    "semi_closed": "rebreather",
+    "surface_supplied": "surface-supplied",
+}
+_PLATFORM = {"shore": "beach-shore", "pier": "pier"}
+_CURRENT = {
+    "none": "no-current",
+    "light": "mild-current",
+    "moderate": "moderate-current",
+    "strong": "hard-current",
+    "extreme": "very-hard-current",
 }
 
 # The scales §6.4 fixes for the three channels this writer converts back out of, as the
@@ -566,6 +591,35 @@ class _Writer:
             self.note(
                 where,
                 f"UDDF has no slot for {member}; it is not written",
+                "dropped",
+            )
+
+    def enumeration(
+        self,
+        parent: ET.Element,
+        tag: str,
+        value: Any,
+        written: dict[str, str],
+        read: dict[str, str],
+        where: str,
+    ) -> None:
+        """One of §6.2's vocabularies as a UDDF enumeration, or the report of why it is not.
+
+        `written` is this writer's table and `read` the reader's: a value written as an
+        element that reads back as another is written and reported, the gear-type shape.
+        """
+        if value is None:
+            return
+        element = written.get(value)
+        if element is None:
+            self.note(where, f"UDDF's <{tag}> does not name {value!r}; it is not written", "dropped")
+            return
+        _sub(parent, tag, element)
+        if read.get(element) != value:
+            self.note(
+                where,
+                f"UDDF's <{tag}> does not name {value!r}; it is written as {element!r}, which reads back as "
+                f"{read[element]!r}",
                 "dropped",
             )
 
@@ -1567,12 +1621,17 @@ class _Writer:
                     "started_at",
                     "duration",
                     "notes",
+                    "type",
+                    "rating",
                     "max_depth",
                     "avg_depth",
                     "bottom_temperature",
                     "visibility",
                     "weight",
                     "altitude",
+                    "air_temperature",
+                    "current",
+                    "entry_type",
                     "trip_uuid",
                     "contact_uuid",
                     "site_uuids",
@@ -1591,8 +1650,8 @@ class _Writer:
 
         # `informationbeforediveType` is an `xs:sequence`, and this is the whole of what
         # this writer puts in it, in the schema's order: link, divenumber,
-        # internaldivenumber, datetime, altitude, equipmentused, tripmembership,
-        # surfacepressure.
+        # internaldivenumber, datetime, airtemperature, altitude, equipmentused, apparatus,
+        # platform, tripmembership, surfacepressure.
         before = _sub(element, "informationbeforedive")
         for site_uuid in dive.get("site_uuids") or []:
             _sub(before, "link", ref=_uddf_id("site", site_uuid))
@@ -1624,6 +1683,8 @@ class _Writer:
         # the document never had, and the reader takes the bare date back as the date it was
         # (`docs/uddf-writing.md`), so nothing is lost and nothing is reported.
         _sub(before, "datetime", str(dive["started_at"]))
+        if dive.get("air_temperature") is not None:
+            _sub(before, "airtemperature", _num(_decimal(dive["air_temperature"]) + KELVIN_OFFSET))
         _optional(before, "altitude", dive.get("altitude"))
         weight, gear_uuids = dive.get("weight"), dive.get("gear_uuids") or []
         devices = [
@@ -1643,6 +1704,8 @@ class _Writer:
             for element_id in dict.fromkeys(devices):
                 _sub(used, "link", ref=element_id)
         self.check_link_order(index, recordings, gear_uuids, devices, where)
+        self.enumeration(before, "apparatus", dive.get("type"), _APPARATUS, APPARATUS, f"{where}/type")
+        self.enumeration(before, "platform", dive.get("entry_type"), _PLATFORM, PLATFORM, f"{where}/entry_type")
         if dive.get("trip_uuid"):
             _sub(before, "tripmembership", ref=_uddf_id("trip", dive["trip_uuid"]))
         # UDDF states one surface pressure per dive, so it is the **primary** recording's
@@ -1674,7 +1737,11 @@ class _Writer:
             )
         _sub(after, "greatestdepth", _num(depth if depth is not None else 0))
         _optional(after, "visibility", dive.get("visibility"))
+        self.enumeration(after, "current", dive.get("current"), _CURRENT, CURRENT, f"{where}/current")
         self.notes_of(after, where, dive)
+        if dive.get("rating") is not None:
+            # Doubled onto `ratingvalueType`'s 1 to 10, which the reader halves back exactly.
+            _sub(_sub(after, "rating"), "ratingvalue", str(2 * dive["rating"]))
         duration = dive.get("duration")
         if duration is None:
             # `<diveduration>` is mandatory too, and takes the same zero for the same

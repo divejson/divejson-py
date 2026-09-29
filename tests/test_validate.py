@@ -15,8 +15,9 @@ check — no `invalid/` document can pin an absence of a rule — the one uuid c
 fixture is refused for another reason by any validator that does not know its member, the
 hosts a contact reference sits on, the corpus holding a dangling one on a trip part alone,
 the hosts a person reference sits on, the corpus holding its defects on a dive and a
-certification alone, what a sighting's two defects are reported as, and the collections the
-validator walks, which the schema can gain one of without it.
+certification alone, what a sighting's two defects are reported as, the collections the
+validator walks, which the schema can gain one of without it, and what rule 8 counts as one
+tag — a fold one fixture cannot sweep.
 Everything already covered by a pair stays covered by the pair.
 """
 
@@ -27,7 +28,13 @@ import json
 import pytest
 from helpers import FIXTURES
 
-from divejson.validate import CHANNELS, COLLECTIONS, READOUTS, validate_document
+from divejson.validate import (
+    CHANNELS,
+    COLLECTIONS,
+    READOUTS,
+    WHITE_SPACE,
+    validate_document,
+)
 
 
 def document(recording: dict) -> dict:
@@ -341,3 +348,58 @@ def test_a_species_is_sighted_on_a_dive_once_whatever_the_counts_say() -> None:
 def test_one_species_sighted_on_two_dives_is_two_sightings() -> None:
     """The rule is per list: a lionfish seen on Monday and on Tuesday was seen twice."""
     assert validate_document(_with_sightings([{"species_uuid": SPECIES}], [{"species_uuid": SPECIES}])) == []
+
+
+# -- §3 rule 8: a tag is on a dive once, compared trimmed and case-folded ------------------------
+
+
+def _with_tags(*tags: list[str]) -> dict:
+    """One dive per list of tags."""
+    dives = [
+        {"uuid": f"0198a6f0-9999-7001-8000-00000000000{index}", "started_at": "2026-04-17T11:49:23+02:00", "tags": listed}
+        for index, listed in enumerate(tags)
+    ]
+    return {"format": "divejson", "version": "1.0", "exported_at": "2026-09-05T00:00:00+00:00", "dives": dives}
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        ("night", "Night"),
+        # Full case folding, not lowercasing: `lower()` keeps the ß, and the two stay apart.
+        ("Großes Riff", "GROSSES RIFF"),
+        # Trimmed, and inner whitespace is the diver's.
+        ("night", " night　"),
+    ],
+)
+def test_a_tag_twice_on_a_dive_is_refused_where_the_schema_sees_two(first: str, second: str) -> None:
+    """`uniqueItems` compares bytes, so only this rule refuses these."""
+    assert [str(issue) for issue in validate_document(_with_tags([first, second]))] == [
+        (
+            f"dives/0/tags/1: tag {second!r} is already listed at dives/0/tags/0, compared trimmed and "
+            "case-folded (spec §3 rule 8)"
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    "tags",
+    [
+        ["night", "night dive"],
+        # U+001C is not White_Space, though `str.strip()` strips it.
+        ["night", "\x1cnight"],
+    ],
+)
+def test_tags_that_differ_after_the_fold_are_two_tags(tags: list[str]) -> None:
+    assert validate_document(_with_tags(tags)) == []
+
+
+def test_one_tag_on_two_dives_is_two_tags() -> None:
+    """The rule is per dive: two night dives both say `night`."""
+    assert validate_document(_with_tags(["night"], ["Night"])) == []
+
+
+def test_the_trim_is_unicodes_white_space() -> None:
+    """Every code point Python calls whitespace, less the four information separators it adds."""
+    python = {chr(point) for point in range(0x110000) if chr(point).isspace()}
+    assert set(WHITE_SPACE) == python - {"\x1c", "\x1d", "\x1e", "\x1f"}

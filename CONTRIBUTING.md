@@ -92,10 +92,11 @@ also lands with its report's kinds documented: `absent`, `inferred`, `resolved` 
 `dropped` are what a diver reads. The two in the middle are not interchangeable and an
 adapter does not get to blur them — `inferred` is a value the converter **computed** from
 readings the source did keep, and it obliges the document to list that member under
-`extensions.divejson.inferred`; `resolved` is a number the source recorded whose scale or
-units were ambiguous, where the converter decided only how to read it and lists nothing.
-Reaching for `inferred` on a unit reading is the mistake, and it produces a document whose
-report and whose derived-value list disagree.
+`extensions.divejson.inferred`; `resolved` is a value the source recorded whose scale, units
+or meaning were ambiguous, or which lands on a coarser scale than the source's — a UDDF
+rating of 7 of 10 read as 4 of 5 — where the converter decided only how to read it and lists
+nothing. Reaching for `inferred` on a unit reading is the mistake, and it produces a document
+whose report and whose derived-value list disagree.
 
 ## Adding a writer
 

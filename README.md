@@ -52,7 +52,7 @@ old application never kept. Every line says which kind of news it is:
 | --- | --- |
 | `absent` | the source never recorded this |
 | `inferred` | the converter computed it from other readings the source did keep |
-| `resolved` | the source recorded the value and left its scale, its units or its meaning ambiguous; the converter decided how to read it |
+| `resolved` | the source recorded the value and left its scale, its units or its meaning ambiguous, or recorded it on a finer scale than the format's; the converter decided how to read it |
 | `dropped` | the source recorded it and this format cannot hold it |
 
 `inferred` and `resolved` are worth telling apart, because they answer different questions
@@ -62,7 +62,10 @@ about the value in front of you: an `inferred` one is the converter's arithmetic
 cylinder, and a Shearwater Cloud Desktop `<datetime>` suffixed `Z` is the wall clock the
 diver read off their wrist rather than an instant in UTC. A scale is settled on the value by
 a magnitude test; a *meaning* is settled on the writer, by a table of generators whose
-habits are known.
+habits are known, or on the element, where one word covers two of the format's — UDDF's
+`rebreather` is closed and semi-closed circuit alike, and reads as closed. A value on a
+finer scale than the format's is `resolved` too, being no longer quite the source's own: a
+UDDF rating of 7 of 10 is 4 of the format's 5.
 
 An `inferred` member is also listed under `extensions.divejson.inferred` in the document
 itself, so a reader can tell a derivation from a reading (spec §5.4). A `resolved` one is

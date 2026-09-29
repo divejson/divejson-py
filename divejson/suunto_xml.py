@@ -19,9 +19,10 @@ element is *not recorded*, never zero — which is `converting.md`'s empty-is-ab
 meeting the writer that makes it unmissable.
 
 **A `<Mode>3</Mode>` document is a freedive, and a freedive is a dive.** §6.4a's `mode` is
-what says which kind of dive it is, so the recording carries `freedive` and nothing is
-mislabelled. It was skipped and reported until that member existed, on the ground that a
-carried freedive would be indistinguishable from a scuba dive with no gas and no
+what says the computer ran in freedive mode, so the recording carries `freedive` and nothing
+is mislabelled; the dive's own `type` is the diver's statement, which §6.4a forbids reading
+off a recording's mode. It was skipped and reported until `mode` existed, on the ground that
+a carried freedive would be indistinguishable from a scuba dive with no gas and no
 decompression algorithm; an archive of the owner's whole export directory now converts to
 **384** dives where it used to produce 342 and a report saying why the other 42 were
 missing. The 42 are exactly the 42 that carry no `<DiveMixture>` at all — and since they had
@@ -128,9 +129,10 @@ SUUNTO = "Suunto"
 # nil `<Algorithm>`, a nil `<DiveTime>`, durations of 3 to 60 seconds and depths of 1.39 to
 # 15.48 m.
 #
-# A freedive is a dive and is carried — §6.4a's `mode` is what says which kind it is — so
-# this reader skips nothing on its mode and has no not-a-dive test at all, where the app's
-# JSON export needs one because a run and a dive are the same shape there.
+# A freedive is a dive and is carried — §6.4a's `mode` is what says the computer ran in
+# freedive mode — so this reader skips nothing on its mode and has no not-a-dive test at
+# all, where the app's JSON export needs one because a run and a dive are the same shape
+# there.
 DIVE_MODES = {Decimal(0): "open_circuit", Decimal(1): "open_circuit", Decimal(3): "freedive"}
 
 # The `<Mode>` that runs no decompression model, so a `<PersonalMode>` beside it is the
@@ -486,10 +488,10 @@ class _Converter:
         """`<Mode>` as §6.4a's `mode`, by the table the corpus derives.
 
         Every record this format holds is a dive of some kind, so nothing is skipped for its
-        mode: a `<Mode>3</Mode>` freedive used to be dropped on the ground that the format
-        had no member for the kind of a dive, and there is a member now. An archive of the
-        owner's whole export directory converts to 384 dives where it used to produce 342 and
-        a report saying why the other 42 were missing.
+        mode: a `<Mode>3</Mode>` document is carried, its recording in freedive mode. An
+        archive of the owner's whole export directory converts to 384 dives, 42 of them those.
+        The dive's `type` is not read off the mode: §6.4a forbids deriving either from the
+        other.
 
         A document that states **no** `<Mode>`, or one outside the table, leaves the mode
         absent: absence is not a claim, §6.4a forbids assuming open circuit, and
@@ -635,14 +637,14 @@ class _Converter:
         together or not at all: 25 of the 384 exports in hand carry all three and 359 carry
         none, and every recorded value is `0`.
 
-        None of them can be read at a scale the file states. `<Weather>` is a code with no
-        member in §6 at all. `<Visibility>` is the application's own rating where §6.2's is
-        metres, which is the refusal Subsurface's five-star `@visibility` gets for the same
-        reason. And `<Weight>` reaches a §6.2 member measured in kilograms, but the export
-        writes a bare number and neither it nor any companion file in hand states the unit
-        the application wrote it in — so reading it would break `converting.md`'s
-        refuse-rather-than-guess rule for a member whose every recorded value here is zero
-        in either unit.
+        None of them can be read at a scale the file states. `<Weather>` is an undocumented
+        code: §6.2 has a `weather` member, and nothing says which of its values any code
+        means. `<Visibility>` is the application's own rating where §6.2's is metres, which
+        is the refusal Subsurface's five-star `@visibility` gets for the same reason. And
+        `<Weight>` reaches a §6.2 member measured in kilograms, but the export writes a bare
+        number and neither it nor any companion file in hand states the unit the application
+        wrote it in — so reading it would break `converting.md`'s refuse-rather-than-guess
+        rule for a member whose every recorded value here is zero in either unit.
         """
         for name in ("Visibility", "Weather", "Weight"):
             if _recorded_text(self.root, name) is not None:

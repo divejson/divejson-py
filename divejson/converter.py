@@ -32,8 +32,8 @@ defines them for the way in, and this module holds only the vocabulary.
 says what the report is telling the diver — `absent` for what the source never recorded,
 `inferred` for a value this converter computed from readings the source *did* record,
 `resolved` for a recorded value whose scale, units or **meaning** the source left
-ambiguous and this converter had to decide, `dropped` for what was recorded and could not
-be carried.
+ambiguous and this converter had to decide, or that it read onto a coarser scale than the
+source's, `dropped` for what was recorded and could not be carried.
 
 `inferred` and `resolved` are the pair worth separating, because a diver reading one
 report line has to know whether the number in the document is the converter's arithmetic
