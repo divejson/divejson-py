@@ -90,6 +90,7 @@ in a converter, are in `converting.md`.
 | `deco_model.gf_low`, `.gf_high` | whole percent | `<gradientfactorlow>`, `<gradientfactorhigh>` | fraction, and see below | × 100, or — |
 | `max_depth`, `avg_depth` | metres | `<greatestdepth>`, `<averagedepth>` | metres | — |
 | `bottom_temperature` | °C | `<lowesttemperature>` | Kelvin | K − 273.15 |
+| `air_temperature` | °C | `<airtemperature>` | Kelvin | K − 273.15 |
 | `cylinders[].start_pressure`, `.end_pressure` | bar | `<tankpressurebegin>`, `<tankpressureend>` | Pascal | ÷ 100 000 |
 | a recording's `surface_pressure` | bar | `<surfacepressure>` | Pascal | ÷ 100 000 |
 | `cylinders[].volume` | litres | `<tankvolume>` | cubic metres | × 1000, and see below |
@@ -551,6 +552,9 @@ carries nothing this format records.
 | `informationbeforedive/link/@ref` naming a `<divebase>` or a `<shop>` | `contact_uuid` |
 | `informationbeforedive/link/@ref` naming a `<buddy>` or a `<guide>` | `people` — *People* above |
 | `informationbeforedive/altitude` | `altitude` |
+| `informationbeforedive/airtemperature` | `air_temperature` |
+| `informationbeforedive/apparatus` | `type` — see below |
+| `informationbeforedive/platform` | `entry_type` — see below |
 | `informationbeforedive/surfacepressure` | the primary recording's `surface_pressure` — see below |
 | `informationbeforedive/equipmentused/leadquantity` | `weight` |
 | `informationafterdive/diveduration` | `duration` |
@@ -558,7 +562,49 @@ carries nothing this format records.
 | `informationafterdive/averagedepth` | `avg_depth` |
 | `informationafterdive/lowesttemperature` | `bottom_temperature` |
 | `informationafterdive/visibility` | `visibility` |
+| `informationafterdive/current` | `current` — see below |
+| `informationafterdive/rating/ratingvalue` | `rating` — see below |
 | `informationafterdive/notes/para` | `notes` |
+
+**Four of those rows read a closed vocabulary or a scale, and on two of them §6.2 has fewer
+steps than UDDF.** `<ratingvalue>` counts 1 to 10 and §6.2's `rating` 1 to 5, so a value reads as
+half of itself rounded up — ⌈n/2⌉, a `7` reading as `4` — reported `resolved` with both
+scales named, since the value written is no longer the source's own. `<current>` has six
+values and §6.2's five:
+
+| `<current>` | `current` |
+| --- | --- |
+| `no-current` | `none` |
+| `very-mild-current`, `mild-current` | `light` |
+| `moderate-current` | `moderate` |
+| `hard-current` | `strong` |
+| `very-hard-current` | `extreme` |
+
+`very-mild-current` shares `light` with `mild-current`, and that read is reported `resolved`,
+the six-step scale having lost a step on the way in; every other row is one value to one and
+carries no finding.
+
+| `<apparatus>` | `type` |
+| --- | --- |
+| `open-scuba` | `open_circuit` |
+| `rebreather` | `closed_circuit`, reported `resolved` |
+| `surface-supplied` | `surface_supplied` |
+| `chamber`, `experimental` | not read, reported `dropped` |
+
+UDDF's `rebreather` names closed and semi-closed circuits alike, so reading it as
+`closed_circuit` settles a meaning the source left open, which is what `resolved` is for.
+Neither `chamber` nor `experimental` is a value §6.2's vocabulary has.
+
+| `<platform>` | `entry_type` |
+| --- | --- |
+| `beach-shore`, `landside` | `shore` |
+| `pier` | `pier` |
+| `small-boat`, `charter-boat`, `live-aboard`, `barge` | `boat` |
+| `hyperbaric-facility`, `other` | not read, reported `dropped` |
+
+The folds into `shore` and `boat` are silent, as every vocabulary fold this reader makes is:
+the value read is the one the source stated, in §6.2's broader word for it, and no scale was
+decided.
 
 `<datetime>` is the source of the UTC offset `converting.md` requires be carried through
 untouched; a dive with no `<datetime>` at all is dropped, since §6.2 makes `started_at`
@@ -856,8 +902,9 @@ writes all three that way.
 | `<waypoint><alarm>`, `<setpo2>`, `<heading>`, `<pulserate>` | no core member, and no fixture to map against. `<setpo2>` is a *maximum tolerated* ppO₂ rather than a rebreather setpoint, which is the member it would otherwise look like. |
 | `<decomodel><vpm>`, `<rgbm>` | no file in hand carries either, so §6.4c's `algorithm` has no value seeded for them yet. |
 | `<calculateprofile><profile><density>` | a water density in kg/m³ — Shearwater Cloud Desktop writes `1030` — beside the recalculation's model, a route not read for the reason *The decompression model* gives. §6.4a's `salinity` is a named setting and carries no density: the two are different members, neither derivable from the other, and a density arrives in a minor version when a reader maps one. |
-| `<informationbeforedive><surfaceintervalbeforedive>` | no core member. |
-| `<informationafterdive><rating>`, `<current>`, `<problems>` | no core member. |
+| `<informationbeforedive><surfaceintervalbeforedive>`; `<informationafterdive><desaturationtime>`, `<noflighttime>` | no core member. |
+| `<informationafterdive><problems>` | no core member. |
+| `<informationbeforedive><purpose>`, `<informationafterdive><program>` | each a closed vocabulary holding one value — what the dive was for, `sightseeing`, `teaching` or `research`, and the programme it was dived under, `recreation`, `training` or `military` — which is the subject matter a diver's `tags` (§6.2) often carry, in a vocabulary the diver does not choose. A tag list is free text and neither element holds one, so a dive's `tags` are neither written into them nor read from them. |
 | `<informationafterdive><observations>` | a dive's `<fauna>` and `<flora>`, the slot a dive's `sightings` (§6.3a) would be read from, and no file in hand fills either. The corpus's two Shearwater Cloud files carry only its `<notes>`, the computer's mode markers (`-ShearwaterDiveModeType:6-`) rather than anything the diver wrote, and the dive's `notes` do not take them. A reading rule waits for a file that carries a species. Not reported. |
 | `<site><ecology>` | what is found at a site in general, where a sighting (§6.3a) is what one dive saw — the per-dive slot is `<observations>`, above. |
 | `<trippart><relateddives>` | the reverse of `<tripmembership>`; no writer in the corpus emits it. Not reported. |

@@ -52,7 +52,7 @@
       "water_type": "salt",
       "altitude": 0,
       "air_temperature": 11.5,
-      "current": "moderate",
+      "current": "hard-current",
       "waves": "slight",
       "weather": "overcast",
       "entry_type": "boat",

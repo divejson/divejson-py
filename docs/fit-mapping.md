@@ -312,8 +312,8 @@ model for the same dive.
 
 The dive's mode has no source here. `session.sub_sport` is the field that would carry it and
 no file in hand writes one, so §6.4a's `mode` is absent on a FIT dive — including a
-freediving one, which this reader carries as a dive that does not say what kind it is. The
-DM5 XML path says which, because its files state it.
+freediving one, which this reader carries as a dive whose recording does not say what mode
+its computer ran in. The DM5 XML path says which, because its files state it.
 
 ### The depth from the samples is `inferred`, and is listed
 

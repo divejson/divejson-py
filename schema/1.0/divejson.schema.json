@@ -139,6 +139,16 @@
         },
         "duration": { "type": "integer", "exclusiveMinimum": 0 },
         "notes": { "$ref": "#/$defs/notes" },
+        "type": {
+          "enum": ["open_circuit", "closed_circuit", "semi_closed", "freedive", "snorkel", "surface_supplied"]
+        },
+        "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "tags": {
+          "description": "The diver's labels for the dive. uniqueItems rejects a tag written twice byte for byte; that no two tags are equal once trimmed and case-folded is a rule the validator checks, since two such tags are two different strings to uniqueItems.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "uniqueItems": true
+        },
         "max_depth": { "type": "number", "exclusiveMinimum": 0 },
         "avg_depth": { "type": "number", "exclusiveMinimum": 0 },
         "bottom_temperature": { "type": "number" },
@@ -146,6 +156,12 @@
         "weight": { "type": "number", "minimum": 0 },
         "water_type": { "enum": ["salt", "fresh", "brackish"] },
         "altitude": { "type": "integer", "minimum": -450, "maximum": 6500 },
+        "air_temperature": { "type": "number" },
+        "current": { "enum": ["none", "light", "moderate", "strong", "extreme"] },
+        "waves": { "enum": ["calm", "slight", "moderate", "rough"] },
+        "weather": { "enum": ["clear", "partly_cloudy", "overcast", "rain", "storm", "snow", "fog"] },
+        "entry_type": { "enum": ["shore", "boat", "pier", "pool"] },
+        "boat_name": { "type": "string", "minLength": 1, "maxLength": 255 },
         "entry_position": { "$ref": "#/$defs/position" },
         "exit_position": { "$ref": "#/$defs/position" },
         "trip_uuid": { "$ref": "#/$defs/uuid" },

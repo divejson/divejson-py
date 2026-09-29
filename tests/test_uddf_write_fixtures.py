@@ -101,6 +101,13 @@ LOST: dict[str, frozenset[str]] = {
             "sites/0/location/position",
             "sites/0/location/bbox",
             "dives/0/water_type",
+            # No slot either, like the water type.
+            "dives/0/tags",
+            "dives/0/waves",
+            "dives/0/weather",
+            "dives/0/boat_name",
+            # `<platform>`'s boats are each a kind of boat, and a plain one is none of them.
+            "dives/0/entry_type",
             # A recording's settings and oxygen clocks have no slot, and its surface
             # pressure has the dive's `<surfacepressure>` and so comes back.
             "dives/0/recordings/0/salinity",

@@ -55,7 +55,7 @@
       "current": "moderate",
       "waves": "slight",
       "weather": "overcast",
-      "entry_type": "boat",
+      "entry_type": "jetty",
       "boat_name": "Taiaroa",
       "entry_position": {
         "latitude": -45.86055,

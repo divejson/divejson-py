@@ -54,7 +54,8 @@ Nothing else in the file distinguishes a run from a dive whose computer recorded
 so an activity that states some other type is skipped and reported — `converting.md`'s rule
 for a source record that is not a dive at all, and this is the format that shows it at its
 plainest, since a run and a dive here are the same shape. A **freedive** is not one of those:
-§6.4a's `mode` is what says which kind of dive it is, and the DM5 XML reader carries one.
+it is a dive, §6.4a's `mode` is what says its computer ran in freedive mode, and the DM5 XML
+reader carries one.
 No file in hand has a freedive in this shape — every one of the 35 states `51` — so nothing
 here says how the app would mark it.
 
@@ -613,8 +614,10 @@ Read as a list of what was considered, not of what was missed.
   none of these — and is not documented as a maximum depth.
 - **`Header.Feeling`, `IsSupervised`, `DiveInWorkout`, `DeviceLocation`, `MoveType`,
   `Activity`, `Personal`, `Settings`, `Targets`** — the diver's rating of the dive and the
-  watch's configuration. §6.2 has nowhere for a 1-5 feeling, and inventing an `extensions`
-  member for it would be this reader defining vocabulary.
+  watch's configuration. §6.2's `rating` is where a five-step feeling would go, and it waits
+  for a pair: no input in `fixtures/suunto_json/` keeps one, and a mapping no pair
+  exercises is not adopted (`converting.md`). The rest has no member, and inventing an
+  `extensions` member for it would be this reader defining vocabulary.
 - **Every fitness member — `EPOC`, `Energy`, `MAXVO2`, `FitnessAge`,
   `FitnessAgeClassification`, `HrZones`, `PowerZones`, `SpeedZones`, `PeakTrainingEffect`,
   `RecoveryTime`, `TraingingLoadPeak` (the vendor's spelling), `StepCount`,
@@ -631,10 +634,10 @@ Read as a list of what was considered, not of what was missed.
   `NumberInSeries` was refused alongside them until §6.4b gave a device's counter a home;
   it is carried now, under *Device* above. A dive's `number` is still the diver's own
   numbering and a device's counter is still not reliably it — which is why the two are
-  different members rather than one. **Untested**: no file in hand carries a
-  `Header.Diving.NumberInSeries`. Only the D5 shapes have a `Header.Diving` at all — the
-  Ocean shape has none, per *The three header shapes* above — and the one D5 file in
-  `fixtures/suunto_json/` states no number inside it.
+  different members rather than one. `d5-deco-max-depth.json`, `d5-deep-stop-broken.json`
+  and `d5-stop-alarms.json` each carry a `Header.Diving.NumberInSeries`, and each pair's
+  document carries the same figure as the `dive_number` of its recording's device, per the
+  row under *Device* above.
 - **`Diving.StartTissue` / `EndTissue`'s `Helium`, `Nitrogen`, `OLF`, `RgbmHelium` and
   `RgbmNitrogen`** — everything under those blocks but `CNS` and `OTU`. §6.2 has no member
   for a tissue model's state, and a loading figure is only meaningful beside the algorithm
