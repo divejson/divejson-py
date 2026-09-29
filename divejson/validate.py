@@ -3,9 +3,9 @@
 Two passes, mirroring §3 of the specification: the JSON Schema (types, required members,
 enums, ranges, lengths, and the structural rules like Position objects), then the
 semantic requirements the schema cannot express — identifier uniqueness, referential
-closure, a record listed once in a list of references, cross-member arithmetic,
-profile-series integrity and span, what a recording carries, the offset requirement on
-``exported_at``, and the gradient-factor order.
+closure, a record listed once in a list of references, a tag listed once on a dive when
+trimmed and case-folded, cross-member arithmetic, profile-series integrity and span, what a
+recording carries, the offset requirement on ``exported_at``, and the gradient-factor order.
 
 §4's member order is a SHOULD, not a requirement on the document: a generic
 re-serialisation commonly sorts an object's members, and a document it produced is as
