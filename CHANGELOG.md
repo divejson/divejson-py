@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.17.0
+
 - **A dive carries its type, rating, tags and conditions.** §6.2 of
   [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) adds
   `type`, `rating`, `tags`, `air_temperature`, `current`, `waves`, `weather`, `entry_type` and
