@@ -1753,17 +1753,18 @@ def test_the_current_reads_six_steps_onto_five(written: str, current: str | None
 
 
 @pytest.mark.parametrize(("written", "rating"), [(str(steps), (steps + 1) // 2) for steps in range(1, 11)])
-def test_a_rating_is_half_of_uddfs_rounded_up_and_an_odd_one_says_so(written: str, rating: int) -> None:
-    """8 of 10 is 4 of 5 and says nothing; 7 of 10 is 4 of 5 too, which is where two of the
-    source's values became one, and the report says so naming both scales."""
+def test_a_rating_is_half_of_uddfs_rounded_up_and_says_so(written: str, rating: int) -> None:
+    """8 of 10 is 4 of 5, and so is 7 of 10: every read lands on the coarser scale, and the
+    report names both."""
     body = STARTED_AT + _after(f"<rating><ratingvalue>{written}</ratingvalue></rating>")
     assert dive(body)["rating"] == rating
-    expected = (
-        [("resolved", f"UDDF rates a dive 1 to 10 and the format 1 to 5; <ratingvalue> {written} is read as {rating}, rounded up (spec §6.2)")]
-        if int(written) % 2
-        else []
-    )
-    assert _reported(body) == expected
+    assert _reported(body) == [
+        (
+            "resolved",
+            f"UDDF rates a dive 1 to 10 and the format 1 to 5; <ratingvalue> {written} is read as {rating}, half "
+            "of it rounded up (spec §6.2)",
+        )
+    ]
 
 
 @pytest.mark.parametrize("written", ["0", "11", "7.5", "-2"])

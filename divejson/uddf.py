@@ -315,8 +315,8 @@ _RESOLVED_READS = {
 }
 
 # `ratingvalueType`'s range. The format rates a dive 1 to 5, so a UDDF rating reads as half of
-# itself rounded up — 8 as 4 and 7 as 4 too — and an odd one is reported `resolved`, being
-# the read where two of the source's values became one.
+# itself rounded up — 8 as 4 and 7 as 4 too — reported `resolved`: every read lands the value
+# on a coarser scale than the one the source stated it on.
 MIN_UDDF_RATING = 1
 MAX_UDDF_RATING = 10
 
@@ -1934,13 +1934,12 @@ class _Converter:
             return None
         steps = int(stated)
         rating = (steps + 1) // 2
-        if steps % 2:
-            self.note(
-                where,
-                f"UDDF rates a dive 1 to 10 and the format 1 to 5; <ratingvalue> {steps} is read as {rating}, "
-                "rounded up (spec §6.2)",
-                "resolved",
-            )
+        self.note(
+            where,
+            f"UDDF rates a dive 1 to 10 and the format 1 to 5; <ratingvalue> {steps} is read as {rating}, half "
+            "of it rounded up (spec §6.2)",
+            "resolved",
+        )
         return rating
 
     def read_recordings(

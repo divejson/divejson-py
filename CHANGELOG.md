@@ -17,9 +17,9 @@ this file is about the package, whose version moves independently.
 
 - **The UDDF reader reads what UDDF holds of them.** `<airtemperature>` in Kelvin,
   `<apparatus>` as the type, `<platform>` as the entry type, `<current>` and `<rating>`. A
-  rating is half of UDDF's 1 to 10, rounded up; an odd one, `very-mild-current` read as
-  `light` and `rebreather` read as `closed_circuit` are reported `resolved`, the kind now
-  naming a value read onto a coarser scale than the source's. UDDF's boats and `landside`
+  rating is half of UDDF's 1 to 10, rounded up; it, `very-mild-current` read as `light` and
+  `rebreather` read as `closed_circuit` are reported `resolved`, the kind now naming a value
+  read onto a coarser scale than the source's. UDDF's boats and `landside`
   fold silently, and `chamber`, `experimental`, `hyperbaric-facility` and `other` are reported
   and not read. No reader derives a dive's type from a recording's mode.
 

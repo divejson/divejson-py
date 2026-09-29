@@ -1357,11 +1357,10 @@ def test_the_air_temperature_goes_out_in_kelvin_and_comes_back_exactly(celsius: 
 
 @pytest.mark.parametrize("rating", range(1, 6))
 def test_a_rating_goes_out_doubled_and_comes_back_whole(rating: int, schema) -> None:
-    """Even steps only, so the reader's halving never rounds and never reports."""
+    """Even steps only, so the reader's halving never rounds."""
     source = one_dive(rating=rating)
     assert f"<ratingvalue>{2 * rating}</ratingvalue>" in written(source, schema)
     assert read_back(source)["dives"][0]["rating"] == rating
-    assert not [note for note in convert(write_uddf(source).data, format="uddf").notes if "rating" in note.message]
 
 
 @pytest.mark.parametrize(
