@@ -1406,10 +1406,8 @@ class _Writer:
     ) -> None:
         """`<geography>`, which UDDF will not let carry coordinates without a place name.
 
-        `place` is the text the one `<location>` element gets, and each host spends that
-        element on a different member of §6.9's location — a site on the place's `name`, a
-        trip part on its `full_name`, the part's own `<name>` already holding the name.
-        `docs/uddf-mapping.md` has the asymmetry and why UDDF forces it.
+        `place` is the text the one `<location>` element gets, and on both hosts that is the
+        name of §6.9's location — a trip part writing it into its own `<name>` as well.
 
         `<location>` is mandatory in `geographyType`, and there is nothing honest to put
         there for a record that has none: copying the record's own **name** in — which is
@@ -1472,18 +1470,15 @@ class _Writer:
                     if record is not None:
                         self.nameless_part(part_where, record)
                 else:
-                    self.unmapped(part_where, location, frozenset({"name", "full_name", "position"}))
+                    self.unmapped(part_where, location, frozenset({"name", "position"}))
                     _sub(part, "name", str(location.get("name") or ""))
                 if record is not None:
                     self.date_of_trip(part, part_where, record)
                 if location is not None:
-                    # `full_name` and nothing else: the reader takes a part's
-                    # `<geography><location>` as the fuller form and only where it differs
-                    # from the part's own name, so writing the name here would round-trip as
-                    # no full name at all.
-                    self.geography(
-                        part, part_where, location.get("full_name"), location.get("position"), noun="location"
-                    )
+                    # The name in both slots: a reader takes `<geography><location>` as the
+                    # place and `<name>` only in its absence, and the element is what lets the
+                    # part's coordinates be written at all.
+                    self.geography(part, part_where, location.get("name"), location.get("position"), noun="location")
                 if record is not None:
                     self.accommodation(part, part_where, record)
                 if part_index == 0:

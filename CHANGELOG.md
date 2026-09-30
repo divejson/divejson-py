@@ -7,6 +7,22 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Breaking: a location has one name, and `full_name` is removed.** §6.9 of
+  [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) keeps
+  `name`, `position` and `bbox`, `name` being the place as a person writes it — alone, or
+  extended outward through its region to its country — so a second, fuller form says nothing
+  a reader uses. `divejson validate` refuses a location carrying `full_name` as an undefined
+  member.
+
+- **A UDDF trip part's place is its `<geography><location>`.** The reader takes that element
+  as the part's `location.name` wherever it has text, and the part's `<name>` only where it is
+  blank; a `<name>` that differs is reported, §6.9a giving a part no name of its own, so a
+  label such as "Red Sea Liveaboard" is no longer read as the name of a place. A part with no
+  `<name>` whose `<location>` has text now keeps its place rather than dropping it. The writer
+  puts a part's `location.name` into both slots with its coordinates beside it, so a part with
+  a `position` keeps it through the write; a site's locality is written as before, its
+  `position` and `bbox` reported.
+
 ## 0.17.0
 
 - **A dive carries its type, rating, tags and conditions.** §6.2 of
