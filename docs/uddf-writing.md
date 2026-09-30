@@ -399,10 +399,10 @@ UDDF file expects to find there.
 ### Sites and trips
 
 `geographyType` makes `<location>` mandatory, so **coordinates are written only where the
-record has a place name**: a site with a `position` and no `location`, or a part's location
-with a `position` and no `full_name`, keeps its name and loses its coordinates, reported.
+record has a place name**: a site with a `position` and no `location` keeps its name and
+loses its coordinates, reported.
 
-**Differs from the reference writer**: it puts the record's own **name** in `<location>` and
+**Differs from the reference writer**: it puts the site's own **name** in `<location>` and
 keeps the coordinates, which is defensible for an application exporting data it holds a name
 for and wrong for a converter — a round trip through it hands the diver back a `location`
 they never wrote. This is the same trade *The three answers* describes, and it is the one
@@ -411,9 +411,13 @@ place in the document where the reference writer takes the third of them.
 A trip becomes one `<trippart>` **per §6.9a part**, which is as close to an identity as
 this document gets: both formats model a trip as a sequence of stretches, each carrying its
 own dates and its own place, so a part goes out whole instead of having its dates lifted to
-the trip. A part's `location.name` is the `<name>`, its `location.full_name` the
-`<geography><location>`, its own dates the `<dateoftrip>`, and its `accommodation_uuid` an
-`<accomodation>` — *Contacts* below.
+the trip. A part's `location.name` is both its `<name>` and its `<geography><location>`, its
+own dates the `<dateoftrip>`, and its `accommodation_uuid` an `<accomodation>` — *Contacts*
+below. The name goes in both slots: `<name>` is mandatory, `<location>` is the slot a reader
+takes the place from ([`uddf-mapping.md`](uddf-mapping.md)), and with the same text in each a
+reader has no differing label to report. `<location>` is also what lets `<geography>` carry
+coordinates at all, and a location's `name` is REQUIRED, so **every part whose location has a
+`position` is written with its coordinates**.
 
 **A trip with no parts still needs one `<trippart>`** — `tripType` requires at least one —
 and gets a nameless, dateless one, an empty `<name>` being a valid `xs:string` that reads
@@ -447,14 +451,13 @@ held the dates:
 
 `trips[].parts[].location.bbox` has no UDDF slot at all.
 
-**A dive site's locality loses three members rather than one**, and the reason is the
+**A dive site's locality loses two members where a part's loses one**, and the reason is the
 element it has to share. A site's `<name>` is the site's own, so the locality has only
 `<geography><location>` to live in and that one slot takes `location.name` — which leaves
-`sites[].location.full_name` with nowhere to go, and `sites[].location.position` and
-`sites[].location.bbox` with nowhere either, `<geography>`'s own `<latitude>` and
-`<longitude>` being the **site's** pin and not the locality's. All three are reported
-dropped. A part gives the same element to its `full_name` and so loses only its box, which
-is the asymmetry [`uddf-mapping.md`](uddf-mapping.md) describes from the reading side.
+`sites[].location.position` and `sites[].location.bbox` with nowhere to go, `<geography>`'s
+own `<latitude>` and `<longitude>` being the **site's** pin and not the locality's. Both are
+reported dropped. A part's `<geography>` is its location's own, so it loses only its box,
+which is the asymmetry [`uddf-mapping.md`](uddf-mapping.md) describes from the reading side.
 
 ### Contacts
 
@@ -846,7 +849,7 @@ writer leaves empty:
 | `diver.portrait_file` | `<owner>` has no image element. A `<notes><link>` to a `<mediadata><image>` names a file by path, whose bytes a UDDF file does not carry, and reads back as a linked picture with no role — `uddf-mapping.md`'s *Diver* section says why no linked image is read as a portrait |
 | a recording's `source_files`, `started_at`, `salinity` and oxygen clocks, its device's `firmware`, and every recording after the first, its `surface_pressure` included | UDDF gives a dive one `<samples>` and one `<surfacepressure>`, `equipmentPieceType` no firmware element, and nothing at all a salinity setting or an oxygen clock's two ends could go in — *Devices* and *Dives* above have each answer, and why the device of a dropped recording is kept even so |
 | `trips[].parts[].location.bbox` | `geographyType` carries a point, not a box |
-| `sites[].location.full_name`, `position` and `bbox` | a site's `<name>` is its own, so the locality gets only `<geography><location>` and that slot holds `location.name`; `<geography>`'s coordinates are the site's pin, and the box has nowhere either — *Sites and trips* above has the asymmetry with a part |
+| `sites[].location.position` and `bbox` | a site's `<name>` is its own, so the locality gets only `<geography><location>` and that slot holds `location.name`; `<geography>`'s coordinates are the site's pin, and the box has nowhere either — *Sites and trips* above has the asymmetry with a part |
 | `contacts[].roles` | no element; *Contacts* above says when it is reported |
 | `contact_uuid` on a course, a certification or a service record, and a certification's `instructor_uuid` | the record has no slot (above), and its reference goes with it |
 | `trips[].people`, `courses[].people` | `<trippart>` links only a dive base, and UDDF has no course; *People* above |

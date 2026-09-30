@@ -91,6 +91,9 @@
       <trippart>
         <name>Dahab</name>
         <dateoftrip startdate="2026-05-01T00:00:00" enddate="2026-05-05T00:00:00" />
+        <geography>
+          <location>Dahab</location>
+        </geography>
       </trippart>
     </trip>
   </divetrip>

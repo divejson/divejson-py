@@ -8,6 +8,26 @@
   "diver": {
     "uuid": "0198a6f0-1111-7001-8000-000000000001",
     "name": "Alex Trim",
+    "emergency_contacts": [
+      {
+        "name": "Robin Trim",
+        "phone": "+64 3 555 0142",
+        "relationship": "brother"
+      }
+    ],
+    "insurances": [
+      {
+        "provider": "DAN World",
+        "number": "DW-88213"
+      }
+    ],
+    "portrait_file": {
+      "uuid": "0198a6f0-1111-7002-8000-000000000002",
+      "original_filename": "IMG_4471.jpg",
+      "content_type": "image/jpeg",
+      "byte_size": 2861904,
+      "sha256": "5e0c7a1b9d24f3e6a8b0c2d4e6f80a1b3c5d7e9f0a2b4c6d8e0f1a3b5c7d9e1f"
+    },
     "created_at": "2024-01-05T09:00:00+00:00"
   },
   "dives": [
@@ -17,6 +37,13 @@
       "started_at": "2026-07-03T09:14:00+12:45",
       "duration": 5520,
       "notes": "Trimix wall dive; two deco gases staged on the line.",
+      "type": "open_circuit",
+      "rating": 4,
+      "tags": [
+        "deep",
+        "wall",
+        "training"
+      ],
       "max_depth": 62.3,
       "avg_depth": 31.8,
       "bottom_temperature": 7.4,
@@ -24,6 +51,12 @@
       "weight": 0,
       "water_type": "salt",
       "altitude": 0,
+      "air_temperature": 11.5,
+      "current": "moderate",
+      "waves": "slight",
+      "weather": "overcast",
+      "entry_type": "boat",
+      "boat_name": "Taiaroa",
       "entry_position": {
         "latitude": -45.86055,
         "longitude": 170.66973
@@ -34,6 +67,7 @@
       },
       "trip_uuid": "0198a6f0-1111-7030-8000-000000000030",
       "course_uuid": "0198a6f0-1111-7090-8000-000000000090",
+      "contact_uuid": "0198a6f0-1111-7095-8000-000000000095",
       "site_uuids": [
         "0198a6f0-1111-7040-8000-000000000040",
         "0198a6f0-1111-7041-8000-000000000041"
@@ -47,6 +81,16 @@
           "species_uuid": "0198a6f0-1111-7060-8000-000000000060",
           "count": 3,
           "notes": "Under the overhang below the chimney, polyps white in the torchlight."
+        }
+      ],
+      "people": [
+        {
+          "person_uuid": "0198a6f0-1111-70a0-8000-0000000000a0",
+          "role": "instructor"
+        },
+        {
+          "person_uuid": "0198a6f0-1111-70a1-8000-0000000000a1",
+          "role": "student"
         }
       ],
       "cylinders": [
@@ -112,6 +156,7 @@
             "gf_low": 30,
             "gf_high": 70
           },
+          "salinity": "en13319",
           "surface_pressure": 1.013,
           "cns_start": 4.5,
           "cns_end": 61.0,
@@ -449,12 +494,38 @@
           "species_uuid": "0198a6f0-1111-7061-8000-000000000061"
         }
       ],
+      "people": [
+        {
+          "person_uuid": "0198a6f0-1111-70a1-8000-0000000000a1",
+          "role": "buddy"
+        }
+      ],
       "cylinders": [
         {
           "oxygen": 32.0
         }
       ],
       "notes": "Converted from a legacy log: no offset, no duration recorded."
+    },
+    {
+      "uuid": "0198a6f0-1111-7012-8000-000000000012",
+      "started_at": "2026-07-05",
+      "duration": 2880,
+      "max_depth": 21.5,
+      "site_uuids": [
+        "0198a6f0-1111-7040-8000-000000000040"
+      ],
+      "people": [
+        {
+          "person_uuid": "0198a6f0-1111-70a1-8000-0000000000a1"
+        }
+      ],
+      "recordings": [
+        {
+          "cns_end": 14.0
+        }
+      ],
+      "notes": "Logged by hand on the boat: the day, and no time of day."
     }
   ],
   "trips": [
@@ -477,7 +548,8 @@
               "west": 167.8,
               "east": 167.99
             }
-          }
+          },
+          "accommodation_uuid": "0198a6f0-1111-7095-8000-000000000095"
         },
         {
           "location": {
@@ -499,6 +571,16 @@
           "ends_on": "2026-07-09"
         }
       ],
+      "people": [
+        {
+          "person_uuid": "0198a6f0-1111-70a1-8000-0000000000a1",
+          "role": "buddy"
+        },
+        {
+          "person_uuid": "0198a6f0-1111-70a2-8000-0000000000a2",
+          "role": "companion"
+        }
+      ],
       "notes": "",
       "created_at": "2026-06-01T08:00:00+12:00"
     }
@@ -512,6 +594,17 @@
       "status": "completed",
       "starts_on": "2026-06-30",
       "ends_on": "2026-07-05",
+      "contact_uuid": "0198a6f0-1111-7095-8000-000000000095",
+      "people": [
+        {
+          "person_uuid": "0198a6f0-1111-70a0-8000-0000000000a0",
+          "role": "instructor"
+        },
+        {
+          "person_uuid": "0198a6f0-1111-70a1-8000-0000000000a1",
+          "role": "student"
+        }
+      ],
       "notes": "Four training dives; the wall dive was the final assessment.",
       "created_at": "2026-06-01T09:00:00+12:00"
     },
@@ -525,10 +618,15 @@
     {
       "uuid": "0198a6f0-1111-7092-8000-000000000092",
       "name": "Underwater Videography",
-      "agency_other": "NZ Tech Diving Society",
       "status": "completed",
       "starts_on": "2026-08-14",
       "ends_on": "2026-08-16",
+      "people": [
+        {
+          "person_uuid": "0198a6f0-1111-70a3-8000-0000000000a3",
+          "role": "instructor"
+        }
+      ],
       "notes": "Taught privately over two weekends; no agency issued it."
     }
   ],
@@ -537,7 +635,18 @@
       "uuid": "0198a6f0-1111-7040-8000-000000000040",
       "name": "Harrys Wall",
       "location": {
-        "name": "Milford Sound, New Zealand"
+        "name": "Milford Sound, New Zealand",
+        "full_name": "Milford Sound / Piopiotahi, Southland, New Zealand",
+        "position": {
+          "latitude": -44.6414,
+          "longitude": 167.8974
+        },
+        "bbox": {
+          "south": -44.7,
+          "north": -44.58,
+          "west": 167.8,
+          "east": 167.99
+        }
       },
       "position": {
         "latitude": -44.6301,
@@ -626,7 +735,8 @@
       "type": "visual_inspection",
       "serviced_on": "2025-11-10",
       "dive_count_at_service": 84,
-      "performed_by": "Southern Cylinders Ltd",
+      "performed_by": "M. Rewi",
+      "contact_uuid": "0198a6f0-1111-7095-8000-000000000095",
       "notes": "Passed.",
       "created_at": "2025-11-10T15:00:00+13:00"
     }
@@ -639,6 +749,8 @@
       "name": "Normoxic Trimix Diver",
       "number": "NZT-2044",
       "certified_on": "2025-03-14",
+      "instructor_uuid": "0198a6f0-1111-70a0-8000-0000000000a0",
+      "contact_uuid": "0198a6f0-1111-7095-8000-000000000095",
       "course_uuid": "0198a6f0-1111-7090-8000-000000000090",
       "notes": "",
       "front_file": {
@@ -656,6 +768,69 @@
         "sha256": "b4f1c2d4e5b697887960a1b2c3d4e5f60718293a4b5c6d7e8f9012345678abce"
       },
       "created_at": "2025-03-15T09:00:00+13:00"
+    },
+    {
+      "uuid": "0198a6f0-1111-7083-8000-000000000083",
+      "agency": "aida",
+      "name": "AIDA 2 Freediver",
+      "certified_on": "2024-11-09"
+    }
+  ],
+  "contacts": [
+    {
+      "uuid": "0198a6f0-1111-7095-8000-000000000095",
+      "name": "Deep South Divers",
+      "roles": [
+        "dive_center",
+        "school",
+        "shop",
+        "accommodation"
+      ],
+      "phone": "+64 3 555 0187",
+      "email": "desk@deepsouth.example",
+      "website": "https://deepsouth.example/",
+      "address": {
+        "street": "1 Deepwater Basin Road",
+        "city": "Milford Sound",
+        "postcode": "9679",
+        "region": "Southland",
+        "country": "New Zealand"
+      },
+      "notes": "Runs the fiord boat, fills trimix, and has bunks above the shop.",
+      "created_at": "2026-06-01T08:30:00+12:00",
+      "extensions": {
+        "com.example.divekit": {
+          "rating": 4
+        }
+      }
+    }
+  ],
+  "people": [
+    {
+      "uuid": "0198a6f0-1111-70a0-8000-0000000000a0",
+      "name": "J. Harbord",
+      "email": "jo@deepsouth.example",
+      "phone": "+64 27 555 0142",
+      "notes": "Taught the trimix course and signs the society's cards.",
+      "created_at": "2026-06-01T09:05:00+12:00",
+      "extensions": {
+        "com.example.divekit": {
+          "account_uuid": "0198a6f0-2222-7000-8000-000000000001"
+        }
+      }
+    },
+    {
+      "uuid": "0198a6f0-1111-70a1-8000-0000000000a1",
+      "name": "Ana Ruiz"
+    },
+    {
+      "uuid": "0198a6f0-1111-70a2-8000-0000000000a2",
+      "name": "Wiremu",
+      "notes": "Came for the fiord and stayed on the boat."
+    },
+    {
+      "uuid": "0198a6f0-1111-70a3-8000-0000000000a3",
+      "name": "T. Mahuta"
     }
   ],
   "extensions": {

@@ -488,7 +488,6 @@
           "ends_on": "2026-07-04",
           "location": {
             "name": "Milford Sound",
-            "full_name": "Milford Sound / Piopiotahi, Southland, New Zealand",
             "position": {
               "latitude": -44.6414,
               "longitude": 167.8974
@@ -559,7 +558,6 @@
       "name": "Harrys Wall",
       "location": {
         "name": "Milford Sound, New Zealand",
-        "full_name": "Milford Sound / Piopiotahi, Southland, New Zealand",
         "position": {
           "latitude": -44.6414,
           "longitude": 167.8974
