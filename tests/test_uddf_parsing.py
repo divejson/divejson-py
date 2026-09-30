@@ -598,9 +598,8 @@ def test_a_parts_name_that_repeats_its_location_is_not_reported() -> None:
 def test_a_blank_geography_location_leaves_the_parts_name_standing() -> None:
     """`geographyType` lets `<location>` be empty, and an empty one names nothing.
 
-    Nothing is reported for it either: the part's `<name>` is the place's name exactly as it
-    was before a `<location>` counted for anything, and the coordinates beside the blank
-    element are the place's still.
+    So the part's `<name>` stands in as the place's name and nothing is reported, and the
+    coordinates beside the blank element stay with the place.
     """
     trip, messages = trip_of(
         "<trippart><name>Hurghada</name><geography><location> </location>"
@@ -611,7 +610,7 @@ def test_a_blank_geography_location_leaves_the_parts_name_standing() -> None:
 
 
 def test_a_nameless_trippart_whose_location_has_text_keeps_its_dates_and_its_place() -> None:
-    """The part's `<name>` was never the place, so a part without one still has a place."""
+    """`<geography><location>` is the place, so a part with no `<name>` still has one."""
     trip, messages = trip_of(
         '<trippart><dateoftrip startdate="2026-04-25T00:00:00" enddate="2026-04-26T00:00:00"/>'
         "<geography><location>Cairo, Egypt</location><latitude>30.04</latitude>"
