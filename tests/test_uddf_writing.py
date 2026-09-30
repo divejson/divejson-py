@@ -271,7 +271,7 @@ def test_a_site_with_a_location_carries_its_coordinates(schema) -> None:
 
 
 def test_a_sites_locality_loses_everything_but_its_name_and_says_so(schema) -> None:
-    """Three members with nowhere to go, each named at the locality's own path.
+    """Two members with nowhere to go, each named at the locality's own path.
 
     A site's `<name>` is the site's own, so `<geography><location>` is the only slot the
     place has and `location.name` takes it. The rest of §6.9 has none: `<geography>`'s
@@ -291,7 +291,6 @@ def test_a_sites_locality_loses_everything_but_its_name_and_says_so(schema) -> N
                 "name": "Harrys Wall",
                 "location": {
                     "name": "Milford Sound, New Zealand",
-                    "full_name": "Milford Sound / Piopiotahi, Southland, New Zealand",
                     "position": {"latitude": -44.6414, "longitude": 167.8974},
                     "bbox": {"south": -44.7, "north": -44.58, "west": 167.8, "east": 167.99},
                 },
@@ -306,13 +305,40 @@ def test_a_sites_locality_loses_everything_but_its_name_and_says_so(schema) -> N
     assert messages(source, "sites/0") == []
     assert sorted(messages(source, "sites/0/location")) == [
         "UDDF has no slot for bbox; it is not written",
-        "UDDF has no slot for full_name; it is not written",
         "UDDF has no slot for position; it is not written",
     ]
 
     site = read_back(source)["sites"][0]
     assert site["location"] == {"name": "Milford Sound, New Zealand"}
     assert site["position"] == {"latitude": -44.6301, "longitude": 167.8901}
+
+
+def test_a_parts_place_goes_into_both_slots_and_keeps_its_coordinates(schema) -> None:
+    """A part's `<geography><location>` is its place's name, so a position always has a place.
+
+    The same name goes into the part's `<name>` too, which `simpleNamedType` requires and a
+    reader takes only where the element is blank — so the pair reads back as one name and no
+    finding. The box is the one member left with nowhere to go, and it is reported at the
+    part's own path, the part having no pin of its own for the note to be mistaken about.
+    """
+    source = trip_of(
+        {
+            "location": {
+                "name": "Chatham Rise crossing",
+                "position": {"latitude": -43.9, "longitude": 179.9},
+                "bbox": {"south": -44.2, "north": -43.6, "west": 179.5, "east": -179.6},
+            }
+        }
+    )
+    divetrip = written(source, schema).partition("<divetrip>")[2]
+    assert "<name>Chatham Rise crossing</name>" in divetrip
+    assert "<location>Chatham Rise crossing</location>" in divetrip
+    assert "<latitude>-43.9</latitude>" in divetrip and "<longitude>179.9</longitude>" in divetrip
+
+    assert messages(source, "trips/0/parts/0") == ["UDDF has no slot for bbox; it is not written"]
+    assert read_back(source)["trips"][0]["parts"] == [
+        {"location": {"name": "Chatham Rise crossing", "position": {"latitude": -43.9, "longitude": 179.9}}}
+    ]
 
 
 def test_a_dive_numbered_zero_is_not_written(schema) -> None:

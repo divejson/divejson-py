@@ -148,7 +148,6 @@ LITRES_THRESHOLD = Decimal(1)
 # one machine. A phone, an email and a website — §6.1's and §6.18's — are never cut to theirs,
 # only dropped past them: a number or an address with its end missing is a wrong one rather
 # than a short one. An address's parts are cut like a name, the postcode to a code's length.
-MAX_FULL_NAME = 512
 MAX_SERIAL = 64
 MAX_PHONE = 32
 MAX_EMAIL = 255
@@ -1045,8 +1044,8 @@ class _Converter:
             if location:
                 # The place's name and nothing else. `<geography>`'s own coordinates are the
                 # **site's** pin, not the locality's centre (§6.10), and UDDF has no element
-                # for a fuller form of the place or for its extent — so a site read from
-                # here never arrives with a `full_name`, a `location.position` or a `bbox`.
+                # for the place's extent — so a site read from here never arrives with a
+                # `location.position` or a `bbox`.
                 site["location"] = {"name": self.capped(location, MAX_NAME, where, "the site's locality")}
             position = self.position(geography, where)
             if position:
@@ -1374,7 +1373,7 @@ class _Converter:
     ) -> tuple[list[dict[str, Any]], str | None]:
         """Every `<trippart>` as a part, in file order, and the trip's note.
 
-        A part with neither a name, a date nor a place to stay is **no part at all**, which
+        A part naming no place, with no date and nowhere to stay, is **no part at all**, which
         is what lets a trip with no parts survive a round trip: `tripType` requires at least
         one `<trippart>`, so a writer with nothing to put in one emits exactly this element
         (`docs/uddf-writing.md`), and reading it back as nothing is what closes the circle.
@@ -1411,20 +1410,31 @@ class _Converter:
 
             geography = _kid(part, "geography")
             part_name = _text_of(part, "name")
-            full_name = _text_of(geography, "location")
+            place = _text_of(geography, "location")
             location: dict[str, Any] | None = None
-            if part_name:
+            # `<geography><location>` is the place, and the part's `<name>` stands in only where
+            # that element is blank: a diver's label for a stretch — "Red Sea Liveaboard" — is
+            # not the name of anywhere, and §6.9a gives a part no name of its own to keep it in.
+            if place:
+                location = {"name": self.capped(place, MAX_NAME, part_where, "the trip part's location")}
+                if part_name and part_name != place:
+                    self.note(
+                        part_where,
+                        f"the part's <name> {part_name!r} differs from its <geography><location>, which is "
+                        "the place's name; §6.9a gives a part no name of its own, so it is not read",
+                        "dropped",
+                    )
+            elif part_name:
                 location = {"name": self.capped(part_name, MAX_NAME, part_where, "the trip part's name")}
-                if full_name and full_name != part_name:
-                    location["full_name"] = self.capped(full_name, MAX_FULL_NAME, part_where, "the location")
+            if location is not None:
                 position = self.position(geography, part_where)
                 if position:
                     location["position"] = position
             elif geography is not None:
                 # What the finding has to say is what survives, and that turns on the rest of
-                # the part — a nameless part with no dates and nowhere to stay is nothing at
-                # all once the place goes, which is the same split `uddf_write.nameless_part`
-                # makes from the other side.
+                # the part — a part naming no place, with no dates and nowhere to stay, is
+                # nothing at all once the coordinates go, which is the same split
+                # `uddf_write.nameless_part` makes from the other side.
                 kept = (
                     "the rest of the part is kept"
                     if starts is not None or ends is not None or stay is not None
@@ -1432,8 +1442,8 @@ class _Converter:
                 )
                 self.note(
                     part_where,
-                    f"the trip part has no name, which the format requires of a location; the place is "
-                    f"dropped and {kept} (spec §6.9)",
+                    f"the trip part names no place in its <name> or its <geography><location>, and the "
+                    f"format requires a location's name; the place is dropped and {kept} (spec §6.9)",
                     "dropped",
                 )
 

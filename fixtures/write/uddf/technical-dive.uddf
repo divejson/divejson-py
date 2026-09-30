@@ -117,7 +117,7 @@
         <name>Milford Sound</name>
         <dateoftrip startdate="2026-07-01T00:00:00" enddate="2026-07-04T00:00:00" />
         <geography>
-          <location>Milford Sound / Piopiotahi, Southland, New Zealand</location>
+          <location>Milford Sound</location>
           <latitude>-44.6414</latitude>
           <longitude>167.8974</longitude>
         </geography>
@@ -142,6 +142,11 @@
       </trippart>
       <trippart>
         <name>Chatham Rise crossing</name>
+        <geography>
+          <location>Chatham Rise crossing</location>
+          <latitude>-43.9</latitude>
+          <longitude>179.9</longitude>
+        </geography>
       </trippart>
       <trippart>
         <name />

@@ -82,6 +82,9 @@
       <trippart type="hotel">
         <name>Dahab</name>
         <dateoftrip startdate="2026-03-02T00:00:00" enddate="2026-03-06T00:00:00" />
+        <geography>
+          <location>Dahab</location>
+        </geography>
         <accomodation id="accommodation-0">
           <name>Blue Hole Divers</name>
           <address>
@@ -104,6 +107,9 @@
       <trippart type="boat">
         <name>Brothers Islands</name>
         <dateoftrip startdate="2026-03-06T00:00:00" enddate="2026-03-13T00:00:00" />
+        <geography>
+          <location>Brothers Islands</location>
+        </geography>
         <accomodation id="accommodation-1">
           <name>Northern Star Liveaboards</name>
           <contact>
@@ -117,6 +123,9 @@
       <trippart type="hotel">
         <name>Hurghada</name>
         <dateoftrip startdate="2026-03-13T00:00:00" enddate="2026-03-14T00:00:00" />
+        <geography>
+          <location>Hurghada</location>
+        </geography>
         <accomodation id="accommodation-2">
           <name>Grandma's house</name>
         </accomodation>
@@ -124,6 +133,9 @@
       <trippart type="hotel">
         <name>Hurghada</name>
         <dateoftrip startdate="2026-03-20T00:00:00" enddate="2026-03-21T00:00:00" />
+        <geography>
+          <location>Hurghada</location>
+        </geography>
         <accomodation id="accommodation-3">
           <name>Grandma's house</name>
         </accomodation>
@@ -131,6 +143,9 @@
       <trippart>
         <name>El Gouna</name>
         <dateoftrip startdate="2026-03-21T00:00:00" enddate="2026-03-22T00:00:00" />
+        <geography>
+          <location>El Gouna</location>
+        </geography>
       </trippart>
     </trip>
   </divetrip>

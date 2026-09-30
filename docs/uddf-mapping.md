@@ -306,8 +306,8 @@ instead. `<email>` takes the owner's guard (*Diver* above).
 | --- | --- |
 | `name` | `trips[].name` |
 | `trippart` | `trips[].parts[]`, in file order |
-| `trippart/name` | `trips[].parts[].location.name` |
-| `trippart/geography/location` | `trips[].parts[].location.full_name`, when it differs from the name |
+| `trippart/geography/location` | `trips[].parts[].location.name` |
+| `trippart/name` | `trips[].parts[].location.name` where the part has no `<geography><location>` with text; where it has one, a `<name>` that differs is reported |
 | `trippart/geography/latitude` + `longitude` | `trips[].parts[].location.position` |
 | `trippart/dateoftrip/@startdate` | `trips[].parts[].starts_on` |
 | `trippart/dateoftrip/@enddate` | `trips[].parts[].ends_on` |
@@ -316,11 +316,15 @@ instead. `<email>` takes the owner's guard (*Diver* above).
 | `trippart/operator` + `vessel` | `trips[].parts[].accommodation_uuid`, and a contact named for the operator |
 | dive's `informationbeforedive/tripmembership/@ref` | `dives[].trip_uuid` |
 
-**`<geography><location>` lands in a different member on each host**, and the asymmetry is
-UDDF's rather than this reader's. A `<trippart>`'s `<name>` *is* its place's name, so the
-element beside it is free to carry the fuller form; a `<site>`'s `<name>` is the site's own,
-which leaves `<location>` as the only slot the locality has at all — and a site read from
-UDDF therefore never arrives with a `full_name`, a locality position or a box.
+**`<geography><location>` is the place's name on both hosts.** A `<site>`'s `<name>` is the
+site's own, which leaves `<location>` as the only slot the locality has at all, and
+`<geography>`'s coordinates are the site's pin — so a site read from UDDF never arrives with
+a locality position or a box. A `<trippart>` has two text slots where a location has one, and
+writers spend its `<name>` on a label for the stretch as often as on a place — "Red Sea
+Liveaboard" beside a `<location>` of "Sha'ab Ali, Egypt". §6.9a gives a part no name of its
+own, so the label has nowhere to go: the `<location>` is the place, and a `<name>` that
+differs from it is reported. Where the `<location>` is blank — `geographyType` makes it a bare
+string, so nothing stops one — it names nothing, and the `<name>` stands in.
 
 **A `<trippart>` is a part**, which is as close to an identity as this table gets: both
 formats model a trip as a sequence of stretches each carrying its own dates and its own
@@ -328,16 +332,18 @@ place, so the dates stay where the file put them instead of being collapsed into
 `tripType` records no dates of its own and §6.8 records none either — a trip's span is the
 span of its parts in both, and a trip whose parts carry none has no span in either.
 
-A `<trippart>` with a `<name>` becomes a part with a location; one without becomes a part
-with dates and no location, which §6.9a allows and which is what a `<trippart>` carrying
-only a `<dateoftrip>` says. A `<geography>` on a nameless part has no `name` to hang off
-and is dropped and reported (§6.9 makes `name` REQUIRED of a location) — the part survives
-with its dates, where before the whole element did nothing but widen the trip's span.
-**Where it carries no dates either, the rule below reaches the same element**: nothing comes
-back at all, and the finding says that rather than saying the part survived.
+A `<trippart>` with text in either slot becomes a part with a location, so a nameless part
+whose `<location>` has text has a place like any other. One with neither becomes a part with
+dates and no location, which §6.9a allows and which is what a `<trippart>` carrying only a
+`<dateoftrip>` says. A `<geography>` on such a part, its `<location>` blank, has no `name` to
+hang its coordinates off and is dropped and reported (§6.9 makes `name` REQUIRED of a
+location) — the part survives with its dates, where before the whole element did nothing but
+widen the trip's span. **Where it carries no dates either, the rule below reaches the same
+element**: nothing comes back at all, and the finding says that rather than saying the part
+survived.
 
-**A `<trippart>` carrying neither a name, a date nor a place to stay produces no part at
-all**, and that is what closes the round trip in the other direction: `tripType` requires at
+**A `<trippart>` with no text in either slot, no date and no place to stay produces no part
+at all**, and that is what closes the round trip in the other direction: `tripType` requires at
 least one `<trippart>`, so [`uddf-writing.md`](uddf-writing.md) emits a nameless empty one
 for a trip with no parts, and a trip with no parts is what comes back.
 

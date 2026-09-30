@@ -521,6 +521,7 @@ def test_hostile_source_strings_still_produce_a_conforming_document() -> None:
     # A note is prose and carries whole, however long (§6.2 bounds none).
     assert conversion.document["dives"][0]["notes"] == long_note.strip()
     assert len(conversion.document["sites"][0]["name"]) == 255
+    assert len(conversion.document["trips"][0]["parts"][0]["location"]["name"]) == 255
 
 
 # -- trips -----------------------------------------------------------------------------
@@ -563,25 +564,99 @@ def test_a_trip_whose_parts_carry_no_dates_is_carried() -> None:
     assert not [message for message in messages if "records no dates" in message]
 
 
-def test_a_nameless_trippart_keeps_its_dates_and_loses_its_place() -> None:
-    """§6.9 makes a location's `name` REQUIRED, and §6.9a lets the part live without one."""
+def test_a_parts_place_is_its_geography_location_and_a_differing_name_is_reported() -> None:
+    """`<geography><location>` names the place, and a part's `<name>` is the diver's label.
+
+    "Red Sea Liveaboard" is what the diver called a week, not the name of anywhere, and
+    §6.9a gives a part no name of its own to keep it in — so the element that does name a
+    place is read as one, and the label is reported rather than read.
+    """
+    trip, messages = trip_of(
+        '<trippart><name>Red Sea Liveaboard</name><dateoftrip startdate="2026-04-18T00:00:00" '
+        'enddate="2026-04-25T00:00:00"/><geography><location>Sha\'ab Ali, Egypt</location>'
+        "<latitude>27.85</latitude><longitude>33.87</longitude></geography></trippart>"
+    )
+    assert trip["parts"] == [
+        {
+            "starts_on": "2026-04-18",
+            "ends_on": "2026-04-25",
+            "location": {"name": "Sha'ab Ali, Egypt", "position": {"latitude": 27.85, "longitude": 33.87}},
+        }
+    ]
+    assert [message for message in messages if "'Red Sea Liveaboard' differs" in message]
+
+
+def test_a_parts_name_that_repeats_its_location_is_not_reported() -> None:
+    """The writer puts one name in both slots, and reading it back is not a finding."""
+    trip, messages = trip_of(
+        "<trippart><name>Dahab</name><geography><location>Dahab</location></geography></trippart>"
+    )
+    assert trip["parts"] == [{"location": {"name": "Dahab"}}]
+    assert not [message for message in messages if "differs" in message]
+
+
+def test_a_blank_geography_location_leaves_the_parts_name_standing() -> None:
+    """`geographyType` lets `<location>` be empty, and an empty one names nothing.
+
+    So the part's `<name>` stands in as the place's name and nothing is reported, and the
+    coordinates beside the blank element stay with the place.
+    """
+    trip, messages = trip_of(
+        "<trippart><name>Hurghada</name><geography><location> </location>"
+        "<latitude>27.26</latitude><longitude>33.81</longitude></geography></trippart>"
+    )
+    assert trip["parts"] == [{"location": {"name": "Hurghada", "position": {"latitude": 27.26, "longitude": 33.81}}}]
+    assert not [message for message in messages if "differs" in message or "no place" in message]
+
+
+def test_a_nameless_trippart_whose_location_has_text_keeps_its_dates_and_its_place() -> None:
+    """`<geography><location>` is the place, so a part with no `<name>` still has one."""
     trip, messages = trip_of(
         '<trippart><dateoftrip startdate="2026-04-25T00:00:00" enddate="2026-04-26T00:00:00"/>'
         "<geography><location>Cairo, Egypt</location><latitude>30.04</latitude>"
+        "<longitude>31.24</longitude></geography></trippart>"
+    )
+    assert trip["parts"] == [
+        {
+            "starts_on": "2026-04-25",
+            "ends_on": "2026-04-26",
+            "location": {"name": "Cairo, Egypt", "position": {"latitude": 30.04, "longitude": 31.24}},
+        }
+    ]
+    assert not [message for message in messages if "the place is dropped" in message]
+
+
+def test_a_nameless_undated_trippart_whose_location_has_text_is_a_part() -> None:
+    """A place and nothing else is a part: §6.9a asks a part for no date."""
+    trip, messages = trip_of(
+        "<trippart><geography><location>Cairo, Egypt</location>"
+        "<latitude>30.04</latitude><longitude>31.24</longitude></geography></trippart>"
+    )
+    assert trip["parts"] == [
+        {"location": {"name": "Cairo, Egypt", "position": {"latitude": 30.04, "longitude": 31.24}}}
+    ]
+    assert not [message for message in messages if "nothing of it is carried" in message]
+
+
+def test_a_trippart_naming_no_place_keeps_its_dates_and_loses_its_coordinates() -> None:
+    """§6.9 makes a location's `name` REQUIRED, and §6.9a lets the part live without one."""
+    trip, messages = trip_of(
+        '<trippart><name/><dateoftrip startdate="2026-04-25T00:00:00" enddate="2026-04-26T00:00:00"/>'
+        "<geography><location/><latitude>30.04</latitude>"
         "<longitude>31.24</longitude></geography></trippart>"
     )
     assert trip["parts"] == [{"starts_on": "2026-04-25", "ends_on": "2026-04-26"}]
     assert "the place is dropped and the rest of the part is kept" in "\n".join(messages)
 
 
-def test_a_nameless_undated_trippart_says_that_nothing_of_it_is_carried() -> None:
+def test_a_trippart_naming_no_place_and_undated_says_that_nothing_of_it_is_carried() -> None:
     """The place goes for want of a name, and with no dates behind it the part goes too.
 
     The report has to say which of the two happened, because a diver reading "the place is
     dropped" beside a part that is not there has been told the smaller half of it.
     """
     trip, messages = trip_of(
-        "<trippart><geography><location>Cairo, Egypt</location>"
+        "<trippart><geography><location></location>"
         "<latitude>30.04</latitude><longitude>31.24</longitude></geography></trippart>"
     )
     assert "parts" not in trip

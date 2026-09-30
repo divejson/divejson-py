@@ -96,8 +96,7 @@ LOST: dict[str, frozenset[str]] = {
             # A site's locality entire but for its name: its `<name>` is the site's own, so
             # `<geography><location>` is the one slot the place has and `location.name`
             # takes it. `<geography>`'s coordinates are the **site's** pin (§6.10), and
-            # UDDF has no box element — three losses off one record where a part loses one.
-            "sites/0/location/full_name",
+            # UDDF has no box element — two losses off one record where a part loses one.
             "sites/0/location/position",
             "sites/0/location/bbox",
             "dives/0/water_type",
@@ -130,8 +129,6 @@ LOST: dict[str, frozenset[str]] = {
             # `equipmentPieceType` carries no firmware element at all (§6.4b).
             "dives/0/recordings/0/device/firmware",
             *(f"dives/0/cylinders/{index}/{member}" for index in range(4) for member in ("role", "usage")),
-            # A place UDDF will not record without a full name for it.
-            "trips/0/parts/1/location/position",
             # An empty note, which reads back as no note: `<para></para>` and no `<notes>`
             # at all are the same file to every reader here.
             "trips/0/notes",
