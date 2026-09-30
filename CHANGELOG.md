@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.18.0
+
 - **Breaking: a location has one name, and `full_name` is removed.** §6.9 of
   [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) keeps
   `name`, `position` and `bbox`, `name` being the place as a person writes it — alone, or
