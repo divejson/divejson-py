@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.20.0
+
 - **The Subsurface reader carries a site's coordinates, notes, description and locality.**
   `@gps` is `position`, latitude first and carried as written; an attribute that is not two
   numbers is dropped and reported with its text, and a pair outside WGS 84 or an exact
