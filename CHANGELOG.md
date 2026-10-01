@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.19.0
+
 - **A dive site carries its other names, external ids, depth range, water type, altitude, entry
   types and tags.** §6.10 of
   [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) adds
