@@ -23,22 +23,23 @@ land here self-contained, with the expected documents it produces and the docume
 explains them. It can never carry a different version of a file the specification already
 has.
 
-So a change lands in one of two orders.
+So a change lands in one of two orders, and which one depends on whether it touches a file
+the specification already has.
 
-**A change to what validates** — the schema, or a rule the fixtures encode — starts in
-the specification repository, whose pull request is red against the current release and
-says what is missing. The change here then sets `SPEC_REF` to that pull request's head,
-which passes the byte check and fails only the ancestor one; the specification's pull
-request points its own pin at this one and goes green; it merges; this one re-pins
-`SPEC_REF` to the merged commit, merges, and is released. `main` here never pins a commit
-that is not on the specification's `main`. While that window lasts, a commit added to the
-specification's branch is re-vendored here and the pin moved to it in one step: the branch
-moving under the pin is the one thing the byte check cannot see.
+**A change to what validates** — the schema, a rule the fixtures encode, or anything in a
+file the specification already owns, an adopted mapping document and an adopted pair
+included — starts in the specification repository, whose pull request is red against the
+current release and says what is missing. The change here then sets `SPEC_REF` to that
+pull request's head, which passes the byte check and fails only the ancestor one; the
+specification's pull request points its own pin at this one and goes green; it merges; this
+one re-pins `SPEC_REF` to the merged commit, merges, and is released. `main` here never pins
+a commit that is not on the specification's `main`. While that window lasts, a commit added
+to the specification's branch is re-vendored here and the pin moved to it in one step: the
+branch moving under the pin is the one thing the byte check cannot see.
 
-**A new reader, or a change to a mapping** goes the other way: it lands here first,
-self-contained and green, then a release, and then the specification adopts the pairs and
-the mapping document and moves its pin. The next change here bumps `SPEC_REF` and
-re-vendors whatever moved.
+**A new reader or writer** goes the other way: it lands here first, self-contained and
+green, then a release, and then the specification adopts the pairs and the mapping document
+and moves its pin. The next change here bumps `SPEC_REF` and re-vendors whatever moved.
 
 ## Working on the package
 
