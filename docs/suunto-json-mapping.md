@@ -606,7 +606,7 @@ Read as a list of what was considered, not of what was missed.
 - **`Header.Altitude` and `Diving.Altitude`** — the first is a `{Max, Min}` pair of readings
   taken during the activity and the second reads `0` on all 16 files that have it, being the
   computer's altitude *adjustment mode* rather than a place. §6.2's `altitude` is the
-  altitude of the site, which neither is.
+  altitude of the water the dive was made in, which neither is.
 - **`Header.DiveTimeMax`, `Ascent`, `AscentTime`, `Descent`, `DescentTime`,
   `MaxDepthAverage`, `Distance`, `VerticalSpeed`, `PauseDuration`, `SampleInterval`,
   `Ventilation`** — a device's own derived figures, none of which §6.2 has a member for.

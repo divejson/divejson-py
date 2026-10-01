@@ -1,0 +1,51 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-10-01T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.19.0"
+  },
+  "sites": [
+    {
+      "uuid": "0198a6f0-8888-7040-8000-000000000040",
+      "name": "Kristallsee",
+      "other_names": [
+        "Crystal Lake",
+        "Lago di Cristallo"
+      ],
+      "location": {
+        "name": "Tyrol, Austria"
+      },
+      "position": {
+        "latitude": 47.3241,
+        "longitude": 10.8317
+      },
+      "depth_from": 3,
+      "depth_to": 24.5,
+      "altitude": 1205,
+      "notes": "Clear and cold all year; the deep end is the old quarry face."
+    },
+    {
+      "uuid": "0198a6f0-8888-7041-8000-000000000041",
+      "name": "Old Quarry",
+      "location": {
+        "name": "Tyrol, Austria"
+      }
+    },
+    {
+      "uuid": "0198a6f0-8888-7042-8000-000000000042",
+      "name": "The Ledge",
+      "depth_to": 12
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "uddf",
+      "uddf_version": "3.2.2",
+      "source_generator": {
+        "name": "DiveJSON fixtures"
+      }
+    }
+  }
+}

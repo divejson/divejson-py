@@ -542,7 +542,7 @@ which the `extensions.divejson.inferred` list is ever written.
 - **`session.total_distance`, `avg_speed`, `max_speed`, `total_calories`,
   `training_stress_score`, `total_training_effect`, `enhanced_min_altitude` /
   `max_altitude`** — an activity tracker's members, not a dive log's. §6.2's `altitude` is the
-  altitude of the *site*, which none of these is.
+  altitude of the *water the dive was made in*, which none of these is.
 - **`session.surface_interval`** — the gap before the dive, derivable from two dives' start
   times and a property of a pair rather than of one file. `session.dive_number` was refused
   beside it until §6.4b gave a device's counter a home; it is carried now, under *Device*

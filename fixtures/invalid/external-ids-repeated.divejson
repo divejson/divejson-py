@@ -672,6 +672,10 @@
               "checked_on": "2026-06-01"
             }
           }
+        },
+        {
+          "registry": "openstreetmap",
+          "identifier": "node/4415738262"
         }
       ],
       "depth_from": 8,

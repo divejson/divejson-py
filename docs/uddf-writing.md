@@ -398,15 +398,27 @@ UDDF file expects to find there.
 
 ### Sites and trips
 
-`geographyType` makes `<location>` mandatory, so **coordinates are written only where the
-record has a place name**: a site with a `position` and no `location` keeps its name and
-loses its coordinates, reported.
+`geographyType` makes `<location>` mandatory, so **coordinates and an altitude are written
+only where the record has a place name**: a site with a `position` or an `altitude` and no
+`location` keeps its name and loses them, reported.
 
 **Differs from the reference writer**: it puts the site's own **name** in `<location>` and
 keeps the coordinates, which is defensible for an application exporting data it holds a name
 for and wrong for a converter — a round trip through it hands the diver back a `location`
 they never wrote. This is the same trade *The three answers* describes, and it is the one
 place in the document where the reference writer takes the third of them.
+
+A site's `other_names` go out as its `<aliasname>`s, in order, after its `<name>`, and its
+`altitude` as `<geography>`'s `<altitude>` beside its pin. Its `depth_from` and `depth_to`
+go out as `<sitedata>`'s `<minimumdepth>` and `<maximumdepth>`, the deep end first because
+`sitedataType` is an `xs:sequence` that lists it first; `<sitedata>` follows `<geography>`
+and precedes `<notes>`, as `siteType` orders them.
+
+A site's `external_ids`, `water_type`, `entry_types` and `tags` have no slot, and each is
+reported `dropped`. UDDF's site has no identifier from outside the file, no entry and no tag,
+and its `<environment>` and `<density>` class the water body and weigh the water rather than
+name its kind: writing `salt` as a density would invent the number, and as `ocean-sea` would
+say something about the place the document does not.
 
 A trip becomes one `<trippart>` **per §6.9a part**, which is as close to an identity as
 this document gets: both formats model a trip as a sequence of stretches, each carrying its
@@ -849,6 +861,7 @@ writer leaves empty:
 | `diver.portrait_file` | `<owner>` has no image element. A `<notes><link>` to a `<mediadata><image>` names a file by path, whose bytes a UDDF file does not carry, and reads back as a linked picture with no role — `uddf-mapping.md`'s *Diver* section says why no linked image is read as a portrait |
 | a recording's `source_files`, `started_at`, `salinity` and oxygen clocks, its device's `firmware`, and every recording after the first, its `surface_pressure` included | UDDF gives a dive one `<samples>` and one `<surfacepressure>`, `equipmentPieceType` no firmware element, and nothing at all a salinity setting or an oxygen clock's two ends could go in — *Devices* and *Dives* above have each answer, and why the device of a dropped recording is kept even so |
 | `trips[].parts[].location.bbox` | `geographyType` carries a point, not a box |
+| a site's `external_ids`, `water_type`, `entry_types` and `tags` | no slot — *Sites and trips* above |
 | `sites[].location.position` and `bbox` | a site's `<name>` is its own, so the locality gets only `<geography><location>` and that slot holds `location.name`; `<geography>`'s coordinates are the site's pin, and the box has nowhere either — *Sites and trips* above has the asymmetry with a part |
 | `contacts[].roles` | no element; *Contacts* above says when it is reported |
 | `contact_uuid` on a course, a certification or a service record, and a certification's `instructor_uuid` | the record has no slot (above), and its reference goes with it |

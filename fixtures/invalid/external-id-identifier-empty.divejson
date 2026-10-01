@@ -666,7 +666,7 @@
         },
         {
           "registry": "com.example.sitepool",
-          "identifier": "NZ/FIO/0042",
+          "identifier": "",
           "extensions": {
             "com.example.divekit": {
               "checked_on": "2026-06-01"

@@ -97,11 +97,18 @@
     </divebase>
     <site id="site-0198a6f0-1111-7040-8000-000000000040">
       <name>Harrys Wall</name>
+      <aliasname>Harry's Wall</aliasname>
+      <aliasname>The Black Coral Wall</aliasname>
       <geography>
         <location>Milford Sound, New Zealand</location>
         <latitude>-44.6301</latitude>
         <longitude>167.8901</longitude>
+        <altitude>0</altitude>
       </geography>
+      <sitedata>
+        <maximumdepth>70.5</maximumdepth>
+        <minimumdepth>8</minimumdepth>
+      </sitedata>
       <notes>
         <para>Black coral from 12 m.</para>
       </notes>

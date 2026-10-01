@@ -657,7 +657,7 @@
       },
       "external_ids": [
         {
-          "registry": "openstreetmap",
+          "registry": "OpenStreetMap",
           "identifier": "node/4415738262"
         },
         {
