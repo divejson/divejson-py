@@ -313,6 +313,73 @@ def test_a_sites_locality_loses_everything_but_its_name_and_says_so(schema) -> N
     assert site["position"] == {"latitude": -44.6301, "longitude": 167.8901}
 
 
+def test_a_sites_other_names_altitude_and_depth_range_go_out_in_the_schemas_order(schema) -> None:
+    """`<aliasname>` after the name, the altitude inside `<geography>`, and `<sitedata>`'s
+    pair deep end first — `siteType` and `sitedataType` being sequences — and each comes
+    back. The four members UDDF's site has no slot for are named and nothing else is."""
+    source = document(
+        sites=[
+            {
+                "uuid": SITE_UUID,
+                "name": "Harrys Wall",
+                "other_names": ["Harry's", "砂辺"],
+                "location": {"name": "Milford Sound"},
+                "position": {"latitude": -44.6301, "longitude": 167.8901},
+                "external_ids": [{"registry": "openstreetmap", "identifier": "node/313862678"}],
+                "depth_from": 4.5,
+                "depth_to": 30,
+                "water_type": "salt",
+                "altitude": 12,
+                "entry_types": ["boat", "shore"],
+                "tags": ["wall"],
+                "notes": "Black coral below 20 m.",
+            }
+        ]
+    )
+    text = written(source, schema)
+    assert "<aliasname>Harry's</aliasname>" in text and "<altitude>12</altitude>" in text
+    assert re.search(r"<maximumdepth>30</maximumdepth>\s*<minimumdepth>4.5</minimumdepth>", text)
+
+    site = read_back(source)["sites"][0]
+    assert (site["other_names"], site["altitude"], site["depth_from"], site["depth_to"]) == (
+        ["Harry's", "砂辺"],
+        12,
+        4.5,
+        30,
+    )
+    assert sorted(messages(source, "sites/0")) == [
+        f"UDDF has no slot for {member}; it is not written"
+        for member in ("entry_types", "external_ids", "tags", "water_type")
+    ]
+
+
+def test_one_end_of_a_depth_range_goes_out_alone(schema) -> None:
+    source = document(sites=[{"uuid": SITE_UUID, "name": "The Chimney", "depth_from": 0}])
+    text = written(source, schema)
+    assert "<minimumdepth>0</minimumdepth>" in text and "<maximumdepth>" not in text
+    assert read_back(source)["sites"][0]["depth_from"] == 0
+
+
+def test_a_sites_altitude_goes_with_its_pin_where_it_has_no_locality(schema) -> None:
+    """`<altitude>` lives in `<geography>`, which needs a place name the site does not have."""
+    source = document(
+        sites=[
+            {
+                "uuid": SITE_UUID,
+                "name": "The Chimney",
+                "position": {"latitude": 1.5, "longitude": 2.5},
+                "altitude": 1800,
+            }
+        ]
+    )
+    assert "<geography>" not in written(source, schema)
+    assert read_back(source)["sites"][0] == {"uuid": SITE_UUID, "name": "The Chimney"}
+    assert "the position and the altitude are dropped" in messages(source, "sites/0")[0]
+
+    alone = document(sites=[{"uuid": SITE_UUID, "name": "The Chimney", "altitude": 1800}])
+    assert "the altitude is dropped" in messages(alone, "sites/0")[0]
+
+
 def test_a_parts_place_goes_into_both_slots_and_keeps_its_coordinates(schema) -> None:
     """A part's `<geography><location>` is its place's name, so a position always has a place.
 

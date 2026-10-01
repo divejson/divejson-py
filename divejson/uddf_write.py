@@ -489,6 +489,13 @@ _ADDRESS_CARRIED = frozenset({"street", "city", "postcode", "region", "country"}
 # What a person goes out with as a `<buddy>`.
 _PERSON_CARRIED = frozenset({"uuid", "name", "email", "phone", "notes"})
 
+# What a site goes out with: `<aliasname>`, `<geography>`'s place, pin and altitude, and
+# `<sitedata>`'s depth pair. UDDF's site has no slot for an external id, an entry, the
+# water's kind or a tag — `<environment>` classes the water body, which is not a water type.
+_SITE_CARRIED = frozenset(
+    {"uuid", "name", "other_names", "location", "position", "altitude", "depth_from", "depth_to", "notes"}
+)
+
 # Why neither a dive's sightings nor the species they reference are written, though the slot
 # exists — `docs/uddf-writing.md`'s *What is never written* has the reason in full. Not
 # `unmapped`'s line, which would say there is no slot.
@@ -1373,9 +1380,11 @@ class _Writer:
             self.contact_element(divesite, "divebase", index, contact)
         for index, site in enumerate(sites):
             where = f"sites/{index}"
-            self.unmapped(where, site, frozenset({"uuid", "name", "location", "position", "notes"}))
+            self.unmapped(where, site, _SITE_CARRIED)
             element = _sub(divesite, "site", id=_uddf_id("site", site["uuid"]))
             _sub(element, "name", str(site.get("name") or ""))
+            for other_name in site.get("other_names") or ():
+                _sub(element, "aliasname", str(other_name))
             location = site.get("location")
             if location:
                 # The locality's own members report here or nowhere: `unmapped` is flat, and
@@ -1391,7 +1400,13 @@ class _Writer:
                 location.get("name") if location else None,
                 site.get("position"),
                 noun="site",
+                altitude=site.get("altitude"),
             )
+            if site.get("depth_from") is not None or site.get("depth_to") is not None:
+                sitedata = _sub(element, "sitedata")
+                # `sitedataType` is an `xs:sequence`, and it lists the deep end first.
+                _optional(sitedata, "maximumdepth", site.get("depth_to"))
+                _optional(sitedata, "minimumdepth", site.get("depth_from"))
             self.notes_of(element, where, site)
         return divesite
 
@@ -1403,25 +1418,29 @@ class _Writer:
         position: Any,
         *,
         noun: str,
+        altitude: Any = None,
     ) -> None:
         """`<geography>`, which UDDF will not let carry coordinates without a place name.
 
         `place` is the text the one `<location>` element gets, and on both hosts that is the
-        name of §6.9's location — a trip part writing it into its own `<name>` as well.
+        name of §6.9's location — a trip part writing it into its own `<name>` as well. A
+        site's `altitude` goes in beside its pin.
 
         `<location>` is mandatory in `geographyType`, and there is nothing honest to put
         there for a record that has none: copying the record's own **name** in — which is
         what the reference writer does, having one to spare and an app's own export to
         produce — would hand a round trip a location the diver never wrote. So the
-        coordinates are dropped and reported, which is the loss this format actually
-        imposes.
+        coordinates and the altitude are dropped and reported, which is the loss this format
+        actually imposes.
         """
         if not place:
-            if position:
+            lost = [what for what, value in (("position", position), ("altitude", altitude)) if value is not None]
+            if lost:
                 self.note(
                     where,
-                    f"UDDF records a coordinate only inside a <geography>, which must name a place, and the "
-                    f"{noun} records none; the position is dropped rather than the name being copied into it",
+                    f"UDDF records a position or an altitude only inside a <geography>, which must name a place, "
+                    f"and the {noun} records none; the {' and the '.join(lost)} "
+                    f"{'are' if len(lost) > 1 else 'is'} dropped rather than the name being copied into it",
                     "dropped",
                 )
             return
@@ -1430,6 +1449,7 @@ class _Writer:
         if position:
             _sub(geography, "latitude", _num(position["latitude"]))
             _sub(geography, "longitude", _num(position["longitude"]))
+        _optional(geography, "altitude", altitude)
 
     # -- trips -------------------------------------------------------------------
 

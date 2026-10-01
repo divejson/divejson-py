@@ -16,8 +16,10 @@ fixture is refused for another reason by any validator that does not know its me
 hosts a contact reference sits on, the corpus holding a dangling one on a trip part alone,
 the hosts a person reference sits on, the corpus holding its defects on a dive and a
 certification alone, what a sighting's two defects are reported as, the collections the
-validator walks, which the schema can gain one of without it, and what rule 8 counts as one
-tag — a fold one fixture cannot sweep.
+validator walks, which the schema can gain one of without it, what rule 8 counts as one
+tag — a fold one fixture cannot sweep — and, on a site, what each of the four rules reports,
+the name the fold of its other names starts from, and the half of an external id that makes
+two entries two.
 Everything already covered by a pair stays covered by the pair.
 """
 
@@ -403,3 +405,73 @@ def test_the_trim_is_unicodes_white_space() -> None:
     """Every code point Python calls whitespace, less the four information separators it adds."""
     python = {chr(point) for point in range(0x110000) if chr(point).isspace()}
     assert set(WHITE_SPACE) == python - {"\x1c", "\x1d", "\x1e", "\x1f"}
+
+
+# -- a site's depth range, tags, other names and external ids ------------------------------------
+
+SITE = "0198a6f0-9999-7002-8000-000000000002"
+
+
+def _with_site(**members) -> dict:
+    """One site named Harrys Wall, carrying `members`."""
+    site = {"uuid": SITE, "name": "Harrys Wall", **members}
+    return {"format": "divejson", "version": "1.0", "exported_at": "2026-09-05T00:00:00+00:00", "sites": [site]}
+
+
+def _site_issues(**members) -> list[str]:
+    return [str(issue) for issue in validate_document(_with_site(**members))]
+
+
+def test_a_sites_shallow_end_below_its_deep_end_is_refused() -> None:
+    """§3 rule 2 on a site: each end bounded alone by the schema, the pair by this rule."""
+    assert _site_issues(depth_from=12, depth_to=5) == ["sites/0: depth_from exceeds depth_to"]
+    assert _site_issues(depth_from=12, depth_to=12) == []
+
+
+def test_a_tag_twice_on_a_site_is_refused_as_on_a_dive() -> None:
+    assert _site_issues(tags=["wall", "Wall"]) == [
+        "sites/0/tags/1: tag 'Wall' is already listed at sites/0/tags/0, compared trimmed and case-folded "
+        "(spec §3 rule 8)"
+    ]
+
+
+def test_another_name_may_be_neither_the_sites_name_nor_another_one_under_the_same_fold() -> None:
+    assert _site_issues(other_names=[" HARRYS WALL", "Sandy", "Straße", "STRASSE"]) == [
+        "sites/0/other_names/0: other name ' HARRYS WALL' is already listed at sites/0/name, compared trimmed "
+        "and case-folded (spec §3 rule 8)",
+        "sites/0/other_names/3: other name 'STRASSE' is already listed at sites/0/other_names/2, compared "
+        "trimmed and case-folded (spec §3 rule 8)",
+    ]
+    assert _site_issues(other_names=["Harry's", "砂辺"]) == []
+
+
+def test_one_registry_entry_twice_on_a_site_is_refused_on_the_pair_alone() -> None:
+    """Differing `extensions` make two different items to `uniqueItems`; the pair is one entry."""
+    entry = {"registry": "openstreetmap", "identifier": "node/313862678"}
+    assert _site_issues(external_ids=[entry, {**entry, "extensions": {"example.app": {"source": "catalogue"}}}]) == [
+        "sites/0/external_ids/1: the openstreetmap entry 'node/313862678' is already listed at "
+        "sites/0/external_ids/0 (spec §3 rule 7)"
+    ]
+
+
+@pytest.mark.parametrize(
+    "second",
+    [
+        {"registry": "openstreetmap", "identifier": "way/313862678"},
+        # Compared exactly: a registry the format does not name keeps its identifier's case.
+        {"registry": "example", "identifier": "Node/313862678"},
+    ],
+)
+def test_entries_differing_in_either_half_are_two(second: dict) -> None:
+    first = {"registry": "example", "identifier": "node/313862678"}
+    assert _site_issues(external_ids=[first, second]) == []
+
+
+def test_two_sites_may_share_one_registry_entry() -> None:
+    """A registry's object may be coarser than a diver's site, so nothing makes a pair unique."""
+    entry = {"registry": "wikidata", "identifier": "Q1137468"}
+    document = _with_site(external_ids=[entry])
+    document["sites"].append(
+        {"uuid": "0198a6f0-9999-7002-8000-000000000003", "name": "Canyon", "external_ids": [entry]}
+    )
+    assert validate_document(document) == []
