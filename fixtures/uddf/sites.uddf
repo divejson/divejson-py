@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<uddf xmlns="http://www.streit.cc/uddf/3.2/" version="3.2.2">
+  <generator>
+    <name>DiveJSON fixtures</name>
+  </generator>
+  <divesite>
+    <site id="site-0198a6f0-8888-7040-8000-000000000040">
+      <name>Kristallsee</name>
+      <aliasname>Crystal Lake</aliasname>
+      <aliasname> KRISTALLSEE</aliasname>
+      <aliasname>Lago di Cristallo</aliasname>
+      <environment>lake-quarry</environment>
+      <geography>
+        <location>Tyrol, Austria</location>
+        <address>
+          <city>Nassereith</city>
+          <country>Austria</country>
+        </address>
+        <latitude>47.3241</latitude>
+        <longitude>10.8317</longitude>
+        <altitude>1204.6</altitude>
+        <timezone>1</timezone>
+      </geography>
+      <sitedata>
+        <bottom>gravel</bottom>
+        <density>1000</density>
+        <difficulty>3</difficulty>
+        <maximumdepth>24.5</maximumdepth>
+        <minimumdepth>3</minimumdepth>
+      </sitedata>
+      <rating>
+        <ratingvalue>8</ratingvalue>
+      </rating>
+      <notes>
+        <para>Clear and cold all year; the deep end is the old quarry face.</para>
+      </notes>
+    </site>
+    <site id="site-0198a6f0-8888-7041-8000-000000000041">
+      <name>Old Quarry</name>
+      <geography>
+        <location>Tyrol, Austria</location>
+        <altitude>7012</altitude>
+      </geography>
+      <sitedata>
+        <maximumdepth>6</maximumdepth>
+        <minimumdepth>18</minimumdepth>
+      </sitedata>
+    </site>
+    <site id="site-0198a6f0-8888-7042-8000-000000000042">
+      <name>The Ledge</name>
+      <sitedata>
+        <maximumdepth>12</maximumdepth>
+        <minimumdepth>-2</minimumdepth>
+      </sitedata>
+    </site>
+  </divesite>
+</uddf>

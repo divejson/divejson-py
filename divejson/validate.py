@@ -3,8 +3,9 @@
 Two passes, mirroring §3 of the specification: the JSON Schema (types, required members,
 enums, ranges, lengths, and the structural rules like Position objects), then the
 semantic requirements the schema cannot express — identifier uniqueness, referential
-closure, a record listed once in a list of references, a tag listed once on a dive when
-trimmed and case-folded, cross-member arithmetic, profile-series integrity and span, what a
+closure, a record listed once in a list of references and a registry entry once in a site's
+external ids, a tag listed once on a dive or a site and a site's names each once when trimmed
+and case-folded, cross-member arithmetic, profile-series integrity and span, what a
 recording carries, the offset requirement on ``exported_at``, and the gradient-factor order.
 
 §4's member order is a SHOULD, not a requirement on the document: a generic
@@ -331,7 +332,17 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
             _check_reference(part, "accommodation_uuid", known["contacts"], "contacts", part_path, issues)
 
     for index, site in enumerate(collections["sites"]):
-        _check_location_bbox(site, f"sites/{index}", issues)
+        here = f"sites/{index}"
+        _check_location_bbox(site, here, issues)
+        if _present(site, "depth_from") and _present(site, "depth_to"):
+            try:
+                if site["depth_from"] > site["depth_to"]:
+                    issues.append(Issue(here, "depth_from exceeds depth_to"))
+            except TypeError:
+                pass
+        _check_tags(site, here, issues)
+        _check_other_names(site, here, issues)
+        _check_external_ids(site, here, issues)
 
     for index, gear_set in enumerate(collections["gear_sets"]):
         _check_reference_list(
@@ -476,31 +487,83 @@ WHITE_SPACE = (
 )
 
 
-def _check_tags(dive: dict[str, Any], path: str, issues: list[Issue]) -> None:
-    """§3 rule 8: no tag twice on one dive, compared trimmed and case-folded.
+def folded(text: str) -> str:
+    """§3 rule 8's comparison: trimmed of White_Space, then case-folded.
 
+    One function for every text the rule reaches — a tag, a site's other name, the site's
+    own name — and for a reader deciding whether a name it meets is one it already holds.
     The schema's `uniqueItems` compares bytes, so `night` beside `Night`, or `Großes Riff`
     beside `GROSSES RIFF`, passes it. `str.casefold()` is Unicode full case folding, the C and
     F mappings the rule names, under which `ß` and `ss` are one.
     """
-    tags = dive.get("tags")
-    if not isinstance(tags, list):
+    return text.strip(WHITE_SPACE).casefold()
+
+
+def _check_folded(
+    values: Any, listed: dict[str, str], path: str, noun: str, issues: list[Issue]
+) -> None:
+    """No two of `values` equal under `folded`, nor any equal to one `listed` already.
+
+    `listed` maps a folded text to where it was met, so a caller can seed it with a text
+    the list must not repeat — a site's name, for its other names.
+    """
+    if not isinstance(values, list):
         return
-    listed: dict[str, int] = {}
-    for index, tag in enumerate(tags):
-        if not isinstance(tag, str):
+    for index, value in enumerate(values):
+        if not isinstance(value, str):
             continue
-        folded = tag.strip(WHITE_SPACE).casefold()
-        if folded in listed:
+        key = folded(value)
+        if key in listed:
             issues.append(
                 Issue(
-                    f"{path}/tags/{index}",
-                    f"tag {tag!r} is already listed at {path}/tags/{listed[folded]}, compared trimmed and "
-                    "case-folded (spec §3 rule 8)",
+                    f"{path}/{index}",
+                    f"{noun} {value!r} is already listed at {listed[key]}, compared trimmed and case-folded "
+                    "(spec §3 rule 8)",
                 )
             )
         else:
-            listed[folded] = index
+            listed[key] = f"{path}/{index}"
+
+
+def _check_tags(record: dict[str, Any], path: str, issues: list[Issue]) -> None:
+    """§3 rule 8: no tag twice on one dive or one site, compared trimmed and case-folded."""
+    _check_folded(record.get("tags"), {}, f"{path}/tags", "tag", issues)
+
+
+def _check_other_names(site: dict[str, Any], path: str, issues: list[Issue]) -> None:
+    """§3 rule 8 again: no other name twice on one site, and none that is the site's name."""
+    name = site.get("name")
+    listed = {folded(name): f"{path}/name"} if isinstance(name, str) else {}
+    _check_folded(site.get("other_names"), listed, f"{path}/other_names", "other name", issues)
+
+
+def _check_external_ids(site: dict[str, Any], path: str, issues: list[Issue]) -> None:
+    """No two of a site's external ids naming one registry entry, compared exactly.
+
+    The schema cannot say it, for rule 7's reason: an External Id may carry `extensions`, so
+    two entries naming one pair are two different objects to `uniqueItems` whenever anything
+    beside the pair differs. The pair alone decides.
+    """
+    entries = site.get("external_ids")
+    if not isinstance(entries, list):
+        return
+    listed: dict[tuple[str, str], int] = {}
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            continue
+        registry, identifier = entry.get("registry"), entry.get("identifier")
+        if not isinstance(registry, str) or not isinstance(identifier, str):
+            continue
+        if (registry, identifier) in listed:
+            issues.append(
+                Issue(
+                    f"{path}/external_ids/{index}",
+                    f"the {registry} entry {identifier!r} is already listed at "
+                    f"{path}/external_ids/{listed[registry, identifier]} (spec §3 rule 7)",
+                )
+            )
+        else:
+            listed[registry, identifier] = index
 
 
 def _check_profile(profile: Any, path: str, issues: list[Issue]) -> None:

@@ -54,6 +54,14 @@
     "notes": {
       "type": "string"
     },
+    "tags": {
+      "description": "The diver's labels for a dive or a dive site. uniqueItems rejects a tag written twice byte for byte; that no two tags are equal once trimmed and case-folded is a rule the validator checks, since two such tags are two different strings to uniqueItems.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 64 },
+      "uniqueItems": true
+    },
+    "water_type": { "enum": ["salt", "fresh", "brackish"] },
+    "entry_type": { "enum": ["shore", "boat", "pier", "pool"] },
     "extensions": {
       "type": "object",
       "propertyNames": { "pattern": "^[a-z0-9][a-z0-9._-]*$" }
@@ -143,24 +151,19 @@
           "enum": ["open_circuit", "closed_circuit", "semi_closed", "freedive", "snorkel", "surface_supplied"]
         },
         "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
-        "tags": {
-          "description": "The diver's labels for the dive. uniqueItems rejects a tag written twice byte for byte; that no two tags are equal once trimmed and case-folded is a rule the validator checks, since two such tags are two different strings to uniqueItems.",
-          "type": "array",
-          "items": { "type": "string", "minLength": 1, "maxLength": 64 },
-          "uniqueItems": true
-        },
+        "tags": { "$ref": "#/$defs/tags" },
         "max_depth": { "type": "number", "exclusiveMinimum": 0 },
         "avg_depth": { "type": "number", "exclusiveMinimum": 0 },
         "bottom_temperature": { "type": "number" },
         "visibility": { "type": "number", "minimum": 0 },
         "weight": { "type": "number", "minimum": 0 },
-        "water_type": { "enum": ["salt", "fresh", "brackish"] },
+        "water_type": { "$ref": "#/$defs/water_type" },
         "altitude": { "type": "integer", "minimum": -450, "maximum": 6500 },
         "air_temperature": { "type": "number" },
         "current": { "enum": ["none", "light", "moderate", "strong", "extreme"] },
         "waves": { "enum": ["calm", "slight", "moderate", "rough"] },
         "weather": { "enum": ["clear", "partly_cloudy", "overcast", "rain", "storm", "snow", "fog"] },
-        "entry_type": { "enum": ["shore", "boat", "pier", "pool"] },
+        "entry_type": { "$ref": "#/$defs/entry_type" },
         "boat_name": { "type": "string", "minLength": 1, "maxLength": 255 },
         "entry_position": { "$ref": "#/$defs/position" },
         "exit_position": { "$ref": "#/$defs/position" },
@@ -440,14 +443,67 @@
       "properties": {
         "uuid": { "$ref": "#/$defs/uuid" },
         "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "other_names": {
+          "description": "Other names the site goes by, in the diver's own order. uniqueItems rejects a name written twice byte for byte; that none repeats another or the site's name once trimmed and case-folded is a rule the validator checks.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 255 },
+          "uniqueItems": true
+        },
         "location": { "$ref": "#/$defs/location" },
         "position": { "$ref": "#/$defs/position" },
+        "external_ids": {
+          "description": "The place's entries in registries outside the logbook. uniqueItems rejects an entry written twice whole; that no two name the same registry and identifier is a rule the validator checks, since two such entries are two different objects to uniqueItems whenever anything beside the pair differs.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/external_id" },
+          "uniqueItems": true
+        },
+        "depth_from": { "type": "number", "minimum": 0 },
+        "depth_to": { "type": "number", "minimum": 0 },
+        "water_type": { "$ref": "#/$defs/water_type" },
+        "altitude": { "type": "integer", "minimum": -450, "maximum": 6500 },
+        "entry_types": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/entry_type" },
+          "uniqueItems": true
+        },
+        "tags": { "$ref": "#/$defs/tags" },
         "notes": { "$ref": "#/$defs/notes" },
         "created_at": { "$ref": "#/$defs/date_time" },
         "extensions": { "$ref": "#/$defs/extensions" }
       },
       "required": ["uuid", "name"],
       "additionalProperties": false
+    },
+    "external_id": {
+      "description": "One entry of a dive site in a registry outside the logbook. A registry this version names holds its identifier to that registry's form; any other is carried as written.",
+      "type": "object",
+      "properties": {
+        "registry": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+        "identifier": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["registry", "identifier"],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": { "registry": { "const": "wikidata" } },
+            "required": ["registry"]
+          },
+          "then": {
+            "properties": { "identifier": { "pattern": "^Q[1-9][0-9]*$" } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "registry": { "const": "openstreetmap" } },
+            "required": ["registry"]
+          },
+          "then": {
+            "properties": { "identifier": { "pattern": "^(node|way|relation)/[1-9][0-9]*$" } }
+          }
+        }
+      ]
     },
     "species": {
       "type": "object",

@@ -662,7 +662,7 @@
         },
         {
           "registry": "wikidata",
-          "identifier": "Q65553718"
+          "identifier": "https://www.wikidata.org/wiki/Q65553718"
         },
         {
           "registry": "com.example.sitepool",

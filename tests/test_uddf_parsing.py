@@ -16,7 +16,7 @@ from helpers import FIXTURES, STARTED_AT, before, device_of, one_dive, profile_o
 
 from divejson import DoctypeRefusedError, MalformedUddfError, convert
 from divejson.uddf import LOCAL_CLOCK_NOTE, UDDF_ID_NAMESPACE
-from divejson.validate import validate_document
+from divejson.validate import load_schema, validate_document
 
 
 def _refuse_non_json(token: str) -> None:
@@ -688,6 +688,102 @@ def test_a_parts_end_before_its_start_is_dropped_from_that_part() -> None:
     )
     assert trip["parts"] == [{"starts_on": "2026-04-18", "location": {"name": "Hurghada"}}]
     assert [message for message in messages if "before it starts on 2026-04-18" in message]
+
+
+# -- sites ------------------------------------------------------------------------------
+
+
+def site_of(body: str) -> tuple[dict, list[str]]:
+    """The one site a `<divesite>` holding `body` reads as, and the report at its path."""
+    conversion = convert(uddf(f"<divesite><site id='s'><name>Harrys Wall</name>{body}</site></divesite>"))
+    assert validate_document(conversion.document) == []
+    return conversion.document["sites"][0], [note.message for note in conversion.notes if note.where == "site/0"]
+
+
+def test_a_sites_other_names_altitude_and_depth_range_are_read_in_the_sections_order() -> None:
+    """`<aliasname>`, `<geography><altitude>` and `<sitedata>`'s pair, with nothing reported."""
+    site, report = site_of(
+        "<aliasname>Harry's</aliasname><aliasname>砂辺</aliasname>"
+        "<geography><location>Milford Sound</location><latitude>-44.63</latitude><longitude>167.89</longitude>"
+        "<altitude>12.6</altitude></geography>"
+        "<sitedata><maximumdepth>30.5</maximumdepth><minimumdepth>4</minimumdepth></sitedata>"
+    )
+    assert site["other_names"] == ["Harry's", "砂辺"]
+    assert (site["altitude"], site["depth_from"], site["depth_to"]) == (13, 4.0, 30.5)
+    assert list(site) == [member for member in load_schema()["$defs"]["dive_site"]["properties"] if member in site]
+    assert report == []
+
+
+def test_an_alias_that_repeats_the_name_or_another_is_not_carried_and_not_reported() -> None:
+    """§3's comparison, trimmed and case-folded: it says nothing the record does not."""
+    site, report = site_of(
+        "<aliasname>HARRYS WALL</aliasname><aliasname>Sandy</aliasname><aliasname> sandy </aliasname>"
+        "<aliasname/><aliasname>Straße</aliasname><aliasname>STRASSE</aliasname>"
+    )
+    assert site["other_names"] == ["Sandy", "Straße"]
+    assert report == []
+
+
+def test_a_depth_above_the_surface_goes_alone_and_a_reversed_pair_goes_together() -> None:
+    """A negative depth is one wrong reading; a shallow end below the deep end does not say
+    which of the two is wrong, so neither is kept."""
+    site, report = site_of("<sitedata><maximumdepth>18</maximumdepth><minimumdepth>-2</minimumdepth></sitedata>")
+    assert (site.get("depth_from"), site["depth_to"]) == (None, 18.0)
+    assert report == ["<minimumdepth> is -2 m, above the surface; dropped"]
+
+    site, report = site_of("<sitedata><maximumdepth>5</maximumdepth><minimumdepth>12</minimumdepth></sitedata>")
+    assert "depth_from" not in site and "depth_to" not in site
+    assert "both are dropped" in report[0]
+
+    site, report = site_of("<sitedata><minimumdepth>0</minimumdepth></sitedata>")
+    assert site["depth_from"] == 0.0 and report == []
+
+
+def test_a_sites_altitude_outside_the_format_range_is_dropped_and_reported() -> None:
+    site, report = site_of("<geography><location>Lake Titicaca</location><altitude>8000</altitude></geography>")
+    assert "altitude" not in site
+    assert report == ["<altitude> is 8000 m, outside the -450 to 6500 the format allows; dropped"]
+
+
+def test_what_a_site_records_and_the_format_does_not_is_named_once_per_element() -> None:
+    """Every child of the site, its `<geography>` and its `<sitedata>` the reader does not
+    read — `<environment>` and `<density>` among them — by name, a repeated one once, and a
+    nested one only where it records something."""
+    _, report = site_of(
+        "<environment>lake-quarry</environment>"
+        "<geography><location>Dahab</location><timezone>2</timezone><address><country>Egypt</country></address>"
+        "</geography>"
+        "<ecology><fauna><notes><para>Lionfish</para></notes></fauna></ecology>"
+        "<sitedata><density>1000</density><difficulty>4</difficulty><bottom/><wreck><name>A</name></wreck>"
+        "<wreck><name>B</name></wreck></sitedata>"
+        "<rating><ratingvalue>7</ratingvalue></rating><rating><ratingvalue>9</ratingvalue></rating>"
+    )
+    named = [message.removeprefix("§6.10 has no member for ").removesuffix("; it is not read") for message in report]
+    assert named == [
+        "<environment>",
+        "<ecology>",
+        "<rating>",
+        "<geography><timezone>",
+        "<geography><address>",
+        "<sitedata><density>",
+        "<sitedata><difficulty>",
+        "<sitedata><wreck>",
+    ]
+
+
+def test_a_site_holding_only_what_was_always_read_reports_nothing_new() -> None:
+    site, report = site_of(
+        "<geography><location>Dahab</location><latitude>28.57</latitude><longitude>34.54</longitude></geography>"
+        "<notes><para>Shore entry.</para></notes>"
+    )
+    assert site == {
+        "uuid": site["uuid"],
+        "name": "Harrys Wall",
+        "location": {"name": "Dahab"},
+        "position": {"latitude": 28.57, "longitude": 34.54},
+        "notes": "Shore entry.",
+    }
+    assert report == []
 
 
 # -- contacts ---------------------------------------------------------------------------

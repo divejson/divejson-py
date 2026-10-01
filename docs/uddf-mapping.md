@@ -89,6 +89,7 @@ in a converter, are in `converting.md`.
 | `profile.gradient_factor` values | whole percent | `<waypoint><gradientfactor>` | percent or fraction, and see below | — , or × 100 |
 | `deco_model.gf_low`, `.gf_high` | whole percent | `<gradientfactorlow>`, `<gradientfactorhigh>` | fraction, and see below | × 100, or — |
 | `max_depth`, `avg_depth` | metres | `<greatestdepth>`, `<averagedepth>` | metres | — |
+| a site's `depth_from`, `depth_to` | metres | `<minimumdepth>`, `<maximumdepth>` | metres | — |
 | `bottom_temperature` | °C | `<lowesttemperature>` | Kelvin | K − 273.15 |
 | `air_temperature` | °C | `<airtemperature>` | Kelvin | K − 273.15 |
 | `cylinders[].start_pressure`, `.end_pressure` | bar | `<tankpressurebegin>`, `<tankpressureend>` | Pascal | ÷ 100 000 |
@@ -177,9 +178,37 @@ one rather than a short one.
 | UDDF | DiveJSON |
 | --- | --- |
 | `name` | `sites[].name` — REQUIRED, so a nameless site is dropped |
+| `aliasname` | `sites[].other_names`, in file order — see below |
 | `geography/location` | `sites[].location.name` — the only slot UDDF has for a locality, so nothing else of the place is filled in |
 | `geography/latitude` + `longitude` | `sites[].position` |
+| `geography/altitude` | `sites[].altitude`, rounded to the whole metre with halves away from zero, as a dive's `<altitude>` is |
+| `sitedata/minimumdepth` | `sites[].depth_from` |
+| `sitedata/maximumdepth` | `sites[].depth_to` |
 | `notes/para` | `sites[].notes`, paragraphs joined with blank lines |
+
+UDDF has no slot for a site's entry, its tags, the kind of water it holds or an identifier
+from outside the file, so a site read from UDDF never carries `entry_types`, `tags`,
+`water_type` or `external_ids`. `<environment>` and `<density>` come nearest the third, and
+*Deliberately not mapped* says why neither is read.
+
+**An `<aliasname>` is carried where it says something the record does not.** One that
+repeats the site's name or an earlier `<aliasname>` once trimmed and case-folded — §3's
+comparison — is neither carried nor reported: the document would be refused for it, and it
+records nothing the name does not. An empty one is no name and is skipped. Each is held to
+§6.10's 255 characters as the name is, cut and reported, and compared after the cut, which is
+the text the document holds.
+
+**The depths and the altitude meet their bounds.** A `<minimumdepth>` or `<maximumdepth>`
+above the surface — below zero — is dropped and reported, alone. A `<minimumdepth>` deeper
+than the `<maximumdepth>` drops the pair together, reported, as half a coordinate pair goes:
+the file does not say which of the two is wrong, and adjusting either to fit would be
+inventing it. An `<altitude>` outside −450 to 6500 is dropped and reported, as a dive's is.
+
+**Every other child of a `<site>`, its `<geography>` and its `<sitedata>` is reported**, by
+element name and once per name on each site, in the contact reader's manner: §6.10 has no
+member for it, and a reader says so rather than dropping it in silence. *Deliberately not
+mapped* below gives each one's reason. A child of `<geography>` or `<sitedata>` that records
+nothing — no text and no attribute anywhere beneath it — says nothing and is not reported.
 
 divelogs.de produces the nameless site: one it holds only a locality for exports as
 `<name/>` with a `<location>`. Promoting the locality into the name would be inventing one,
@@ -912,7 +941,14 @@ writes all three that way.
 | `<informationafterdive><problems>` | no core member. |
 | `<informationbeforedive><purpose>`, `<informationafterdive><program>` | each a closed vocabulary holding one value — what the dive was for, `sightseeing`, `photography-videography` and `spearfishing` among nine, and the programme it was dived under, `recreation`, `training` and `military` among eight — which is the subject matter a diver's `tags` (§6.2) often carry, in a vocabulary the diver does not choose. A tag list is free text and neither element holds one, so a dive's `tags` are neither written into them nor read from them. |
 | `<informationafterdive><observations>` | a dive's `<fauna>` and `<flora>`, the slot a dive's `sightings` (§6.3a) would be read from, and no file in hand fills either. The corpus's two Shearwater Cloud files carry only its `<notes>`, the computer's mode markers (`-ShearwaterDiveModeType:6-`) rather than anything the diver wrote, and the dive's `notes` do not take them. A reading rule waits for a file that carries a species. Not reported. |
-| `<site><ecology>` | what is found at a site in general, where a sighting (§6.3a) is what one dive saw — the per-dive slot is `<observations>`, above. |
+| `<site><ecology>` | what is found at a site in general, where a sighting (§6.3a) is what one dive saw — the per-dive slot is `<observations>`, above. Reported, as every child of a site the reader does not read is (*Dive sites* above). |
+| `<site><environment>` | the class of water body a site is in — `ocean-sea`, `lake-quarry`, `river-spring`, `cave-cavern`, `pool`, `hyperbaric-chamber`, `under-ice` — which is neither a water type nor a word the diver wrote: a sea can be brackish, and reading `lake-quarry` as the tags `lake` and `quarry` would put words in the diver's mouth. Reported. |
+| `<sitedata><density>` | a water density in kg/m³, where §6.10's `water_type` is three words: reading one onto the other needs a threshold, and no file in hand carries a density to test one against. Reported. |
+| `<site><rating>`, `<sitedata><difficulty>` | the place's rating, and its difficulty on UDDF's ten steps. §6.10 carries neither: how a diver rates a place is what their rated dives there say, and no two difficulty scales agree, nor does any say who judged. Each is reported. |
+| `<sitedata><averagevisibility>`, `<minimumvisibility>`, `<maximumvisibility>` | the visibility a site usually has, which is an aggregate of dives rather than a fact about the place, and the diver's own dives there carry theirs (§6.2). Each is reported. |
+| `<sitedata><arealength>`, `<areawidth>`, `<bottom>`, `<terrain>`, `<globallightintensity>` | the site's extent, its seabed and its light, which §6.10 has no member for. Each is reported. |
+| `<sitedata><wreck>`, `<cave>`, `<indoor>`, `<lake>`, `<river>`, `<shore>` | the particulars of a kind of place — a wreck's ship and its sinking, a cave, an indoor pool's address. A charted wreck's are a registry entry's, which `external_ids` is the door to. Each is reported. |
+| `<geography><address>`, `<timezone>` on a site | a postal address, which a site's `location` is not — §6.9's is a named place — and a zone, which a dive's `started_at` carries as its offset (§5.2). Each is reported. |
 | `<trippart><relateddives>` | the reverse of `<tripmembership>`; no writer in the corpus emits it. Not reported. |
 | a trip's `<aliasname>` and `<rating>`; a part's `<aliasname>`, `<rating>`, `<priceperdive>` and `<pricedivepackage>` | §6.8 and §6.9a carry none of them. None is reported (*Trips* above). |
 | `<trippart @type>` | `boat`, `hotel`, `individual` or `organized`, and reported. What a part gained was a reference, not a type: the contact its `accommodation_uuid` names says whether the diver slept aboard (`liveaboard`) or ashore (`accommodation`), and `individual` and `organized` say how the trip was booked, which nothing stores ([divejson/divejson's CONTRIBUTING.md](https://github.com/divejson/divejson/blob/main/CONTRIBUTING.md#proposing-additions-to-the-data-model)). A reader that wants it has `extensions`. |
@@ -947,6 +983,9 @@ converter's. Recording them here saves the next reader the round trip.
 - **Subsurface writes one placeholder `<divebase>` into every export** — `allbase`, named
   `Subsurface Divebase`, linked from nothing. *Contacts* above is why it does not arrive as a
   contact.
+- **Oceanic+ writes a GPS altitude on its sites**, so a site at sea level read from one of
+  its files can carry an `altitude` a few metres either side of zero. It is read as written:
+  the reader cannot tell a satellite's altitude from a surveyed one.
 - **divelogs.de reads a missing depth as zero**, producing a profile that saws between the
   seabed and the surface on every other sample, and writes `0.000000` coordinates for every
   site.

@@ -676,7 +676,7 @@
       ],
       "depth_from": 8,
       "depth_to": 70.5,
-      "water_type": "salt",
+      "water_type": "lake",
       "altitude": 0,
       "entry_types": [
         "boat",

@@ -680,7 +680,7 @@
       "altitude": 0,
       "entry_types": [
         "boat",
-        "shore"
+        "jetty"
       ],
       "tags": [
         "wall",

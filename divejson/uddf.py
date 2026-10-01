@@ -105,9 +105,10 @@ from .converter import (
     rounded,
     in_seconds,
     shared_readout,
+    site_members,
 )
 from .series import Channel, SampleAxis
-from .validate import validate_document
+from .validate import folded, validate_document
 
 # Aliased on import rather than renamed at every call site. These four moved into
 # `xmlsource.py` when a second XML format arrived — taking a child by lowercased local
@@ -187,6 +188,15 @@ _ADDRESS = (
 # a rating, a guide, a hotel's category — is never dropped in silence.
 _SHAPE_READ = {"name", "address", "contact", "notes"}
 _CONTACT_BLOCK_READ = {"phone", "mobilephone", "email", "homepage"}
+
+# The children of a `<site>`, its `<geography>` and its `<sitedata>` that §6.10 reads; every
+# other one is reported by name. `<density>` and `<environment>` are among the rest on purpose:
+# a density is a number and `water_type` three words, with no file in hand to test a threshold
+# against, and an environment classes the water body, which is neither a water type nor a word
+# the diver wrote.
+_SITE_READ = {"name", "aliasname", "geography", "sitedata", "notes"}
+_GEOGRAPHY_READ = {"location", "latitude", "longitude", "altitude"}
+_SITEDATA_READ = {"minimumdepth", "maximumdepth"}
 
 # `<personal>`'s names, in the order a person's `name` joins them; a `<buddy>`'s children and
 # its `<contact>` block's that §6.20 reads. Every other one is reported, as a contact's are.
@@ -1014,6 +1024,11 @@ class _Converter:
     # -- sites -------------------------------------------------------------------
 
     def read_sites(self) -> list[dict[str, Any]]:
+        """`<divesite><site>` as §6.10 sites, in file order, before the dives that link them.
+
+        Each is put back in the section's member order, as a contact is, and what it records
+        beyond what §6.10 reads is reported by name (`report_site_residue`).
+        """
         sites: list[dict[str, Any]] = []
         for index, element in enumerate(_kids(_kid(self.root, "divesite"), "site")):
             where = f"site/{index}"
@@ -1039,6 +1054,9 @@ class _Converter:
                 continue
 
             site: dict[str, Any] = {"uuid": claimed, "name": self.capped(name, MAX_NAME, where, "the site name")}
+            other_names = self.other_names(element, site["name"], where)
+            if other_names:
+                site["other_names"] = other_names
             geography = _kid(element, "geography")
             location = _text_of(geography, "location")
             if location:
@@ -1050,12 +1068,98 @@ class _Converter:
             position = self.position(geography, where)
             if position:
                 site["position"] = position
+            altitude = self.altitude(geography, where)
+            if altitude is not None:
+                site["altitude"] = altitude
+            site.update(self.depth_range(_kid(element, "sitedata"), where))
             notes = self.notes_text(element)
             if notes:
                 site["notes"] = notes
+            self.report_site_residue(element, where)
 
-            sites.append(site)
+            sites.append({member: site[member] for member in site_members() if member in site})
         return sites
+
+    def other_names(self, element: ET.Element, name: str, where: str) -> list[str]:
+        """`<aliasname>` as §6.10's `other_names`, in file order.
+
+        One that repeats the site's name or an earlier alias under §3's comparison is not
+        carried and not reported: it says nothing the record does not already. Compared after
+        the cap, which is the text the document would hold.
+        """
+        seen = {folded(name)}
+        names: list[str] = []
+        for kid in _kids(element, "aliasname"):
+            alias = _text(kid)
+            if not alias:
+                continue
+            alias = self.capped(alias, MAX_NAME, where, "the site's other name")
+            if folded(alias) in seen:
+                continue
+            seen.add(folded(alias))
+            names.append(alias)
+        return names
+
+    def depth_range(self, sitedata: ET.Element | None, where: str) -> dict[str, float]:
+        """`<sitedata>`'s `<minimumdepth>` and `<maximumdepth>` as §6.10's depth range.
+
+        A depth above the surface is dropped alone. A shallow end deeper than the deep end
+        drops the pair together, as half a coordinate pair goes: the file does not say which
+        of the two is wrong, and adjusting either to fit would be inventing it.
+        """
+        depths: dict[str, Decimal] = {}
+        for tag, member in (("minimumdepth", "depth_from"), ("maximumdepth", "depth_to")):
+            value = decimal_of(_text_of(sitedata, tag))
+            if value is None:
+                continue
+            if not recorded(value, record="dive_site", member=member):
+                self.note(where, f"<{tag}> is {value} m, above the surface; dropped", "dropped")
+                continue
+            depths[member] = value
+        shallow, deep = depths.get("depth_from"), depths.get("depth_to")
+        if shallow is not None and deep is not None and shallow > deep:
+            self.note(
+                where,
+                f"the <minimumdepth> {shallow} m is deeper than the <maximumdepth> {deep} m, which cannot be; both "
+                "are dropped rather than either being adjusted to fit (spec §6.10)",
+                "dropped",
+            )
+            return {}
+        return {member: float(value) for member, value in depths.items()}
+
+    def report_site_residue(self, element: ET.Element, where: str) -> None:
+        """What a `<site>` records that §6.10 has no member for, each element name once.
+
+        Derived from the elements rather than listed, in the contact reader's manner: every
+        child of the `<site>` but the ones read, and every child of its `<geography>` and its
+        `<sitedata>` that records anything. Once per name, because `<rating>` and `<wreck>`
+        repeat and a line per occurrence would say one thing several times.
+        """
+        reported: set[str] = set()
+        levels = (
+            (element, _SITE_READ, ""),
+            (_kid(element, "geography"), _GEOGRAPHY_READ, "<geography>"),
+            (_kid(element, "sitedata"), _SITEDATA_READ, "<sitedata>"),
+        )
+        for parent, read, inside in levels:
+            for child in parent if parent is not None else ():
+                tag = local_name(child)
+                said = f"{inside}<{tag}>"
+                if tag in read or said in reported or (inside and not _states(child)):
+                    continue
+                reported.add(said)
+                self.note(where, f"§6.10 has no member for {said}; it is not read", "dropped")
+
+    def altitude(self, parent: ET.Element | None, where: str) -> int | None:
+        """An `<altitude>` on §6.2's range, which a site's shares; a dive's sits in
+        `<informationbeforedive>` and a site's in `<geography>`."""
+        altitude = integer_of(decimal_of(_text_of(parent, "altitude")))
+        if altitude is None:
+            return None
+        if MIN_ALTITUDE <= altitude <= MAX_ALTITUDE:
+            return altitude
+        self.note(where, f"<altitude> is {altitude} m, outside the -450 to 6500 the format allows; dropped", "dropped")
+        return None
 
     # -- contacts -------------------------------------------------------------------
 
@@ -1827,12 +1931,9 @@ class _Converter:
             else:
                 self.note(where, f"<leadquantity> is {weight} kg; dropped", "dropped")
 
-        altitude = integer_of(decimal_of(_text_of(before, "altitude")))
+        altitude = self.altitude(before, where)
         if altitude is not None:
-            if MIN_ALTITUDE <= altitude <= MAX_ALTITUDE:
-                dive["altitude"] = altitude
-            else:
-                self.note(where, f"<altitude> is {altitude} m, outside the -450 to 6500 the format allows; dropped", "dropped")
+            dive["altitude"] = altitude
 
         air = decimal_of(_text_of(before, "airtemperature"))
         if air is not None:

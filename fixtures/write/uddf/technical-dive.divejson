@@ -634,6 +634,10 @@
     {
       "uuid": "0198a6f0-1111-7040-8000-000000000040",
       "name": "Harrys Wall",
+      "other_names": [
+        "Harry's Wall",
+        "The Black Coral Wall"
+      ],
       "location": {
         "name": "Milford Sound, New Zealand",
         "position": {
@@ -651,6 +655,37 @@
         "latitude": -44.6301,
         "longitude": 167.8901
       },
+      "external_ids": [
+        {
+          "registry": "openstreetmap",
+          "identifier": "node/4415738262"
+        },
+        {
+          "registry": "wikidata",
+          "identifier": "Q65553718"
+        },
+        {
+          "registry": "com.example.sitepool",
+          "identifier": "NZ/FIO/0042",
+          "extensions": {
+            "com.example.divekit": {
+              "checked_on": "2026-06-01"
+            }
+          }
+        }
+      ],
+      "depth_from": 8,
+      "depth_to": 70.5,
+      "water_type": "salt",
+      "altitude": 0,
+      "entry_types": [
+        "boat",
+        "shore"
+      ],
+      "tags": [
+        "wall",
+        "black coral"
+      ],
       "notes": "Black coral from 12 m.",
       "created_at": "2026-06-01T08:05:00+12:00"
     },

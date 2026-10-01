@@ -7,6 +7,29 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **A dive site carries its other names, external ids, depth range, water type, altitude, entry
+  types and tags.** §6.10 of
+  [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) adds
+  `other_names`, `external_ids`, `depth_from`, `depth_to`, `water_type`, `altitude`,
+  `entry_types` and `tags`, each OPTIONAL; an external id is a `registry` and an `identifier`,
+  whose form the schema fixes for `wikidata` and `openstreetmap`. `divejson validate` refuses a
+  site whose `depth_from` exceeds its `depth_to`, a tag listed twice on one site as on a dive,
+  an other name that repeats another or the site's own name under the same trimmed, case-folded
+  comparison, and one registry entry listed twice on a site — compared on its `registry` and
+  `identifier` alone, whatever its `extensions` say.
+
+- **The UDDF reader reads what UDDF holds of them.** `<aliasname>` as `other_names`,
+  `<geography><altitude>` as `altitude`, and `<sitedata>`'s `<minimumdepth>` and
+  `<maximumdepth>` as the depth range. An alias that repeats the name or an earlier alias is not
+  carried; a depth above the surface is dropped, and a shallow end deeper than the deep end
+  drops the pair. Every other child of a `<site>`, its `<geography>` and its `<sitedata>` is
+  reported by name, once per site, where the reader used to drop it in silence — `<environment>`
+  and `<density>` among them, which stay unread.
+
+- **The UDDF writer writes them back** in the schema's order, and reports the external ids, the
+  water type, the entry types and the tags, which UDDF's site has no slot for. A site's altitude
+  goes with its pin where the site has no locality name, `<geography>` requiring one.
+
 ## 0.18.0
 
 - **Breaking: a location has one name, and `full_name` is removed.** §6.9 of

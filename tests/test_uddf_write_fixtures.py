@@ -99,6 +99,12 @@ LOST: dict[str, frozenset[str]] = {
             # UDDF has no box element — two losses off one record where a part loses one.
             "sites/0/location/position",
             "sites/0/location/bbox",
+            # UDDF's site holds its other names, its altitude and its depth range, and no
+            # registry entry, entry, kind of water or tag.
+            "sites/0/external_ids",
+            "sites/0/water_type",
+            "sites/0/entry_types",
+            "sites/0/tags",
             "dives/0/water_type",
             # No slot either, like the water type.
             "dives/0/tags",

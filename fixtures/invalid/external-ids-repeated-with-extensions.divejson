@@ -672,6 +672,15 @@
               "checked_on": "2026-06-01"
             }
           }
+        },
+        {
+          "registry": "openstreetmap",
+          "identifier": "node/4415738262",
+          "extensions": {
+            "com.example.divekit": {
+              "checked_on": "2026-06-01"
+            }
+          }
         }
       ],
       "depth_from": 8,

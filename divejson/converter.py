@@ -131,6 +131,7 @@ __all__ = [
     "roles_in_order",
     "rounded",
     "shared_readout",
+    "site_members",
     "zero_is_an_answer",
 ]
 
@@ -900,6 +901,13 @@ def contact_members() -> tuple[str, ...]:
     is written, as a recording is.
     """
     return tuple(load_schema()["$defs"]["contact"]["properties"])
+
+
+@cache
+def site_members() -> tuple[str, ...]:
+    """§6.10's Dive Site members in the section's own order, off the schema, for the reason
+    `contact_members` gives."""
+    return tuple(load_schema()["$defs"]["dive_site"]["properties"])
 
 
 # -- people ---------------------------------------------------------------------------

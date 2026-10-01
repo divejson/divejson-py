@@ -677,7 +677,7 @@
       "depth_from": 8,
       "depth_to": 70.5,
       "water_type": "salt",
-      "altitude": 0,
+      "altitude": 6501,
       "entry_types": [
         "boat",
         "shore"
