@@ -1,0 +1,96 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-10-01T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.19.0"
+  },
+  "dives": [
+    {
+      "uuid": "99ca578d-a074-52d2-9216-e98057a33dcb",
+      "number": 1,
+      "started_at": "2026-10-01T17:32:28",
+      "duration": 2400,
+      "site_uuids": [
+        "28d5ad58-7af2-5aa0-84b0-7603cbb878e4"
+      ],
+      "max_depth": 15.0,
+      "avg_depth": 13.002
+    },
+    {
+      "uuid": "a27d7fb1-89c9-52aa-9531-4d33de232b2e",
+      "number": 2,
+      "started_at": "2026-10-01T17:34:45",
+      "duration": 2400,
+      "site_uuids": [
+        "07468b1a-3444-5860-8433-24d75c6120d7"
+      ],
+      "max_depth": 15.0,
+      "avg_depth": 13.002
+    },
+    {
+      "uuid": "d51dfcdf-e98d-5027-9652-7a5a8a4b5224",
+      "number": 3,
+      "started_at": "2026-10-01T17:36:34",
+      "duration": 2400,
+      "site_uuids": [
+        "8452dee1-50fd-52ba-a496-94880320c170"
+      ],
+      "max_depth": 15.0,
+      "avg_depth": 13.002
+    }
+  ],
+  "sites": [
+    {
+      "uuid": "28d5ad58-7af2-5aa0-84b0-7603cbb878e4",
+      "name": "first",
+      "location": {
+        "name": "Morocco"
+      },
+      "position": {
+        "latitude": 33.602987,
+        "longitude": -7.703508
+      },
+      "notes": "Desccccccccc\n\nNooooooo\ntes"
+    },
+    {
+      "uuid": "07468b1a-3444-5860-8433-24d75c6120d7",
+      "name": "in the ocean",
+      "location": {
+        "name": "Dahab, South Sinai, Egypt"
+      },
+      "position": {
+        "latitude": 28.478807,
+        "longitude": 34.522936
+      }
+    },
+    {
+      "uuid": "8452dee1-50fd-52ba-a496-94880320c170",
+      "name": "coordinates only",
+      "position": {
+        "latitude": 22.878216,
+        "longitude": -109.895267
+      }
+    },
+    {
+      "uuid": "811240b2-89a3-5e52-8ab3-27e2b69fb5d8",
+      "name": "description only",
+      "notes": "Sandy slope below the lighthouse"
+    },
+    {
+      "uuid": "9536721c-8bec-544b-85c5-110be78ab43c",
+      "name": "notes only",
+      "notes": "Entry from the beach steps.\nStrong current on the outgoing tide."
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "ssrf",
+      "ssrf_version": "3",
+      "source_generator": {
+        "name": "subsurface"
+      }
+    }
+  }
+}

@@ -20,10 +20,11 @@ assumed.** `depth max='45.91 m'`, `duration='66:50 min'`, `cns='11%'`, `size='12
 the number in front of it, and a spelling the table does not carry is **refused and
 reported** rather than converted by a factor no file has checked. That is the whole reason
 this reader has no scale ambiguity of its own: UDDF's `<tankvolume>` and `<o2>` are numbers
-whose units the file never states, and there is no such number here. This reader therefore
-emits one `resolved` finding and it is not about a scale — a `<dive @cns>` or `@otu` on a
-dive with more than one recording, the file not saying whose figure it is — and past that
-the only two kinds in its report are `absent` and `dropped`.
+whose units the file never states, and the one number here written without a unit, a site's
+`@gps`, has a single spelling (`read_position`). This reader therefore emits one
+`resolved` finding and it is not about a scale — a `<dive @cns>` or `@otu` on a dive with
+more than one recording, the file not saying whose figure it is — and past that the only
+two kinds in its report are `absent` and `dropped`.
 
 **A dive has no id, so its identity is its position.** Subsurface keys a dive by its
 computer's own dive id where there is one and by nothing at all otherwise; `@number` is the
@@ -77,12 +78,14 @@ from .converter import (
     integer_of,
     milliseconds,
     onto_primary,
+    position,
     recorded,
     recording,
     rounded,
+    site_members,
 )
 from .series import Channel, SampleAxis
-from .validate import validate_document
+from .validate import folded, validate_document
 from .xmlsource import attribute, child, children, local_name, parse_xml, root_name, text
 
 # The format id this adapter registers under, which is also the name of the directory a
@@ -121,6 +124,13 @@ _MEASUREMENT = re.compile(r"\A(?P<number>\S+?)\s*(?P<unit>%|[A-Za-z][A-Za-z/]*)?
 # in the format — see `read_started_at`.
 _DATE = re.compile(r"\A\d{4}-\d{2}-\d{2}\Z")
 _TIME = re.compile(r"\A(?P<hour>\d{2}):(?P<minute>\d{2})(?::(?P<second>\d{2}))?(?P<fraction>\.\d+)?\Z")
+
+# The parts of a site's place name, each as the `<geo @cat>` codes that can supply it, the
+# first present winning. Subsurface's labels are Town, City, State, County and Country; its
+# reverse lookup fills them from geonames' `toponymName` (the nearest populated place),
+# `adminName3`, `adminName1`, `adminName2` and `countryName`, and the country is also the
+# one entry a diver types. 1 is the ocean and 0 is none, and neither is a part of a name.
+_LOCALITY = (("5", "6"), ("3", "4"), ("2",))
 
 
 def _clock(raw: str) -> Decimal | None:
@@ -340,12 +350,20 @@ class _Converter:
     # -- sites -------------------------------------------------------------------
 
     def read_sites(self) -> list[dict[str, Any]]:
-        """`<divesites><site>` as Dive Site records.
+        """`<divesites><site>` as Dive Site records, in the section's member order.
 
         A site's `@uuid` is Subsurface's own eight-hex-digit key rather than a real UUID,
         so it is hashed like any other source id — and read as an opaque string, since one
         of them in the file this reader was built against is `" ff47210"`, with a leading
         space that the dives' `@divesiteid` carries too.
+
+        Past its name a site carries its pin, `@gps` (`read_position`); its place, the
+        `<geo>` taxonomy (`read_locality`); and the diver's prose, a one-line
+        `@description` and a multi-line `<notes>`, which §6.10's one `notes` holds both of:
+        the description first, being the headline Subsurface shows beside the name, then a
+        blank line, then the notes, and either alone where the other is empty. A site with
+        no name is dropped before any of that is read, so its one note is the whole of what
+        the report says about it.
         """
         sites: list[dict[str, Any]] = []
         for index, element in enumerate(children(child(self.root, "divesites"), "site")):
@@ -372,8 +390,70 @@ class _Converter:
                 self.site_uuids[source_id] = claimed
             if not carried:
                 continue
-            sites.append({"uuid": claimed, "name": self.capped(name, MAX_NAME, where, "the site name")})
+
+            site: dict[str, Any] = {"uuid": claimed, "name": self.capped(name, MAX_NAME, where, "the site name")}
+            locality = self.read_locality(element, where)
+            if locality:
+                site["location"] = {"name": locality}
+            pin = self.read_position(attribute(element, "gps"), where)
+            if pin:
+                site["position"] = pin
+            prose = [part for part in (attribute(element, "description"), text(child(element, "notes"))) if part]
+            if prose:
+                site["notes"] = "\n\n".join(prose)
+            sites.append({member: site[member] for member in site_members() if member in site})
         return sites
+
+    def read_position(self, raw: str | None, where: str) -> dict[str, float] | None:
+        """`@gps` as a Position: two decimals, latitude first, separated by whitespace.
+
+        Subsurface writes each half from an integer count of micro-degrees, `%u.%06u` with a
+        leading `-` — never a comma decimal and never locale-dependent — and the halves are
+        carried as written, a pair of fewer decimals included. Its parser also takes a comma
+        between them, which its writer has never emitted, so that is text that is not two
+        numbers here: dropped, and named with its text, since it is a pin the diver set.
+        Everything past two numbers — the exact-zero pair, the WGS 84 range — is the shared
+        rule.
+        """
+        if raw is None:
+            return None
+        halves = [decimal_of(half) for half in raw.split()]
+        if len(halves) != 2 or halves[0] is None or halves[1] is None:
+            self.note(where, f"<site gps> is {raw!r}, which is not two numbers, a latitude and a longitude; dropped", "dropped")
+            return None
+        return position(halves[0], halves[1], note=self.note, where=where)
+
+    def read_locality(self, element: ET.Element, where: str) -> str | None:
+        """`<geo>` as the site's place name: its town, its region and its country.
+
+        Joined with ", ", and a part equal to an earlier one — compared whole, trimmed and
+        case-folded — left out, so a region standing in for a town reads "Bali, Indonesia"
+        rather than "Bali, Bali, Indonesia" — §6.9's name, the place extended outward through
+        its region to its country.
+
+        `_LOCALITY` says which category supplies which part. `@origin` is not consulted: a
+        country the diver typed and one the lookup returned are both what the diver saw, and
+        the lookup's values are carried as geonames returned them. The ocean, category 0 and
+        a code this reader does not know are not read, and an entry with no `@value` is
+        skipped, all of it silently: a line per site for a fact no member could hold would
+        tell a diver nothing they could act on.
+        """
+        named: dict[str, str] = {}
+        for entry in children(element, "geo"):
+            category, value = attribute(entry, "cat"), attribute(entry, "value")
+            if category is not None and value is not None:
+                named.setdefault(category, value)
+
+        seen: set[str] = set()
+        parts: list[str] = []
+        for codes in _LOCALITY:
+            part = next((named[code] for code in codes if code in named), None)
+            if part is not None and folded(part) not in seen:
+                seen.add(folded(part))
+                parts.append(part)
+        if not parts:
+            return None
+        return self.capped(", ".join(parts), MAX_NAME, where, "the site's locality")
 
     # -- dives -------------------------------------------------------------------
 

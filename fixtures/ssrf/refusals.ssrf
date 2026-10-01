@@ -1,6 +1,8 @@
 <divelog program='subsurface' version='3'>
 <divesites>
-<site uuid='0a1b2c3d' name='Blue Hole'>
+<site uuid='0a1b2c3d' name='Blue Hole' gps='128.572900 34.537100'>
+</site>
+<site uuid='9c8d7e6f' name='Canyon' gps='28.509700,34.513900'>
 </site>
 <site uuid='4e5f6a7b'>
 </site>

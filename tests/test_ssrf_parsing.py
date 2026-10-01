@@ -337,6 +337,213 @@ def test_a_reference_to_a_site_nothing_defines_is_reported_as_the_source_defect_
     assert any("<divesites> does not define" in message for message in messages(conversion))
 
 
+# -- a site's pin, prose and place ----------------------------------------------------
+
+
+def read_site(attributes: str = "", body: str = "") -> tuple[dict, list[tuple[str, str]]]:
+    """A site called Blue Hole carrying `attributes` and `body`, and the dive logged there.
+
+    Returned with what the report says about the site, as `(kind, message)`.
+    """
+    conversion = convert(
+        one_ssrf_dive("divesiteid='s1'", sites=f"<site uuid='s1' name='Blue Hole' {attributes}>{body}</site>")
+    )
+    assert validate_document(conversion.document) == []
+    report = [(note.kind, note.message) for note in conversion.notes if note.where == "site/0"]
+    return conversion.document["sites"][0], report
+
+
+def test_a_site_of_a_name_alone_is_a_name_alone() -> None:
+    found, report = read_site()
+    assert list(found) == ["uuid", "name"] and found["name"] == "Blue Hole"
+    assert report == []
+
+
+def test_a_whole_site_reads_in_the_sections_order_and_reports_nothing() -> None:
+    """Written as Subsurface 6.0 saves one: attributes `name`, `gps`, `description`, then a
+    `<notes>` with a space before its close and the `<geo>` a typed country makes."""
+    found, report = read_site(
+        "gps='33.602987 -7.703508' description='Sandy slope'",
+        "\n  <notes>Two lines\nof notes </notes>\n  <geo cat='2' origin='2' value='Morocco'/>\n",
+    )
+    assert list(found) == ["uuid", "name", "location", "position", "notes"]
+    assert {member: found[member] for member in ("location", "position", "notes")} == {
+        "location": {"name": "Morocco"},
+        "position": {"latitude": 33.602987, "longitude": -7.703508},
+        "notes": "Sandy slope\n\nTwo lines\nof notes",
+    }
+    assert report == []
+
+
+@pytest.mark.parametrize(
+    ("gps", "latitude", "longitude"),
+    [
+        ("28.478807 34.522936", 28.478807, 34.522936),
+        # West of Greenwich, and south of the equator: the sign rides on each half.
+        ("33.602987 -7.703508", 33.602987, -7.703508),
+        ("-43.342295 171.545936", -43.342295, 171.545936),
+        # Fewer decimals than Subsurface writes, which is still a latitude and a longitude.
+        ("28.4788 34.5229", 28.4788, 34.5229),
+        ("28.478807   34.522936", 28.478807, 34.522936),
+    ],
+)
+def test_gps_is_latitude_then_longitude_carried_as_written(gps: str, latitude: float, longitude: float) -> None:
+    found, report = read_site(f"gps='{gps}'")
+    assert found["position"] == {"latitude": latitude, "longitude": longitude}
+    assert report == []
+
+
+@pytest.mark.parametrize(
+    "gps",
+    [
+        # The comma Subsurface's parser accepts between the halves and its writer never wrote.
+        "28.478807,34.522936",
+        "28,478807 34,522936",
+        "28.478807",
+        "28.478807 34.522936 12.0",
+        "N28.478807 E34.522936",
+    ],
+)
+def test_gps_that_is_not_two_numbers_is_dropped_and_named(gps: str) -> None:
+    found, report = read_site(f"gps='{gps}'")
+    assert "position" not in found
+    assert report == [
+        ("dropped", f"<site gps> is {gps!r}, which is not two numbers, a latitude and a longitude; dropped")
+    ]
+
+
+@pytest.mark.parametrize("gps", ["91.000000 34.522936", "28.478807 -180.500000"])
+def test_gps_outside_wgs_84_is_dropped_by_the_shared_rule(gps: str) -> None:
+    found, report = read_site(f"gps='{gps}'")
+    assert "position" not in found
+    assert report == [("dropped", f"the coordinates {gps.replace(' ', ' / ')} are outside the WGS 84 range; dropped")]
+
+
+def test_an_exact_zero_pair_is_no_position_rather_than_null_island() -> None:
+    """Subsurface omits `@gps` for a site at 0 / 0, so only a hand-edited file says this."""
+    found, report = read_site("gps='0.000000 0.000000'")
+    assert "position" not in found
+    assert [kind for kind, _ in report] == ["absent"] and "Null Island" in report[0][1]
+
+
+@pytest.mark.parametrize("gps", ["28.478807 34.522936", "28,478807 34,522936"])
+def test_a_nameless_site_goes_whole_under_its_one_note(gps: str) -> None:
+    """Coordinates, prose, place and all: nothing on it is read, so nothing on it is reported
+    — not even a pin the reader would have refused — and nothing is promoted into a name."""
+    sites = (
+        f"<site uuid='s1' gps='{gps}' description='Reef'><notes>Shallow</notes>"
+        "<geo cat='2' origin='2' value='Egypt'/></site>"
+    )
+    conversion = convert(one_ssrf_dive("divesiteid='s1'", sites=sites))
+    assert "sites" not in conversion.document
+    assert [(note.kind, note.message) for note in conversion.notes if note.where == "site/0"] == [
+        (
+            "dropped",
+            "the site has no name, which the format requires of one; it is dropped along with the references to "
+            "it, because a name cannot be invented (spec §6.10)",
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    ("attributes", "body", "notes"),
+    [
+        ("description='Wall to 40 m'", "", "Wall to 40 m"),
+        ("", "<notes>Current from the north </notes>", "Current from the north"),
+        (
+            "description='Wall to 40 m'",
+            "<notes>Current from the north\non the ebb </notes>",
+            "Wall to 40 m\n\nCurrent from the north\non the ebb",
+        ),
+    ],
+)
+def test_the_description_leads_the_notes_and_either_stands_alone(attributes: str, body: str, notes: str) -> None:
+    found, report = read_site(attributes, body)
+    assert found["notes"] == notes
+    assert report == []
+
+
+def test_a_blank_description_and_blank_notes_are_absent() -> None:
+    found, report = read_site("description='   '", "<notes> \n </notes>")
+    assert "notes" not in found and report == []
+
+
+def test_the_notes_attribute_of_the_2015_pre_release_builds_is_not_read() -> None:
+    found, report = read_site("description='Wall to 40 m' notes='Current from the north'")
+    assert found["notes"] == "Wall to 40 m"
+    assert report == []
+
+
+_LOOKED_UP = (
+    "<geo cat='1' origin='0' value='Gulf of Aqaba'/><geo cat='2' origin='0' value='Egypt'/>"
+    "<geo cat='3' origin='0' value='South Sinai'/><geo cat='5' origin='0' value='Dahab'/>"
+)
+
+
+@pytest.mark.parametrize(
+    ("geo", "locality"),
+    [
+        ("<geo cat='2' origin='2' value='Morocco'/>", "Morocco"),
+        # The ocean is no part of a place name.
+        (_LOOKED_UP, "Dahab, South Sinai, Egypt"),
+        # Subsurface copies the town into the city where the lookup gave both.
+        (_LOOKED_UP + "<geo cat='6' origin='0' value='Dahab'/>", "Dahab, South Sinai, Egypt"),
+        # The state over the county, and the town over the city, where the lookup named each.
+        (
+            "<geo cat='2' origin='0' value='Spain'/><geo cat='3' origin='0' value='Canary Islands'/>"
+            "<geo cat='4' origin='0' value='Santa Cruz de Tenerife'/><geo cat='5' origin='0' value='Los Cristianos'/>"
+            "<geo cat='6' origin='0' value='Arona'/>",
+            "Los Cristianos, Canary Islands, Spain",
+        ),
+        # The city where there is no town, and the county where there is no state.
+        (
+            "<geo cat='2' origin='0' value='Spain'/><geo cat='4' origin='0' value='Santa Cruz de Tenerife'/>"
+            "<geo cat='6' origin='0' value='Arona'/>",
+            "Arona, Santa Cruz de Tenerife, Spain",
+        ),
+        # A region standing in for a town is named once, as the town spells it.
+        (
+            "<geo cat='2' origin='0' value='Indonesia'/><geo cat='3' origin='0' value='Bali'/>"
+            "<geo cat='5' origin='0' value='BALI'/>",
+            "BALI, Indonesia",
+        ),
+        # An entry with no value is skipped, and does not hide the code behind it.
+        (
+            "<geo cat='5' origin='0'/><geo cat='6' origin='0' value='Arona'/><geo cat='2' origin='0' value=''/>",
+            "Arona",
+        ),
+    ],
+)
+def test_geo_composes_the_town_its_region_and_its_country(geo: str, locality: str) -> None:
+    found, report = read_site(body=geo)
+    assert found["location"] == {"name": locality}
+    assert report == []
+
+
+@pytest.mark.parametrize(
+    "geo",
+    [
+        "<geo cat='1' origin='0' value='Red Sea'/>",
+        "<geo cat='0' origin='0' value='Somewhere'/>",
+        "<geo cat='7' origin='0' value='Somewhere'/>",
+        "<geo origin='2' value='Egypt'/>",
+        "<geo cat='2' origin='2' value='  '/>",
+    ],
+)
+def test_the_ocean_and_codes_this_reader_does_not_know_are_not_read_and_not_reported(geo: str) -> None:
+    found, report = read_site(body=geo)
+    assert "location" not in found and report == []
+
+
+def test_a_locality_past_the_name_bound_is_capped_and_reported() -> None:
+    town, country = "T" * 200, "C" * 100
+    found, report = read_site(body=f"<geo cat='5' origin='0' value='{town}'/><geo cat='2' origin='0' value='{country}'/>")
+    assert found["location"] == {"name": f"{town}, {country}"[:255]}
+    assert report == [
+        ("dropped", "the site's locality is 302 characters; the format caps it at 255 and the rest is dropped")
+    ]
+
+
 # -- people ---------------------------------------------------------------------------
 
 

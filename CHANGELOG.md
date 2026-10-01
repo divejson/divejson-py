@@ -7,6 +7,16 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **The Subsurface reader carries a site's coordinates, notes, description and locality.**
+  `@gps` is `position`, latitude first and carried as written; an attribute that is not two
+  numbers is dropped and reported with its text, and a pair outside WGS 84 or an exact
+  `0.000000 0.000000` is refused as every reader refuses one. `@description` and `<notes>`
+  are `notes`, the description first and a blank line between, either alone where the other
+  is empty. `<geo>` is `location.name`, composed from the town, its region and its country —
+  "Dahab, South Sinai, Egypt" — with no part twice; the ocean and any code the reader does not
+  know are not read. A site with a pin and no locality loses the pin when written on to UDDF,
+  whose `<geography>` carries coordinates only beside a place name, and the report says so.
+
 ## 0.19.0
 
 - **A dive site carries its other names, external ids, depth range, water type, altitude, entry
