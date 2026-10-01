@@ -440,14 +440,58 @@
       "properties": {
         "uuid": { "$ref": "#/$defs/uuid" },
         "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "other_names": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 255 },
+          "uniqueItems": true
+        },
         "location": { "$ref": "#/$defs/location" },
         "position": { "$ref": "#/$defs/position" },
+        "external_ids": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/external_id" },
+          "uniqueItems": true
+        },
+        "depth_from": { "type": "number", "minimum": 0 },
+        "depth_to": { "type": "number", "minimum": 0 },
+        "water_type": { "enum": ["salt", "fresh", "brackish"] },
+        "altitude": { "type": "integer", "minimum": -450, "maximum": 6500 },
+        "entry_types": {
+          "type": "array",
+          "items": { "enum": ["shore", "boat", "pier", "pool"] },
+          "uniqueItems": true
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "uniqueItems": true
+        },
         "notes": { "$ref": "#/$defs/notes" },
         "created_at": { "$ref": "#/$defs/date_time" },
         "extensions": { "$ref": "#/$defs/extensions" }
       },
       "required": ["uuid", "name"],
       "additionalProperties": false
+    },
+    "external_id": {
+      "type": "object",
+      "properties": {
+        "registry": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+        "identifier": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["registry", "identifier"],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "properties": { "registry": { "const": "wikidata" } } },
+          "then": { "properties": { "identifier": { "pattern": "^Q[1-9][0-9]*$" } } }
+        },
+        {
+          "if": { "properties": { "registry": { "const": "openstreetmap" } } },
+          "then": { "properties": { "identifier": { "pattern": "^(node|way|relation)/[1-9][0-9]*$" } } }
+        }
+      ]
     },
     "species": {
       "type": "object",
