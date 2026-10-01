@@ -20,10 +20,11 @@ assumed.** `depth max='45.91 m'`, `duration='66:50 min'`, `cns='11%'`, `size='12
 the number in front of it, and a spelling the table does not carry is **refused and
 reported** rather than converted by a factor no file has checked. That is the whole reason
 this reader has no scale ambiguity of its own: UDDF's `<tankvolume>` and `<o2>` are numbers
-whose units the file never states, and there is no such number here. This reader therefore
-emits one `resolved` finding and it is not about a scale — a `<dive @cns>` or `@otu` on a
-dive with more than one recording, the file not saying whose figure it is — and past that
-the only two kinds in its report are `absent` and `dropped`.
+whose units the file never states, and the one number here written without a unit, a site's
+`@gps`, has a single spelling (`read_position`). This reader therefore emits one
+`resolved` finding and it is not about a scale — a `<dive @cns>` or `@otu` on a dive with
+more than one recording, the file not saying whose figure it is — and past that the only
+two kinds in its report are `absent` and `dropped`.
 
 **A dive has no id, so its identity is its position.** Subsurface keys a dive by its
 computer's own dive id where there is one and by nothing at all otherwise; `@number` is the
