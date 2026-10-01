@@ -13,10 +13,12 @@ It is also where a reader learns why the same logbook converts differently throu
 Subsurface's two export paths, and which of the two answers is the closer one.
 
 Every claim below was checked against real Subsurface output: one eight-dive logbook
-exported both as a `.ssrf` save file and as UDDF. Neither whole export is carried here —
+exported both as a `.ssrf` save file and as UDDF, and a second save, of three dive sites
+given coordinates, a description, notes and a country, made with Subsurface 6.0.5738 for
+what a site carries. No whole file of either is carried here —
 `fixtures/ssrf/subsurface.ssrf` and `fixtures/uddf/subsurface.uddf` are two-dive reductions
-of them — so where a rule rests on a file this repository does not carry, it says so in
-place.
+of the first, and `fixtures/ssrf/sites.ssrf` of the second — so where a rule rests on a file
+this repository does not carry, it says so in place.
 
 ## Why this format and not the UDDF export
 
@@ -144,8 +146,74 @@ and no version.
 
 | `.ssrf` | DiveJSON |
 | --- | --- |
-| `@name` | `sites[].name` — REQUIRED, so a nameless site is dropped along with the references to it |
+| `@name` | `sites[].name` — REQUIRED, so a nameless site is dropped whole — its coordinates, notes and locality too — along with the references to it |
 | `@uuid` | the source id `sites[].uuid` is derived from |
+| `@gps` | `sites[].position` |
+| `@description`, `<notes>` | `sites[].notes`, the description first |
+| `<geo>` | `sites[].location.name`, composed from the entries |
+
+A site's members land in §6.10's order: `uuid`, `name`, `location`, `position`, `notes`.
+`fixtures/ssrf/sites.ssrf` carries every row; `@description` is checked against the second
+save, the only file in hand that carries one.
+
+**`@gps` is two decimals, latitude first, separated by one space.** Subsurface writes each
+half from an integer count of micro-degrees — whole degrees, a point and exactly six digits,
+a leading `-` for south and for west — so no locale reaches it and a comma decimal cannot
+occur; it leaves the attribute out when both halves are zero. The order and the sign hold in
+the second save, which has sites on both sides of Greenwich, and in a file Subsurface's own test suite
+regenerates and compares line by line, which this repository does not carry: Lake
+Coleridge, `-43.342295 171.545936`, 43° south and 171° east. The reader splits the attribute
+on whitespace and reads each half as a decimal, at however many places it has, and the pair
+is carried as written — nothing a source recorded is quantized (`converting.md`). An
+attribute that does not split into exactly two decimals is dropped and reported with its
+text. A pair outside WGS 84's range is dropped and reported, and an exact `0.000000` /
+`0.000000` is no position, which are `converting.md`'s rules for every reader. Subsurface's
+own parser also accepts a comma between the halves, which its writer has never emitted and
+no file in hand carries, so this reader refuses that spelling rather than guess at it;
+`fixtures/ssrf/refusals.ssrf` holds it beside a latitude past 90°.
+
+**A site's description and its notes are one `notes`.** Subsurface gives a site a one-line
+*Description* and a multi-line *Notes*, and §6.10 has one member for both. The description
+comes first, then a blank line, then the notes; either stands alone where the other is
+absent. The description leads because it is the site's headline in Subsurface — the text
+its dive-site list shows beside the name, where the notes are hidden — and the blank line is
+the separator a UDDF note's paragraphs are joined with ([`uddf-mapping.md`](uddf-mapping.md)).
+No label is written beside either: it would be words the diver did not write. `<notes>` is
+read as a dive's is — the child element's text, stripped, which removes the space Subsurface
+writes before `</notes>`, and uncapped, since §6's `notes` has no length limit. An empty or
+whitespace-only value is absent.
+
+**`<geo>` is Subsurface's place taxonomy, and the site's locality is composed from it.** Each
+entry is a `<geo cat= origin= value=/>`, one per category the site has. A diver types a
+country, stored with origin `2`; a *Reverse geo lookup* button asks geonames.org and stores
+what it answered with origin `0`. The categories, as Subsurface labels them, the geonames
+field its lookup fills each from, and what this reader takes each for:
+
+| `@cat` | Subsurface's label | filled from geonames' | read as |
+| --- | --- | --- | --- |
+| `0` | None | — | not read |
+| `1` | Ocean | the ocean's `name` | not read |
+| `2` | Country | `countryName` | the country |
+| `3` | State | `adminName1` | the region |
+| `4` | County | `adminName2` | the region, where no `3` has a value |
+| `5` | Town | `toponymName` | the town |
+| `6` | City | `adminName3` | the town, where no `5` has a value |
+
+`@origin` — `0` geocoded, `1` parsed, `2` typed, `3` copied — is not consulted: a typed
+country and a geocoded one are both what the diver saw. The locality is the town, the region
+and the country, those present, joined with `", "`, leaving out a part equal to an earlier
+one compared whole and case-folded — the place written as a person writes it, through its
+region to its country (§6.9). The second save's looked-up site reads "Dahab, South Sinai,
+Egypt", its typed country alone reads "Morocco", and a region standing in for a town reads
+"Bali, Indonesia" and never "Bali, Bali, Indonesia". The values are carried as written,
+which is in the language of Subsurface's interface wherever geonames localises the field.
+A locality past §6.9's 255 characters is cut and reported. An entry with no `@value` is
+skipped; categories `0` and `1` and any code not in the table are not read (*Deliberately
+not mapped*). The result is `location.name` and nothing else: Subsurface records no position
+or extent for the place, and §6.10 forbids filling `location.position` from the site's pin.
+The codes and the fields are Subsurface's own source, which this repository does not carry;
+the second save carries categories `1`, `2`, `3` and `5` and origins `0` and `2`, and no
+`4` or `6`, which geonames' default answer does not include.
 
 ### Dives — `/divelog/dives/dive`, and `/divelog/dives/trip/dive`
 
@@ -324,7 +392,8 @@ units or *meaning* are genuinely in doubt. **This reader emits one, and it is no
 scale**: the dive-level `@cns` and `@otu` above, on a dive with more than one recording, where
 the file does not say whose figures they are. Past that the absence is a property of the
 format rather than an omission. There is no scale to settle: every measurement states
-its unit, so there is no fraction-or-percent and no litres-or-cubic-metres for a magnitude
+its unit, and the one number written without one, a site's `@gps`, has a single spelling
+(*Dive sites* above), so there is no fraction-or-percent and no litres-or-cubic-metres for a magnitude
 test to reach. Where UDDF's `<o2>0.32</o2>` and `<o2>34</o2>` are both schema-valid and mean
 the same gas, `.ssrf` writes `o2='32.0%'` and there is nothing left to decide. And no
 writer's meaning needs settling either, so this document carries no generator table: one application
@@ -368,11 +437,12 @@ one, so nothing about it could be checked against output Subsurface actually pro
 | `.ssrf` | why not |
 | --- | --- |
 | `<trip>`'s own attributes | No real export in hand carries a `<trip>` to read its `@date` and `@location` from — so the dives inside one are carried and the grouping is reported as dropped. The element is still walked *through*, or a trip's dives would disappear with it. §6.8's `starts_on` was a second reason and is no longer one: a trip records no dates now, and §6.9a's part is the shape `@date` and `@location` together make. What is left to settle is a trip's `name`, which §6.8 still REQUIRES and which no attribute here states. This is the first thing to map when such a file arrives. |
-| `<site @gps>` | site coordinates, and the highest-value entry in this table. No file in hand carries one, so neither the separator nor the coordinate order can be checked; `converting.md`'s Null Island and half-a-pair rules are already shared and waiting for it. |
-| `<site><geo>` | Subsurface's country/region taxonomy, whose `@cat` codes are not documented in any file here. `sites[].location.name` is where it would land — the tags say what the place is called and nothing about where it sits, so the rest of §6.9's members would stay empty. |
+| `<site><geo>` of `@cat` `0` or `1`, or of a code *Dive sites* does not list | `0` is Subsurface's "None" and names nothing. `1` is the ocean, which a place name running from a town through its region to its country does not carry, and §6.9 has no other member for it. An unknown code is not guessed at. None of them is reported: a finding per site for a fact no member could hold would say nothing a diver could act on. |
+| `<site @notes>` | the attribute form of a site's notes, which pre-release builds of 2015 wrote before the `<notes>` child replaced it. Subsurface's own parser still reads it; no file in hand carries one, and this reader reads the child only. |
+| `<dive><location>`, and its `@gps` | save format 2's place. Until format 3 arrived in 2015 a dive carried its place itself, as `<location gps='…'>name</location>`, and a file had no `<divesites>`. Reading it is a different reader — one that makes a site out of each dive's place — and no format-2 file is in hand, so this reader walks past the element and reads format 3. |
 | `<weightsystem>` | `dive.weight` is the member, and the unit spelling and the multiple-system summing rule are both unchecked against a real file. |
 | `<sample @pressure>`, `@sensor` | `profile.pressures[]` and the cylinder numbering it needs. No file in hand carries a sample pressure, and a channel tied to the wrong cylinder is worse than no channel. |
-| `<sample @ndl>`, `@tts`, `@cns`, `@dc_supplied_ppo2` | §6.4's `ndl`, `tts`, `cns` and `ppo2` channels. Nothing in this table is closer to landing: the members exist and Subsurface writes all four. No `.ssrf` in hand carries one — every `<sample>` in the four fixtures states depth, temperature and nothing else — and this corpus does not adopt a mapping no pair exercises. Named here as Subsurface writes them so the reader that maps them starts from the right list. |
+| `<sample @ndl>`, `@tts`, `@cns`, `@dc_supplied_ppo2` | §6.4's `ndl`, `tts`, `cns` and `ppo2` channels. Nothing in this table is closer to landing: the members exist and Subsurface writes all four. No `.ssrf` in hand carries one — every `<sample>` in `fixtures/ssrf/` states depth, temperature and nothing else — and this corpus does not adopt a mapping no pair exercises. Named here as Subsurface writes them so the reader that maps them starts from the right list. |
 | `<sample @po2>`, `@sensor1` … `@sensor6` | the rebreather setpoint and the individual O₂ cells, which §6.4 defers: `@po2` is the *setpoint* here rather than the computed ppO₂ — that is `@dc_supplied_ppo2` above — and a per-cell reading has no member. Reading `@po2` into `ppo2` would put a diver's dialled setpoint on the curve their computer drew. |
 | `<sample @in_deco>`, `@stopdepth`, `@stoptime`, `@rbt`, `@heartbeat`, `@bearing` | a deco flag, the next stop's depth and time, remaining bottom time, heart rate and a compass bearing. §6.4's `ceiling` is the ceiling rather than the next stop, and the rest are the members §6.4 names as deferred. |
 | `<divecomputer @dctype>` | §6.4a's `mode`. Subsurface writes it only when the mode is **not** open circuit, spelling it `CCR`, `PSCR` or `Freedive`, so an absence is this format's documented default — and `converting.md`'s explicit-value rule is that a format's documented default is not the device's record. A file that states one would map; none in hand does. |
@@ -381,7 +451,7 @@ one, so nothing about it could be checked against output Subsurface actually pro
 | `<divecomputer @deviceid>`, `@diveid`, `@last-manual-time` | Subsurface's own key for the computer, its own key for the dive, and a marker saying the duration was typed by hand. None is a core member: `@deviceid` is not the serial §6.4b asks for — that is the `Serial` `<extradata>`, under *Device* above — and `@diveid` keys a dive rather than counting one, so it is not the device counter either. |
 | `<temperature @air>` | §6.2's `air_temperature`. The member exists and no file in hand states a value, so the mapping waits for a pair: a claim about what Subsurface writes is checked against a file it wrote (`converting.md`). |
 | `<cylinder @description>`, `@workpressure`, `@use`, `@depth` | the cylinder's model name, its working pressure, its role and its maximum operating depth. `@use` would land on §6.3's `role`, whose value spellings no file here shows. |
-| `<dive @tags>`, `@rating` | §6.2's `tags` and `rating`. Subsurface writes its tags as one comma-joined attribute and its rating as a count of stars, and both members exist; no file in hand states either, so the mapping — how the attribute splits, and whether an unrated dive writes `0` or nothing — waits for a pair, on `<temperature @air>`'s terms. |
+| `<dive @tags>`, `@rating` | §6.2's `tags` and `rating`. Subsurface writes its tags as one comma-joined attribute and its rating as a count of stars, and both members exist. No file in hand states a tag, so how the attribute splits waits for a pair, on `<temperature @air>`'s terms. The second save states a rating of `1` and `2` on two of its three dives and nothing on the third, which shows an unrated dive writing nothing; no pair carries a rating, and the mapping waits for one. |
 | `<dive @wavesize>`, `@current` | §6.2's `waves` and `current`, which Subsurface keeps as star ratings, as it does `@visibility`, `@surge` and `@chill`. The members exist and no file in hand states a value, so how a count of stars reads onto a vocabulary waits for a pair, on `<temperature @air>`'s terms. `@surge` and `@chill` have no core member. |
 | `<settings>` | Subsurface's per-computer device records, keyed by the `@deviceid` a `<divecomputer>` carries. §6.4b now *does* have members for what they hold, so this stopped being "no core member" and became the highest-value entry in this table: a document-level table resolving a dive's computer to a model, a serial and a firmware is exactly a device, and reading it would be a second source for the §6.4b members a `<divecomputer>`'s own attributes cannot reach. It waits on a file: `<settings>` is empty in every fixture that has the element and absent from the rest, so neither the child element's spelling nor its attribute names can be checked against output Subsurface actually produces. Until then a serial and a firmware come from the `Serial` and `FW Version` `<extradata>` children, which `fixtures/ssrf/two-computers.ssrf` does carry. |
 | the logbook's owner | the format records nothing about one, so no `diver` member is written (§6.1). Minting an identity for one would be §5.4's fabrication applied to people. |
@@ -438,8 +508,9 @@ exporter's doing. Everything else in both documents is equal.
 - **`sites[].location`** — a place named after the site itself there, absent here, on all
   five sites. The exporter writes a `<geography><location>` holding exactly what `<name>`
   holds, and the UDDF reader carries it into `location.name` because §6.10's `location` is a
-  real member and a reader cannot know that a writer filled it by copying. The save file's
-  `<site>` has one name and no second field to copy it into. This is the one difference
+  real member and a reader cannot know that a writer filled it by copying. That logbook's
+  sites carry no `<geo>`, so the save file gives this reader no locality to compose for them,
+  and the copy is the whole difference. This is the one difference
   `dives` cannot see: the other seven all live on a dive or its recording.
 
 The record UUIDs differ too, and always will: each format has its own frozen identity

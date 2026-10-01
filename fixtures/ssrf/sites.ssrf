@@ -1,0 +1,42 @@
+<divelog program='subsurface' version='3'>
+<settings>
+</settings>
+<divesites>
+<site uuid='376a99e0' name='first' gps='33.602987 -7.703508' description='Desccccccccc'>
+  <notes>Nooooooo
+tes </notes>
+  <geo cat='2' origin='2' value='Morocco'/>
+</site>
+<site uuid='8d695877' name='in the ocean' gps='28.478807 34.522936'>
+  <geo cat='1' origin='0' value='Gulf of Aqaba'/>
+  <geo cat='2' origin='0' value='Egypt'/>
+  <geo cat='3' origin='0' value='South Sinai'/>
+  <geo cat='5' origin='0' value='Dahab'/>
+</site>
+<site uuid='a01cc8f0' name='coordinates only' gps='22.878216 -109.895267'>
+</site>
+<site uuid='5e0c41d2' name='description only' description='Sandy slope below the lighthouse'>
+</site>
+<site uuid='c7b3920a' name='notes only'>
+  <notes>Entry from the beach steps.
+Strong current on the outgoing tide. </notes>
+</site>
+</divesites>
+<dives>
+<dive number='1' divesiteid='376a99e0' date='2026-10-01' time='17:32:28' duration='40:00 min'>
+  <divecomputer last-manual-time='40:00 min'>
+  <depth max='15.0 m' mean='13.002 m' />
+  </divecomputer>
+</dive>
+<dive number='2' divesiteid='8d695877' date='2026-10-01' time='17:34:45' duration='40:00 min'>
+  <divecomputer last-manual-time='40:00 min'>
+  <depth max='15.0 m' mean='13.002 m' />
+  </divecomputer>
+</dive>
+<dive number='3' divesiteid='a01cc8f0' date='2026-10-01' time='17:36:34' duration='40:00 min'>
+  <divecomputer last-manual-time='40:00 min'>
+  <depth max='15.0 m' mean='13.002 m' />
+  </divecomputer>
+</dive>
+</dives>
+</divelog>

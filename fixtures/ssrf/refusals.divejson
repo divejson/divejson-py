@@ -100,6 +100,10 @@
     {
       "uuid": "5508e90d-683a-5d1f-8d82-b3214e43d495",
       "name": "Blue Hole"
+    },
+    {
+      "uuid": "3be14560-ba98-527b-8981-e21100855617",
+      "name": "Canyon"
     }
   ],
   "extensions": {
