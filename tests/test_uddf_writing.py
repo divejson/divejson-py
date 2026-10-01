@@ -1408,7 +1408,12 @@ def test_sightings_have_a_slot_and_are_not_written_into_it(schema) -> None:
 
 
 def _vocabulary(member: str) -> list[str]:
-    return load_schema()["$defs"]["dive"]["properties"][member]["enum"]
+    """A dive member's values, through the definition a dive and a site share where it has one."""
+    defined = load_schema()["$defs"]
+    definition = defined["dive"]["properties"][member]
+    if "$ref" in definition:
+        definition = defined[definition["$ref"].rsplit("/", 1)[-1]]
+    return definition["enum"]
 
 
 def test_the_members_with_a_slot_go_where_the_xsd_puts_them_and_come_back(schema) -> None:
