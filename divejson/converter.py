@@ -1105,9 +1105,10 @@ def chosen_fix(fixes: Sequence[Fix], *, side: str, note: Reporter) -> Fix | None
     an estimate of anything and vouches for nothing.
 
     `fixes` runs outward from the split — forward in time on the exit side, backward on the
-    entry side, which `side` names in the finding — and the window is measured on each fix's own time rather than counted in
-    fixes, so a receiver that logged one fix and then nothing for minutes keeps that fix
-    rather than one from wherever the diver had swum to by the next.
+    entry side, which `side` names in the finding — and the window is measured on each
+    fix's own time rather than counted in fixes, so a receiver that logged one fix and then
+    nothing for minutes keeps that fix rather than one from wherever the diver had swum to
+    by the next.
 
     A fix taken that is not the nearest is a `resolved` finding at the fix taken, in one
     sentence whatever the file, so a logbook's report groups it: the source recorded every
