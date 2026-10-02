@@ -21,7 +21,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from helpers import EXPORTED_AT, FIXTURES, profile_of
+from helpers import EXPORTED_AT, FIX_TAKEN, FIXTURES, profile_of
 
 from divejson import compared, convert
 from divejson.converter import INFERRED, PRODUCER_KEY
@@ -75,17 +75,20 @@ def test_this_reader_computes_nothing_and_so_lists_nothing(source) -> None:
 
 
 @pytest.mark.parametrize("source", SUUNTO_FIXTURES, ids=lambda path: path.stem)
-def test_this_reader_settles_no_scale_and_so_resolves_nothing(source) -> None:
+def test_this_reader_settles_no_scale_and_resolves_nothing_but_the_fix_taken(source) -> None:
     """Every member this format states carries one unit, so no scale is in doubt.
 
     That is what separates it from UDDF, whose `<o2>` and `<tankvolume>` are numbers with no
     stated unit and which therefore emits `resolved` findings. The two coordinate units in
     one file are not this case: a sample fix is radians and a `DiveRouteOrigin` is degrees,
     and those are different members each with one unit rather than one member with two
-    readings.
+    readings. The one thing this reader decides is which of the fixes the file recorded is
+    the dive's entry or exit, where the receiver's own error estimate moves it off the one
+    nearest the deepest sample — and nothing else it raises is `resolved`.
     """
     conversion = convert(source.read_bytes(), exported_at=EXPORTED_AT)
-    assert [note.where for note in conversion.notes if note.kind == "resolved"] == []
+    resolved = [note for note in conversion.notes if note.kind == "resolved"]
+    assert [note.where for note in resolved if not note.message.startswith(FIX_TAKEN)] == []
 
 
 def test_every_expected_document_has_an_input() -> None:
@@ -214,7 +217,9 @@ def test_the_ocean_positions_come_off_two_channels_in_two_units() -> None:
     Every satellite fix in this stream lands after the diver surfaced — a receiver has
     nothing to talk to through seawater — so without the origin this shape yields an exit
     and no entry. The exit is the same position this dive's FIT reading gives from a
-    completely different file, which is the strongest check either reader has.
+    completely different file, which is the strongest check either reader has: the first fix
+    after the deepest sample is within the error bound here, so the error estimate the FIT
+    export does not carry would not have moved it.
     """
     dive = _dive(OCEAN)
     assert dive["entry_position"] == {"latitude": 28.567251205444336, "longitude": 34.53325653076172}

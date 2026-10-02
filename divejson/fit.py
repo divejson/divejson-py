@@ -67,12 +67,14 @@ from .converter import (
     TENTHS_PER_UNIT,
     Conversion,
     ConverterError,
+    Fix,
     Identities,
     NonConformingOutputError,
     Note,
     NoteKind,
     Scope,
     SourceTooLargeError,
+    chosen_fix,
     deco_model,
     decimal_of,
     device,
@@ -320,6 +322,9 @@ class _Point:
     temperature: Decimal | None = None
     latitude: Decimal | None = None
     longitude: Decimal | None = None
+    # `gps_accuracy`, the receiver's stated horizontal error in metres, off the `record`
+    # that brought the fix.
+    error: Decimal | None = None
     pressures: dict[int, Decimal] = field(default_factory=dict)
 
 
@@ -468,6 +473,11 @@ def _collect_record(scan: _Scan, frame: fitdecode.FitDataMessage) -> None:
     `next_stop_depth` is FIT's deco ceiling — the depth of the next required stop, in
     metres, scaled like `depth` beside it. **Not** `next_stop_time`, `time_to_surface` or
     `ndl_time`, the three neighbouring fields that measure durations rather than a depth.
+
+    `gps_accuracy` is the receiver's error estimate for the fix on the same `record`, and
+    is read only where that fix is the one the point keeps: a fix dropped as a collision
+    takes its estimate with it. **Untested against a real file** — no FIT file in hand
+    writes the field.
     """
     point = _point(scan, frame)
     if point is None:
@@ -475,8 +485,11 @@ def _collect_record(scan: _Scan, frame: fitdecode.FitDataMessage) -> None:
     _set(scan, point, "depth", _number(_native(frame, "depth")))
     _set(scan, point, "ceiling", _number(_native(frame, "next_stop_depth")))
     _set(scan, point, "temperature", _number(_native(frame, "temperature")))
+    unfixed = point.latitude is None
     _set(scan, point, "latitude", _degrees(_native(frame, "position_lat")))
     _set(scan, point, "longitude", _degrees(_native(frame, "position_long")))
+    if unfixed and point.latitude is not None:
+        point.error = _number(_native(frame, "gps_accuracy"))
 
 
 def _collect_tank_update(scan: _Scan, frame: fitdecode.FitDataMessage) -> None:
@@ -730,7 +743,7 @@ class _Converter:
 
         Both gradient factors are already whole percent in the FIT profile, which is §6.4c's
         unit, so nothing is scaled. They are written both or neither, which `deco_model`
-        holds to; two of the three recordings in `fixtures/fit/` state a pair with no `model`
+        holds to; three of the four recordings in `fixtures/fit/` state a pair with no `model`
         beside it and produce a pair and no family, which is the honest shape.
 
         **§6.4a's `mode` has no source here.** `session.sub_sport` is the field that would
@@ -1032,33 +1045,43 @@ class _Converter:
         seawater — so every position in a dive log was recorded at the surface, and the
         only question worth asking of one is which surface interval it belongs to. The
         deepest sample is the split: what is at or before it is on the way in, what is
-        after it is on the way out, and the last before and the first after are the two
-        kept, because the fix that says where a diver got in is the one taken just before
-        they descended rather than the one from when the boat left the jetty.
+        after it is on the way out, and on each side the fix kept is the one nearest the
+        split that the receiver vouched for, which `chosen_fix` decides for every reader.
+        The fix that says where a diver got in is the one taken just before they descended
+        rather than the one from when the boat left the jetty, and the one that says where
+        they got out is the receiver's settled fix rather than the first it logged on
+        surfacing — where the file says which that is. `gps_accuracy` is how a `record` would
+        say it, and no file in hand writes it, so on every one of them the fix nearest the
+        split is the one kept.
 
         The deepest sample is the pivot in preference to an in-water *window*, which would
         need a depth threshold this reader would have to invent. With no depth channel
         there is no pivot and so no answer, and nothing is written: a file that recorded
         positions and never a depth cannot say which of them is the entry.
         """
-        fixed = [(at, point) for at, point in samples.ordered() if point.latitude is not None]
+        # The elapsed second each record is at, which a FIT timestamp states whole.
+        fixes = [
+            Fix(at, f"dive/0/record/{at // 1000}", point.latitude, point.longitude, point.error)
+            for at, point in samples.ordered()
+            if point.latitude is not None
+        ]
         depths = [(at, point.depth) for at, point in samples.ordered() if point.depth is not None]
-        if not fixed or not depths:
+        if not fixes or not depths:
             return
 
         # `max` keeps the first of equal values, so a flat profile pivots on its earliest
         # sample and every fix on it reads as an exit — except one landing exactly there,
         # which the `<=` below keeps as the entry.
         pivot = max(depths, key=lambda pair: pair[1])[0]
-        before = [pair for pair in fixed if pair[0] <= pivot]
-        after = [pair for pair in fixed if pair[0] > pivot]
-        for member, chosen in (("entry_position", before[-1:]), ("exit_position", after[:1])):
-            for at, point in chosen:
-                # The elapsed second the record is at, which a FIT timestamp states whole.
-                where = f"dive/0/record/{at // 1000}"
-                found = position(point.latitude, point.longitude, note=self.note, where=where)
-                if found is not None:
-                    dive[member] = found
+        before = [fix for fix in fixes if fix.at <= pivot]
+        after = [fix for fix in fixes if fix.at > pivot]
+        for member, side, outward in (("entry_position", "entry", before[::-1]), ("exit_position", "exit", after)):
+            taken = chosen_fix(outward, side=side, note=self.note)
+            if taken is None:
+                continue
+            found = position(taken.latitude, taken.longitude, note=self.note, where=taken.where)
+            if found is not None:
+                dive[member] = found
 
     # -- cylinders ---------------------------------------------------------------
 

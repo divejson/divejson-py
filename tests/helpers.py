@@ -49,6 +49,11 @@ def device_of(dive: dict, index: int = 0) -> dict | None:
     return recorded_by(dive, index).get("device")
 
 
+# How the finding `converter.chosen_fix` raises opens, on either side of the dive: the one
+# `resolved` a reader of a format whose every member states its unit has to give.
+FIX_TAKEN = "this fix is taken as the dive's "
+
+
 def before(extra: str = "", *, datetime_text: str = "2026-04-17T11:49:23+02:00") -> str:
     """An `<informationbeforedive>` carrying a start time, which every dive needs.
 
