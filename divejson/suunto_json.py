@@ -74,11 +74,13 @@ from .converter import (
     TENTHS_PER_UNIT,
     Conversion,
     ConverterError,
+    Fix,
     Identities,
     NonConformingOutputError,
     Note,
     NoteKind,
     Scope,
+    chosen_fix,
     deco_model,
     decimal_of,
     device,
@@ -461,6 +463,12 @@ class _Sample:
     surface_gradient_factor: Decimal | None = None
     latitude: Decimal | None = None
     longitude: Decimal | None = None
+    # Whether the coordinates are the `DiveRouteOrigin`'s rather than a fix's own.
+    origin: bool = False
+    # `EHPE`, the receiver's stated horizontal error in metres. Written on an entry of its
+    # own beside a fix rather than on the fix's entry, and on thousands of instants with no
+    # fix at all, where nothing reads it.
+    error: Decimal | None = None
     # Source gas number to Pascal, for the slots this sample carried a reading on.
     pressures: dict[int, Decimal] = field(default_factory=dict)
     # `(name, payload)` for every event member this sample carried, in file order.
@@ -840,40 +848,51 @@ class _Converter:
     def read_positions(self, samples: SampleAxis, dive: dict[str, Any]) -> None:
         """The fix on the way in and the fix on the way out, split at the deepest sample.
 
-        The same rule every reader in this package applies — no fix is taken underwater, so
-        the only question worth asking of one is which surface interval it belongs to, and
-        the deepest sample is the split.
+        The same rule every reader in this package applies, through `chosen_fix` — no fix is
+        taken underwater, so the deepest sample is the split, and on each side of it the fix
+        taken is the one nearest it that the receiver vouched for. This export states what
+        the receiver vouches: `EHPE`, its horizontal error in metres, written on an entry of
+        its own at the fix's `TimeISO8601` and folded onto the fix by `_merge`. A receiver
+        that has just surfaced logs its first fix before it has settled, and the fix that says
+        where the diver got out is the settled one a few seconds on.
 
         **This export writes its coordinates in two units, in one file.** A sample's own
         `Latitude`/`Longitude` are radians; the `DiveRouteOrigin` block on the first sample
         is degrees. That is the exporter's doing and not a dialect to resolve: the two are
         different members, each with one unit, so neither is ambiguous and neither is a
-        `resolved` finding. The origin matters because every satellite fix in the sample
-        stream lands after the diver surfaced — a receiver has nothing to talk to until
-        then — so without it these files yield an exit and no entry, while the app draws
-        both pins from the same export.
+        `resolved` finding. The origin matters because a receiver seldom logs a fix of its
+        own before the descent, so without it these files yield an exit and no entry, while
+        the app draws both pins from the same export. The origin states no error, so the rule
+        weighs it as it weighs any fix that states none.
         """
-        fixed = [(at, sample) for at, sample in samples.ordered() if sample.latitude is not None]
+        fixes = [
+            Fix(
+                at,
+                f"dive/0/sample/{in_seconds(at)}",
+                sample.latitude,
+                sample.longitude,
+                None if sample.origin else sample.error,
+            )
+            for at, sample in samples.ordered()
+            if sample.latitude is not None
+        ]
         depths = [(at, sample.depth) for at, sample in samples.ordered() if sample.depth is not None]
-        if not fixed or not depths:
+        if not fixes or not depths:
             return
 
         # `max` keeps the first of equal values, so a flat profile pivots on its earliest
         # sample and every fix on it reads as an exit — except one landing exactly there,
         # which the `<=` below keeps as the entry.
         pivot = max(depths, key=lambda pair: pair[1])[0]
-        before = [pair for pair in fixed if pair[0] <= pivot]
-        after = [pair for pair in fixed if pair[0] > pivot]
-        for member, chosen in (("entry_position", before[-1:]), ("exit_position", after[:1])):
-            for at, sample in chosen:
-                found = position(
-                    sample.latitude,
-                    sample.longitude,
-                    note=self.note,
-                    where=f"dive/0/sample/{in_seconds(at)}",
-                )
-                if found is not None:
-                    dive[member] = found
+        before = [fix for fix in fixes if fix.at <= pivot]
+        after = [fix for fix in fixes if fix.at > pivot]
+        for member, side, outward in (("entry_position", "entry", before[::-1]), ("exit_position", "exit", after)):
+            taken = chosen_fix(outward, side=side, note=self.note)
+            if taken is None:
+                continue
+            found = position(taken.latitude, taken.longitude, note=self.note, where=taken.where)
+            if found is not None:
+                dive[member] = found
 
     # -- cylinders ---------------------------------------------------------------
 
@@ -1224,6 +1243,7 @@ class _Converter:
             surface_gradient_factor=_first(
                 _number(factors.get("gfSurface")), _number(factors.get("gtSurface"))
             ),
+            error=_number(raw.get("EHPE")),
         )
         latitude, longitude = _number(raw.get("Latitude")), _number(raw.get("Longitude"))
         if latitude is not None or longitude is not None:
@@ -1235,6 +1255,7 @@ class _Converter:
                 # Degrees here, radians two lines up, in the same file. See `read_positions`.
                 sample.latitude = _number(origin.get("Latitude"))
                 sample.longitude = _number(origin.get("Longitude"))
+                sample.origin = True
         for slot in raw.get("Cylinders") or []:
             if not isinstance(slot, dict):
                 continue
@@ -1440,7 +1461,9 @@ def _merge(standing: _Sample, arriving: _Sample, collisions: dict[str, int]) -> 
     `series.py`'s rule applied one level down: the channels are what §6.5 makes strictly
     increasing, and two entries at one millisecond are only in competition where they carry the
     same channel. Events are not a channel and are all kept — a gas switch and an alarm on
-    one millisecond are two things that happened.
+    one millisecond are two things that happened. Neither is the receiver's error estimate,
+    which this export writes on an entry of its own at a fix's millisecond and which is
+    folded onto the fix here, whichever of the two arrives first.
     """
     for member, channel in (
         ("depth", "depth"),
@@ -1461,8 +1484,11 @@ def _merge(standing: _Sample, arriving: _Sample, collisions: dict[str, int]) -> 
     if arriving.latitude is not None or arriving.longitude is not None:
         if standing.latitude is None and standing.longitude is None:
             standing.latitude, standing.longitude = arriving.latitude, arriving.longitude
+            standing.origin = arriving.origin
         else:
             collisions["position"] = collisions.get("position", 0) + 1
+    if standing.error is None:
+        standing.error = arriving.error
     for number, pascal in arriving.pressures.items():
         if number in standing.pressures:
             collisions["cylinder pressure"] = collisions.get("cylinder pressure", 0) + 1

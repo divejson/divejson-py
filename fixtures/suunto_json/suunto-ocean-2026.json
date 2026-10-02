@@ -282,11 +282,74 @@
         "TimeISO8601": "2026-09-08T16:06:46.420+03:00"
       },
       {
+        "EHPE": 13,
+        "EVPE": 20,
+        "NumberOfSatellites": 10,
+        "Satellite5BestSNR": 27.8,
+        "TimeISO8601": "2026-09-08T16:14:34.000+03:00"
+      },
+      {
         "GPSAltitude": 0.6,
         "Latitude": 0.49735815695627983,
         "Longitude": 0.6024314285159311,
         "UTC": "2026-09-08T13:14:34.000+00:00",
         "TimeISO8601": "2026-09-08T16:14:34.000+03:00"
+      },
+      {
+        "EHPE": 12,
+        "EVPE": 18,
+        "NumberOfSatellites": 10,
+        "Satellite5BestSNR": 27.4,
+        "TimeISO8601": "2026-09-08T16:14:35.000+03:00"
+      },
+      {
+        "GPSAltitude": 0.6,
+        "Latitude": 0.49735795449808656,
+        "Longitude": 0.6024305855219024,
+        "UTC": "2026-09-08T13:14:35.000+00:00",
+        "TimeISO8601": "2026-09-08T16:14:35.000+03:00"
+      },
+      {
+        "EHPE": 13,
+        "EVPE": 20,
+        "NumberOfSatellites": 12,
+        "Satellite5BestSNR": 27.6,
+        "TimeISO8601": "2026-09-08T16:14:36.000+03:00"
+      },
+      {
+        "GPSAltitude": 1,
+        "Latitude": 0.4973576630281015,
+        "Longitude": 0.6024309345877527,
+        "UTC": "2026-09-08T13:14:36.000+00:00",
+        "TimeISO8601": "2026-09-08T16:14:36.000+03:00"
+      },
+      {
+        "EHPE": 12,
+        "EVPE": 18,
+        "NumberOfSatellites": 15,
+        "Satellite5BestSNR": 29.6,
+        "TimeISO8601": "2026-09-08T16:14:37.000+03:00"
+      },
+      {
+        "GPSAltitude": 0.4,
+        "Latitude": 0.49735716909992317,
+        "Longitude": 0.6024309049171555,
+        "UTC": "2026-09-08T13:14:37.000+00:00",
+        "TimeISO8601": "2026-09-08T16:14:37.000+03:00"
+      },
+      {
+        "EHPE": 10,
+        "EVPE": 15,
+        "NumberOfSatellites": 20,
+        "Satellite5BestSNR": 24.8,
+        "TimeISO8601": "2026-09-08T16:14:40.000+03:00"
+      },
+      {
+        "GPSAltitude": 0.4,
+        "Latitude": 0.4973568200340728,
+        "Longitude": 0.6024311963871405,
+        "UTC": "2026-09-08T13:14:40.000+00:00",
+        "TimeISO8601": "2026-09-08T16:14:40.000+03:00"
       },
       {
         "AmbientIlluminance": 5603.48,

@@ -7,6 +7,17 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **The Suunto JSON and FIT readers take the fix nearest the split that the receiver vouched
+  for.** A receiver that has just surfaced logs its first fix before it has settled, and the
+  Suunto app's JSON says so: `EHPE`, the receiver's horizontal error in metres, sits beside
+  every fix. On each side of the deepest sample the fix taken is now the nearest one, within
+  40 s of the fix nearest the split, whose stated error is 10 m or less; where none is, the
+  nearest fix stands, as it does wherever a source states no error. FIT's `record.gps_accuracy`
+  is read the same way and is untested against a real file, none in hand writing it — so a
+  Suunto app FIT export keeps the fix nearest the split, and can place an exit its JSON twin
+  does not. A fix taken that is not the nearest is a `resolved` finding at that fix. The error
+  is read to choose a fix and not carried, a §6 Position having no member for it.
+
 ## 0.20.0
 
 - **The Subsurface reader carries a site's coordinates, notes, description and locality.**

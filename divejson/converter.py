@@ -11,7 +11,8 @@ disagree with it.
 The sections below the policy classes carry the rest of what an adapter inherits rather
 than rewrites: `decimal_of` and its representability bound, `rounded`'s half-away-from-zero
 convention, the millisecond axis and the two §6.5 channel scales; `capped`; the recording
-and where a readout stated on the dive goes; `Identities`; and `position`. An
+and where a readout stated on the dive goes; `Identities`; and `position`, with the
+`chosen_fix` that decides which of a dive's satellite fixes is its entry and its exit. An
 adapter that reimplements one of these gets it subtly different, which is the failure this
 module exists to prevent — the bound and the Null Island rule were each written once for
 one format and are true of every format.
@@ -84,6 +85,8 @@ from .validate import READOUTS, Issue, load_schema
 __all__ = [
     "CENTIMETRES_PER_METRE",
     "DEVICE_CAPS",
+    "FIX_ERROR_BOUND",
+    "FIX_WINDOW",
     "INFERRED",
     "MAX_MAGNITUDE",
     "MAX_MODEL_NAME",
@@ -96,6 +99,7 @@ __all__ = [
     "Conversion",
     "ConverterError",
     "DoctypeRefusedError",
+    "Fix",
     "Identities",
     "MalformedArchiveError",
     "NonConformingOutputError",
@@ -108,6 +112,7 @@ __all__ = [
     "UnsupportedSourceError",
     "Written",
     "capped",
+    "chosen_fix",
     "contact_members",
     "contact_roles",
     "person_members",
@@ -1055,3 +1060,75 @@ def position(
         note(where, f"the coordinates {latitude} / {longitude} are outside the WGS 84 range; dropped", "dropped")
         return None
     return {"latitude": float(latitude), "longitude": float(longitude)}
+
+
+# The two numbers in `docs/converting.md`'s *Where a fix belongs*, whose evidence the Suunto
+# JSON mapping carries. A fix whose stated horizontal error is at most this many metres is
+# one the receiver vouches for, this being what a receiver that has just surfaced settles to.
+FIX_ERROR_BOUND = Decimal(10)
+
+# How far from the fix nearest the split a vouched fix may be and still stand for it, in
+# milliseconds on the profile axis: long enough for a receiver to settle, short enough that
+# a diver swimming on the surface while it does has not gone far.
+FIX_WINDOW = 40_000
+
+
+@dataclass(frozen=True, slots=True)
+class Fix:
+    """One satellite fix a reader found, as `chosen_fix` weighs it.
+
+    `at` is the fix's place on the profile axis and `where` the path into the source a note
+    about it names. `error` is the horizontal error the receiver stated beside the fix, in
+    metres, and `None` where the source states none — every FIT file in hand, and a fix the
+    source did not take from a receiver at all, such as Suunto's `DiveRouteOrigin`. The
+    error is read to choose a fix and is never carried: a §6 Position has no member for it.
+    """
+
+    at: int
+    where: str
+    latitude: Decimal | None
+    longitude: Decimal | None
+    error: Decimal | None = None
+
+
+def chosen_fix(fixes: Sequence[Fix], *, side: str, note: Reporter) -> Fix | None:
+    """The fix that places one side of a dive, out of that side's fixes ordered from the split.
+
+    `docs/converting.md`'s *Where a fix belongs*, for every format: on each side of the
+    deepest sample, the fix taken is the one nearest it that the receiver vouched for. The
+    candidates are the fixes at most `FIX_WINDOW` from the fix nearest the split, and the one
+    taken is the nearest whose stated error is at most `FIX_ERROR_BOUND`, both bounds
+    inclusive. Where no candidate states one, the nearest fix stands, exactly as it does
+    where the source states no error at all: a fix is replaced only by one the receiver
+    vouches for, and a format with no error to read keeps the answer it always had, since
+    a delay with nothing to wait for would be an invention. A stated error below zero is not
+    an estimate of anything and vouches for nothing.
+
+    `fixes` runs outward from the split — forward in time on the exit side, backward on the
+    entry side, which `side` names in the finding — and the window is measured on each
+    fix's own time rather than counted in fixes, so a receiver that logged one fix and then
+    nothing for minutes keeps that fix rather than one from wherever the diver had swum to
+    by the next.
+
+    A fix taken that is not the nearest is a `resolved` finding at the fix taken, in one
+    sentence whatever the file, so a logbook's report groups it: the source recorded every
+    candidate and this converter decided which one places the dive. The nearest kept raises
+    nothing, the rule having changed no answer.
+    """
+    if not fixes:
+        return None
+    nearest = fixes[0]
+    for fix in fixes:
+        if abs(fix.at - nearest.at) > FIX_WINDOW:
+            break
+        if fix.error is not None and 0 <= fix.error <= FIX_ERROR_BOUND:
+            if fix is not nearest:
+                note(
+                    fix.where,
+                    f"this fix is taken as the dive's {side}: the fix nearest the deepest sample does not state "
+                    f"a horizontal error of {FIX_ERROR_BOUND} m or less, and this is the nearest within "
+                    f"{in_seconds(FIX_WINDOW)} s of it that does",
+                    "resolved",
+                )
+            return fix
+    return nearest

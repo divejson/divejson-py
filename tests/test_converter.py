@@ -1,4 +1,5 @@
-"""The converter policy every adapter inherits: notes, identities, and how a zero reads.
+"""The converter policy every adapter inherits: notes, identities, how a zero reads, and
+which satellite fix places a dive.
 
 Nothing here is UDDF's. These are the rules a second reader would otherwise re-implement
 slightly differently, which is the failure the shared module exists to prevent — a report
@@ -20,8 +21,10 @@ from divejson.converter import (
     MAX_MODEL_NAME,
     NOTE_KINDS,
     Claimed,
+    Fix,
     Scope,
     channel_floor,
+    chosen_fix,
     deco_model,
     header,
     in_seconds,
@@ -432,3 +435,137 @@ def test_an_inverted_gradient_factor_pair_is_dropped_rather_than_reaching_valida
 def test_an_equal_pair_is_not_inverted() -> None:
     """The rule is `gf_low <= gf_high`: a diver who dialled 85/85 ran a model."""
     assert _built({"gf_low": 85, "gf_high": 85}) == {"gf_low": 85, "gf_high": 85}
+
+
+# -- which fix places a side of the dive ---------------------------------------------------
+
+# Where the deepest sample is, half an hour in. Every fix below is placed off it: forward in
+# time on the exit side and backward on the entry side, which is the one thing the two sides
+# do differently, so every test runs on both.
+SPLIT = 1_800_000
+
+SIDES = pytest.mark.parametrize("side", ["exit", "entry"])
+
+
+def _fixes(side: str, *stated: tuple[str, int | None]) -> list[Fix]:
+    """One side's fixes outward from the split, each `(seconds from the split, stated error)`."""
+    sign = 1 if side == "exit" else -1
+    return [
+        Fix(
+            at=SPLIT + sign * milliseconds(Decimal(seconds)),
+            where=f"dive/0/sample/{index}",
+            latitude=Decimal("28.47") + Decimal(index) / 1000,
+            longitude=Decimal("34.50"),
+            error=None if error is None else Decimal(error),
+        )
+        for index, (seconds, error) in enumerate(stated)
+    ]
+
+
+def _chosen(side: str, *stated: tuple[str, int | None]) -> tuple[int | None, list[tuple[str, str, str]]]:
+    """Which of the fixes is taken, by its place outward from the split, and the report."""
+    notes, note = _collected()
+    fixes = _fixes(side, *stated)
+    taken = chosen_fix(fixes, side=side, note=note)
+    return (None if taken is None else fixes.index(taken)), notes
+
+
+@SIDES
+def test_a_vouched_fix_inside_the_window_replaces_a_poor_nearest_one(side: str) -> None:
+    """The receiver's first fix on surfacing is before it settled, and it says so.
+
+    The dive this rule was measured on: 47 m of error, then 31 m three seconds on, and 9 m
+    six seconds after that, 79 m from the first. The fix taken is the 9 m one, and the report
+    says the converter decided it, at the fix it took.
+    """
+    taken, notes = _chosen(side, ("0", 47), ("3", 31), ("9", 9))
+    assert taken == 2
+    assert [(where, kind) for where, _, kind in notes] == [("dive/0/sample/2", "resolved")]
+    assert f"the dive's {side}" in notes[0][1]
+
+
+@SIDES
+def test_the_nearest_vouched_fix_is_taken_and_not_the_tightest(side: str) -> None:
+    """Nearest the split among the vouched, not lowest error: a tighter fix later on is the
+    diver further along the swim."""
+    taken, notes = _chosen(side, ("0", 20), ("4", 9), ("12", 3))
+    assert taken == 1 and [where for where, _, _ in notes] == ["dive/0/sample/1"]
+    assert _chosen(side, ("0", 6), ("3", 2)) == (0, [])
+
+
+@SIDES
+def test_with_nothing_vouched_inside_the_window_the_nearest_stands_and_says_nothing(side: str) -> None:
+    """However poor it is: a fix is replaced only by one the receiver vouches for, and the
+    lower of two estimates above the bound is not one."""
+    assert _chosen(side, ("0", 28), ("6", 12), ("20", 15), ("39", 11)) == (0, [])
+
+
+@SIDES
+def test_a_vouched_fix_past_the_window_does_not_reach_back(side: str) -> None:
+    """A lone fix, then nothing for longer than the window: the fix logged stands, because by
+    the next one the diver may be somewhere else."""
+    assert _chosen(side, ("0", 46), ("41", 8)) == (0, [])
+
+
+@SIDES
+def test_the_window_is_measured_from_the_nearest_fix_and_not_from_the_last(side: str) -> None:
+    """Thirty seconds between fixes, sixty from the first: a window counted fix to fix would
+    walk along the swim for as long as the receiver kept logging."""
+    assert _chosen(side, ("0", 30), ("30", 20), ("60", 5)) == (0, [])
+
+
+@SIDES
+@pytest.mark.parametrize(
+    ("stated", "taken"),
+    [
+        ((("0", 20), ("5", 10)), 1),
+        ((("0", 20), ("40", 5)), 1),
+        ((("0", 20), ("40", 10)), 1),
+        ((("0", 20), ("40.001", 5)), 0),
+        ((("0", 20), ("5", 11)), 0),
+    ],
+)
+def test_both_bounds_are_inclusive(side: str, stated: tuple, taken: int) -> None:
+    assert _chosen(side, *stated)[0] == taken
+
+
+@SIDES
+def test_where_no_fix_states_an_error_the_nearest_is_taken(side: str) -> None:
+    """The rule has nothing to read, and a blind delay would be an invention."""
+    assert _chosen(side, ("0", None), ("5", None), ("30", None)) == (0, [])
+
+
+@SIDES
+def test_a_fix_stating_no_error_gives_way_to_a_vouched_one_inside_the_window(side: str) -> None:
+    """Suunto's route origin is the nearest fix stating none, and stands unless a fix the
+    receiver vouched for is inside its window."""
+    taken, notes = _chosen(side, ("0", None), ("7", 9))
+    assert taken == 1
+    assert [(where, kind) for where, _, kind in notes] == [("dive/0/sample/1", "resolved")]
+
+
+@SIDES
+@pytest.mark.parametrize("error", [47, 6, None])
+def test_one_fix_is_that_fix(side: str, error: int | None) -> None:
+    assert _chosen(side, ("0", error)) == (0, [])
+
+
+def test_no_fixes_is_no_fix() -> None:
+    notes, note = _collected()
+    assert chosen_fix([], side="exit", note=note) is None
+    assert notes == []
+
+
+@SIDES
+def test_an_error_below_zero_vouches_for_nothing(side: str) -> None:
+    """An estimate is a distance, and a negative one is a device spelling something else."""
+    assert _chosen(side, ("0", 20), ("5", -1)) == (0, [])
+
+
+@SIDES
+def test_the_finding_is_one_sentence_whatever_the_file(side: str) -> None:
+    """A logbook's report groups a finding by its message, so two dives that moved their fix
+    differently still read as one line with two places."""
+    _, first = _chosen(side, ("0", 47), ("9", 9))
+    _, second = _chosen(side, ("0", 13), ("2", 12), ("6", 10))
+    assert [message for _, message, _ in first] == [message for _, message, _ in second]

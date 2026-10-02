@@ -127,7 +127,7 @@ untouched.
 
 **Two coordinate units in one file is not an ambiguity.** A sample fix and a route origin
 are different members, each with one unit, so there is no magnitude test and no `resolved`
-finding — see below.
+finding for the unit — see below.
 
 ## Identity
 
@@ -387,6 +387,7 @@ switch that happened, and saying so is honest where guessing a position would no
 | `RtGradientFactors.gfSurface`, else `.gtSurface` | | the `surface_gradient_factor` channel, whole percent |
 | `DiveEvents` / `Events` | | §6.5 events, below |
 | `Latitude` / `Longitude`, `DiveRouteOrigin` | | `entry_position` and `exit_position` |
+| `EHPE`, on the entry at a fix's own `TimeISO8601` | | which fix is the entry or the exit, under *Positions*; never written |
 
 **This exporter is what made `converting.md`'s collision rule per channel.** It appends its
 sensor streams as separate entries: on the dive `suunto-ocean.json` is reduced from, 7 477
@@ -543,37 +544,76 @@ narration that is not an occurrence.
 
 ### Positions
 
-Which surface interval a fix belongs to is `converting.md`'s question, and the deepest
-sample is its split. What is this format's is below.
+Which surface interval a fix belongs to, and which of that interval's fixes the receiver
+vouched for, are `converting.md`'s questions, and the deepest sample is its split. What is
+this format's is below.
 
 **This export writes its coordinates in two units, in one file.** A sample's own
 `Latitude`/`Longitude` are radians; the `DiveRouteOrigin` on the first sample is degrees.
-The origin matters because **every satellite fix in the sample stream lands after the diver
-surfaced** — a receiver has nothing to talk to through seawater — so on the strength of
-those alone this shape yields an exit and no entry, while the app draws both pins from the
+The origin matters because **almost every satellite fix in the sample stream lands after the
+diver surfaced** — a receiver has nothing to talk to through seawater — so on the strength
+of those alone this shape yields an exit and no entry, while the app draws both pins from the
 same export. The origin is fed in as an ordinary fix rather than assigned to the entry
 directly, so a file that does log a pre-descent fix gets the rule the rest of the mapping
-promises; none in hand does.
+promises. One personal export in hand does: a 9.5 m dive with no origin, whose three fixes
+664 to 667 s in carry 19, 25 and 36 m of error. None is within the bound, so its entry is the
+last of the three, the fix nearest the split.
+
+**`EHPE` is a fix's stated error**: the receiver's estimated horizontal position error, in
+metres. It is never on the fix's own entry. The export writes it on a sibling `Samples[]`
+entry at the same `TimeISO8601`, beside `EVPE`, `NumberOfSatellites` and
+`Satellite5BestSNR`, and the reader carries it onto the fix at that millisecond, whichever of
+the two entries comes first. The receiver writes `EHPE` on thousands of timestamps that carry
+no fix as well; those set nothing. `DiveRouteOrigin` states no error, so it is the entry
+unless a vouched fix inside the window replaces it. The estimate decides which fix is taken
+and is not written, a Position having no member for it.
+
+**The bound and the window rest on a personal export set this repository does not carry**:
+one diver's 42 Suunto Ocean dives of 2026 with a fix after the deepest sample, split there
+as this reader splits them. Every one of their 1,385 fixes has an `EHPE` sibling.
+
+- **The first fix after surfacing is often poor.** Its error is above 15 m on 18 of the 42
+  dives, and reaches 46, 47 and 48 m. It sits more than 10 m from the fix the rule takes on
+  13 dives, more than 20 m on 7, more than 50 m on 3, and 92 m on the worst.
+- **The receiver settles fast, and to the bound.** On the 26 dives where a fix within the
+  bound follows the first inside the window, it arrives 1 to 39 s after it, median 6 s, at 6
+  to 10 m of error; on 13 more the first fix is within the bound already. So 10 m is what the
+  receiver settles to, and 40 s covers every settle the set shows inside it while keeping
+  the swim the rule waits through to some 20 m at a slow surface pace.
+- **Three dives keep a first fix above the bound**, and the rule keeps it on purpose. Two
+  log one fix, at 38 and 46 m of error, and then nothing for 77 s and 141 s; the receiver's
+  first fix within the bound, 91 s and 155 s on, lies 10 m and 323 m away — the second a
+  distance no surface swim covers, so by then the diver was elsewhere or the lone fix was
+  wrong, and the file cannot say which. The third logs seven fixes inside the window, none
+  within the bound, and keeps its 28 m first fix, 40 m from the 8 m fix 53 s later.
 
 `DiveRouteQuality` is deliberately not read as a validity signal: it reads 1 on good origins
 and on `0, 0` ones alike across the corpus, so treating it as one would drop real positions
 and keep junk. The `0.000000` pair is already rejected by the rule in
 [`converting.md`](converting.md), which is where two of these files' origins go.
 
-Every Ocean dive in `fixtures/suunto_json/` that a FIT input here also carries comes back
-with the exit position that file gives it — `suunto-ocean.divejson` against
-`fixtures/fit/suunto-ocean.divejson`, `suunto-ocean-2026.divejson` against
-`fixtures/fit/suunto-ocean-2026.divejson` — two files, two readers, two coordinate
-encodings, one answer at six decimal places on each dive.
+**Where a FIT input here carries the same dive, the two readers agree only where the JSON's
+first fix is within the bound**, because the FIT export states no error and this one does.
+`suunto-ocean.divejson` carries the exit `fixtures/fit/suunto-ocean.divejson` does, at six
+decimal places: its export's first fix after surfacing carries 6 m. `suunto-ocean-2026.divejson`
+sits 8.5 m from `fixtures/fit/suunto-ocean-2026.divejson`, its first fix carrying 13 m and a
+10 m one following 6 s later; `ocean-poor-first-fix.divejson` sits 79 m from
+`fixtures/fit/ocean-poor-first-fix.divejson`, its first fix carrying 47 m and the 9 m one it
+takes following 9 s later. Each FIT exit is the same dive's first fix, which both exports
+record to six places alike; what differs is that only this one says how good it was.
 
-## This format settles no ambiguity
+## The one ambiguity this reader settles is which fix
 
 Every member this export states carries one unit, so there is no scale for a reader to
-decide and this reader emits **no `resolved` finding**. That is what separates it from UDDF,
-whose `<o2>` and `<tankvolume>` are numbers with no stated unit.
+decide. That is what separates it from UDDF, whose `<o2>` and `<tankvolume>` are numbers with
+no stated unit. The two coordinate units are not that case either: they are two different
+members each with one unit, and neither is in doubt.
 
-The two coordinate units are not this case: they are two different members each with one
-unit, and neither is in doubt.
+What the export leaves open is which of a side's fixes is the entry or the exit, and
+`converting.md` settles it. Where the fix taken is not the one nearest the split — a vouched
+fix inside the window behind a poor first one — the reader emits one `resolved` finding naming
+the fix taken, its message the same on every file; where the nearest fix stands, it emits
+none.
 
 ## The kinds this reader's report emits
 
@@ -587,7 +627,8 @@ unit, and neither is in doubt.
   that carry a time and no reading this format can hold.
 - **`inferred`** — never. This export summarises its own dive, so there is nothing for this
   reader to compute, and `extensions.divejson.inferred` is never written.
-- **`resolved`** — never, as above.
+- **`resolved`** — an entry or an exit taken from a vouched fix in place of the one nearest
+  the split, as above; nothing else.
 
 ## Deliberately not mapped
 
@@ -665,9 +706,10 @@ Read as a list of what was considered, not of what was missed.
   how loaded it is, and no member holds a compartment number.
 - **`Samples[].BatteryCharge`, `BatteryCurrent`, `BatteryVoltage`** — the watch's battery,
   logged every few seconds.
-- **`Samples[].DiveRoute`, `DiveRouteDistance`, `EHPE`, `EVPE`, `NumberOfSatellites`,
+- **`Samples[].DiveRoute`, `DiveRouteDistance`, `EVPE`, `NumberOfSatellites`,
   `Satellite5BestSNR`, `GPSAltitude`, `QualityFeatures`, `UTC`** — the rest of the GPS
-  track and its quality metrics. §6 carries an entry and an exit position, not a track.
+  track and its quality metrics. §6 carries an entry and an exit position, not a track, and
+  `EHPE` alone answers which fix the receiver vouched for; it is read, under *Positions*.
 - **`Samples[].Events` / `DiveEvents` under `State`, `DiveState`, `DiveStatus`, `Lap`,
   `Pause`, `ArrayBegin`, `Activity`** — the computer narrating its own mode: "Below
   Surface", "Wet Outside", "Dive Active", "Tank pressure available". Five of them land on

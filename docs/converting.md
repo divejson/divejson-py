@@ -376,9 +376,36 @@ readings beside 29 temperatures keeps both, rather than gaining 402 invented one
 seawater, so every position in a dive log was recorded at the surface, and the only
 question worth asking of one is which surface interval it belongs to.
 
-**The deepest sample is the split**: the last fix at or before it is the entry position and
-the first after it is the exit. The fix that says where a diver got in is the one taken just
-before they descended, not the one from when the boat left the jetty.
+**The deepest sample is the split**, and on each side of it the fix taken is the one nearest
+it that the receiver vouched for. The fix that says where a diver got in is the one taken
+just before they descended, not the one from when the boat left the jetty; the one that says
+where they got out is the first the receiver vouched for, not merely the first it logged on
+breaking the surface.
+
+**Where the format states a fix's horizontal error**, the candidates on a side are the fixes
+at most 40 seconds from the fix nearest the split on that side, and the one taken is the
+candidate nearest the split whose stated error is at most 10 metres. Both bounds are
+inclusive, and every estimate in hand is whole metres. Where no candidate is within the
+bound, the fix nearest the split stands, exactly as if the source had stated no error: a fix
+is replaced only by one the receiver vouches for, never by a guess at which of two poor fixes
+is the less poor. A fix that states no error is vouched for by nothing, so it too stands
+only until a vouched one inside the window replaces it. **Where the format states no error,
+the fix nearest the split is taken**: the rule has nothing to read, and waiting a fixed time
+instead would be an invention.
+
+The bound is what a receiver settles to once it is out of the water, and the window covers
+that settling while bounding how far a diver can swim from where they surfaced while the
+rule waits; [`suunto-json-mapping.md`](suunto-json-mapping.md) carries the measurement both
+rest on. The error is read for this choice and never written — a Position is a latitude and
+a longitude — and each mapping document names the member its format states it in: `EHPE`
+in [`suunto-json-mapping.md`](suunto-json-mapping.md), `gps_accuracy` in
+[`fit-mapping.md`](fit-mapping.md).
+
+**A fix taken that is not the one nearest the split is a `resolved` finding**, naming the
+fix taken, with one message whatever the file so that the report groups it. The source
+recorded every candidate and left open which of them is the entry or the exit, and the
+converter decided — which is the kind's definition under *The report*. The nearest fix kept
+carries no finding, whatever its error: the rule changed nothing.
 
 The deepest sample is the pivot in preference to an in-water *window*, which would need a
 depth threshold a converter has nowhere to get and would therefore invent. With no depth

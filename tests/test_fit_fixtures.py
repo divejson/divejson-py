@@ -6,10 +6,10 @@ a correct reader produces from it. The Python converter in this repository is th
 be run against them and deliberately not the last, so a port in another language can take
 the same directory and expect the same answers.
 
-**These two inputs are the only ones in the corpus that were not hand-built**, and they
+**These inputs are the only ones in the corpus that were not hand-built**, and they
 could not have been: a FIT file cannot be reduced with a text editor, and a synthetic one
 would prove that an encoder and a decoder agree rather than that a device's file reads.
-`fixtures/README.md` records that exception. What it costs is that the two files are large
+`fixtures/README.md` records that exception. What it costs is that the files are large
 and opaque; what it buys is the only evidence in this repository that the reader works on
 bytes a watch actually wrote.
 
@@ -22,7 +22,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from helpers import EXPORTED_AT, FIXTURES, profile_of
+from helpers import EXPORTED_AT, FIX_TAKEN, FIXTURES, profile_of
 
 from divejson import compared, convert
 from divejson.converter import INFERRED, PRODUCER_KEY
@@ -35,6 +35,7 @@ FIT_FIXTURES = sorted((FIXTURES / "fit").glob("*.fit"))
 
 OCEAN = FIXTURES / "fit" / "suunto-ocean.fit"
 D5 = FIXTURES / "fit" / "suunto-d5.fit"
+POOR_FIRST_FIX = FIXTURES / "fit" / "ocean-poor-first-fix.fit"
 
 
 @pytest.mark.parametrize("source", FIT_FIXTURES, ids=lambda path: path.stem)
@@ -58,7 +59,7 @@ def test_an_inferred_note_and_a_listed_member_arrive_together(source) -> None:
     """The report's `inferred` kind and `extensions.divejson.inferred` are one decision.
 
     This is the reader that can compute a value, so the coupling has teeth here in a way it
-    does not for the two XML readers. Both halves are empty for both files below — each
+    does not for the two XML readers. Both halves are empty for every file here — each
     session records its own depths — and the encoder tests are where a file that infers one
     is built. Either half without the other is a document saying two different things about
     itself.
@@ -70,15 +71,20 @@ def test_an_inferred_note_and_a_listed_member_arrive_together(source) -> None:
 
 
 @pytest.mark.parametrize("source", FIT_FIXTURES, ids=lambda path: path.stem)
-def test_this_reader_settles_no_scale_and_so_resolves_nothing(source) -> None:
+def test_this_reader_settles_no_scale_and_resolves_nothing_but_the_fix_taken(source) -> None:
     """FIT states every unit in the profile, so there is no scale for a reader to decide.
 
     That is what separates it from UDDF, whose `<o2>` and `<tankvolume>` are numbers with no
-    stated unit and which therefore emits `resolved` findings. A `resolved` appearing here
-    would mean this reader had started guessing at something the profile already says.
+    stated unit and which therefore emits `resolved` findings. Any other `resolved` here
+    would mean this reader had started guessing at something the profile already says. The
+    one it may raise is which fix is the dive's entry or exit, where a `record`'s
+    `gps_accuracy` moves it off the one nearest the deepest sample — which no file in hand
+    does, none of them writing the field, so the synthetic files in `test_fit_parsing.py` are
+    the only ones that raise it.
     """
     conversion = convert(source.read_bytes(), exported_at=EXPORTED_AT)
-    assert {note.kind for note in conversion.notes} <= {"absent", "inferred", "dropped"}
+    resolved = [note for note in conversion.notes if note.kind == "resolved"]
+    assert [note.where for note in resolved if not note.message.startswith(FIX_TAKEN)] == []
 
 
 def test_every_expected_document_has_an_input() -> None:
@@ -201,3 +207,16 @@ def test_the_ocean_carries_the_fix_taken_on_the_way_out() -> None:
     assert "entry_position" not in ocean
     d5 = convert(D5.read_bytes(), exported_at=EXPORTED_AT).document["dives"][0]
     assert "entry_position" not in d5 and "exit_position" not in d5
+
+
+def test_an_export_that_states_no_error_keeps_the_first_fix_after_the_split() -> None:
+    """The FIT twin of `suunto_json/ocean-poor-first-fix.json`: the same fixes, with no
+    `gps_accuracy` beside them, so the rule has nothing to read and the first fix stands —
+    the one at 47 m of error that the JSON reading passes over, 79 m from its exit. Nothing
+    was decided, so nothing is `resolved`.
+    """
+    conversion = convert(POOR_FIRST_FIX.read_bytes(), exported_at=EXPORTED_AT)
+    dive = conversion.document["dives"][0]
+    assert dive["exit_position"] == {"latitude": 28.471383, "longitude": 34.507658}
+    assert "entry_position" not in dive
+    assert [note.where for note in conversion.notes if note.kind == "resolved"] == []

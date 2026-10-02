@@ -833,8 +833,9 @@ def test_a_file_with_no_samples_at_all_says_nothing_about_a_profile() -> None:
 
 def test_the_fixes_either_side_of_the_deepest_sample_are_the_entry_and_the_exit() -> None:
     """No fix is taken underwater, so the only question worth asking of one is which surface
-    interval it belongs to. The last before the pivot and the first after are the two kept:
-    the fix that says where a diver got in is the one taken just before they descended."""
+    interval it belongs to. With no error stated, the fix nearest the pivot on each side is
+    the one kept: the fix that says where a diver got in is the one taken just before they
+    descended."""
     fix = round(28.5 / float(DEGREES_PER_SEMICIRCLE))
     data = dive_file(
         _at(0, depth=1.0, position_lat=fix, position_long=fix),
@@ -848,6 +849,61 @@ def test_the_fixes_either_side_of_the_deepest_sample_are_the_entry_and_the_exit(
     assert dive["entry_position"]["latitude"] < dive["exit_position"]["latitude"]
     assert dive["entry_position"]["latitude"] == pytest.approx(28.500084, abs=1e-6)
     assert dive["exit_position"]["latitude"] == pytest.approx(28.500168, abs=1e-6)
+
+
+def test_gps_accuracy_is_how_a_record_vouches_for_its_fix() -> None:
+    """The profile's own error estimate, in metres, on the `record` that carries the fix.
+
+    No file in hand writes it, so this is the only thing that pins the reading: a first fix
+    at 47 m of error gives way to the 9 m one nine seconds on, and the report says so at the
+    fix taken. The entry side has one fix, which stands whatever it states.
+    """
+    fix = round(28.5 / float(DEGREES_PER_SEMICIRCLE))
+    data = dive_file(
+        _at(0, depth=1.0, position_lat=fix, position_long=fix, gps_accuracy=40),
+        _at(60, depth=40.0),
+        _at(90, depth=0.5, position_lat=fix + 1000, position_long=fix + 1000, gps_accuracy=47),
+        _at(93, position_lat=fix + 2000, position_long=fix + 2000, gps_accuracy=31),
+        _at(99, position_lat=fix + 3000, position_long=fix + 3000, gps_accuracy=9),
+        session={"total_elapsed_time": 120.0},
+    )
+    conversion = _run(data)
+    dive = conversion.document["dives"][0]
+    assert dive["entry_position"]["latitude"] == pytest.approx(28.5, abs=1e-6)
+    assert dive["exit_position"]["latitude"] == pytest.approx(28.500251, abs=1e-6)
+    resolved = [(note.where, note.message) for note in conversion.notes if note.kind == "resolved"]
+    assert [where for where, _ in resolved] == ["dive/0/record/99"]
+    assert "the dive's exit" in resolved[0][1]
+
+
+_FIX = round(28.5 / float(DEGREES_PER_SEMICIRCLE))
+
+
+@pytest.mark.parametrize(
+    "at_ninety",
+    [
+        [_at(90, gps_accuracy=2), _at(90, position_lat=_FIX, position_long=_FIX)],
+        [
+            _at(90, position_lat=_FIX, position_long=_FIX),
+            _at(90, position_lat=_FIX + 500, position_long=_FIX + 500, gps_accuracy=2),
+        ],
+    ],
+    ids=["a-record-with-no-fix", "a-fix-dropped-as-a-collision"],
+)
+def test_an_accuracy_vouches_only_for_the_fix_on_its_own_record(at_ninety: list) -> None:
+    """Two records at the first fix's instant, and the 2 m on the second says nothing about
+    the fix the point keeps: a record carrying no fix vouches for none, and a fix dropped as
+    a collision takes its accuracy with it. So the vouched fix five seconds on is the exit."""
+    data = dive_file(
+        _at(0, depth=1.0),
+        _at(60, depth=40.0),
+        *at_ninety,
+        _at(95, position_lat=_FIX + 1000, position_long=_FIX + 1000, gps_accuracy=8),
+        session={"total_elapsed_time": 120.0},
+    )
+    conversion = _run(data)
+    assert conversion.document["dives"][0]["exit_position"]["latitude"] == pytest.approx(28.500084, abs=1e-6)
+    assert [note.where for note in conversion.notes if note.kind == "resolved"] == ["dive/0/record/95"]
 
 
 def test_a_file_with_fixes_and_no_depth_channel_cannot_say_which_is_the_entry() -> None:

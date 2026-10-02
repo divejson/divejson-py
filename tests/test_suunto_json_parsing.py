@@ -8,6 +8,7 @@ rule reads as the gas-switch rule rather than as a diff of two logbooks.
 from __future__ import annotations
 
 import json
+import math
 
 import pytest
 from helpers import (
@@ -220,6 +221,111 @@ def test_one_channel_twice_on_a_millisecond_keeps_the_first_and_is_reported_once
             "dropped, because the format's sample times are strictly increasing (spec §6.5)"
         )
     ]
+
+
+# -- positions ------------------------------------------------------------------------
+
+
+def _fix(seconds: float, latitude: float, longitude: float) -> dict:
+    """A satellite fix, in the radians this export writes a sample's coordinates in."""
+    return suunto_sample(seconds, Latitude=math.radians(latitude), Longitude=math.radians(longitude))
+
+
+def _ehpe(seconds: float, metres: int) -> dict:
+    """The receiver's error estimate, on an entry of its own as this export writes it."""
+    return suunto_sample(seconds, EHPE=metres)
+
+
+# A dive to 30 m half an hour in, which is the split every fix below is placed against.
+_DIVE = [suunto_sample(0, Depth=1.0), suunto_sample(1800, Depth=30.0), suunto_sample(3600, Depth=1.0)]
+
+
+def _resolved(conversion) -> list[tuple[str, str]]:
+    return [(note.where, note.message) for note in conversion.notes if note.kind == "resolved"]
+
+
+def test_the_exit_is_the_fix_the_receiver_vouched_for_and_the_report_says_so() -> None:
+    """The first fix on surfacing at 47 m of error, then 31 m, then 9 m nine seconds on."""
+    conversion = _conversion(
+        {},
+        [
+            *_DIVE,
+            _fix(3630, 28.471383, 34.507658),
+            _ehpe(3630, 47),
+            _fix(3633, 28.4712, 34.5075),
+            _ehpe(3633, 31),
+            _fix(3639, 28.470792, 34.507208),
+            _ehpe(3639, 9),
+        ],
+    )
+    assert conversion.document["dives"][0]["exit_position"] == {"latitude": 28.470792, "longitude": 34.507208}
+    assert [where for where, _ in _resolved(conversion)] == ["dive/0/sample/3639"]
+    assert "the dive's exit" in _resolved(conversion)[0][1]
+
+
+@pytest.mark.parametrize("estimate_first", [True, False], ids=["estimate-first", "fix-first"])
+def test_an_estimate_folds_onto_the_fix_at_its_millisecond_whichever_arrives_first(estimate_first: bool) -> None:
+    """Two entries on one millisecond, carrying different things, so neither is a collision."""
+    tight = [_ehpe(3635, 6), _fix(3635, 28.47, 34.51)]
+    conversion = _conversion(
+        {},
+        [*_DIVE, _fix(3630, 28.48, 34.52), _ehpe(3630, 20), *(tight if estimate_first else tight[::-1])],
+    )
+    assert conversion.document["dives"][0]["exit_position"] == {"latitude": 28.47, "longitude": 34.51}
+    assert _messages(conversion, "dropped") == []
+
+
+def test_an_estimate_on_an_instant_with_no_fix_sets_nothing_and_counts_nothing() -> None:
+    """The receiver writes estimates on thousands of instants with no fix, and an estimate
+    vouches only for the fix at its own millisecond. Nor is a second estimate at a fix's
+    millisecond a collision: it is not a channel, and the first one stands."""
+    conversion = _conversion(
+        {},
+        [
+            *_DIVE,
+            _fix(3630, 28.48, 34.52),
+            _ehpe(3630, 30),
+            _ehpe(3630, 2),
+            _ehpe(3631, 2),
+            _fix(3636, 28.47, 34.51),
+        ],
+    )
+    dive = conversion.document["dives"][0]
+    assert dive["exit_position"] == {"latitude": 28.48, "longitude": 34.52}
+    assert profile_of(dive)["depth"]["times"] == [0, 1_800_000, 3_600_000]
+    assert _messages(conversion, "dropped") == [] and _resolved(conversion) == []
+
+
+def test_fixes_before_the_descent_take_the_same_rule_mirrored() -> None:
+    """Three pre-descent fixes three seconds apart, none within the bound, keep the last
+    and worst as the entry, as before; a vouched one inside the window replaces it."""
+    unvouched = [_fix(664, 28.4963, 34.5170), _ehpe(664, 19), _fix(665, 28.4962, 34.5169)]
+    unvouched += [_ehpe(665, 25), _fix(667, 28.496277, 34.516943), _ehpe(667, 36)]
+    conversion = _conversion({}, [*_DIVE, *unvouched])
+    assert conversion.document["dives"][0]["entry_position"] == {"latitude": 28.496277, "longitude": 34.516943}
+    assert _resolved(conversion) == []
+
+    conversion = _conversion({}, [*_DIVE, *unvouched, _fix(640, 28.4961, 34.5168), _ehpe(640, 8)])
+    assert conversion.document["dives"][0]["entry_position"] == {"latitude": 28.4961, "longitude": 34.5168}
+    assert [where for where, _ in _resolved(conversion)] == ["dive/0/sample/640"]
+    assert "the dive's entry" in _resolved(conversion)[0][1]
+
+
+def test_the_route_origin_states_no_error_even_beside_an_estimate() -> None:
+    """The origin is not a fix the receiver logged, so an estimate at its millisecond is not
+    about it: here it would otherwise outrank the unvouched fix nearer the descent."""
+    conversion = _conversion(
+        {},
+        [
+            suunto_sample(0, Depth=1.0, DiveRouteOrigin={"Latitude": 28.5, "Longitude": 34.5}),
+            _ehpe(0, 3),
+            _fix(10, 28.501, 34.501),
+            _ehpe(10, 25),
+            suunto_sample(1800, Depth=30.0),
+        ],
+    )
+    assert conversion.document["dives"][0]["entry_position"] == {"latitude": 28.501, "longitude": 34.501}
+    assert _resolved(conversion) == []
 
 
 # -- the duration pair ----------------------------------------------------------------

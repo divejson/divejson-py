@@ -1,0 +1,398 @@
+{
+  "DeviceLog": {
+    "Header": {
+      "ActivityType": 51,
+      "DateTime": "2026-09-12T10:04:08.610+03:00",
+      "Depth": {
+        "Max": 9.25
+      },
+      "DepthAverage": 7.42,
+      "Device": {
+        "Info": {
+          "BatteryDesignCapacity": 1980,
+          "BatteryFullCapacity": 1972.8,
+          "HW": "Seal_RevA3",
+          "SW": "2.51.28"
+        },
+        "Name": "Porvoo",
+        "SerialNumber": "253810000400"
+      },
+      "DiveTime": 4096.1,
+      "Duration": 4418.339,
+      "Notes": "",
+      "Temperature": {
+        "Max": 301,
+        "Min": 301.9
+      }
+    },
+    "Samples": [
+      {
+        "DiveRouteOrigin": {
+          "Altitude": 31.399999618530273,
+          "Latitude": 28.471494674682617,
+          "Longitude": 34.507686614990234
+        },
+        "DiveRouteQuality": 1,
+        "QualityFeatures": [
+          4,
+          0.10000000149011612,
+          0.5379999876022339,
+          1.962665319442749,
+          0.0645955353975296,
+          10.025801658630371,
+          1.1052992343902588,
+          3601.563720703125,
+          22.29608917236328,
+          0.9261818528175354,
+          181.95314025878906,
+          0
+        ],
+        "TimeISO8601": "2026-09-12T10:04:08.610+03:00"
+      },
+      {
+        "DiveEvents": {
+          "GasSwitch": {
+            "GasNumber": 0
+          }
+        },
+        "TimeISO8601": "2026-09-12T10:04:08.890+03:00"
+      },
+      {
+        "AmbientIlluminance": 28138.24,
+        "BrightnessDisplayIntensity": 0,
+        "Ceiling": 0,
+        "Cylinders": [
+          {
+            "GasNumber": 0,
+            "GasTime": 2280,
+            "Pressure": 7859375,
+            "Pressure2": null,
+            "Ventilation": 0.000188
+          },
+          {
+            "GasNumber": 1,
+            "GasTime": 0,
+            "Pressure": null,
+            "Pressure2": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 2,
+            "GasTime": 0,
+            "Pressure": null,
+            "Pressure2": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 3,
+            "GasTime": 0,
+            "Pressure": null,
+            "Pressure2": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 4,
+            "GasTime": 0,
+            "Pressure": null,
+            "Pressure2": null,
+            "Ventilation": 0
+          }
+        ],
+        "Depth": 1.24,
+        "DeviceInternalAbsPressure": 99749.15,
+        "DeviceInternalTemperature": 302.98,
+        "NoDecTime": 6000,
+        "RtGradientFactors": {
+          "gf99": -100,
+          "gfLeadingTissue": 0,
+          "gfSurface": 0
+        },
+        "TimeToSurface": 8,
+        "TimeISO8601": "2026-09-12T10:04:09.080+03:00"
+      },
+      {
+        "AmbientIlluminance": 25375.2,
+        "BrightnessDisplayIntensity": 0.46,
+        "Ceiling": 0,
+        "Cylinders": [
+          {
+            "GasNumber": 0,
+            "GasTime": 3796,
+            "Pressure": 14495312,
+            "Pressure2": null,
+            "Ventilation": 0.00016
+          },
+          {
+            "GasNumber": 1,
+            "GasTime": 0,
+            "Pressure": null,
+            "Pressure2": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 2,
+            "GasTime": 0,
+            "Pressure": null,
+            "Pressure2": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 3,
+            "GasTime": 0,
+            "Pressure": null,
+            "Pressure2": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 4,
+            "GasTime": 0,
+            "Pressure": null,
+            "Pressure2": null,
+            "Ventilation": 0
+          }
+        ],
+        "Depth": 9.22,
+        "DeviceInternalAbsPressure": 100310.78,
+        "DeviceInternalTemperature": 301.35,
+        "NoDecTime": 6000,
+        "RtGradientFactors": {
+          "gf99": -100,
+          "gfLeadingTissue": 0,
+          "gfSurface": 9
+        },
+        "TimeToSurface": 0,
+        "TimeISO8601": "2026-09-12T10:34:38.890+03:00"
+      },
+      {
+        "AmbientIlluminance": 8829.56,
+        "BrightnessDisplayIntensity": 0.36,
+        "Ceiling": 0,
+        "Cylinders": [
+          {
+            "GasNumber": 0,
+            "GasTime": 1913,
+            "Pressure": 7168750,
+            "Pressure2": null,
+            "Ventilation": 0.000171
+          },
+          {
+            "GasNumber": 1,
+            "GasTime": 0,
+            "Pressure": null,
+            "Pressure2": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 2,
+            "GasTime": 0,
+            "Pressure": null,
+            "Pressure2": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 3,
+            "GasTime": 0,
+            "Pressure": null,
+            "Pressure2": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 4,
+            "GasTime": 0,
+            "Pressure": null,
+            "Pressure2": null,
+            "Ventilation": 0
+          }
+        ],
+        "Depth": 1.7,
+        "DeviceInternalAbsPressure": 99437.98,
+        "DeviceInternalTemperature": 301.44,
+        "NoDecTime": 6000,
+        "RtGradientFactors": {
+          "gf99": -100,
+          "gfLeadingTissue": 0,
+          "gfSurface": 11
+        },
+        "TimeToSurface": 12,
+        "TimeISO8601": "2026-09-12T11:12:18.890+03:00"
+      },
+      {
+        "EHPE": 47,
+        "EVPE": 98,
+        "NumberOfSatellites": 8,
+        "Satellite5BestSNR": 13.4,
+        "TimeISO8601": "2026-09-12T11:13:58.000+03:00"
+      },
+      {
+        "GPSAltitude": 18.2,
+        "Latitude": 0.4969193811823285,
+        "Longitude": 0.6022722544881493,
+        "UTC": "2026-09-12T08:13:58.000+00:00",
+        "TimeISO8601": "2026-09-12T11:13:58.000+03:00"
+      },
+      {
+        "EHPE": 42,
+        "EVPE": 104,
+        "NumberOfSatellites": 11,
+        "Satellite5BestSNR": 16.6,
+        "TimeISO8601": "2026-09-12T11:13:59.000+03:00"
+      },
+      {
+        "GPSAltitude": 12.6,
+        "Latitude": 0.49691446633515485,
+        "Longitude": 0.6022686189673172,
+        "UTC": "2026-09-12T08:13:59.000+00:00",
+        "TimeISO8601": "2026-09-12T11:13:59.000+03:00"
+      },
+      {
+        "EHPE": 31,
+        "EVPE": 65,
+        "NumberOfSatellites": 17,
+        "Satellite5BestSNR": 25.2,
+        "TimeISO8601": "2026-09-12T11:14:00.000+03:00"
+      },
+      {
+        "GPSAltitude": 24,
+        "Latitude": 0.4969111205389788,
+        "Longitude": 0.602265681578186,
+        "UTC": "2026-09-12T08:14:00.000+00:00",
+        "TimeISO8601": "2026-09-12T11:14:00.000+03:00"
+      },
+      {
+        "EHPE": 27,
+        "EVPE": 56,
+        "NumberOfSatellites": 18,
+        "Satellite5BestSNR": 29.8,
+        "TimeISO8601": "2026-09-12T11:14:01.000+03:00"
+      },
+      {
+        "GPSAltitude": 28.2,
+        "Latitude": 0.49691024787435273,
+        "Longitude": 0.6022655349705289,
+        "UTC": "2026-09-12T08:14:01.000+00:00",
+        "TimeISO8601": "2026-09-12T11:14:01.000+03:00"
+      },
+      {
+        "EHPE": 21,
+        "EVPE": 46,
+        "NumberOfSatellites": 19,
+        "Satellite5BestSNR": 31.6,
+        "TimeISO8601": "2026-09-12T11:14:02.000+03:00"
+      },
+      {
+        "GPSAltitude": 29.2,
+        "Latitude": 0.4969098115420398,
+        "Longitude": 0.6022652452458731,
+        "UTC": "2026-09-12T08:14:02.000+00:00",
+        "TimeISO8601": "2026-09-12T11:14:02.000+03:00"
+      },
+      {
+        "EHPE": 18,
+        "EVPE": 38,
+        "NumberOfSatellites": 20,
+        "Satellite5BestSNR": 31,
+        "TimeISO8601": "2026-09-12T11:14:03.000+03:00"
+      },
+      {
+        "GPSAltitude": 28,
+        "Latitude": 0.4969097242755771,
+        "Longitude": 0.6022648368388281,
+        "UTC": "2026-09-12T08:14:03.000+00:00",
+        "TimeISO8601": "2026-09-12T11:14:03.000+03:00"
+      },
+      {
+        "EHPE": 12,
+        "EVPE": 21,
+        "NumberOfSatellites": 27,
+        "Satellite5BestSNR": 31.4,
+        "TimeISO8601": "2026-09-12T11:14:05.000+03:00"
+      },
+      {
+        "GPSAltitude": 24.6,
+        "Latitude": 0.49690946247618933,
+        "Longitude": 0.602264517443575,
+        "UTC": "2026-09-12T08:14:05.000+00:00",
+        "TimeISO8601": "2026-09-12T11:14:05.000+03:00"
+      },
+      {
+        "EHPE": 9,
+        "EVPE": 16,
+        "NumberOfSatellites": 26,
+        "Satellite5BestSNR": 29.8,
+        "TimeISO8601": "2026-09-12T11:14:07.000+03:00"
+      },
+      {
+        "GPSAltitude": 19.2,
+        "Latitude": 0.49690905581447364,
+        "Longitude": 0.6022644005065152,
+        "UTC": "2026-09-12T08:14:07.000+00:00",
+        "TimeISO8601": "2026-09-12T11:14:07.000+03:00"
+      },
+      {
+        "AmbientIlluminance": 24102.04,
+        "BrightnessDisplayIntensity": 0.46,
+        "Ceiling": 0,
+        "Cylinders": [
+          {
+            "GasNumber": 0,
+            "GasTime": 2082,
+            "Pressure": 6971875,
+            "Pressure2": null,
+            "Ventilation": 0.000167
+          },
+          {
+            "GasNumber": 1,
+            "GasTime": 0,
+            "Pressure": null,
+            "Pressure2": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 2,
+            "GasTime": 0,
+            "Pressure": null,
+            "Pressure2": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 3,
+            "GasTime": 0,
+            "Pressure": null,
+            "Pressure2": null,
+            "Ventilation": 0
+          },
+          {
+            "GasNumber": 4,
+            "GasTime": 0,
+            "Pressure": null,
+            "Pressure2": null,
+            "Ventilation": 0
+          }
+        ],
+        "Depth": 0,
+        "DeviceInternalAbsPressure": 99764.3,
+        "DeviceInternalTemperature": 302.22,
+        "NoDecTime": 0,
+        "RtGradientFactors": {
+          "gf99": 0,
+          "gfLeadingTissue": 0,
+          "gfSurface": 0
+        },
+        "TimeToSurface": 0,
+        "TimeISO8601": "2026-09-12T11:17:38.860+03:00"
+      },
+      {
+        "AbsPressure": 100494,
+        "Altitude": 0,
+        "Cadence": null,
+        "Distance": 134,
+        "Power": null,
+        "SeaLevelPressure": null,
+        "Speed": 0,
+        "Temperature": 301.86,
+        "VerticalSpeed": -0.04,
+        "TimeISO8601": "2026-09-12T11:17:45.870+03:00"
+      }
+    ]
+  }
+}

@@ -1,30 +1,30 @@
 {
   "format": "divejson",
   "version": "1.0",
-  "exported_at": "2026-09-05T00:00:00+00:00",
+  "exported_at": "2026-10-02T00:00:00+00:00",
   "generator": {
     "name": "divejson convert",
-    "version": "0.13.0"
+    "version": "0.20.0"
   },
   "dives": [
     {
       "uuid": "29e7c994-34d6-5135-940d-1ec2b3a7e42d",
-      "started_at": "2026-09-08T15:17:38.670+03:00",
-      "duration": 3051,
-      "max_depth": 19.04,
-      "avg_depth": 10.74,
+      "started_at": "2026-09-12T10:04:08.610+03:00",
+      "duration": 4096,
+      "max_depth": 9.25,
+      "avg_depth": 7.42,
       "entry_position": {
-        "latitude": 28.496524810791016,
-        "longitude": 34.51679992675781
+        "latitude": 28.471494674682617,
+        "longitude": 34.507686614990234
       },
       "exit_position": {
-        "latitude": 28.496447,
-        "longitude": 34.516765
+        "latitude": 28.470792,
+        "longitude": 34.507208
       },
       "cylinders": [
         {
-          "start_pressure": 207.34376,
-          "end_pressure": 44.03125,
+          "start_pressure": 78.59375,
+          "end_pressure": 71.6875,
           "gas_number": 0
         }
       ],
@@ -37,63 +37,55 @@
             "name": "Porvoo"
           },
           "profile": {
-            "duration": 3473050,
+            "duration": 4417260,
             "depth": {
               "times": [
-                910,
-                1160030,
-                1810030,
-                2947750,
-                3470030
+                470,
+                1830280,
+                4090280,
+                4410250
               ],
               "values": [
-                137,
-                1900,
-                1429,
-                336,
+                124,
+                922,
+                170,
                 0
               ]
             },
             "temperature": {
               "times": [
-                8050,
-                3473050
+                4417260
               ],
               "values": [
-                298,
-                292
+                287
               ]
             },
             "pressures": [
               {
                 "times": [
-                  910,
-                  1160030,
-                  1810030,
-                  2947750,
-                  3470030
+                  470,
+                  1830280,
+                  4090280,
+                  4410250
                 ],
                 "values": [
-                  2073,
-                  1534,
-                  1246,
-                  440,
-                  450
+                  786,
+                  1450,
+                  717,
+                  697
                 ],
                 "gas_number": 0
               }
             ],
             "ndl": {
               "times": [
-                910,
-                1160030,
-                1810030,
-                2947750,
-                3470030
+                470,
+                1830280,
+                4090280,
+                4410250
               ],
               "values": [
                 6000,
-                3720,
                 6000,
                 6000,
                 0
@@ -101,17 +93,17 @@
             },
             "tts": {
               "times": [
-                910,
-                2947750
+                470,
+                4090280
               ],
               "values": [
-                12,
-                24
+                8,
+                12
               ]
             },
             "gradient_factor": {
               "times": [
-                3470030
+                4410250
               ],
               "values": [
                 0
@@ -119,23 +111,21 @@
             },
             "surface_gradient_factor": {
               "times": [
-                910,
-                1160030,
-                1810030,
-                2947750,
-                3470030
+                470,
+                1830280,
+                4090280,
+                4410250
               ],
               "values": [
                 0,
-                24,
-                32,
-                23,
+                9,
+                11,
                 0
               ]
             },
             "events": [
               {
-                "time": 40,
+                "time": 280,
                 "type": "gas_switch",
                 "gas_number": 0
               }
