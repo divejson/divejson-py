@@ -33,6 +33,8 @@ from divejson.validate import validate_document
 SUUNTO_FIXTURES = sorted((FIXTURES / "suunto_json").glob("*.json"))
 
 OCEAN = FIXTURES / "suunto_json" / "suunto-ocean.json"
+OCEAN_2026 = FIXTURES / "suunto_json" / "suunto-ocean-2026.json"
+POOR_FIRST_FIX = FIXTURES / "suunto_json" / "ocean-poor-first-fix.json"
 PURGED = FIXTURES / "suunto_json" / "purged-regulator.json"
 D5 = FIXTURES / "suunto_json" / "suunto-d5.json"
 HEADER_ONLY = FIXTURES / "suunto_json" / "header-only.json"
@@ -224,6 +226,32 @@ def test_the_ocean_positions_come_off_two_channels_in_two_units() -> None:
     dive = _dive(OCEAN)
     assert dive["entry_position"] == {"latitude": 28.567251205444336, "longitude": 34.53325653076172}
     assert dive["exit_position"] == {"latitude": 28.56723, "longitude": 34.533233}
+
+
+@pytest.mark.parametrize(
+    ("source", "exit", "taken"),
+    [
+        # 47 m of error on the first fix after surfacing, falling to 9 m nine seconds on,
+        # 79 m from it.
+        (POOR_FIRST_FIX, {"latitude": 28.470792, "longitude": 34.507208}, "dive/0/sample/4198.39"),
+        # 13 m, then exactly the bound six seconds on, 8.5 m from it.
+        (OCEAN_2026, {"latitude": 28.496447, "longitude": 34.516765}, "dive/0/sample/3421.33"),
+    ],
+    ids=["ocean-poor-first-fix", "suunto-ocean-2026"],
+)
+def test_a_first_fix_the_receiver_did_not_vouch_for_gives_way_to_one_it_did(source, exit, taken) -> None:
+    """The receiver's estimate sits on an entry of its own at each fix's instant, and the exit
+    is the nearest fix it puts within 10 m. The report says so once, at the fix taken; the
+    entry is still the route origin, the only fix before the descent, which states no error.
+
+    These two are the pairs on which this reading and the same dive's FIT export disagree:
+    the FIT export records the same fixes with no error beside them, so it keeps the first.
+    """
+    conversion = convert(source.read_bytes(), exported_at=EXPORTED_AT)
+    dive = conversion.document["dives"][0]
+    assert dive["exit_position"] == exit
+    assert "entry_position" in dive
+    assert [note.where for note in conversion.notes if note.kind == "resolved"] == [taken]
 
 
 # -- the D5 shape ---------------------------------------------------------------------

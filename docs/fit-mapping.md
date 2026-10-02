@@ -26,9 +26,10 @@ global FIT profile rather than from the vendor. Every other source this corpus c
 invents its own spelling and has to be read one writer at a time.
 
 That cuts both ways. There is almost no unit table here, and there is no scale for a reader
-to settle — so this reader raises no `resolved` finding, and never will. What it has
-instead is one very sharp trap, below, and a file whose summary is written *after* the
-samples it summarises, so nothing can be read cheaply from a header.
+to settle — the one `resolved` finding this reader can raise is `converting.md`'s choice of
+a dive's entry or exit fix, below. What it has instead is one very sharp trap, below, and a
+file whose summary is written *after* the samples it summarises, so nothing can be read
+cheaply from a header.
 
 ## Parsing
 
@@ -144,10 +145,11 @@ value.
 **A semicircle is 180/2³¹ degrees**, a signed 32-bit count over a full circle of 2³², and
 the profile declares no scale factor for it — so the raw count is what a decoder hands
 back and this is the one conversion FIT does not do for you. Six decimal places is about
-11 cm at the equator, and it is what makes one dive converted from two of its own exports
-produce one position rather than two: the same fix arrives as a semicircle count here and
+11 cm at the equator, and it is what makes one fix converted from two of a dive's own exports
+one position rather than two: the same fix arrives as a semicircle count here and
 as a radian float from the Suunto app's JSON, and the two agree exactly at
-six places and disagree below.
+six places and disagree below. Which fix each reader takes is another matter, under
+*Positions*.
 
 `position_lat` is a `sint32` whose invalid sentinel is `0x7FFFFFFF`, and the arithmetic on
 that count gives 179.99999991618097 — which rounds to a real, in-range longitude that no
@@ -301,7 +303,7 @@ nothing is scaled. They are written **both or neither** (§6.4c), so a file stat
 yields neither and a note.
 
 **`model` is read only where it states a value.** `tissue_model_type` has exactly one member
-in the FIT profile, `zhl_16c`. Two of the three recordings in `fixtures/fit/` carry a
+in the FIT profile, `zhl_16c`. Three of the four recordings in `fixtures/fit/` carry a
 `dive_settings` at all, and each of those states a gradient-factor pair with no `model`
 beside it — so each produces a `deco_model` of a pair and no family, which is the honest
 shape, while `suunto-d5.fit` writes no `dive_settings` and gets no `deco_model`. Reading
@@ -453,6 +455,7 @@ source defect rather than a scale to reinterpret: the profile states the unit ou
 | `next_stop_depth` (93) | | the `ceiling` channel, centimetres |
 | `temperature` (13) | | the `temperature` channel, tenths of a degree |
 | `position_lat` (0) / `position_long` (1) | | `entry_position` / `exit_position` |
+| `gps_accuracy` (31) | | which fix is the entry or the exit, under *Positions*; never written. **untested** |
 
 The axis origin is the session's own `start_time`, so the profile's axis is the elapsed
 milliseconds from the instant `started_at` names — whole seconds multiplied by a thousand,
@@ -478,10 +481,26 @@ rather than that an obligation sits at 0 m.
 ### Positions
 
 A `record`'s `position_lat` / `position_long` pair is a fix, and which surface interval a
-fix belongs to is `converting.md`'s question rather than this format's — the deepest sample
-is the split. What is FIT's is the semicircle encoding above and the `0x7FFFFFFF` sentinel
-beside it. The Ocean pair in `fixtures/fit/` is the case that shape produces: all 28 of its
-fixes land after the deepest sample, so the dive has an exit position and no entry.
+fix belongs to, and which of its fixes the receiver vouched for, are `converting.md`'s
+questions rather than this format's — the deepest sample is the split. What is FIT's is the
+semicircle encoding above, the `0x7FFFFFFF` sentinel beside it, and the member a fix's error
+is stated in.
+
+**`gps_accuracy` (31) is a fix's stated error**, a `uint8` in metres that the profile defines
+on `record`, and the reader reads it off a `record` that carries a fix. It is **untested**:
+no file in hand writes it — not one of the four recordings in `fixtures/fit/`, and not one of
+the 792 fix records across a personal set of 25 Suunto Ocean exports this repository does
+not carry — and whether a Garmin Descent writes it on a dive is unverified. Messages built
+with an encoder stand in for a device, as they do for the other untested rows.
+
+So from every FIT file in hand the rule has nothing to read, and the exit is the first fix
+after the deepest sample. `suunto-ocean.fit` is the shape that produces: all 28 of its fixes
+land after the deepest sample, so the dive has an exit position and no entry.
+`ocean-poor-first-fix.fit` is the same shape and the case it costs: its 15 fixes all land
+after the deepest sample, and its exit is the first of them, which the same dive's Suunto app
+export says carried 47 m of error — that export's reading takes the 9 m fix 9 s later, 79 m
+away ([`suunto-json-mapping.md`](suunto-json-mapping.md)). The two readers differ there
+because the two files do, and this one states nothing the rule could act on.
 
 ### Events — `event` (21)
 
@@ -521,12 +540,15 @@ has that table because its files have the alerts.
 than an array index, so the cylinders are numbered when the profile carries a pressure channel
 or a gas switch naming one, and not otherwise.
 
-## This format settles no ambiguity
+## The one ambiguity this reader settles is which fix
 
 The profile states every unit, so there is no fraction-or-percent and no litres-or-cubic-metres
-for a magnitude test to decide. This reader therefore raises no `resolved` finding, and the
-three kinds its report can carry are `absent`, `inferred` and `dropped`. A `resolved` appearing
-here would mean it had started guessing at something the profile already says.
+for a magnitude test to decide. What a file can leave open is which of a side's fixes is the
+entry or the exit: where its records state `gps_accuracy` and `converting.md`'s rule takes a
+fix other than the one nearest the split, the reader raises one `resolved` finding naming the
+fix taken, its message the same on every file. No file in hand states it, so the kinds every
+file here produces are `absent`, `inferred` and `dropped`. A `resolved` for anything else
+would mean it had started guessing at something the profile already says.
 
 It is the only format in this corpus whose reader raises `inferred`, and so the only one for
 which the `extensions.divejson.inferred` list is ever written.
@@ -557,11 +579,15 @@ which the `extensions.divejson.inferred` list is ever written.
 - **`record.ndl_time`, `time_to_surface`, `cns_load`, `po2` and `next_stop_time`, and
   `session.sub_sport`** — §6.4 now has a channel for the first four and §6.4a a `mode` the
   last would fill, and all six stay unmapped for a different reason: **no file in hand writes
-  any of them.** All three FIT recordings in `fixtures/fit/` carry `record` messages with
+  any of them.** All four FIT recordings in `fixtures/fit/` carry `record` messages with
   every one of these fields empty, and a mapping written against a profile listing rather than
   a dive is the speculation this format's core rule exists to keep out. Each lands the day a
-  file arrives that has it. `next_stop_time` appears above under *The ceiling*, as the field
-  a reader must not mistake for a ceiling; that warning stands either way.
+  file arrives that has it. `gps_accuracy` is read under *Positions* although no file writes
+  it either, and is not this case: it maps onto no member, so reading it adds nothing to a
+  document, and it feeds a rule `converting.md` states for every format, which a FIT file that
+  states it should get as a Suunto app export does. `next_stop_time` appears above under *The
+  ceiling*, as the field a reader must not mistake for a ceiling; that warning stands either
+  way.
 - **`dive_settings`'s thirty-odd other fields** — PO₂ alarm thresholds, backlight,
   safety-stop times, the CCR setpoint fields newer SDKs add. The computer's configuration,
   not the dive. `gf_low` and `gf_high` left this list when §6.4c arrived; they are carried

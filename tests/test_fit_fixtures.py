@@ -35,6 +35,7 @@ FIT_FIXTURES = sorted((FIXTURES / "fit").glob("*.fit"))
 
 OCEAN = FIXTURES / "fit" / "suunto-ocean.fit"
 D5 = FIXTURES / "fit" / "suunto-d5.fit"
+POOR_FIRST_FIX = FIXTURES / "fit" / "ocean-poor-first-fix.fit"
 
 
 @pytest.mark.parametrize("source", FIT_FIXTURES, ids=lambda path: path.stem)
@@ -206,3 +207,16 @@ def test_the_ocean_carries_the_fix_taken_on_the_way_out() -> None:
     assert "entry_position" not in ocean
     d5 = convert(D5.read_bytes(), exported_at=EXPORTED_AT).document["dives"][0]
     assert "entry_position" not in d5 and "exit_position" not in d5
+
+
+def test_an_export_that_states_no_error_keeps_the_first_fix_after_the_split() -> None:
+    """The FIT twin of `suunto_json/ocean-poor-first-fix.json`: the same fixes, with no
+    `gps_accuracy` beside them, so the rule has nothing to read and the first fix stands —
+    the one at 47 m of error that the JSON reading passes over, 79 m from its exit. Nothing
+    was decided, so nothing is `resolved`.
+    """
+    conversion = convert(POOR_FIRST_FIX.read_bytes(), exported_at=EXPORTED_AT)
+    dive = conversion.document["dives"][0]
+    assert dive["exit_position"] == {"latitude": 28.471383, "longitude": 34.507658}
+    assert "entry_position" not in dive
+    assert [note.where for note in conversion.notes if note.kind == "resolved"] == []
