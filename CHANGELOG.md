@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.21.0
+
 - **The Suunto JSON and FIT readers take the fix nearest the split that the receiver vouched
   for.** A receiver that has just surfaced logs its first fix before it has settled, and the
   Suunto app's JSON says so: `EHPE`, the receiver's horizontal error in metres, sits beside
