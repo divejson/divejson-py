@@ -10,9 +10,9 @@
     {
       "uuid": "1c81e561-6fc5-59c7-bcdc-5c144636e163",
       "started_at": "2026-09-12T10:04:08+03:00",
-      "duration": 4418,
+      "duration": 4099,
       "max_depth": 9.25,
-      "avg_depth": 6.9,
+      "avg_depth": 7.43,
       "exit_position": {
         "latitude": 28.471383,
         "longitude": 34.507658
@@ -9747,7 +9747,11 @@
       "fit_protocol_version": "2.0",
       "source_generator": {
         "name": "Suunto Ocean"
-      }
+      },
+      "inferred": [
+        "dives/0/duration",
+        "dives/0/avg_depth"
+      ]
     }
   }
 }

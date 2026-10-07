@@ -28,12 +28,14 @@ developer fields out by type, so a message carrying **only** the developer dupli
 as not recorded and falls through to the next source rather than passing a vendor's float
 off as the profile's scaled integer.
 
-**A summary is read from the `session` first for the depths and from Garmin's
-`dive_summary` first for the oxygen accounting**, which looks inconsistent and is not. The
-depths agree wherever both exist, and the fallback is for a device that summarises a dive
-in one message and not the other. The CNS and OTU totals are the *dive's*, and on a
-multi-dive Garmin file the session's cover the whole activity while the `dive_summary`
-picked by `_summary` describes the dive being read.
+**The `session` is the activity's and Garmin's `dive_summary` is the dive's.** The
+session's elapsed time and mean depth cover the whole recording — on a Suunto Ocean, five
+minutes at the surface after the dive by default — so a dive's duration and mean depth come
+from the summary, else from its time in the water as `converter.in_water` derives it, and
+the session stands in only where neither yields one. Its maximum has no window and is read
+first. The CNS and OTU totals are the dive's too, and on a multi-dive Garmin file the
+session's cover the whole activity while the `dive_summary` picked by `_summary` describes
+the dive being read.
 
 **A FIT file records no id for its dive**, so a dive's identity is its position — the
 stand-in `converting.md` defines, reported as such. Two copies of one file in one archive
@@ -63,12 +65,14 @@ from fitdecode.types import DevField, FieldData
 
 from .converter import (
     CENTIMETRES_PER_METRE,
+    IN_WATER_DEPTH,
     PRODUCER_KEY,
     TENTHS_PER_UNIT,
     Conversion,
     ConverterError,
     Fix,
     Identities,
+    InWater,
     NonConformingOutputError,
     Note,
     NoteKind,
@@ -79,6 +83,7 @@ from .converter import (
     decimal_of,
     device,
     header,
+    in_water,
     integer_of,
     milliseconds,
     position,
@@ -705,10 +710,11 @@ class _Converter:
         summary = self.summary()
         samples = self.axis(where)
         self.gases = self.carried_gases(where)
+        derived = in_water((at, point.depth) for at, point in samples.ordered() if point.depth is not None)
 
         # In §6.2's own member order, so a converted dive reads down the schema.
-        self.read_duration(session, summary, dive, where)
-        self.read_depths(session, summary, samples, dive, where)
+        self.read_duration(session, summary, derived, dive, where)
+        self.read_depths(session, summary, samples, derived, dive, where)
         # The salinity setting and the oxygen clocks are the computer's own (§6.4a), so they
         # are read here and carried on its recording below rather than on the dive — and the
         # clocks are enough on their own to make one, where the setting is not.
@@ -862,24 +868,45 @@ class _Converter:
         self,
         session: fitdecode.FitDataMessage,
         summary: fitdecode.FitDataMessage | None,
+        derived: InWater | None,
         dive: dict[str, Any],
         where: str,
     ) -> None:
-        """`total_elapsed_time`, else `total_timer_time`, else `dive_summary.bottom_time`.
+        """`dive_summary.bottom_time`, else the time in the water, else the session's elapsed time.
 
-        In that order and for that reason. `total_elapsed_time` is the wall clock from the
-        moment the dive started to the moment it ended, which is what a diver means by a
-        dive's duration; `total_timer_time` excludes pauses, a distinction that barely
-        exists underwater, and stands in where a device omits the first. Garmin's
-        `bottom_time` is deliberately last: it measures time *at depth*, not the dive.
+        `bottom_time` is the one figure a FIT file states for the dive, and no Suunto-app
+        export writes it. The session's `total_elapsed_time` and `total_timer_time` are the
+        activity's: the whole recording, the surface time a computer waits before closing a
+        dive included. So where the summary is silent the dive's time in the water is derived
+        from its depth samples, `inferred`, and the session's figures stand in — as readings,
+        unmarked — only where the samples yield none.
         """
+        stated = _number(_native(summary, "bottom_time"))
+        if stated is not None and recorded(rounded(stated), record="dive", member="duration"):
+            dive["duration"] = rounded(stated)
+            return
+        if derived is not None and recorded(derived.duration, record="dive", member="duration"):
+            dive["duration"] = derived.duration
+            self.note(
+                where,
+                "the file states no dive time on a dive summary, and its session's elapsed time covers the "
+                "whole recording, so the dive's duration is computed from its depth samples as the time "
+                f"they spend deeper than {IN_WATER_DEPTH} m (spec §5.4)",
+                "inferred",
+            )
+            self.inferred.append("dives/0/duration")
+            return
         seconds = _first(
             _number(_native(session, "total_elapsed_time")),
             _number(_native(session, "total_timer_time")),
-            _number(_native(summary, "bottom_time")),
         )
         if seconds is None:
-            self.absent("duration", "elapsed time for the session", where)
+            self.absent(
+                "duration",
+                f"dive time on a dive summary or elapsed time on its session, and no depth samples deeper than "
+                f"{IN_WATER_DEPTH} m to derive one from",
+                where,
+            )
             return
         duration = rounded(seconds)
         if recorded(duration, record="dive", member="duration"):
@@ -897,16 +924,20 @@ class _Converter:
         session: fitdecode.FitDataMessage,
         summary: fitdecode.FitDataMessage | None,
         samples: SampleAxis,
+        derived: InWater | None,
         dive: dict[str, Any],
         where: str,
     ) -> None:
-        """`max_depth` and `avg_depth`: the session, then Garmin's summary, then the samples.
+        """`max_depth` from the session, then Garmin's summary, then the samples; `avg_depth`
+        from the summary, then the time in the water, then the session.
 
-        The two messages agree wherever both carry a depth, and the summary is the
-        fallback for a device that summarises a dive in one message and not the other. The
-        samples are the third source and the only one that is *this converter's
-        arithmetic*, so a depth taken from them is `inferred` and the document lists it
-        under `extensions.divejson.inferred` (spec §5.4).
+        A maximum has no window, so the session's is the dive's, and the summary is the
+        fallback for a device that summarises a dive in one message and not the other. A
+        mean does have one: the session's runs over the whole recording, so the summary's is
+        read first, then the time-weighted mean over the time in the water that
+        `converter.in_water` derives, and the session's stands in only where both are
+        missing. A depth computed from the samples is *this converter's arithmetic*, so it is
+        `inferred` and the document lists it under `extensions.divejson.inferred` (spec §5.4).
 
         **The `inferred` findings are raised last, after the two depths have been checked
         against each other**, because a computed mean deeper than a recorded maximum is
@@ -916,36 +947,48 @@ class _Converter:
         disagreeing — an `inferred` line with no member on the list, which is the one thing
         `converter.py` says can never happen.
         """
-        depths = [point.depth for _, point in samples.ordered() if point.depth is not None]
-        computed = {
-            "max_depth": max(depths) if depths else None,
-            # The arithmetic mean of the depth readings, which is the mean *depth of the
-            # dive* only where the device sampled at a constant rate. Every file in hand
-            # does; a device that samples faster on descent would weight it towards the
-            # descent, which is why this is the last resort and is labelled as computed.
-            "avg_depth": (sum(depths, Decimal(0)) / len(depths)).quantize(Decimal("0.01")) if depths else None,
-        }
-
         found: dict[str, Decimal] = {}
-        derived: list[str] = []
-        for member, source in (("max_depth", "max_depth"), ("avg_depth", "avg_depth")):
-            native = _first(_number(_native(session, source)), _number(_native(summary, source)))
-            if native is not None and recorded(native, record="dive", member=member):
-                found[member] = native
-                continue
+        derived_members: list[str] = []
+
+        native = _first(_number(_native(session, "max_depth")), _number(_native(summary, "max_depth")))
+        deepest = max((point.depth for _, point in samples.ordered() if point.depth is not None), default=None)
+        if native is not None and recorded(native, record="dive", member="max_depth"):
+            found["max_depth"] = native
+        else:
             if native is not None:
                 self.note(
                     where,
-                    f"the session's {source} is {native} m; the format records a depth only when it is "
-                    "positive",
+                    f"the session's max_depth is {native} m; the format records a depth only when it is positive",
                     "absent",
                 )
-            value = computed[member]
-            if value is None or not recorded(value, record="dive", member=member):
-                self.absent(member, f"{source} on its session or on a dive summary", where)
-                continue
-            found[member] = value
-            derived.append(member)
+            if deepest is not None and recorded(deepest, record="dive", member="max_depth"):
+                found["max_depth"] = deepest
+                derived_members.append("max_depth")
+            else:
+                self.absent("max_depth", "max_depth on its session or on a dive summary", where)
+
+        stated = _number(_native(summary, "avg_depth"))
+        whole = _number(_native(session, "avg_depth"))
+        if stated is not None and recorded(stated, record="dive", member="avg_depth"):
+            found["avg_depth"] = stated
+        elif derived is not None and recorded(derived.avg_depth, record="dive", member="avg_depth"):
+            found["avg_depth"] = derived.avg_depth
+            derived_members.append("avg_depth")
+        elif whole is not None and recorded(whole, record="dive", member="avg_depth"):
+            found["avg_depth"] = whole
+        elif whole is not None:
+            self.note(
+                where,
+                f"the session's avg_depth is {whole} m; the format records a depth only when it is positive",
+                "absent",
+            )
+        else:
+            self.absent(
+                "avg_depth",
+                f"avg_depth on a dive summary or on its session, and no depth samples deeper than {IN_WATER_DEPTH} m "
+                "to derive one from",
+                where,
+            )
 
         if "max_depth" in found and "avg_depth" in found and found["avg_depth"] > found["max_depth"]:
             self.note(
@@ -961,14 +1004,21 @@ class _Converter:
             if member not in found:
                 continue
             dive[member] = float(found[member])
-            if member in derived:
-                self.note(
-                    where,
-                    f"the file records no {member} on its session or on a dive summary, so the dive's "
-                    f"{member} is computed from its own depth samples (spec §5.4)",
-                    "inferred",
+            if member not in derived_members:
+                continue
+            if member == "max_depth":
+                message = (
+                    "the file records no max_depth on its session or on a dive summary, so the dive's max_depth "
+                    "is computed from its own depth samples (spec §5.4)"
                 )
-                self.inferred.append(f"dives/0/{member}")
+            else:
+                message = (
+                    "the file states no mean depth on a dive summary, and its session's avg_depth covers the whole "
+                    "recording, so the dive's avg_depth is computed from its depth samples as their time-weighted "
+                    f"mean over the time they spend deeper than {IN_WATER_DEPTH} m (spec §5.4)"
+                )
+            self.note(where, message, "inferred")
+            self.inferred.append(f"dives/0/{member}")
 
     def read_oxygen(
         self,
@@ -978,10 +1028,10 @@ class _Converter:
     ) -> dict[str, float]:
         """The dive's CNS and OTU totals — the summary first, then the session.
 
-        The mirror of `read_depths`, which prefers the session. The order is the other way
-        round because these are the *dive's* oxygen accounting: on a multi-dive Garmin
-        file the session totals cover the whole activity, while `summary` has already
-        picked out the summary that describes the dive being read. They are the computer's
+        The order `read_depths` gives the mean, and for the same reason: these are the
+        *dive's* oxygen accounting, and on a multi-dive Garmin file the session totals cover
+        the whole activity, while `summary` has already picked out the summary that
+        describes the dive being read. They are the computer's
         own arithmetic, so they are returned for its recording rather than written onto the
         dive (§6.4a).
 
@@ -1054,8 +1104,9 @@ class _Converter:
         say it, and no file in hand writes it, so on every one of them the fix nearest the
         split is the one kept.
 
-        The deepest sample is the pivot in preference to an in-water *window*, which would
-        need a depth threshold this reader would have to invent. With no depth channel
+        The deepest sample is the pivot in preference to the in-water window `in_water`
+        counts: a fix belongs to a surfacing, and a diver who hovers about the threshold at
+        the start crosses it several times on the way in. With no depth channel
         there is no pivot and so no answer, and nothing is written: a file that recorded
         positions and never a depth cannot say which of them is the entry.
         """

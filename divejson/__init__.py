@@ -14,6 +14,8 @@ nothing here claims; ``convert(source)`` takes the whole thing and returns a
 ``Conversion``: the document, and the notes that are the other half of the output.
 ``write_uddf(document)`` is the way back out, and returns the mirror of that — a
 ``Written``: the bytes, and the notes saying what UDDF could not hold.
+``in_water(depths)`` is the derivation a reader applies where a source states no time in
+the water for a dive, for an application that holds a dive's depth samples already.
 
 The schema, the fixtures and the mapping documents are **vendored** here, from the
 specification commit named in the repository's ``SPEC_REF``, so that an installed package
@@ -29,10 +31,12 @@ SPEC_VERSION = "1.0"
 # the time the import runs.
 from .conform import compared  # noqa: E402
 from .converter import (  # noqa: E402
+    IN_WATER_DEPTH,
     PRODUCER_KEY,
     Conversion,
     ConverterError,
     DoctypeRefusedError,
+    InWater,
     MalformedArchiveError,
     NonConformingOutputError,
     Note,
@@ -41,6 +45,7 @@ from .converter import (  # noqa: E402
     SourceTooLargeError,
     UnsupportedSourceError,
     Written,
+    in_water,
 )
 from .fit import FIT_ID_NAMESPACE, FitError, MalformedFitError  # noqa: E402
 from .registry import (  # noqa: E402
@@ -74,6 +79,7 @@ from .validate import (  # noqa: E402
 )
 
 __all__ = [
+    "IN_WATER_DEPTH",
     "SNIFF_BYTES",
     "SPEC_VERSION",
     "WRITTEN",
@@ -88,6 +94,7 @@ __all__ = [
     "DoctypeRefusedError",
     "DuplicateMemberError",
     "FitError",
+    "InWater",
     "Issue",
     "MalformedArchiveError",
     "MalformedFitError",
@@ -109,6 +116,7 @@ __all__ = [
     "__version__",
     "compared",
     "convert",
+    "in_water",
     "load_document",
     "load_schema",
     "parse_document",

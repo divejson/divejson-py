@@ -59,10 +59,9 @@ def test_an_inferred_note_and_a_listed_member_arrive_together(source) -> None:
     """The report's `inferred` kind and `extensions.divejson.inferred` are one decision.
 
     This is the reader that can compute a value, so the coupling has teeth here in a way it
-    does not for the two XML readers. Both halves are empty for every file here — each
-    session records its own depths — and the encoder tests are where a file that infers one
-    is built. Either half without the other is a document saying two different things about
-    itself.
+    does not for the two XML readers. Every file here derives its duration and mean depth,
+    none carrying a `dive_summary`. Either half without the other is a document saying two
+    different things about itself.
     """
     conversion = convert(source.read_bytes(), exported_at=EXPORTED_AT)
     listed = conversion.document.get("extensions", {}).get(PRODUCER_KEY, {}).get(INFERRED, [])
@@ -97,7 +96,7 @@ def test_every_expected_document_has_an_input() -> None:
     assert orphans == []
 
 
-def test_the_ocean_dive_is_read_from_its_session_and_nothing_is_computed() -> None:
+def test_the_ocean_dive_takes_its_maximum_from_the_session_and_derives_its_time_in_the_water() -> None:
     """The known answer, and the point of the whole `_native` filter.
 
     45.91 is the native `uint32` scaled by 1000. The developer `float32` beside it on the
@@ -105,20 +104,22 @@ def test_the_ocean_dive_is_read_from_its_session_and_nothing_is_computed() -> No
     `frame.fields` into a dict by name would carry that instead — a document that validates
     perfectly and is wrong by a rounding error, on every Suunto file there is.
 
-    `duration` is `total_elapsed_time`, the wall clock of the dive, rounded from 4301.72.
-    `started_at` carries the +02:00 the `activity` message's two renderings of one instant
-    recover. Nothing is computed, so nothing is listed.
+    `duration` and `avg_depth` are the time in the water and the mean over it, derived from
+    the samples: the session's 4301.72 s and 19.43 m run on through the five minutes the
+    watch waits at the surface before closing the dive. Its JSON twin states 4001 s and
+    20.87 m. `started_at` carries the +02:00 the `activity` message's two renderings of one
+    instant recover.
     """
     conversion = convert(OCEAN.read_bytes(), exported_at=EXPORTED_AT)
     dive = conversion.document["dives"][0]
     assert dive["max_depth"] == 45.91
-    assert dive["avg_depth"] == 19.43
+    assert dive["avg_depth"] == 20.84
     assert dive["started_at"] == "2026-04-17T11:49:23+02:00"
-    assert dive["duration"] == 4302
+    assert dive["duration"] == 4010
     assert dive["recordings"][0]["cns_end"] == 20.0
     assert dive["recordings"][0]["otu_end"] == 55.0
-    assert INFERRED not in conversion.document["extensions"][PRODUCER_KEY]
-    assert [note.kind for note in conversion.notes if note.kind == "inferred"] == []
+    assert conversion.document["extensions"][PRODUCER_KEY][INFERRED] == ["dives/0/duration", "dives/0/avg_depth"]
+    assert len([note for note in conversion.notes if note.kind == "inferred"]) == 2
 
 
 def test_the_only_mapped_member_the_ocean_session_leaves_empty_is_start_cns() -> None:
@@ -127,11 +128,12 @@ def test_the_only_mapped_member_the_ocean_session_leaves_empty_is_start_cns() ->
     Every `absent` line names a member the device could have filled and did not, so the set
     of them is a statement about the *file*. On this one it is `start_cns` alone — the
     session records `end_cns` and `o2_toxicity` natively and carries no `dive_summary` at
-    all — beside the identity line every FIT dive gets, a file having no id to give one.
+    all — beside the identity line every FIT dive gets, a file having no id to give one, and
+    the two `inferred` lines for the figures derived from the samples.
     """
     conversion = convert(OCEAN.read_bytes(), exported_at=EXPORTED_AT)
-    assert [note.kind for note in conversion.notes] == ["absent", "absent"]
-    identity, unfilled = conversion.notes
+    assert [note.kind for note in conversion.notes] == ["absent", "inferred", "inferred", "absent"]
+    identity, unfilled = (note for note in conversion.notes if note.kind == "absent")
     assert "its identity is derived from its position" in identity.message
     assert "records no start_cns" in unfilled.message
 

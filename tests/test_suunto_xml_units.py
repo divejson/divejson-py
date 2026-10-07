@@ -215,10 +215,12 @@ def test_the_same_dive_read_from_fit_and_from_this_export_agrees() -> None:
     here, scaled integers in a binary message there. A wrong factor on either side moves one
     of them.
 
-    Three things deliberately do not agree, and each is the source's rather than a reader's.
+    Four things deliberately do not agree, and each is the source's rather than a reader's.
     The FIT carries the `+02:00` this export records nowhere, and this export carries the
     sub-second fraction the FIT does not. The temperature channels differ because the FIT
-    writes whole degrees where this file writes the sensor's float. And this export's own
+    writes whole degrees where this file writes the sensor's float. This export states
+    `<Duration>` and `<AvgDepth>` for the dive where the FIT states neither, so the FIT's are
+    derived from its samples, 10 s and a centimetre from these. And this export's own
     scalars — `surface_pressure`, `bottom_temperature`, the cylinder's size and ppO₂ limit —
     have no FIT counterpart at all.
     """
@@ -227,8 +229,9 @@ def test_the_same_dive_read_from_fit_and_from_this_export_agrees() -> None:
 
     assert xml["started_at"] == "2021-04-06T11:16:42.6"
     assert fit["started_at"] == "2021-04-06T11:16:42+02:00"
-    for member in ("duration", "max_depth", "avg_depth"):
-        assert xml[member] == fit[member], member
+    assert xml["max_depth"] == fit["max_depth"]
+    assert (xml["duration"], fit["duration"]) == (2001, 1991)
+    assert (xml["avg_depth"], fit["avg_depth"]) == (17.73, 17.74)
     for member in ("cns_end", "otu_end"):
         assert xml["recordings"][0][member] == fit["recordings"][0][member], member
     assert xml["cylinders"][0]["oxygen"] == fit["cylinders"][0]["oxygen"] == 21.0

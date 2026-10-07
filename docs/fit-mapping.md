@@ -240,25 +240,41 @@ FIT has no field for what a device calls itself, so §6.4b's `name` has no sourc
 | field | | into |
 | --- | --- | --- |
 | `session.start_time` (2) | | `started_at`, in the zone below |
-| `session.total_elapsed_time` (7), else `total_timer_time` (8), else `dive_summary.bottom_time` (11) **untested** | | `duration` |
+| `dive_summary.bottom_time` (11) **untested**, else the derivation, else `session.total_elapsed_time` (7), else `total_timer_time` (8) | | `duration` |
 | `session.max_depth` (141), else `dive_summary.max_depth` (3) **untested**, else the depth samples | | `max_depth` |
-| `session.avg_depth` (140), else `dive_summary.avg_depth` (2) **untested**, else the depth samples | | `avg_depth` |
+| `dive_summary.avg_depth` (2) **untested**, else the derivation, else `session.avg_depth` (140) | | `avg_depth` |
 | `dive_summary.start_cns` (5) **untested**, else `session.start_cns` (143) | | the recording's `cns_start` |
 | `dive_summary.end_cns` (6) **untested**, else `session.end_cns` (144) | | the recording's `cns_end` |
 | `dive_summary.o2_toxicity` (9) **untested**, else `session.o2_toxicity` (155) | | the recording's `otu_end` |
 | `dive_settings.water_type` (4) **untested** | | the recording's `salinity` |
 
-**The duration order is what a diver means by one.** `total_elapsed_time` is the wall clock
-from the moment the dive started to the moment it ended. `total_timer_time` excludes pauses,
-a distinction that barely exists underwater, and stands in where a device omits the first.
-Garmin's `bottom_time` is deliberately last: it measures time *at depth*, not the dive.
+**The session's figures are the activity's, not the dive's.** `total_elapsed_time` is the
+activity's time, pauses included, and `total_timer_time` the same without them; a watch
+keeps the activity running through its end-of-dive delay after the diver surfaces, so both
+count minutes at the surface that §6.2's `duration` leaves out, and `avg_depth` is the mean
+over all of them. On the 28 Ocean files in a diver's hand — personal exports this repository
+does not carry — the records run 268 to 298 s past the last sample deeper than 0.75 m, and
+`total_timer_time` equals the same dive's app-JSON `Duration`, the whole logged period, to
+the millisecond; `suunto-ocean.fit`'s session states 4 302 s where the derivation counts
+4 010. The D5 closes its dive within seconds: its three files in hand run 0 to 10 s past
+that sample. No FIT export of the Suunto app states a `dive_summary`, so every one derives
+its `duration` and `avg_depth` by the rule in [`converting.md`](converting.md) (*A dive's
+time in the water*), and the session's figures stand in only where the derivation yields
+nothing, as readings and with no mark.
 
-**The depths read the session first and the oxygen accounting reads the summary first**,
-which looks inconsistent and is not. The depths agree wherever both exist, and the fallback
-is for a device that summarises a dive in one message and not the other. The CNS and OTU
-totals are the *dive's*, and on a multi-dive Garmin file the session's cover the whole
-activity while the `dive_summary` describes the dive being read. Being the computer's own
-figures, they land on the file's one recording (§6.4a) rather than on the dive.
+`dive_summary.bottom_time` is read first as the computer's own figure for the dive, which is
+the one field Subsurface's Garmin parser takes a dive time from. The profile defines it no
+further than its name, and whether a Descent's is the dive time it displays waits on a file;
+the row is untested until one arrives.
+
+**The duration, the mean depth and the oxygen accounting read the summary first, and the
+maximum depth reads the session first.** On a multi-dive Garmin file the session's figures
+cover the whole activity while the `dive_summary` describes the dive being read, which is
+why the dive's own figures take the summary where there is one. A maximum has no surface
+time to leave out, so the session's is the dive's on every file in hand, and the summary is
+the fallback for a device that summarises a dive in one message and not the other. The CNS
+and OTU totals, being the computer's own figures, land on the file's one recording (§6.4a)
+rather than on the dive.
 
 A Garmin freediving activity writes a `dive_summary` per descent **plus** a session-level
 one, and `reference_mesg` (0) is what separates them: the summary referring to `session` is
@@ -317,18 +333,19 @@ no file in hand writes one, so §6.4a's `mode` is absent on a FIT dive — inclu
 freediving one, which this reader carries as a dive whose recording does not say what mode
 its computer ran in. The DM5 XML path says which, because its files state it.
 
-### The depth from the samples is `inferred`, and is listed
+### What the samples give is `inferred`, and is listed
 
-The third source for `max_depth` and `avg_depth` is the only one that is this converter's
-own arithmetic, so it is `inferred` and the document lists the member under
-`extensions.divejson.inferred` (spec §5.4). Every `inferred` note this reader raises has its
-member on that list and every member on the list has a note; the two are one decision.
+The derived `duration` and `avg_depth`, and a `max_depth` taken from the depth samples, are
+this converter's own arithmetic, so each is `inferred` and the document lists the member
+under `extensions.divejson.inferred` (spec §5.4). Every `inferred` note this reader raises
+has its member on that list and every member on the list has a note; the two are one
+decision. Each derived figure's note is one sentence whatever the file, so a logbook's
+report groups them.
 
-The computed `avg_depth` is the arithmetic mean of the depth readings, which is the mean
-*depth of the dive* only where the device sampled at a constant rate. Every file in this
-project's hand does; a device that sampled faster on descent would weight it towards the
-descent, which is why this is the last resort and why it is labelled as computed. It is
-quantized to two places, which is what a device's own `avg_depth` carries.
+The derived `avg_depth` is the time-weighted mean over the intervals the derivation counts,
+each interval weighted by its length, so a device that samples faster on descent does not
+pull it towards the descent. It is quantized to two places, which is what a device's own
+`avg_depth` carries.
 
 A mean deeper than the maximum cannot be, and the mean is dropped rather than either being
 adjusted to fit (spec §6.2). **The `inferred` findings are raised after that check rather
@@ -336,13 +353,13 @@ than as the values are found**, so a dropped mean is reported as dropped and not
 the document carries a value computed from the samples when it carries no value at all.
 
 The case that makes the ordering matter is a **recorded `max_depth` against a mean computed
-from the samples** — a device that summarised its depths and got the maximum wrong, or one
-whose `session` carries a maximum and no mean. There the dropped member is the derived one,
-so raising its finding first and unlisting it afterwards leaves an `inferred` line in the
-report with nothing on the list to match, which is the one thing this pairing may never do.
-The other way round — a device's own mean against a maximum computed from the samples — the
-dropped member is the device's own reading, which was never `inferred`, and the ordering
-changes nothing.
+from the samples** — the shape of every Suunto-app file, whose maximum is its session's and
+whose mean is derived, and a drop wherever a device got the maximum wrong. There the dropped
+member is the derived one, so raising its finding first and unlisting it afterwards leaves
+an `inferred` line in the report with nothing on the list to match, which is the one thing
+this pairing may never do. The other way round — a device's own mean against a maximum
+computed from the samples — the dropped member is the device's own reading, which was never
+`inferred`, and the ordering changes nothing.
 
 ### The local time zone — `activity` (34)
 
@@ -588,6 +605,9 @@ which the `extensions.divejson.inferred` list is ever written.
   states it should get as a Suunto app export does. `next_stop_time` appears above under *The
   ceiling*, as the field a reader must not mistake for a ceiling; that warning stands either
   way.
+- **`dive_settings.repeat_dive_interval` (17)** — "Time between surfacing and ending the
+  activity": the end-of-dive delay that keeps a session running at the surface. The
+  derivation needs no setting, and no file in hand states one.
 - **`dive_settings`'s thirty-odd other fields** — PO₂ alarm thresholds, backlight,
   safety-stop times, the CCR setpoint fields newer SDKs add. The computer's configuration,
   not the dive. `gf_low` and `gf_high` left this list when §6.4c arrived; they are carried

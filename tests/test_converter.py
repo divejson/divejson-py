@@ -1,5 +1,5 @@
-"""The converter policy every adapter inherits: notes, identities, how a zero reads, and
-which satellite fix places a dive.
+"""The converter policy every adapter inherits: notes, identities, how a zero reads, which
+satellite fix places a dive, and how long a dive spent in the water.
 
 Nothing here is UDDF's. These are the rules a second reader would otherwise re-implement
 slightly differently, which is the failure the shared module exists to prevent — a report
@@ -16,7 +16,9 @@ from typing import Any
 import pytest
 
 from divejson import Conversion, Note
+import divejson
 from divejson.converter import (
+    IN_WATER_DEPTH,
     INFERRED,
     MAX_MODEL_NAME,
     NOTE_KINDS,
@@ -28,6 +30,7 @@ from divejson.converter import (
     deco_model,
     header,
     in_seconds,
+    in_water,
     milliseconds,
     onto_primary,
     profile_members,
@@ -569,3 +572,82 @@ def test_the_finding_is_one_sentence_whatever_the_file(side: str) -> None:
     _, first = _chosen(side, ("0", 47), ("9", 9))
     _, second = _chosen(side, ("0", 13), ("2", 12), ("6", 10))
     assert [message for _, message, _ in first] == [message for _, message, _ in second]
+
+
+# -- a dive's time in the water --------------------------------------------------------
+
+
+def test_the_threshold_is_one_point_two_metres_and_strictly_deeper() -> None:
+    """The interval after a sample at exactly 1.2 m does not count; one after 1.21 m does."""
+    assert IN_WATER_DEPTH == Decimal("1.2")
+    assert in_water([(0, Decimal("1.2")), (10_000, Decimal("5"))]) is None
+    derived = in_water([(0, Decimal("1.21")), (10_000, Decimal("5"))])
+    assert derived is not None
+    assert (derived.duration, derived.avg_depth) == (10, Decimal("3.11"))
+
+
+def test_a_surface_interval_in_the_middle_and_the_tail_are_not_counted() -> None:
+    """Two descents with a surfacing between them, and the end-of-dive delay after the last.
+
+    Down for 70 s, up at 0.5 m for 120 s, down for 40 s, then 300 s at the surface: 110 s in
+    the water, and the mean is weighted by those 110 s alone — (60 × 7.5 + 10 × 5.25 + 20 ×
+    5.5 + 20 × 4.25) / 110 is 6.34, each counted interval taking the mean of both its ends.
+    """
+    depths = [(0, 5), (60_000, 10), (70_000, 0.5), (190_000, 3), (210_000, 8), (230_000, 0.5), (530_000, 0)]
+    derived = in_water(depths)
+    assert derived is not None
+    assert derived.duration == 110
+    assert derived.avg_depth == Decimal("6.34")
+
+
+def test_no_sample_deeper_than_the_threshold_is_nothing() -> None:
+    assert in_water([(0, Decimal("0.4")), (60_000, Decimal("1.2")), (120_000, Decimal("0"))]) is None
+    assert in_water([]) is None
+
+
+def test_the_last_sample_starts_no_interval() -> None:
+    """A recording that ends at depth counts to its last sample and no further."""
+    assert in_water([(0, Decimal("30"))]) is None
+    derived = in_water([(0, Decimal("30")), (5_000, Decimal("30"))])
+    assert derived is not None
+    assert derived.duration == 5
+
+
+def test_both_figures_round_halves_away_from_zero() -> None:
+    """2.5 s is 3 s, and a mean of 2.125 m is 2.13 m — never Python's half-to-even 2 and 2.12."""
+    derived = in_water([(0, Decimal("2")), (2_500, Decimal("2.25"))])
+    assert derived is not None
+    assert (derived.duration, derived.avg_depth) == (3, Decimal("2.13"))
+
+
+def test_a_float_depth_reads_as_the_decimal_it_prints_as() -> None:
+    """An application holding a profile in floats gets the threshold the reader applies."""
+    assert in_water([(0, 1.2), (10_000, 5.0)]) is None
+    derived = in_water([(0, 10.1), (10_000, 10.2)])
+    assert derived is not None
+    assert derived.avg_depth == Decimal("10.15")
+
+
+def test_a_float_subclass_reads_as_the_number_it_prints() -> None:
+    """NumPy's `float64` is a `float` whose `repr` names its type."""
+
+    class Float64(float):
+        def __repr__(self) -> str:
+            return f"np.float64({float(self)})"
+
+    derived = in_water([(0, Float64(10.1)), (10_000, Float64(10.2))])
+    assert derived is not None
+    assert derived.avg_depth == Decimal("10.15")
+    assert in_water([(0, Float64(1.2)), (10_000, Float64(5.0))]) is None
+
+
+def test_samples_out_of_time_order_are_refused() -> None:
+    with pytest.raises(ValueError, match="time order"):
+        in_water([(10_000, Decimal("5")), (0, Decimal("5"))])
+
+
+def test_the_derivation_is_exported_from_the_package_root() -> None:
+    """An application applies the same rule to samples it holds, rather than a second copy of it."""
+    assert divejson.in_water is in_water
+    assert divejson.IN_WATER_DEPTH == IN_WATER_DEPTH
+    assert {"in_water", "InWater", "IN_WATER_DEPTH"} <= set(divejson.__all__)

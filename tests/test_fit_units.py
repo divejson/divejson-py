@@ -230,19 +230,21 @@ def test_the_duration_rounds_halves_away_from_zero(seconds: float, duration: int
     assert _dive(data).get("duration") == duration
 
 
-def test_the_computed_mean_depth_keeps_two_places() -> None:
-    """The last resort, and the only figure in this reader that is its own arithmetic.
+def test_the_computed_mean_depth_is_weighted_by_time_and_keeps_two_places() -> None:
+    """Each interval's mean depth counts for as long as the interval lasts.
 
-    Two places is what a device's own `avg_depth` carries, so a computed one that carried
-    twelve would be visibly a different kind of number in the same member.
+    (30 × 15 + 40 × 22.5) / 70 is 19.2857…, where the arithmetic mean of the three readings
+    would be 18.33. Two places is what a device's own `avg_depth` carries, so a computed one
+    that carried twelve would be visibly a different kind of number in the same member.
     """
     data = dive_file(
-        *_records((0, {"depth": 10.0}), (30, {"depth": 20.0}), (60, {"depth": 25.0})),
-        session={"total_elapsed_time": 60.0, "max_depth": None, "avg_depth": None},
+        *_records((0, {"depth": 10.0}), (30, {"depth": 20.0}), (70, {"depth": 25.0})),
+        session={"total_elapsed_time": 70.0, "max_depth": None, "avg_depth": None},
     )
     conversion = _conversion(data)
-    assert conversion.document["dives"][0]["avg_depth"] == 18.33
+    assert conversion.document["dives"][0]["avg_depth"] == 19.29
     assert conversion.document["extensions"]["divejson"]["inferred"] == [
+        "dives/0/duration",
         "dives/0/max_depth",
         "dives/0/avg_depth",
     ]
