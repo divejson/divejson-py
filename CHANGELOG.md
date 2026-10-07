@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.22.0
+
 - **The FIT reader derives a dive's time in the water and its mean depth where the file
   states neither.** A `session`'s elapsed time and mean depth are the activity's: on a Suunto
   Ocean they run on through the five minutes the watch waits at the surface before closing
