@@ -4,7 +4,7 @@
   "exported_at": "2026-10-02T00:00:00+00:00",
   "generator": {
     "name": "divejson convert",
-    "version": "0.21.0"
+    "version": "0.20.0"
   },
   "dives": [
     {

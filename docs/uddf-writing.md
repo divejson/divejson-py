@@ -139,7 +139,7 @@ and the report says so.
 | DiveJSON | UDDF |
 | --- | --- |
 | `name` | `personal/firstname` + `lastname`, split as below |
-| `email` | `contact/email` — see the note below |
+| `email` | `contact/email` |
 | `phone` | `contact/phone` |
 | `born_on` | `personal/birthdate/datetime` |
 | `insurances[]` | `diveinsurances/insurance`, one per element, in document order |
@@ -171,12 +171,6 @@ reaches a document.
 
 An insurance's `number` and the diver's `emergency_contacts` and `portrait_file` have no
 element, and each is reported — *What is never written* has why.
-
-**Differs from the reference writer**: `diver.email` is written to
-`<contact><email>`. The reference writer deliberately omits it — a UDDF file is the thing a
-diver hands to a dive shop, and their address riding along in it would be a surprise — which
-is the right call for an application exporting on a diver's behalf and the wrong one for a
-library asked to write the document it was given.
 
 Gear types land in `equipmentType`'s elements. A type UDDF's own vocabulary does not name
 goes to **`<variouspieces>`**, its catch-all, which a reader maps back to `other`; that is

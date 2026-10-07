@@ -370,6 +370,45 @@ readings beside 29 temperatures keeps both, rather than gaining 402 invented one
   file says so and only the file can: the mapping document states the evidence and the
   resolution together, the way the ceiling rule above was settled.
 
+## A dive's time in the water
+
+§6.2's `duration` is the time the diver spent in the water as the computer counts it, and
+`avg_depth` the time-weighted mean depth over that time. Neither is the span of the
+recording: a computer keeps recording at the surface for an end-of-dive delay — five
+minutes by default on a Suunto Ocean — in case the diver descends again, and its own dive
+time leaves those minutes out. The profile keeps them, being the device's (§6.4).
+
+**A reader takes the figure its source states for the dive, and derives one only where the
+source states none.** Each mapping document names what counts as stated — a figure the
+computer or the logbook gave for the dive itself, not one it gave for a wider period such as
+the activity a watch recorded the dive inside. A reader whose source omits its stated figure
+leaves the member absent until a file in hand needs the derivation there; the FIT reader is
+the one that applies it, since no FIT export of the Suunto app states a figure for the dive
+([`fit-mapping.md`](fit-mapping.md)).
+
+**The derivation.** With the depth samples in time order, the interval from each sample to
+the next counts as in the water when that sample is strictly deeper than **1.2 m**. The
+dive's `duration` is the sum of the counted intervals, in whole seconds, halves away from
+zero; its `avg_depth` is the sum over counted intervals of the interval's length times the
+mean of its two depths, divided by the summed length, to two decimals. Both are `inferred`,
+listed under `extensions.divejson.inferred`, and each carries a report note in one sentence
+whatever the file, so that a logbook's report groups them rather than raising a group per
+dive. Where no interval counts — no depth samples, or no sample deeper than the threshold
+that another sample follows — both are absent from the derivation, and whatever wider
+figure the source does state stands in, as a reading and without an `inferred` mark.
+
+1.2 m is the documented default dive-start depth of both Suunto and Garmin. Over 46 Suunto
+Ocean app exports — a diver's personal files, which this repository does not carry — that
+state the watch's own dive time and mean depth beside 10-second samples, the rule lands
+within 22 s of the watch's dive time on every one (median 6 s) and within 0.04 m of its mean
+depth. *Rejected:* counting an interval when either end is deeper, which is Subsurface's
+shape and runs up to 38 s over the watch at the same threshold; Subsurface's own 0.75 m,
+which runs up to 134 s over (median 15 s), the first minutes of a dive often hovering around
+a metre; and following each computer's own start depth, which no file in hand states. A
+computer set to start deeper than 1.2 m — Suunto's maximum is 3.0 m — excludes more than the
+rule does, so a derived figure sits a little over its dive time, and the stated figure wins
+wherever a file carries one.
+
 ## Where a fix belongs
 
 **No fix is taken underwater.** A satellite receiver does not reach a wrist through
@@ -407,8 +446,10 @@ recorded every candidate and left open which of them is the entry or the exit, a
 converter decided — which is the kind's definition under *The report*. The nearest fix kept
 carries no finding, whatever its error: the rule changed nothing.
 
-The deepest sample is the pivot in preference to an in-water *window*, which would need a
-depth threshold a converter has nowhere to get and would therefore invent. With no depth
+The deepest sample is the pivot in preference to an in-water *window*, although the
+threshold *A dive's time in the water* sets would draw one: a fix belongs to a surfacing,
+not to a threshold crossing, and the deepest sample splits the dive into its descent and
+its last ascent whatever the diver did near the surface on either side. With no depth
 channel there is no pivot and so no answer, and nothing is written. A source whose fixes all
 land after the diver surfaced yields an exit and no entry, which is the honest half of what
 it recorded rather than a failure to find the other one.

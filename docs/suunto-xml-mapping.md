@@ -262,6 +262,12 @@ is not `duration`. `<DiveTime>`, which is the member the app-JSON reader prefers
 on every one of the 384 exports in hand: nothing here has seen a value of it, and building a
 preference order on a field nobody has seen would be a guess.
 
+`<Duration>` and `<AvgDepth>` are the figures this format states for the dive, so this
+reader derives neither ([`converting.md`](converting.md), *A dive's time in the water*). On
+the D5 the logged period is close to the time in the water: the computer closes its dive
+within seconds of its last in-water sample, and `fixtures/fit/suunto-d5.fit`, the same
+dive's FIT export, derives 1 991 s against these 2 001.
+
 Which way a zero reads is the member's own constraint (`converting.md`), and this format
 exercises both sides of it: `<MaxDepth>0</MaxDepth>` is a dive whose depth the computer never
 had, while `<CnsStart>0</CnsStart>` is the oxygen clock a diver's first dive of the day

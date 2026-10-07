@@ -247,6 +247,13 @@ boat. On one file in hand they are 4 001 s and 4 302 s. §6.2's `duration` is th
 the in-water figure wins where the export states it — which it does on the Ocean shape and
 not on the D5 shapes, where only `Duration` exists.
 
+The same dive's FIT export states no in-water figure, and the FIT reader derives one
+([`converting.md`](converting.md), *A dive's time in the water*). On each Ocean pair here the
+derived figures sit within seconds and centimetres of the ones this export states: 4 010 s
+and 20.84 m against 4 001 s and 20.87 m for `suunto-ocean`, 3 063 s and 10.73 m against
+3 051 s and 10.74 m for `suunto-ocean-2026`, and 4 099 s and 7.43 m against 4 096 s and
+7.42 m for `ocean-poor-first-fix`. The stated figures are the watch's own.
+
 `DepthAverage` is the Ocean's spelling of the average depth and `Depth.Avg` the D5's; no
 file in hand states both. Neither is derived: this export summarises its own dive, so both
 depths are readings.
@@ -715,8 +722,10 @@ Read as a list of what was considered, not of what was missed.
   Surface", "Wet Outside", "Dive Active", "Tank pressure available". Five of them land on
   t = 0 of every file in the corpus, and none is an event on a dive.
 - **`DeviceLog.Windows[]`** — per-window activity summaries the app uses for its own
-  charts; empty on all 16 D5 files and a repeat of the header's figures on the 19 Ocean
-  ones.
+  charts; empty on all 16 D5 files. On every Ocean export in hand it repeats the header's
+  `Duration` and `DiveTime`, and its depth block is an array whose average is the mean over
+  the whole recording rather than the header's `DepthAverage`, so it says nothing about the
+  dive the header does not say better.
 - **The filename** — above, under *Identity*.
 
 ## The pairs
