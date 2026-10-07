@@ -1118,7 +1118,9 @@ def in_water(depths: Iterable[tuple[int, Decimal | int | float]]) -> InWater | N
     weighted = Decimal(0)
     previous: tuple[int, Decimal] | None = None
     for at, depth in depths:
-        metres = Decimal(repr(depth)) if isinstance(depth, float) else Decimal(depth)
+        # `float.__repr__` rather than `repr`: a subclass such as NumPy's `float64` renders its
+        # type name in its own.
+        metres = Decimal(float.__repr__(depth)) if isinstance(depth, float) else Decimal(depth)
         if previous is not None:
             started, deeper = previous
             if at < started:

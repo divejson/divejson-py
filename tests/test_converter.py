@@ -628,6 +628,19 @@ def test_a_float_depth_reads_as_the_decimal_it_prints_as() -> None:
     assert derived.avg_depth == Decimal("10.15")
 
 
+def test_a_float_subclass_reads_as_the_number_it_prints() -> None:
+    """NumPy's `float64` is a `float` whose `repr` names its type."""
+
+    class Float64(float):
+        def __repr__(self) -> str:
+            return f"np.float64({float(self)})"
+
+    derived = in_water([(0, Float64(10.1)), (10_000, Float64(10.2))])
+    assert derived is not None
+    assert derived.avg_depth == Decimal("10.15")
+    assert in_water([(0, Float64(1.2)), (10_000, Float64(5.0))]) is None
+
+
 def test_samples_out_of_time_order_are_refused() -> None:
     with pytest.raises(ValueError, match="time order"):
         in_water([(10_000, Decimal("5")), (0, Decimal("5"))])
