@@ -4,15 +4,15 @@
   "exported_at": "2026-09-05T00:00:00+00:00",
   "generator": {
     "name": "divejson convert",
-    "version": "0.13.0"
+    "version": "0.21.0"
   },
   "dives": [
     {
       "uuid": "1c81e561-6fc5-59c7-bcdc-5c144636e163",
       "started_at": "2021-04-06T11:16:42+02:00",
-      "duration": 2001,
+      "duration": 1991,
       "max_depth": 32.41,
-      "avg_depth": 17.73,
+      "avg_depth": 17.74,
       "cylinders": [
         {
           "oxygen": 21.0,
@@ -853,7 +853,11 @@
       "fit_protocol_version": "2.0",
       "source_generator": {
         "name": "Suunto D5"
-      }
+      },
+      "inferred": [
+        "dives/0/duration",
+        "dives/0/avg_depth"
+      ]
     }
   }
 }

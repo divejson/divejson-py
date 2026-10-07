@@ -4,15 +4,15 @@
   "exported_at": "2026-09-05T00:00:00+00:00",
   "generator": {
     "name": "divejson convert",
-    "version": "0.13.0"
+    "version": "0.21.0"
   },
   "dives": [
     {
       "uuid": "1c81e561-6fc5-59c7-bcdc-5c144636e163",
       "started_at": "2026-04-17T11:49:23+02:00",
-      "duration": 4302,
+      "duration": 4010,
       "max_depth": 45.91,
-      "avg_depth": 19.43,
+      "avg_depth": 20.84,
       "exit_position": {
         "latitude": 28.56723,
         "longitude": 34.533233
@@ -9515,7 +9515,11 @@
       "fit_protocol_version": "2.0",
       "source_generator": {
         "name": "Suunto Ocean"
-      }
+      },
+      "inferred": [
+        "dives/0/duration",
+        "dives/0/avg_depth"
+      ]
     }
   }
 }
