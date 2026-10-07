@@ -87,6 +87,7 @@ __all__ = [
     "DEVICE_CAPS",
     "FIX_ERROR_BOUND",
     "FIX_WINDOW",
+    "IN_WATER_DEPTH",
     "INFERRED",
     "MAX_MAGNITUDE",
     "MAX_MODEL_NAME",
@@ -101,6 +102,7 @@ __all__ = [
     "DoctypeRefusedError",
     "Fix",
     "Identities",
+    "InWater",
     "MalformedArchiveError",
     "NonConformingOutputError",
     "Note",
@@ -124,6 +126,7 @@ __all__ = [
     "grouped",
     "header",
     "in_seconds",
+    "in_water",
     "integer_of",
     "milliseconds",
     "onto_primary",
@@ -1071,6 +1074,66 @@ FIX_ERROR_BOUND = Decimal(10)
 # milliseconds on the profile axis: long enough for a receiver to settle, short enough that
 # a diver swimming on the surface while it does has not gone far.
 FIX_WINDOW = 40_000
+
+# `docs/converting.md`'s threshold for a dive's time in the water, in metres: an interval
+# counts when the sample it starts at is strictly deeper than this. It is the default dive
+# start depth of Suunto's and Garmin's computers alike, and no file in hand states the
+# setting, so no reader can follow a diver who changed it.
+IN_WATER_DEPTH = Decimal("1.2")
+
+_MEAN_DEPTH_PLACES = Decimal("0.01")
+
+
+@dataclass(frozen=True, slots=True)
+class InWater:
+    """A dive's time in the water and its mean depth over that time, as `in_water` derives them.
+
+    `duration` is in whole seconds and `avg_depth` in metres to two decimals: the units and
+    precision §6.2's members take, so a reader writes them as they are.
+    """
+
+    duration: int
+    avg_depth: Decimal
+
+
+def in_water(depths: Iterable[tuple[int, Decimal | int | float]]) -> InWater | None:
+    """A dive's time in the water and its mean depth, from its depth samples alone.
+
+    `docs/converting.md`'s derivation, for any reader whose source states no figure for the
+    dive and for an application holding the samples already. `depths` are (milliseconds,
+    metres) pairs in time order. The interval from each sample to the next counts as in the
+    water when that sample is strictly deeper than `IN_WATER_DEPTH`; the duration is the sum
+    of the counted intervals and the mean is each counted interval's length times the mean
+    of its two depths, over that sum. Both round halves away from zero, the duration to the
+    second and the mean to the centimetre.
+
+    **Nothing comes back when no interval counts** — no sample deeper than the threshold
+    that another follows — and the caller's own figures stand. The last sample starts no
+    interval, so a recording that ends at depth counts up to its last sample and no further.
+
+    A float is read as the decimal it prints as, so a depth an application stores as
+    `1.2` is exactly the threshold and does not count.
+    """
+    counted = 0
+    weighted = Decimal(0)
+    previous: tuple[int, Decimal] | None = None
+    for at, depth in depths:
+        metres = Decimal(repr(depth)) if isinstance(depth, float) else Decimal(depth)
+        if previous is not None:
+            started, deeper = previous
+            if at < started:
+                raise ValueError(f"depth samples must be in time order; {at} ms follows {started} ms")
+            if deeper > IN_WATER_DEPTH:
+                length = at - started
+                counted += length
+                weighted += length * (deeper + metres) / 2
+        previous = (at, metres)
+    if counted == 0:
+        return None
+    return InWater(
+        duration=rounded(Decimal(counted) / MILLISECONDS_PER_SECOND),
+        avg_depth=(weighted / counted).quantize(_MEAN_DEPTH_PLACES, rounding=ROUND_HALF_UP),
+    )
 
 
 @dataclass(frozen=True, slots=True)

@@ -7,6 +7,19 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **The FIT reader derives a dive's time in the water and its mean depth where the file
+  states neither.** A `session`'s elapsed time and mean depth are the activity's: on a Suunto
+  Ocean they run on through the five minutes the watch waits at the surface before closing
+  the dive, and no Suunto-app export writes a `dive_summary`. So `duration` is now
+  `dive_summary.bottom_time`, else the time the depth samples spend deeper than 1.2 m, else
+  the session's elapsed time; `avg_depth` is `dive_summary.avg_depth`, else the
+  time-weighted mean over that same time, else the session's. A derived figure is
+  `inferred` and listed; the session's stand in unmarked. The Ocean fixture's 4302 s and
+  19.43 m become 4010 s and 20.84 m against its JSON twin's stated 4001 s and 20.87 m. The
+  arithmetic mean of every depth sample, the old last resort, is gone. The derivation is
+  exported as `in_water`, with its threshold `IN_WATER_DEPTH`, for an application that
+  holds a dive's samples already.
+
 ## 0.21.0
 
 - **The Suunto JSON and FIT readers take the fix nearest the split that the receiver vouched

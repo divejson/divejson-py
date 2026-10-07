@@ -103,6 +103,19 @@ conversion.document           # the DiveJSON document
 conversion.grouped()          # NoteGroup(kind, message, wheres), one per finding
 ```
 
+A dive's `duration` is its time in the water and its `avg_depth` the mean over that time.
+Where a source states neither, a reader derives them from the depth samples, and
+`in_water` is that derivation, for an application that holds a dive's samples already:
+
+```python
+divejson.in_water([(0, 5.0), (60_000, 10.0), (120_000, 0.4), (420_000, 0.0)])
+# InWater(duration=120, avg_depth=Decimal('6.35')) — or None when no interval counts
+```
+
+It takes (milliseconds, metres) pairs in time order, and an interval counts when the sample
+it starts at is deeper than `divejson.IN_WATER_DEPTH`, 1.2 m — the rule in
+[`docs/converting.md`](https://github.com/divejson/divejson-py/blob/main/docs/converting.md).
+
 ## Write a logbook back out
 
 ```bash
