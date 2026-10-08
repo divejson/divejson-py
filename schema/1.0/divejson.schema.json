@@ -103,7 +103,6 @@
       "properties": {
         "uuid": { "$ref": "#/$defs/uuid" },
         "name": { "type": "string", "maxLength": 255 },
-        "username": { "type": "string", "maxLength": 64 },
         "email": { "type": "string", "format": "email", "maxLength": 255 },
         "phone": { "type": "string", "maxLength": 32 },
         "born_on": { "$ref": "#/$defs/date" },
