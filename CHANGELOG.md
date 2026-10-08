@@ -7,6 +7,13 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Breaking: a diver carries no handle, and `username` is removed.** §6.1 of
+  [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) keeps
+  the diver's name and the ways they are reached, a username being the handle one application
+  knows them by — meaningful at no other host, and never applied by a reader. `divejson
+  validate` refuses a diver carrying `username` as an undefined member, which it accepted
+  before.
+
 ## 0.22.0
 
 - **The FIT reader derives a dive's time in the water and its mean depth where the file
