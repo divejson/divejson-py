@@ -87,7 +87,7 @@ validator does not look.
 | `trailing-newline-datetime.divejson` | a date-time with a trailing newline inside the string | §5.2 |
 | `position-incomplete.divejson` | a Position missing `longitude` | §6 |
 | `diver-name-too-long.divejson` | a diver `name` of 256 characters | §6.1 |
-| `diver-username-too-long.divejson` | a diver `username` of 65 characters | §6.1 |
+| `diver-username.divejson` | a diver carrying `username` — the retired member | §6.1 |
 | `diver-email-too-long.divejson` | a diver `email` of 256 characters, an address in every other respect | §6.1 |
 | `emergency-contact-without-name.divejson` | an emergency contact with a phone and a relationship and no `name` | §6.1 |
 | `insurance-without-provider.divejson` | an insurance with a `number` and no `provider` | §6.1 |
