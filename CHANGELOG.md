@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.23.0
+
 - **Breaking: a diver carries no handle, and `username` is removed.** §6.1 of
   [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) keeps
   the diver's name and the ways they are reached, a username being the handle one application
