@@ -117,7 +117,7 @@ def test_a_developer_field_under_a_name_no_profile_field_has_is_ignored() -> Non
     )
     dive = _dive(data)
     assert dive["max_depth"] == 45.91
-    assert set(dive) <= {"uuid", "started_at", "duration", "max_depth", "avg_depth", "recordings"}
+    assert set(dive) <= {"uuid", "started_at", "submerged_time", "max_depth", "avg_depth", "recordings"}
     # `recordings` is there because the `file_id` names a manufacturer, which is §6.4b's
     # `brand`. What it must not carry is a counter off `dive_number_in_series`: that is a
     # developer field, and the device's `dive_number` comes from the native `session.dive_number`.
@@ -219,15 +219,15 @@ def test_the_invalid_position_sentinel_is_not_a_hundred_and_eighty_degrees() -> 
 # -- the scalars ----------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(("seconds", "duration"), [(4301.72, 4302), (2.5, 3), (0.4, None), (1.0, 1)])
-def test_the_duration_rounds_halves_away_from_zero(seconds: float, duration: int | None) -> None:
+@pytest.mark.parametrize(("seconds", "submerged_time"), [(4301.72, 4302), (2.5, 3), (0.4, None), (1.0, 1)])
+def test_the_submerged_time_rounds_halves_away_from_zero(seconds: float, submerged_time: int | None) -> None:
     """2.5 seconds of elapsed time is 3, not the 2 Python's own half-to-even `round` gives.
 
-    A value that rounds to zero is not a duration: §6.2's floor is exclusive, so it reads as
+    A value that rounds to zero is not a submerged time: §6.2's floor is exclusive, so it reads as
     not recorded rather than as a dive of no length.
     """
     data = dive_file(session={"total_elapsed_time": seconds})
-    assert _dive(data).get("duration") == duration
+    assert _dive(data).get("submerged_time") == submerged_time
 
 
 def test_the_computed_mean_depth_is_weighted_by_time_and_keeps_two_places() -> None:
@@ -244,7 +244,7 @@ def test_the_computed_mean_depth_is_weighted_by_time_and_keeps_two_places() -> N
     conversion = _conversion(data)
     assert conversion.document["dives"][0]["avg_depth"] == 19.29
     assert conversion.document["extensions"]["divejson"]["inferred"] == [
-        "dives/0/duration",
+        "dives/0/submerged_time",
         "dives/0/max_depth",
         "dives/0/avg_depth",
     ]

@@ -750,8 +750,8 @@ def test_the_profiles_duration_is_the_span_of_its_own_samples() -> None:
     samples = "<sample time='0:00 min' depth='1.0 m'/><sample time='71:40 min' depth='0.0 m'/>"
     conversion = convert(one_ssrf_dive("duration='66:50 min'", f"<divecomputer>{samples}</divecomputer>"))
     found = conversion.document["dives"][0]
-    # The dive's own duration is seconds and the profile's axis milliseconds (§5.1).
-    assert found["duration"] == 4010
+    # The dive's own submerged time is seconds and the profile's axis milliseconds (§5.1).
+    assert found["submerged_time"] == 4010
     assert profile_of(found)["duration"] == 4_300_000
 
 

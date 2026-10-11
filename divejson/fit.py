@@ -30,7 +30,7 @@ off as the profile's scaled integer.
 
 **The `session` is the activity's and Garmin's `dive_summary` is the dive's.** The
 session's elapsed time and mean depth cover the whole recording — on a Suunto Ocean, five
-minutes at the surface after the dive by default — so a dive's duration and mean depth come
+minutes at the surface after the dive by default — so a dive's submerged time and mean depth come
 from the summary, else from its time in the water as `converter.in_water` derives it, and
 the session stands in only where neither yields one. Its maximum has no window and is read
 first. The CNS and OTU totals are the dive's too, and on a multi-dive Garmin file the
@@ -714,7 +714,7 @@ class _Converter:
         derived = in_water((at, point.depth) for at, point in samples.ordered() if point.depth is not None)
 
         # In §6.2's own member order, so a converted dive reads down the schema.
-        self.read_duration(session, summary, derived, dive, where)
+        self.read_submerged_time(session, summary, derived, dive, where)
         self.read_depths(session, summary, samples, derived, dive, where)
         # The salinity setting and the oxygen clocks are the computer's own (§6.4a), so they
         # are read here and carried on its recording below rather than on the dive — and the
@@ -865,7 +865,7 @@ class _Converter:
     def absent(self, member: str, source: str, where: str, *, record: str = "dive") -> None:
         self.note(where, f"the file records no {source}, so the {record}'s {member} is not carried", "absent")
 
-    def read_duration(
+    def read_submerged_time(
         self,
         session: fitdecode.FitDataMessage,
         summary: fitdecode.FitDataMessage | None,
@@ -883,19 +883,19 @@ class _Converter:
         unmarked — only where the samples yield none.
         """
         stated = _number(_native(summary, "bottom_time"))
-        if stated is not None and recorded(rounded(stated), record="dive", member="duration"):
-            dive["duration"] = rounded(stated)
+        if stated is not None and recorded(rounded(stated), record="dive", member="submerged_time"):
+            dive["submerged_time"] = rounded(stated)
             return
-        if derived is not None and recorded(derived.duration, record="dive", member="duration"):
-            dive["duration"] = derived.duration
+        if derived is not None and recorded(derived.submerged_time, record="dive", member="submerged_time"):
+            dive["submerged_time"] = derived.submerged_time
             self.note(
                 where,
                 "the file states no dive time on a dive summary, and its session's elapsed time covers the "
-                "whole recording, so the dive's duration is computed from its depth samples as the time "
+                "whole recording, so the dive's submerged time is computed from its depth samples as the time "
                 f"they spend deeper than {IN_WATER_DEPTH} m (spec §5.4)",
                 "inferred",
             )
-            self.inferred.append("dives/0/duration")
+            self.inferred.append("dives/0/submerged_time")
             return
         seconds = _first(
             _number(_native(session, "total_elapsed_time")),
@@ -903,20 +903,20 @@ class _Converter:
         )
         if seconds is None:
             self.absent(
-                "duration",
+                "submerged_time",
                 f"dive time on a dive summary or elapsed time on its session, and no depth samples deeper than "
                 f"{IN_WATER_DEPTH} m to derive one from",
                 where,
             )
             return
-        duration = rounded(seconds)
-        if recorded(duration, record="dive", member="duration"):
-            dive["duration"] = duration
+        submerged_time = rounded(seconds)
+        if recorded(submerged_time, record="dive", member="submerged_time"):
+            dive["submerged_time"] = submerged_time
         else:
             self.note(
                 where,
-                f"the session's elapsed time is {duration} seconds; the format records a duration only when "
-                "it is positive",
+                f"the session's elapsed time is {submerged_time} seconds; the format records a submerged time "
+                "only when it is positive",
                 "absent",
             )
 

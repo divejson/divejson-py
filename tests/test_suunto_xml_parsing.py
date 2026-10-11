@@ -171,24 +171,24 @@ def test_a_start_time_that_is_not_one_drops_the_dive(written: str) -> None:
 # -- the dive's own scalars -----------------------------------------------------------
 
 
-def test_the_duration_is_the_logged_period_and_not_the_bottom_time() -> None:
+def test_the_submerged_time_is_the_logged_period_and_not_the_bottom_time() -> None:
     """`<BottomTime>` is the time at depth and runs a third shorter.
 
     `<DiveTime>`, which would be the in-water figure the app JSON's reader prefers, is
     `i:nil` on every one of the 384 exports in hand.
     """
     found = one("<Duration>2001</Duration><BottomTime>1028</BottomTime>")
-    assert found["duration"] == 2001
+    assert found["submerged_time"] == 2001
 
 
-def test_a_duration_below_a_whole_second_is_read_as_not_recorded() -> None:
+def test_a_submerged_time_below_a_whole_second_is_read_as_not_recorded() -> None:
     """Rounded before its constraint is asked about, or a 0.4 s dive fails our own validation.
 
     §6.2 admits a positive whole number of seconds, and 0.4 is above the schema's floor
     while the integer written from it is not.
     """
     conversion = convert(suunto_xml("<Duration>0.4</Duration>"))
-    assert "duration" not in conversion.document["dives"][0]
+    assert "submerged_time" not in conversion.document["dives"][0]
     assert any(note.kind == "absent" and "<Duration>" in note.message for note in conversion.notes)
 
 

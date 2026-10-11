@@ -577,7 +577,7 @@ class _Converter:
         samples = self.axis(started.at, where)
 
         # In §6.2's own member order, so a converted dive reads down the schema.
-        self.read_duration(dive, where)
+        self.read_submerged_time(dive, where)
         self.read_depths(dive, where)
         # The oxygen clocks and the surface pressure are the computer's own figures, so they
         # are read here and carried on its recording below rather than on the dive.
@@ -717,17 +717,17 @@ class _Converter:
         )
         return False
 
-    def read_duration(self, dive: dict[str, Any], where: str) -> None:
+    def read_submerged_time(self, dive: dict[str, Any], where: str) -> None:
         """`DiveTime` if the header states one, else `Duration`.
 
         The two are different quantities and the order matters. `DiveTime` is the time in
         the water; `Duration` is the whole period the computer logged, which begins before
         the diver gets in and ends after they are back on the boat — 4 001 s against 4 302 s
-        on one file in hand. §6.2's `duration` is the dive's, so the in-water figure wins
+        on one file in hand. §6.2's `submerged_time` is the dive's, so the in-water figure wins
         where the export states it, and the D5 shapes state only `Duration`.
 
         **The whole seconds are what the member's own rule is asked about**, not the
-        fractional value the header states. §6.2 makes `duration` a positive integer, so a
+        fractional value the header states. §6.2 makes `submerged_time` a positive integer, so a
         `DiveTime` of 0.4 s is above the schema's floor and the number written from it —
         zero — is not; checking before rounding lets that one through and fails the
         converter's own validation. The other three readers in this package round first for
@@ -738,17 +738,17 @@ class _Converter:
             if value is None:
                 continue
             seconds = rounded(value)
-            if not recorded(seconds, record="dive", member="duration"):
+            if not recorded(seconds, record="dive", member="submerged_time"):
                 self.note(
                     where,
-                    f"the header records {source} as {value} s, which the format cannot hold as a duration "
+                    f"the header records {source} as {value} s, which the format cannot hold as a submerged time "
                     "(§6.2 admits a positive whole number of seconds); read as not recorded",
                     "absent",
                 )
                 continue
-            dive["duration"] = seconds
+            dive["submerged_time"] = seconds
             return
-        self.absent("duration", "DiveTime or Duration", where)
+        self.absent("submerged_time", "DiveTime or Duration", where)
 
     def read_depths(self, dive: dict[str, Any], where: str) -> None:
         """`Depth.Max`, and the average under whichever name this generation writes.

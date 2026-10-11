@@ -230,10 +230,10 @@ def test_a_route_origin_is_already_degrees_and_is_carried_exactly() -> None:
 # -- time -----------------------------------------------------------------------------
 
 
-def test_a_duration_is_seconds_and_rounds_half_away_from_zero() -> None:
+def test_a_submerged_time_is_seconds_and_rounds_half_away_from_zero() -> None:
     """4 001.4 s is 4 001, and 2.5 s of anything is 3 rather than banker's 2."""
-    assert _dive({"DiveTime": 4001.4})["duration"] == 4001
-    assert _dive({"DiveTime": 2.5})["duration"] == 3
+    assert _dive({"DiveTime": 4001.4})["submerged_time"] == 4001
+    assert _dive({"DiveTime": 2.5})["submerged_time"] == 3
 
 
 def test_a_samples_place_is_elapsed_milliseconds_from_the_header_s_own_start() -> None:

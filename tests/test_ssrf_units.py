@@ -102,7 +102,7 @@ def test_the_scalar_temperature_takes_no_channel_scale() -> None:
     ],
 )
 def test_a_clock_is_minutes_and_seconds(written: str, seconds: int) -> None:
-    assert one(f"duration='{written} min'").get("duration", 0) == seconds
+    assert one(f"duration='{written} min'").get("submerged_time", 0) == seconds
 
 
 @pytest.mark.parametrize(("written", "milliseconds"), [("0:10", 10_000), ("1:20", 80_000), ("71:40", 4_300_000)])
@@ -131,7 +131,7 @@ def test_a_clock_too_large_for_the_axis_is_not_a_time() -> None:
 def test_something_that_is_not_a_clock_is_refused_rather_than_read_as_minutes(written: str) -> None:
     """A bare `66` is the tempting one, and reading it would be a factor-of-60 guess."""
     conversion = convert(one_ssrf_dive(f"duration='{written} min'"))
-    assert "duration" not in conversion.document["dives"][0]
+    assert "submerged_time" not in conversion.document["dives"][0]
     assert any(note.kind == "dropped" and "<dive duration>" in note.message for note in conversion.notes)
 
 

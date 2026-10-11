@@ -97,12 +97,12 @@ def messages(source: dict[str, Any], where: str) -> list[str]:
 # -- what a required element does when the document has nothing for it -----------------
 
 
-def test_a_dive_with_no_depth_or_duration_writes_the_zeros_the_format_forces(schema) -> None:
+def test_a_dive_with_no_depth_or_submerged_time_writes_the_zeros_the_format_forces(schema) -> None:
     """`<greatestdepth>` and `<diveduration>` are both mandatory, and DiveJSON's are not.
 
     Zero is not a fabricated reading here: it is the spelling UDDF leaves a writer with
     nothing to say, and this format's own reader takes it straight back off — `max_depth`
-    and `duration` both exclude zero in the schema, so a reader that read it as a
+    and `submerged_time` both exclude zero in the schema, so a reader that read it as a
     measurement would be reading "the surface" out of "we do not know".
     """
     source = one_dive()
@@ -111,7 +111,7 @@ def test_a_dive_with_no_depth_or_duration_writes_the_zeros_the_format_forces(sch
     assert "<diveduration>0</diveduration>" in text
 
     dive = read_back(source)["dives"][0]
-    assert "max_depth" not in dive and "duration" not in dive
+    assert "max_depth" not in dive and "submerged_time" not in dive
     assert [kind for kind, where, _ in notes(source) if where == "dives/0"] == ["absent", "absent"]
 
 
@@ -1441,7 +1441,7 @@ def test_the_members_with_a_slot_go_where_the_xsd_puts_them_and_come_back(schema
     assert {member: back.get(member) for member in members} == members
     assert notes(source) == [
         ("absent", "dives/0", "the dive records no maximum depth, and UDDF's <greatestdepth> is mandatory; 0 is written, which readers of this format take as not recorded"),
-        ("absent", "dives/0", "the dive records no duration, and UDDF's <diveduration> is mandatory; 0 is written, which readers of this format take as not recorded"),
+        ("absent", "dives/0", "the dive records no submerged time, and UDDF's <diveduration> is mandatory; 0 is written, which readers of this format take as not recorded"),
     ]
 
 
@@ -1546,7 +1546,7 @@ def test_the_tags_the_waves_the_weather_and_the_boat_have_no_slot(schema) -> Non
         f"UDDF has no slot for {member}; it is not written" for member in ("boat_name", "tags", "waves", "weather")
     ] + [
         "the dive records no maximum depth, and UDDF's <greatestdepth> is mandatory; 0 is written, which readers of this format take as not recorded",
-        "the dive records no duration, and UDDF's <diveduration> is mandatory; 0 is written, which readers of this format take as not recorded",
+        "the dive records no submerged time, and UDDF's <diveduration> is mandatory; 0 is written, which readers of this format take as not recorded",
     ]
 
 

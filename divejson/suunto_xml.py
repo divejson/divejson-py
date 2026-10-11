@@ -334,8 +334,8 @@ class _Converter:
         clock a diver's first dive of the day starts on.
 
         Every member written through here is one §6 types as a `number`, so the reading is
-        carried as a float. `duration`, the one whole-number member this reader maps, has
-        `read_duration` of its own — an integer member has to be rounded *before* its
+        carried as a float. `submerged_time`, the one whole-number member this reader maps, has
+        `read_submerged_time` of its own — an integer member has to be rounded *before* its
         constraint is asked about, and that ordering is the point of separating them.
         """
         value = self.number(self.root, name, where)
@@ -412,7 +412,7 @@ class _Converter:
         dive: dict[str, Any] = {"uuid": claimed, "started_at": started_at}
 
         # In §6.2's own member order, so a converted dive reads down the schema.
-        self.read_duration(dive, where)
+        self.read_submerged_time(dive, where)
         notes = _recorded_text(self.root, "Note")
         if notes is not None:
             dive["notes"] = notes
@@ -582,18 +582,18 @@ class _Converter:
         return started_at
 
 
-    def read_duration(self, dive: dict[str, Any], where: str) -> None:
+    def read_submerged_time(self, dive: dict[str, Any], where: str) -> None:
         """`<Duration>`, the whole period the computer logged.
 
         Deliberately not `<BottomTime>`, which is the time spent at depth and runs a third
         shorter — 1 028 s against 2 001 on the dive this reader is measured against — and
         not `<DiveTime>`, which is `i:nil` on every one of the 384 exports in hand, so
-        nothing here has ever seen a value of it. §6.2's `duration` is the dive's own
+        nothing here has ever seen a value of it. §6.2's `submerged_time` is the dive's own
         length, and `<Duration>` is the only element in this format that has been observed
         holding it.
 
         **The whole seconds are what the member's own rule is asked about**, not the value
-        the element states. §6.2 makes `duration` a positive integer, so a `<Duration>` of
+        the element states. §6.2 makes `submerged_time` a positive integer, so a `<Duration>` of
         0.4 s is above the schema's floor while the number written from it — zero — is not;
         checking before rounding lets that one through and fails the converter's own
         validation. The other readers in this package round first for the same reason.
@@ -602,12 +602,12 @@ class _Converter:
         if value is None:
             return
         seconds = rounded(value)
-        if recorded(seconds, record="dive", member="duration"):
-            dive["duration"] = seconds
+        if recorded(seconds, record="dive", member="submerged_time"):
+            dive["submerged_time"] = seconds
         else:
             self.note(
                 where,
-                f"<Duration> is {value} s, which the format cannot hold as a duration (§6.2 admits a "
+                f"<Duration> is {value} s, which the format cannot hold as a submerged time (§6.2 admits a "
                 "positive whole number of seconds); read as not recorded",
                 "absent",
             )

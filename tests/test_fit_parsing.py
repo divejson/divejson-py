@@ -293,7 +293,7 @@ SURFACE_TAIL = [(0, 5.0), (60, 10.0), (120, 0.4), (420, 0.0)]
 
 
 @pytest.mark.parametrize(
-    ("fields", "summary", "records", "duration", "derived"),
+    ("fields", "summary", "records", "submerged_time", "derived"),
     [
         ({"total_elapsed_time": 420.0}, 2400, SURFACE_TAIL, 2400, False),
         ({"total_elapsed_time": 420.0}, None, SURFACE_TAIL, 120, True),
@@ -302,8 +302,8 @@ SURFACE_TAIL = [(0, 5.0), (60, 10.0), (120, 0.4), (420, 0.0)]
     ],
     ids=["bottom-time", "derived", "elapsed", "timer"],
 )
-def test_the_duration_is_the_summary_then_the_time_in_the_water_then_the_session(
-    fields, summary, records, duration, derived
+def test_the_submerged_time_is_the_summary_then_the_time_in_the_water_then_the_session(
+    fields, summary, records, submerged_time, derived
 ) -> None:
     """Garmin's bottom time, then the time in the water, then the session's elapsed time.
 
@@ -314,16 +314,16 @@ def test_the_duration_is_the_summary_then_the_time_in_the_water_then_the_session
     extra = [message("dive_summary", reference_mesg="session", bottom_time=summary)] if summary else []
     data = dive_file(*extra, *(_at(at, depth=depth) for at, depth in records), session=fields)
     conversion = _run(data)
-    assert conversion.document["dives"][0]["duration"] == duration
+    assert conversion.document["dives"][0]["submerged_time"] == submerged_time
     listed = conversion.document["extensions"]["divejson"].get("inferred", [])
-    assert ("dives/0/duration" in listed) is derived
+    assert ("dives/0/submerged_time" in listed) is derived
 
 
 def test_a_file_with_no_depth_samples_keeps_the_session_figures_and_lists_nothing() -> None:
     """No samples, no derivation: the activity's figures are the only ones the file has."""
     conversion = _run(dive_file(session={"total_elapsed_time": 4301.72, "avg_depth": 19.43}))
     dive = conversion.document["dives"][0]
-    assert (dive["duration"], dive["avg_depth"]) == (4302, 19.43)
+    assert (dive["submerged_time"], dive["avg_depth"]) == (4302, 19.43)
     assert "inferred" not in conversion.document["extensions"]["divejson"]
     assert _messages(conversion, "inferred") == []
 
@@ -333,7 +333,7 @@ def test_a_file_never_deeper_than_the_threshold_keeps_the_session_figures() -> N
     data = dive_file(_at(0, depth=1.2), _at(60, depth=1.0), _at(120, depth=1.2), session={"total_elapsed_time": 120.0})
     conversion = _run(data)
     dive = conversion.document["dives"][0]
-    assert (dive["duration"], dive["avg_depth"]) == (120, 19.43)
+    assert (dive["submerged_time"], dive["avg_depth"]) == (120, 19.43)
     assert "inferred" not in conversion.document["extensions"]["divejson"]
 
 
@@ -360,9 +360,9 @@ def test_a_file_with_neither_summary_nor_session_depth_infers_from_its_samples_a
     )
     conversion = _run(data)
     dive = conversion.document["dives"][0]
-    assert (dive["duration"], dive["max_depth"], dive["avg_depth"]) == (60, 30.5, 20.25)
+    assert (dive["submerged_time"], dive["max_depth"], dive["avg_depth"]) == (60, 30.5, 20.25)
     assert conversion.document["extensions"]["divejson"]["inferred"] == [
-        "dives/0/duration",
+        "dives/0/submerged_time",
         "dives/0/max_depth",
         "dives/0/avg_depth",
     ]
@@ -391,7 +391,7 @@ def test_a_computed_mean_deeper_than_the_recorded_maximum_is_dropped_and_says_no
     assert "avg_depth" not in dive
     assert any("is deeper than the greatest depth" in text for text in _messages(conversion, "dropped"))
     assert not any("avg_depth" in text for text in _messages(conversion, "inferred"))
-    assert conversion.document["extensions"]["divejson"]["inferred"] == ["dives/0/duration"]
+    assert conversion.document["extensions"]["divejson"]["inferred"] == ["dives/0/submerged_time"]
 
 
 def test_the_inferred_report_and_the_derived_list_name_the_same_members() -> None:

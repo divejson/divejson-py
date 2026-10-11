@@ -7,6 +7,18 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Breaking: a dive's time in the water is `submerged_time`, and `duration` is the
+  profile's alone.** §6.2 of
+  [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md)
+  renames the dive's member with its definition unchanged, because one word named two
+  quantities in two units — the dive's seconds and a profile's milliseconds — and beside
+  `started_at` it read as the end time minus the start, which it is not. Every reader writes
+  the figure under the new name, the FIT reader lists a derived one as
+  `dives/0/submerged_time`, `InWater.duration` is `InWater.submerged_time`, and the UDDF
+  writer writes it to `<diveduration>` as before. `divejson validate` and `convert` refuse a
+  dive carrying `duration` as an undefined member, which they accepted before; renaming the
+  key is the whole fix.
+
 ## 0.24.0
 
 - **Breaking: the profile's `temperature` channel is hundredths of a degree Celsius.** §5.1
