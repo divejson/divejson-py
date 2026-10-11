@@ -391,7 +391,7 @@ def test_the_averaged_temperature_is_not_the_temperature_channel() -> None:
     found = profile_of(
         one(suunto_xml_samples(suunto_xml_sample(10, AveragedTemperature="30", Temperature="22.4")))
     )
-    assert found["temperature"]["values"] == [224]
+    assert found["temperature"]["values"] == [2240]
 
 
 def test_a_zero_ceiling_is_not_a_ceiling() -> None:

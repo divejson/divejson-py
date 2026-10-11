@@ -101,7 +101,7 @@ validates perfectly and describes a dive nobody took.
 | CNS | a 0-1 fraction | whole percent | × 100 |
 | OTU | OTUs | the same number | — |
 | depth, ceiling | metres | metres; **centimetres** on a §6.5 channel | — / × 100 |
-| sample temperature | **Kelvin** | **tenths of a degree Celsius** on a §6.5 channel | (K − 273.15) × 10 |
+| sample temperature | **Kelvin** | **hundredths of a degree Celsius** on a §6.5 channel | (K − 273.15) × 100 |
 | tank pressure on a channel | Pascal | **tenths of a bar** | ÷ 10 000 |
 | `Samples[].Latitude` / `Longitude` | **radians** | decimal degrees at six places | × 180/π |
 | `DiveRouteOrigin.Latitude` / `Longitude` | **degrees** | decimal degrees, exactly as recorded | — |
@@ -124,6 +124,13 @@ most digits: a transmitter reports in steps far finer than a gauge a diver reads
 radian-to-degree conversion, which is a converter's own arithmetic on an irrational factor
 and is cut at six places, about 11 cm. `DiveRouteOrigin` is already degrees and is carried
 untouched.
+
+**The Ocean fills the temperature channel's grain; the D5 does not.** Both write Kelvin with
+up to two decimals, and the Ocean's readings step by 0.01 K — `ocean-poor-first-fix.json`'s
+301.86 K is `2871`. Every D5 reading in this corpus is a tenth of a degree written in
+Kelvin — 296.65 K is 23.5 °C, `2350` — so its last digit is always zero. That zero is the
+D5's own resolution at the format's grain, not something a reader rounded, and both are read
+by the same factor.
 
 **Two coordinate units in one file is not an ambiguity.** A sample fix and a route origin
 are different members, each with one unit, so there is no magnitude test and no `resolved`
@@ -386,7 +393,7 @@ switch that happened, and saying so is honest where guessing a position would no
 | `TimeISO8601` | | the sample's instant, in milliseconds elapsed from `Header.DateTime` |
 | `Depth` | | the `depth` channel, centimetres |
 | `Ceiling` | | the `ceiling` channel, centimetres, **where it is above zero** |
-| `Temperature` | | the `temperature` channel, tenths of a degree Celsius |
+| `Temperature` | | the `temperature` channel, hundredths of a degree Celsius |
 | `Cylinders[].Pressure` | | a `pressures` channel, tenths of a bar, per cylinder |
 | `NoDecTime` | | the `ndl` channel, seconds |
 | `TimeToSurface` | | the `tts` channel, seconds, **where it is above zero** |

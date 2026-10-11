@@ -7,7 +7,7 @@ dive nobody took. Every expectation below is worked out in a comment rather than
 off the code, which is the only version of this test that can fail when the code is wrong.
 
 The scales, from spec §5.1: profile depth in **centimetres**, profile temperature in
-**tenths of a degree Celsius**, and every scalar outside a profile channel in the base unit
+**hundredths of a degree Celsius**, and every scalar outside a profile channel in the base unit
 — metres, °C, bar, litres, percent. **The channel conversions carry a scale the scalar ones
 do not**, which is the trap this file exists for.
 
@@ -63,21 +63,26 @@ def test_depth_samples_are_centimetres(metres: str, centimetres: int) -> None:
 
 
 @pytest.mark.parametrize(
-    ("celsius", "tenths"),
+    ("celsius", "hundredths"),
     [
-        ("24.4", 244),  # 24.4 C x 10 - Celsius already, unlike UDDF's Kelvin
-        ("24.0", 240),
-        ("22.0", 220),
+        ("24.4", 2440),  # 24.4 C x 100 - Celsius already, unlike UDDF's Kelvin
+        ("24.0", 2400),
+        ("26.69", 2669),
+        # Subsurface writes millidegrees, trailing zeros trimmed: 26.693 rounds down at the
+        # hundredth, 26.695 half away from zero.
+        ("26.693", 2669),
+        ("26.695", 2670),
         ("0.0", 0),  # freezing
-        ("-2.0", -20),  # an under-ice dive is a negative channel value
+        ("-2.0", -200),  # an under-ice dive is a negative channel value
+        ("-2.005", -201),  # half away from zero is away from zero below freezing too
     ],
 )
-def test_temperature_samples_are_tenths_of_a_degree(celsius: str, tenths: int) -> None:
+def test_temperature_samples_are_hundredths_of_a_degree(celsius: str, hundredths: int) -> None:
     found = profile(f"<sample time='0:00 min' depth='1.0 m' temp='{celsius} C' />")
-    assert found["temperature"]["values"] == [tenths]
+    assert found["temperature"]["values"] == [hundredths]
 
 
-def test_the_scalar_temperature_takes_no_tenths_scale() -> None:
+def test_the_scalar_temperature_takes_no_channel_scale() -> None:
     """The pair this file exists to keep apart: one channel, one scalar, one factor apart."""
     assert summary("<temperature water='22.4 C' />")["bottom_temperature"] == 22.4
 
@@ -218,5 +223,5 @@ def test_the_reference_export_converts_to_the_same_channels_the_uddf_reader_prod
     ]
     assert ssrf["depth"]["values"] == uddf["depth"]["values"] == [145, 183, 222, 257, 260, 332, 911, 0]
     assert ssrf["temperature"]["times"] == uddf["temperature"]["times"] == [30_000, 80_000]
-    assert ssrf["temperature"]["values"] == uddf["temperature"]["values"] == [244, 240]
+    assert ssrf["temperature"]["values"] == uddf["temperature"]["values"] == [2440, 2400]
     assert ssrf["duration"] == uddf["duration"] == 4_300_000

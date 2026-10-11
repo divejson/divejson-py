@@ -87,6 +87,7 @@ __all__ = [
     "DEVICE_CAPS",
     "FIX_ERROR_BOUND",
     "FIX_WINDOW",
+    "HUNDREDTHS_PER_DEGREE",
     "IN_WATER_DEPTH",
     "INFERRED",
     "MAX_MAGNITUDE",
@@ -478,13 +479,14 @@ def recorded(value: Decimal | int | None, *, record: str, member: str) -> bool:
 
 # -- numbers -------------------------------------------------------------------------
 
-# The two §6.5 channel scales, here rather than in any one adapter because every format's
-# samples land on them: depth in centimetres, temperature in tenths of a degree, pressure
-# in tenths of a bar. `docs/converting.md` *Units and arithmetic* names these as the trap —
+# The §6.5 channel scales, here rather than in any one adapter because every format's
+# samples land on them: depth in centimetres, temperature in hundredths of a degree, and
+# pressure and CNS in tenths — of a bar, of a percent. `docs/converting.md` *Units and arithmetic* names these as the trap —
 # "the channel conversions carry a scale the scalar ones do not" — and a table of an
 # adapter's scalar factors does not contain them.
 CENTIMETRES_PER_METRE = Decimal(100)
 TENTHS_PER_UNIT = Decimal(10)
+HUNDREDTHS_PER_DEGREE = Decimal(100)
 
 # The largest magnitude a source number may have. Not a physical bound — this format sets
 # none on a depth or a temperature, and inventing one here would be a converter deciding

@@ -78,6 +78,7 @@ from typing import Any
 
 from .converter import (
     CENTIMETRES_PER_METRE,
+    HUNDREDTHS_PER_DEGREE,
     MAX_NAME,
     PRODUCER_KEY,
     TENTHS_PER_UNIT,
@@ -2470,7 +2471,7 @@ class _Converter:
 
             kelvin = decimal_of(_text_of(waypoint, "temperature"))
             if kelvin is not None:
-                temperature.record(at, rounded((kelvin - KELVIN_OFFSET) * TENTHS_PER_UNIT))
+                temperature.record(at, rounded((kelvin - KELVIN_OFFSET) * HUNDREDTHS_PER_DEGREE))
 
             # Seconds already, which is §6.4's unit for the reading — the axis it sits on
             # is milliseconds, the value is not. A value at the device's display cap —

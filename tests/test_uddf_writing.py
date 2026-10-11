@@ -750,14 +750,14 @@ def test_a_reading_between_two_depth_samples_gets_its_own_waypoint(schema) -> No
         profile={
             "duration": 60_000,
             "depth": {"times": [0, 60_000], "values": [0, 500]},
-            "temperature": {"times": [30_000], "values": [245]},
+            "temperature": {"times": [30_000], "values": [2450]},
         }
     )
     text = written(source, schema)
     assert text.count("<waypoint>") == 3
 
     profile = recorded(read_back(source))["profile"]
-    assert profile["temperature"] == {"times": [30_000], "values": [245]}
+    assert profile["temperature"] == {"times": [30_000], "values": [2450]}
     assert profile["depth"] == {"times": [0, 60_000], "values": [0, 500]}
 
 
@@ -1451,6 +1451,27 @@ def test_the_air_temperature_goes_out_in_kelvin_and_comes_back_exactly(celsius: 
     kelvin = Decimal(str(celsius)) + Decimal("273.15")
     assert f"<airtemperature>{format(kelvin.normalize(), 'f')}</airtemperature>" in written(source, schema)
     assert read_back(source)["dives"][0]["air_temperature"] == celsius
+
+
+@pytest.mark.parametrize(
+    ("hundredths", "kelvin"),
+    [
+        (2711, "300.26"),  # 27.11 + 273.15
+        (2360, "296.75"),  # a D5's 23.6 C, its tenths written at the channel's grain
+        (0, "273.15"),
+        (-150, "271.65"),
+    ],
+)
+def test_a_temperature_sample_goes_out_in_kelvin_and_comes_back_exactly(hundredths: int, kelvin: str, schema) -> None:
+    source = one_dive(
+        profile={
+            "duration": 60_000,
+            "depth": {"times": [0, 60_000], "values": [0, 500]},
+            "temperature": {"times": [0], "values": [hundredths]},
+        }
+    )
+    assert f"<temperature>{kelvin}</temperature>" in written(source, schema)
+    assert recorded(read_back(source))["profile"]["temperature"] == {"times": [0], "values": [hundredths]}
 
 
 @pytest.mark.parametrize("rating", range(1, 6))

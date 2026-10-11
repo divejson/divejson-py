@@ -64,6 +64,7 @@ from typing import Any
 
 from .converter import (
     CENTIMETRES_PER_METRE,
+    HUNDREDTHS_PER_DEGREE,
     PRODUCER_KEY,
     TENTHS_PER_UNIT,
     Conversion,
@@ -918,7 +919,7 @@ class _Converter:
                 ceiling.record(at, rounded(above * CENTIMETRES_PER_METRE))
             celsius = self.number(sample, "Temperature", where)
             if celsius is not None:
-                temperature.record(at, rounded(celsius * TENTHS_PER_UNIT))
+                temperature.record(at, rounded(celsius * HUNDREDTHS_PER_DEGREE))
             millibar = self.number(sample, "Pressure", where)
             if millibar is not None:
                 bar = millibar / MILLIBAR_PER_BAR

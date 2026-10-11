@@ -5,8 +5,8 @@ unit table — and exactly one place where a number can be read at the wrong sca
 the developer field a vendor declares under a profile field's own name. That is the first
 section below, and it is the whole reason `_native` exists.
 
-The rest is the scaling §6.5 fixes — centimetres of depth, tenths of a degree, tenths of a
-bar — and the one conversion FIT does not scale for you, the semicircle.
+The rest is the scaling §6.5 fixes — centimetres of depth, hundredths of a degree, tenths
+of a bar — and the one conversion FIT does not scale for you, the semicircle.
 """
 
 from __future__ import annotations
@@ -137,13 +137,13 @@ def test_depth_samples_are_centimetres(metres: float, centimetres: int) -> None:
     assert profile_of(_dive(data))["depth"]["values"] == [centimetres]
 
 
-def test_temperature_samples_are_tenths_of_a_degree() -> None:
-    """FIT's `record.temperature` is a whole-degree `sint8`, so the tenths are this scale."""
+def test_temperature_samples_are_hundredths_of_a_degree() -> None:
+    """FIT's `record.temperature` is a whole-degree `sint8`, so the hundredths are this scale."""
     data = dive_file(
         *_records((0, {"depth": 5.0, "temperature": 22}), (30, {"depth": 6.0, "temperature": -1})),
         session={"total_elapsed_time": 60.0},
     )
-    assert profile_of(_dive(data))["temperature"]["values"] == [220, -10]
+    assert profile_of(_dive(data))["temperature"]["values"] == [2200, -100]
 
 
 def test_a_ceiling_of_zero_is_not_a_ceiling() -> None:

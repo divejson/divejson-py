@@ -78,7 +78,7 @@ in a converter, are in `converting.md`.
 | DiveJSON member | DiveJSON unit | `.ssrf` attribute | written as | factor |
 | --- | --- | --- | --- | --- |
 | `profile.depth` values | centimetres | `<sample @depth>` | `'1.45 m'` | × 100 |
-| `profile.temperature` values | tenths of a °C | `<sample @temp>` | `'24.4 C'` | × 10 |
+| `profile.temperature` values | hundredths of a °C | `<sample @temp>` | `'24.4 C'` | × 100 |
 | `profile.duration`, `times` | milliseconds | `<sample @time>` | `'0:10 min'` | `(M × 60 + S) × 1 000` |
 | `duration` | seconds | `<dive @duration>` | `'66:50 min'` | `M × 60 + S` |
 | `max_depth`, `avg_depth` | metres | `<depth @max>`, `@mean` | `'45.91 m'` | — |
