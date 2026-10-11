@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.25.0
+
 - **Breaking: a dive's time in the water is `submerged_time`, and `duration` is the
   profile's alone.** §6.2 of
   [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md)
