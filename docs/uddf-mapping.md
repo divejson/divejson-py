@@ -592,7 +592,7 @@ carries nothing this format records.
 | `informationbeforedive/platform` | `entry_type` — see below |
 | `informationbeforedive/surfacepressure` | the primary recording's `surface_pressure` — see below |
 | `informationbeforedive/equipmentused/leadquantity` | `weight` |
-| `informationafterdive/diveduration` | `duration` |
+| `informationafterdive/diveduration` | `submerged_time` |
 | `informationafterdive/greatestdepth` | `max_depth` |
 | `informationafterdive/averagedepth` | `avg_depth` |
 | `informationafterdive/lowesttemperature` | `bottom_temperature` |
@@ -865,17 +865,17 @@ sort of thing that arrives without the heading being corrected.
 
 ### `profile.duration` has no UDDF source
 
-`<diveduration>` is the dive's *logged* duration and maps to `dive.duration`. §6.4 makes
-`profile.duration` REQUIRED and at least the largest sample time in any channel — a
-different quantity, and in practice a larger one: `<diveduration>` is **shorter** than the
+`<diveduration>` is the dive's *logged* time in the water and maps to `dive.submerged_time`.
+§6.4 makes `profile.duration` REQUIRED and at least the largest sample time in any channel —
+a different quantity, and in practice a larger one: `<diveduration>` is **shorter** than the
 sample span in both real exports on record, 4010 s against 4300 s and 4001 s against 4288 s.
 
 **Take the largest sample time across every channel. Never trim samples to make
 `<diveduration>` fit** — that would delete recorded readings to satisfy a number, which is
 exactly §5.4's violation. DiveJSON's own reference writer produces the same shape, a
-profile spanning 4301 s over a logged `duration` of 4001. §6.4 defines the member as the
-span of the samples themselves, so reading it off them is structural rather than derived,
-and it carries no finding of any kind.
+profile spanning 4301 s over a logged `submerged_time` of 4001. §6.4 defines the member as
+the span of the samples themselves, so reading it off them is structural rather than
+derived, and it carries no finding of any kind.
 
 ### `<tankvolume>`: cubic metres or litres
 

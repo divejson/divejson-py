@@ -594,10 +594,10 @@ dive numbered 0 or below is written **without** one and reported. A zero there w
 the whole document invalid, which is a file nobody can open rather than a dive nobody can
 number.
 
-`<greatestdepth>` and `<diveduration>` are both mandatory where `max_depth` and `duration`
-are optional. Both take **`0`**, reported: the schema excludes zero from each of those
-members, so a reader takes the zero back as "not recorded" rather than as the surface or as
-a dive of no length.
+`<greatestdepth>` and `<diveduration>` are both mandatory where `max_depth` and
+`submerged_time` are optional. Both take **`0`**, reported: the schema excludes zero from
+each of those members, so a reader takes the zero back as "not recorded" rather than as the
+surface or as a dive of no length.
 
 `informationbeforediveType` is an `xs:sequence`: `<link>`s first, then `<divenumber>`,
 `<internaldivenumber>`, `<datetime>`, `<airtemperature>`, `<altitude>`, `<equipmentused>`,

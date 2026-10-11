@@ -80,7 +80,7 @@ in a converter, are in `converting.md`.
 | `profile.depth` values | centimetres | `<sample @depth>` | `'1.45 m'` | × 100 |
 | `profile.temperature` values | hundredths of a °C | `<sample @temp>` | `'24.4 C'` | × 100 |
 | `profile.duration`, `times` | milliseconds | `<sample @time>` | `'0:10 min'` | `(M × 60 + S) × 1 000` |
-| `duration` | seconds | `<dive @duration>` | `'66:50 min'` | `M × 60 + S` |
+| `submerged_time` | seconds | `<dive @duration>` | `'66:50 min'` | `M × 60 + S` |
 | `max_depth`, `avg_depth` | metres | `<depth @max>`, `@mean` | `'45.91 m'` | — |
 | `bottom_temperature` | °C | `<temperature @water>` | `'22.4 C'` | — |
 | `cylinders[].volume` | litres | `<cylinder @size>` | `'12.0 l'` | — |
@@ -92,9 +92,9 @@ in a converter, are in `converting.md`.
 
 **The three profile rows are the trap**, exactly as `converting.md` says: they carry a
 scale the scalar rows beside them do not — the axis a thousand, where the dive's own
-`duration` beside it takes none — and the most-executed conversion in this module is the
-first of them. The bare-count rows are a unit too — a `%` on an `@otu` is as much a refusal
-as a `ft` on a depth.
+`submerged_time` beside it takes none — and the most-executed conversion in this module is
+the first of them. The bare-count rows are a unit too — a `%` on an `@otu` is as much a
+refusal as a `ft` on a depth.
 
 `M × 60 + S` is a clock rather than a number: Subsurface formats a time as `seconds / 60`
 and `seconds % 60`, so the minutes are unbounded and the seconds are always two digits below
@@ -221,7 +221,7 @@ the second save carries categories `1`, `2`, `3` and `5` and origins `0` and `2`
 | --- | --- |
 | `@date` + `@time` | `started_at` |
 | `@number` | `number` |
-| `@duration` | `duration` |
+| `@duration` | `submerged_time` |
 | `@divesiteid` | `site_uuids`, one entry |
 | `@cns` | the primary recording's `cns_end` — see below |
 | `@otu` | the primary recording's `otu_end` |
