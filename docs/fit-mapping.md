@@ -132,7 +132,7 @@ value.
 | what | in the file | in DiveJSON |
 | --- | --- | --- |
 | depth, ceiling | `uint32` metres scaled by 1000 | metres; centimetres on a §6.5 channel |
-| sample temperature | `sint8` whole degrees Celsius | tenths of a degree on a §6.5 channel |
+| sample temperature | `sint8` whole degrees Celsius | hundredths of a degree on a §6.5 channel |
 | tank pressure | `uint16` bar scaled by 100 | bar; tenths of a bar on a §6.5 channel |
 | elapsed and timer time | `uint32` seconds scaled by 1000 | whole seconds, halves away from zero |
 | a sample's place on the axis | `uint32` whole seconds, a `record`'s `timestamp` | milliseconds on a §6.5 axis, × 1000 |
@@ -470,7 +470,7 @@ source defect rather than a scale to reinterpret: the profile states the unit ou
 | `timestamp` (253) | | the sample's place on the axis |
 | `depth` (92) | | the `depth` channel, centimetres |
 | `next_stop_depth` (93) | | the `ceiling` channel, centimetres |
-| `temperature` (13) | | the `temperature` channel, tenths of a degree |
+| `temperature` (13) | | the `temperature` channel, hundredths of a degree |
 | `position_lat` (0) / `position_long` (1) | | `entry_position` / `exit_position` |
 | `gps_accuracy` (31) | | which fix is the entry or the exit, under *Positions*; never written. **untested** |
 

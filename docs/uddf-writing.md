@@ -741,7 +741,7 @@ that is not a whole second as seconds with the fraction — `1200.02` — which 
 multiplies back to exactly `1200020`. The self round trip is exact, and a document whose
 samples all fall on whole seconds writes no fraction at all.
 
-Channel units: depth centimetres → metres, temperature tenths of °C → Kelvin, pressures
+Channel units: depth centimetres → metres, temperature hundredths of °C → Kelvin, pressures
 tenths of a bar → Pascal, ppO₂ hundredths of a bar → bar, CNS tenths of a percent →
 percent, `ndl` seconds → seconds, `gradient_factor` whole percent → the documented fraction,
 ÷ 100. Each is a decimal factor, and doing the arithmetic in decimal is what makes a round

@@ -156,7 +156,7 @@ and §6.4a's own 0.4 to 1.2 bar bound refuses the other one outright.
 | `<PO2>` | `cylinders[].ppo2_limit` | bar, ×1 |
 | `<Depth>` | `profile.depth.values` | metres **× 100** — centimetres |
 | `<Ceiling>` | `profile.ceiling.values` | metres **× 100** — centimetres |
-| `<Temperature>` | `profile.temperature.values` | °C **× 10** — tenths |
+| `<Temperature>` | `profile.temperature.values` | °C **× 100** — hundredths |
 | `<Pressure>` | `profile.pressures[].values` | millibar **÷ 1 000 × 10** — tenths of a bar |
 | `<Time>`, `<GasChangeTime>` | sample and event times | decimal seconds **× 1 000** — milliseconds, halves away from zero |
 

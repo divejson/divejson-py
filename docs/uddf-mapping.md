@@ -80,7 +80,7 @@ in a converter, are in `converting.md`.
 | DiveJSON member | DiveJSON unit | UDDF element | UDDF unit | factor |
 | --- | --- | --- | --- | --- |
 | `profile.depth` values | centimetres | `<waypoint><depth>` | metres | × 100 |
-| `profile.temperature` values | tenths of a °C | `<waypoint><temperature>` | Kelvin | (K − 273.15) × 10 |
+| `profile.temperature` values | hundredths of a °C | `<waypoint><temperature>` | Kelvin | (K − 273.15) × 100 |
 | `profile.pressures[]` values | tenths of a bar | `<waypoint><tankpressure>` | Pascal | ÷ 100 000 × 10 |
 | `profile.duration`, `times` | milliseconds | `<waypoint><divetime>` | seconds, `xs:float` | × 1 000, to a whole millisecond |
 | `profile.ndl` values | seconds | `<waypoint><nodecotime>` | seconds | — |
