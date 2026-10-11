@@ -261,6 +261,6 @@ def test_depths_and_temperatures_match_the_reference_export() -> None:
     ],
 )
 def test_air_temperature_is_plain_celsius(kelvin: str, celsius: float) -> None:
-    """The scalar shape, like `bottom_temperature`: no tenths scale."""
+    """The scalar shape, like `bottom_temperature`: no channel scale."""
     document = convert(one_dive(before(f"<airtemperature>{kelvin}</airtemperature>"))).document
     assert document["dives"][0]["air_temperature"] == celsius

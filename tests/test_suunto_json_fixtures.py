@@ -186,7 +186,7 @@ def test_the_ocean_profile_takes_each_channel_only_where_it_was_recorded() -> No
     assert profile["depth"]["times"] == [160, 1_200_000, 4_000_020]
     assert profile["depth"]["values"] == [145, 4464, 132]
     # One temperature and one non-zero ceiling among them, on their own axes.
-    # 295.5 K is 22.35 °C, a hundredth the tenths channel used to round away.
+    # 295.5 K is 22.35 °C, its hundredth kept.
     assert profile["temperature"] == {"times": [60_000], "values": [2235]}
     assert profile["ceiling"] == {"times": [1_200_000], "values": [300]}
 
