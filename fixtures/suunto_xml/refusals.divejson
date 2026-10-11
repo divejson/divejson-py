@@ -10,7 +10,7 @@
     {
       "uuid": "c4b3ed00-9b9e-5374-9280-13b157ad8761",
       "started_at": "2025-03-27T12:06:00",
-      "duration": 1800,
+      "submerged_time": 1800,
       "max_depth": 20.5,
       "bottom_temperature": 24.0,
       "cylinders": [

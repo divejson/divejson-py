@@ -35,7 +35,7 @@
       "uuid": "0198a6f0-1111-7010-8000-000000000010",
       "number": 412,
       "started_at": "2026-07-03T09:14:00+12:45",
-      "duration": 5520,
+      "submerged_time": 5520,
       "notes": "Trimix wall dive; two deco gases staged on the line.",
       "type": "open_circuit",
       "rating": 4,
@@ -511,7 +511,7 @@
     {
       "uuid": "0198a6f0-1111-7012-8000-000000000012",
       "started_at": "2026-07-05",
-      "duration": 2880,
+      "submerged_time": 2880,
       "max_depth": 21.5,
       "site_uuids": [
         "0198a6f0-1111-7040-8000-000000000040"

@@ -10,7 +10,7 @@
     {
       "uuid": "29e7c994-34d6-5135-940d-1ec2b3a7e42d",
       "started_at": "2026-09-12T10:04:08.610+03:00",
-      "duration": 4096,
+      "submerged_time": 4096,
       "max_depth": 9.25,
       "avg_depth": 7.42,
       "entry_position": {

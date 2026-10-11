@@ -11,7 +11,7 @@
       "uuid": "99ca578d-a074-52d2-9216-e98057a33dcb",
       "number": 1,
       "started_at": "2026-05-01T09:15:00",
-      "duration": 2480,
+      "submerged_time": 2480,
       "cylinders": [
         {
           "volume": 11.1,

@@ -144,7 +144,7 @@
         "started_at": {
           "anyOf": [{ "$ref": "#/$defs/date_time" }, { "$ref": "#/$defs/date" }]
         },
-        "duration": { "type": "integer", "exclusiveMinimum": 0 },
+        "submerged_time": { "type": "integer", "exclusiveMinimum": 0 },
         "notes": { "$ref": "#/$defs/notes" },
         "type": {
           "enum": ["open_circuit", "closed_circuit", "semi_closed", "freedive", "snorkel", "surface_supplied"]

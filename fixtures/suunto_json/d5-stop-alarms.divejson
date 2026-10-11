@@ -10,7 +10,7 @@
     {
       "uuid": "29e7c994-34d6-5135-940d-1ec2b3a7e42d",
       "started_at": "2021-04-06T12:31:34.450+02:00",
-      "duration": 2831,
+      "submerged_time": 2831,
       "max_depth": 25.37,
       "avg_depth": 14.54,
       "cylinders": [

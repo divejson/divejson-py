@@ -11,7 +11,7 @@
       "uuid": "6ba5d47c-aeac-5754-ac67-c28c73e7981e",
       "number": 1,
       "started_at": "2026-03-03T09:10:00+02:00",
-      "duration": 2760,
+      "submerged_time": 2760,
       "max_depth": 18.4,
       "site_uuids": [
         "cd4adc13-b149-5d0f-b848-616287cbb95e"
@@ -31,7 +31,7 @@
       "uuid": "abef6704-789a-5048-b078-ba21af60f74b",
       "number": 2,
       "started_at": "2026-03-04T08:40:00+02:00",
-      "duration": 2520,
+      "submerged_time": 2520,
       "max_depth": 27.1,
       "contact_uuid": "9f11d32a-6d82-5ec3-95b0-831dde23cda1",
       "site_uuids": [
@@ -48,7 +48,7 @@
       "uuid": "1f5ffd58-1b17-5c9e-b925-f00bfa5b7457",
       "number": 3,
       "started_at": "2026-03-05T10:15:00+02:00",
-      "duration": 3000,
+      "submerged_time": 3000,
       "max_depth": 22.8,
       "site_uuids": [
         "cd4adc13-b149-5d0f-b848-616287cbb95e"
