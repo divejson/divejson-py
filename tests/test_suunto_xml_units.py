@@ -7,7 +7,7 @@ dive nobody took. Every expectation below is worked out in a comment rather than
 off the code, which is the only version of this test that can fail when the code is wrong.
 
 The scales, from spec §5.1: profile depth in **centimetres**, profile temperature in
-**tenths of a degree Celsius**, profile pressure in **tenths of a bar**, and every scalar
+**hundredths of a degree Celsius**, profile pressure in **tenths of a bar**, and every scalar
 outside a profile channel in the base unit — metres, °C, bar, litres, percent. **The
 channel conversions carry a scale the scalar ones do not**, which is the trap this file
 exists for, and the tank-pressure channel carries *two* of them: millibar to bar, then bar
@@ -67,18 +67,18 @@ def test_depth_samples_are_centimetres(metres: str, centimetres: int) -> None:
 
 
 @pytest.mark.parametrize(
-    ("celsius", "tenths"),
+    ("celsius", "hundredths"),
     [
         # Celsius already, unlike the app JSON's Kelvin and FIT's own integer degrees.
-        ("23.7000065", 237),  # 237.000065 rounds to 237 - the float32 noise this device writes
-        ("21.9999943", 220),  # 219.999943 rounds to 220, which is what the sensor meant
-        ("22", 220),
+        ("23.7000065", 2370),  # 2370.00065 rounds to 2370 - the float32 noise this device writes
+        ("21.9999943", 2200),  # 2199.99943 rounds to 2200, which is what the sensor meant
+        ("22", 2200),
         ("0", 0),  # freezing
-        ("-2", -20),  # an under-ice dive is a negative channel value
+        ("-2", -200),  # an under-ice dive is a negative channel value
     ],
 )
-def test_temperature_samples_are_tenths_of_a_degree(celsius: str, tenths: int) -> None:
-    assert profile(suunto_xml_sample(10, Temperature=celsius))["temperature"]["values"] == [tenths]
+def test_temperature_samples_are_hundredths_of_a_degree(celsius: str, hundredths: int) -> None:
+    assert profile(suunto_xml_sample(10, Temperature=celsius))["temperature"]["values"] == [hundredths]
 
 
 @pytest.mark.parametrize(
@@ -117,7 +117,7 @@ def test_tank_pressure_samples_are_tenths_of_a_bar_from_millibar(
     assert found["pressures"][0]["values"] == [tenths_of_a_bar]
 
 
-def test_the_scalar_temperature_takes_no_tenths_scale() -> None:
+def test_the_scalar_temperature_takes_no_channel_scale() -> None:
     """The pair this file exists to keep apart: one channel, one scalar, one factor apart."""
     assert one("<BottomTemperature>22</BottomTemperature>")["bottom_temperature"] == 22.0
 

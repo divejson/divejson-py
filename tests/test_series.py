@@ -130,9 +130,9 @@ def test_a_channel_takes_only_the_seconds_that_carried_a_reading_for_it() -> Non
     depth, temperature = Channel("depth"), Channel("temperature")
     for second in (0, 10, 20):
         depth.record(second, second * 10)
-    temperature.record(10, 214)
+    temperature.record(10, 2140)
     assert len(depth) == 3
-    assert temperature.member() == {"times": [10], "values": [214]}
+    assert temperature.member() == {"times": [10], "values": [2140]}
 
 
 def test_a_channel_refuses_a_second_reading_at_one_second() -> None:
@@ -154,7 +154,7 @@ def test_the_duration_is_the_span_of_the_samples_themselves() -> None:
     depth, temperature = Channel("depth"), Channel("temperature")
     for second, _ in axis.ordered():
         depth.record(second, 100)
-    temperature.record(30, 214)
+    temperature.record(30, 2140)
 
     profile = axis.profile({"depth": depth, "temperature": temperature})
     assert profile is not None
@@ -236,10 +236,10 @@ def test_a_reading_below_the_channels_floor_is_refused_and_counted() -> None:
 
 
 def test_a_signed_channel_keeps_its_negative_readings() -> None:
-    """An under-ice dive is a negative temperature, and a `-20` there is a reading."""
+    """An under-ice dive is a negative temperature, and a `-200` there is a reading."""
     channel = Channel("temperature")
-    assert channel.record(0, -20) is True
-    assert channel.values == [-20]
+    assert channel.record(0, -200) is True
+    assert channel.values == [-200]
     assert channel.refused == 0
 
 

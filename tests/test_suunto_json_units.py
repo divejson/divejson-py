@@ -7,7 +7,7 @@ worth more than the fixtures.
 
 This export is the SI one. Pressure is Pascal where §6.3 holds bar, tank size is cubic
 metres where §6.3 holds litres, a gas fraction is 0-1 where §6.3 holds whole percent, and
-temperature is Kelvin where §6.5's channel holds tenths of a degree Celsius. Every one of
+temperature is Kelvin where §6.5's channel holds hundredths of a degree Celsius. Every one of
 those is a place where carrying the number as written is a plausible-looking lie.
 """
 
@@ -103,21 +103,27 @@ def test_a_gas_this_export_never_recorded_is_absent_and_never_air() -> None:
 # -- temperature ----------------------------------------------------------------------
 
 
-def test_a_sample_temperature_is_kelvin_and_the_channel_is_tenths_of_celsius() -> None:
-    """293.75 K is 20.6 °C, and the subtraction runs on decimals.
+def test_a_sample_temperature_is_kelvin_and_the_channel_is_hundredths_of_celsius() -> None:
+    """293.75 K is 20.60 °C, and the subtraction runs on decimals.
 
     273.15 has no exact binary representation, so `293.75 - 273.15` on floats lands on
     20.600000000000023 and has to be rounded back out. Doing it in decimal never introduces
     the error.
     """
     dive = _dive({}, [suunto_sample(0, Temperature=293.75, Depth=1.0)])
-    assert profile_of(dive)["temperature"]["values"] == [206]
+    assert profile_of(dive)["temperature"]["values"] == [2060]
+
+
+def test_the_hundredth_an_ocean_states_is_kept() -> None:
+    """301.86 K is 28.71 °C exactly: the Ocean writes Kelvin to 0.01, and a tenth would lose it."""
+    dive = _dive({}, [suunto_sample(0, Temperature=301.86, Depth=1.0)])
+    assert profile_of(dive)["temperature"]["values"] == [2871]
 
 
 def test_a_temperature_below_freezing_stays_negative() -> None:
-    """271.65 K is −1.5 °C, which an ice dive really records."""
+    """271.65 K is −1.50 °C, which an ice dive really records."""
     dive = _dive({}, [suunto_sample(0, Temperature=271.65, Depth=1.0)])
-    assert profile_of(dive)["temperature"]["values"] == [-15]
+    assert profile_of(dive)["temperature"]["values"] == [-150]
 
 
 # -- depth ----------------------------------------------------------------------------

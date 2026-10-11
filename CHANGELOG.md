@@ -7,6 +7,18 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Breaking: the profile's `temperature` channel is hundredths of a degree Celsius.** §5.1
+  of [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md)
+  moves the channel from tenths, because a dive computer's own export states a temperature to
+  0.01 K. Every reader scales the decimal its source wrote by a hundred and rounds once, so a
+  Suunto Ocean's 301.86 K is `2871` where it was `287`, and a coarser source fills the grain
+  with zeros — a D5's 23.6 °C is `2360`, a FIT's whole 27 °C is `2700`. The member keeps its
+  name and type, so a document written in tenths still validates and reads ten times too
+  cold; this package's converters wrote every such document up to this release. The UDDF
+  writer turns hundredths back into Kelvin exactly, so every file it writes is unchanged.
+  Pressure, CNS and every other channel keep their scales: `converter.TENTHS_PER_UNIT` still
+  scales those, and `converter.HUNDREDTHS_PER_DEGREE` is the temperature channel's.
+
 ## 0.23.0
 
 - **Breaking: a diver carries no handle, and `username` is removed.** §6.1 of

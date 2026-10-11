@@ -70,6 +70,7 @@ from typing import Any
 
 from .converter import (
     CENTIMETRES_PER_METRE,
+    HUNDREDTHS_PER_DEGREE,
     PRODUCER_KEY,
     TENTHS_PER_UNIT,
     Conversion,
@@ -1324,7 +1325,7 @@ class _Converter:
             if sample.ceiling is not None and sample.ceiling > 0:
                 ceiling.record(at, rounded(sample.ceiling * CENTIMETRES_PER_METRE))
             if sample.kelvin is not None:
-                temperature.record(at, rounded((sample.kelvin - KELVIN_OFFSET) * TENTHS_PER_UNIT))
+                temperature.record(at, rounded((sample.kelvin - KELVIN_OFFSET) * HUNDREDTHS_PER_DEGREE))
             if sample.ndl is not None:
                 ndl.record(at, rounded(sample.ndl))
             if sample.tts is not None:

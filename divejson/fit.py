@@ -65,6 +65,7 @@ from fitdecode.types import DevField, FieldData
 
 from .converter import (
     CENTIMETRES_PER_METRE,
+    HUNDREDTHS_PER_DEGREE,
     IN_WATER_DEPTH,
     PRODUCER_KEY,
     TENTHS_PER_UNIT,
@@ -1438,7 +1439,7 @@ class _Converter:
             if point.ceiling is not None and point.ceiling > 0:
                 ceiling.record(at, rounded(point.ceiling * CENTIMETRES_PER_METRE))
             if point.temperature is not None:
-                temperature.record(at, rounded(point.temperature * TENTHS_PER_UNIT))
+                temperature.record(at, rounded(point.temperature * HUNDREDTHS_PER_DEGREE))
             for sensor, bar in point.pressures.items():
                 if sensor in pressures and 0 <= bar <= MAX_CYLINDER_PRESSURE:
                     pressures[sensor].record(at, rounded(bar * TENTHS_PER_UNIT))

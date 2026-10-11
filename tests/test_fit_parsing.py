@@ -864,7 +864,7 @@ def test_two_messages_at_one_instant_are_one_sample() -> None:
     )
     profile = profile_of(_dive(data))
     assert profile["depth"] == {"times": [0], "values": [500]}
-    assert profile["temperature"] == {"times": [0], "values": [220]}
+    assert profile["temperature"] == {"times": [0], "values": [2200]}
 
 
 def test_two_readings_of_one_channel_at_one_instant_report_the_collision() -> None:

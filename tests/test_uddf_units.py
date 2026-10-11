@@ -8,7 +8,7 @@ one. Every expectation below is worked out in a comment rather than read back of
 code, which is the only version of this test that can fail when the code is wrong.
 
 The scales, from spec §5.1: profile depth and ceiling in **centimetres**, profile
-temperature in **tenths of a degree Celsius**, profile pressures in **tenths of a bar**,
+temperature in **hundredths of a degree Celsius**, profile pressures in **tenths of a bar**,
 and every scalar outside a profile channel in the base unit — metres, °C, bar, litres.
 UDDF's side, from its own schema and documentation: metres, Kelvin, Pascal, cubic metres
 and gas fractions. The channel conversions therefore carry a scale the scalar ones do not,
@@ -51,22 +51,23 @@ def test_depth_samples_are_centimetres(metres: str, centimetres: int) -> None:
 
 
 @pytest.mark.parametrize(
-    ("kelvin", "tenths"),
+    ("kelvin", "hundredths"),
     [
-        ("297.55", 244),  # 297.55 - 273.15 = 24.40 C, x 10
-        ("297.15", 240),  # 297.15 - 273.15 = 24.00 C, x 10
-        ("295.15", 220),  # 295.15 - 273.15 = 22.00 C, x 10
+        ("297.55", 2440),  # 297.55 - 273.15 = 24.40 C, x 100
+        ("297.15", 2400),  # 297.15 - 273.15 = 24.00 C, x 100
+        ("299.84", 2669),  # 299.84 - 273.15 = 26.69 C, x 100: a hundredth the source stated
+        ("300.255", 2711),  # 27.105 C, rounded half away from zero at the hundredth
         ("273.15", 0),  # freezing
-        ("271.15", -20),  # -2.00 C: an under-ice dive is a negative channel value
+        ("271.15", -200),  # -2.00 C: an under-ice dive is a negative channel value
     ],
 )
-def test_temperature_samples_are_tenths_of_a_degree(kelvin: str, tenths: int) -> None:
+def test_temperature_samples_are_hundredths_of_a_degree(kelvin: str, hundredths: int) -> None:
     samples = f"<waypoint><depth>1</depth><divetime>0</divetime><temperature>{kelvin}</temperature></waypoint>"
-    assert profile(samples)["temperature"]["values"] == [tenths]
+    assert profile(samples)["temperature"]["values"] == [hundredths]
 
 
 def test_bottom_temperature_is_plain_celsius() -> None:
-    """The scalar member takes no tenths scale, which is the pair this file exists to keep apart."""
+    """The scalar member takes no channel scale, which is the pair this file exists to keep apart."""
     document = convert(
         one_dive(f"{STARTED_AT}<informationafterdive><lowesttemperature>295.15</lowesttemperature></informationafterdive>")
     ).document
@@ -248,7 +249,7 @@ def test_depths_and_temperatures_match_the_reference_export() -> None:
     assert found["depth"]["times"] == [0, 10_000, 20_000, 30_000, 40_000, 80_000, 170_000, 4_300_000]
     assert found["depth"]["values"] == [145, 183, 222, 257, 260, 332, 911, 0]
     assert found["temperature"]["times"] == [30_000, 80_000]
-    assert found["temperature"]["values"] == [244, 240]
+    assert found["temperature"]["values"] == [2440, 2400]
 
 
 @pytest.mark.parametrize(

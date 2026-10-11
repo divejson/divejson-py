@@ -55,7 +55,7 @@ class Channel:
     """One sampled quantity: the milliseconds it has readings at, and the readings.
 
     Values are integers in the units §6.5 fixes for each channel — centimetres of depth,
-    tenths of a degree, tenths of a bar, hundredths of a bar of ppO₂ — so the scaling is the
+    hundredths of a degree, tenths of a bar, hundredths of a bar of ppO₂ — so the scaling is the
     adapter's and the ordering is this class's.
 
     The channel is named at construction because its **floor** follows from the name:

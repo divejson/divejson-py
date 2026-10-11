@@ -84,6 +84,7 @@ from . import __version__
 from .converter import (
     CENTIMETRES_PER_METRE,
     GENERATOR_NAME,
+    HUNDREDTHS_PER_DEGREE,
     MILLISECONDS_PER_SECOND,
     TENTHS_PER_UNIT,
     Note,
@@ -2080,8 +2081,8 @@ class _Writer:
 
         for instant, centimetres in _series(profile.get("depth")):
             at(instant)["depth"] = _decimal(centimetres) / CENTIMETRES_PER_METRE
-        for instant, tenths in _series(profile.get("temperature")):
-            at(instant)["temperature"] = _decimal(tenths) / TENTHS_PER_UNIT + KELVIN_OFFSET
+        for instant, hundredths in _series(profile.get("temperature")):
+            at(instant)["temperature"] = _decimal(hundredths) / HUNDREDTHS_PER_DEGREE + KELVIN_OFFSET
         for instant, seconds in _series(profile.get("ndl")):
             at(instant)["nodecotime"] = _decimal(seconds)
         for instant, hundredths in _series(profile.get("ppo2")):

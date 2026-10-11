@@ -60,6 +60,7 @@ from typing import Any
 
 from .converter import (
     CENTIMETRES_PER_METRE,
+    HUNDREDTHS_PER_DEGREE,
     MAX_MAGNITUDE,
     MAX_NAME,
     PRODUCER_KEY,
@@ -988,6 +989,6 @@ class _Converter:
                 depth.record(at, rounded(metres * CENTIMETRES_PER_METRE))
             celsius = self.measure(attribute(sample, "temp"), "C", where, "<sample temp>")
             if celsius is not None:
-                temperature.record(at, rounded(celsius * TENTHS_PER_UNIT))
+                temperature.record(at, rounded(celsius * HUNDREDTHS_PER_DEGREE))
 
         return axis.profile({"depth": depth, "temperature": temperature})
