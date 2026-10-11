@@ -22,7 +22,7 @@ specification commit named in the repository's ``SPEC_REF``, so that an installe
 resolves its own schema and needs no checkout of anything.
 """
 
-__version__ = "0.23.0"
+__version__ = "0.24.0"
 
 SPEC_VERSION = "1.0"
 

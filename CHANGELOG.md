@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.24.0
+
 - **Breaking: the profile's `temperature` channel is hundredths of a degree Celsius.** §5.1
   of [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md)
   moves the channel from tenths, because a dive computer's own export states a temperature to
