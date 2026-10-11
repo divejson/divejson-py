@@ -449,7 +449,7 @@ def zero_is_an_answer(record: str, member: str) -> bool:
     """Whether a source zero is a reading for this member, or a placeholder.
 
     Which way a zero reads follows the member's own constraint. `exclusiveMinimum: 0` —
-    `max_depth`, `duration`, a cylinder's `volume` and `start_pressure` — means the format
+    `max_depth`, `submerged_time`, a cylinder's `volume` and `start_pressure` — means the format
     records the member only when it is positive, so a writer with nothing to say had to
     put a zero somewhere and the zero is that nothing. `minimum: 0` — `weight`,
     `visibility`, `end_pressure` — means zero is a value the diver can have recorded, and
@@ -507,7 +507,7 @@ HUNDREDTHS_PER_DEGREE = Decimal(100)
 MAX_MAGNITUDE = Decimal(sys.float_info.max) / 1000
 
 # §5.1's grain for elapsed time on a profile axis — a Series' `times`, a profile's
-# `duration`, an event's `time` — where a dive's own `duration` and the `ndl` and `tts`
+# `duration`, an event's `time` — where a dive's own `submerged_time` and the `ndl` and `tts`
 # readings stay seconds. Every source this package reads states its sample times in
 # seconds, whole or fractional, so this is the one factor every reader's axis applies.
 MILLISECONDS_PER_SECOND = Decimal(1000)
@@ -1090,11 +1090,11 @@ _MEAN_DEPTH_PLACES = Decimal("0.01")
 class InWater:
     """A dive's time in the water and its mean depth over that time, as `in_water` derives them.
 
-    `duration` is in whole seconds and `avg_depth` in metres to two decimals: the units and
+    `submerged_time` is in whole seconds and `avg_depth` in metres to two decimals: the units and
     precision §6.2's members take, so a reader writes them as they are.
     """
 
-    duration: int
+    submerged_time: int
     avg_depth: Decimal
 
 
@@ -1104,10 +1104,10 @@ def in_water(depths: Iterable[tuple[int, Decimal | int | float]]) -> InWater | N
     `docs/converting.md`'s derivation, for any reader whose source states no figure for the
     dive and for an application holding the samples already. `depths` are (milliseconds,
     metres) pairs in time order. The interval from each sample to the next counts as in the
-    water when that sample is strictly deeper than `IN_WATER_DEPTH`; the duration is the sum
+    water when that sample is strictly deeper than `IN_WATER_DEPTH`; `submerged_time` is the sum
     of the counted intervals and the mean is each counted interval's length times the mean
-    of its two depths, over that sum. Both round halves away from zero, the duration to the
-    second and the mean to the centimetre.
+    of its two depths, over that sum. Both round halves away from zero, the submerged time to
+    the second and the mean to the centimetre.
 
     **Nothing comes back when no interval counts** — no sample deeper than the threshold
     that another follows — and the caller's own figures stand. The last sample starts no
@@ -1135,7 +1135,7 @@ def in_water(depths: Iterable[tuple[int, Decimal | int | float]]) -> InWater | N
     if counted == 0:
         return None
     return InWater(
-        duration=rounded(Decimal(counted) / MILLISECONDS_PER_SECOND),
+        submerged_time=rounded(Decimal(counted) / MILLISECONDS_PER_SECOND),
         avg_depth=(weighted / counted).quantize(_MEAN_DEPTH_PLACES, rounding=ROUND_HALF_UP),
     )
 

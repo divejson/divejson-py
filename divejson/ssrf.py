@@ -515,12 +515,12 @@ class _Converter:
             dive["number"] = number
         dive["started_at"] = started_at
 
-        duration = integer_of(self.measure(attribute(element, "duration"), "min", where, "<dive duration>"))
-        if duration is not None:
-            if recorded(duration, record="dive", member="duration"):
-                dive["duration"] = duration
+        submerged_time = integer_of(self.measure(attribute(element, "duration"), "min", where, "<dive duration>"))
+        if submerged_time is not None:
+            if recorded(submerged_time, record="dive", member="submerged_time"):
+                dive["submerged_time"] = submerged_time
             else:
-                self.note(where, f"<dive duration> is {duration} seconds; the format records a duration only when it is positive", "absent")
+                self.note(where, f"<dive duration> is {submerged_time} seconds; the format records a submerged time only when it is positive", "absent")
 
         notes = text(child(element, "notes"))
         if notes:

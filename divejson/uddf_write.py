@@ -1635,7 +1635,7 @@ class _Writer:
                     "uuid",
                     "number",
                     "started_at",
-                    "duration",
+                    "submerged_time",
                     "notes",
                     "type",
                     "rating",
@@ -1758,18 +1758,18 @@ class _Writer:
         if dive.get("rating") is not None:
             # Doubled onto `ratingvalueType`'s 1 to 10, which the reader halves back exactly.
             _sub(_sub(after, "rating"), "ratingvalue", str(2 * dive["rating"]))
-        duration = dive.get("duration")
-        if duration is None:
+        submerged_time = dive.get("submerged_time")
+        if submerged_time is None:
             # `<diveduration>` is mandatory too, and takes the same zero for the same
-            # reason: §6.2 records a duration only when it is positive, so a reader takes
+            # reason: §6.2 records `submerged_time` only when it is positive, so a reader takes
             # this one back as not recorded rather than as a dive of no length.
             self.note(
                 where,
-                "the dive records no duration, and UDDF's <diveduration> is mandatory; 0 is written, which "
+                "the dive records no submerged time, and UDDF's <diveduration> is mandatory; 0 is written, which "
                 "readers of this format take as not recorded",
                 "absent",
             )
-        _sub(after, "diveduration", _num(duration if duration is not None else 0))
+        _sub(after, "diveduration", _num(submerged_time if submerged_time is not None else 0))
         _optional(after, "averagedepth", dive.get("avg_depth"))
         return element
 

@@ -119,7 +119,7 @@ def test_the_ocean_dive_is_read_off_a_header_that_carries_no_gas_block() -> None
     assert dive["avg_depth"] == 20.87
     # `DiveTime`, not `Duration`: the in-water time rather than the whole logged period,
     # which on this dive is 4,302 s and includes breaking down kit on the boat.
-    assert dive["duration"] == 4001
+    assert dive["submerged_time"] == 4001
 
 
 def test_the_ocean_cylinders_come_from_the_gas_switches() -> None:
@@ -333,7 +333,7 @@ def test_a_header_with_no_gas_and_no_samples_is_still_a_dive() -> None:
     """
     conversion = convert(HEADER_ONLY.read_bytes(), exported_at=EXPORTED_AT)
     dive = conversion.document["dives"][0]
-    assert dive["max_depth"] == 32.41 and dive["duration"] == 2001
+    assert dive["max_depth"] == 32.41 and dive["submerged_time"] == 2001
     assert "cylinders" not in dive and profile_of(dive) is None
     assert [note.kind for note in conversion.notes] == ["absent"]
 

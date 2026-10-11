@@ -440,7 +440,7 @@ IDENTITY = ("uuid", "name", "brand", "type", "location", "position", "notes", "p
 SCALARS = (
     "number",
     "started_at",
-    "duration",
+    "submerged_time",
     "max_depth",
     "avg_depth",
     "bottom_temperature",

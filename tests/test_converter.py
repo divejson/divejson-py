@@ -168,7 +168,7 @@ def test_the_header_opens_with_the_two_members_section_4_asks_for_first() -> Non
         # `exclusiveMinimum: 0` — a writer with nothing to say had to put a zero somewhere.
         ("dive", "max_depth", False),
         ("dive", "avg_depth", False),
-        ("dive", "duration", False),
+        ("dive", "submerged_time", False),
         ("cylinder", "volume", False),
         ("cylinder", "start_pressure", False),
         # `minimum: 0` — the diver can have recorded exactly this.
@@ -583,7 +583,7 @@ def test_the_threshold_is_one_point_two_metres_and_strictly_deeper() -> None:
     assert in_water([(0, Decimal("1.2")), (10_000, Decimal("5"))]) is None
     derived = in_water([(0, Decimal("1.21")), (10_000, Decimal("5"))])
     assert derived is not None
-    assert (derived.duration, derived.avg_depth) == (10, Decimal("3.11"))
+    assert (derived.submerged_time, derived.avg_depth) == (10, Decimal("3.11"))
 
 
 def test_a_surface_interval_in_the_middle_and_the_tail_are_not_counted() -> None:
@@ -596,7 +596,7 @@ def test_a_surface_interval_in_the_middle_and_the_tail_are_not_counted() -> None
     depths = [(0, 5), (60_000, 10), (70_000, 0.5), (190_000, 3), (210_000, 8), (230_000, 0.5), (530_000, 0)]
     derived = in_water(depths)
     assert derived is not None
-    assert derived.duration == 110
+    assert derived.submerged_time == 110
     assert derived.avg_depth == Decimal("6.34")
 
 
@@ -610,14 +610,14 @@ def test_the_last_sample_starts_no_interval() -> None:
     assert in_water([(0, Decimal("30"))]) is None
     derived = in_water([(0, Decimal("30")), (5_000, Decimal("30"))])
     assert derived is not None
-    assert derived.duration == 5
+    assert derived.submerged_time == 5
 
 
 def test_both_figures_round_halves_away_from_zero() -> None:
     """2.5 s is 3 s, and a mean of 2.125 m is 2.13 m — never Python's half-to-even 2 and 2.12."""
     derived = in_water([(0, Decimal("2")), (2_500, Decimal("2.25"))])
     assert derived is not None
-    assert (derived.duration, derived.avg_depth) == (3, Decimal("2.13"))
+    assert (derived.submerged_time, derived.avg_depth) == (3, Decimal("2.13"))
 
 
 def test_a_float_depth_reads_as_the_decimal_it_prints_as() -> None:

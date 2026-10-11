@@ -474,7 +474,7 @@ def test_a_number_too_large_to_carry_is_not_a_number(written: str) -> None:
     assert validate_document(conversion.document) == []
     found = conversion.document["dives"][0]
     assert found["cylinders"][0] == {}
-    assert "max_depth" not in found and "duration" not in found and profile_of(found) is None
+    assert "max_depth" not in found and "submerged_time" not in found and profile_of(found) is None
     # `parse_constant` fires for exactly the three tokens RFC 8259 has no room for, which
     # are what `json.dumps` emits for a float that overflowed.
     json.loads(json.dumps(conversion.document), parse_constant=_refuse_non_json)
@@ -1331,7 +1331,7 @@ def test_profile_duration_spans_the_samples_rather_than_the_logged_duration() ->
         f"{STARTED_AT}<samples>{samples}</samples>"
         "<informationafterdive><diveduration>4010</diveduration></informationafterdive>"
     )
-    assert found["duration"] == 4010
+    assert found["submerged_time"] == 4010
     assert profile_of(found)["duration"] == 4_300_000
 
 
@@ -1952,7 +1952,7 @@ def test_the_new_members_land_in_section_6_2s_order() -> None:
         "<apparatus>open-scuba</apparatus><platform>pier</platform>"
     ) + _after("<current>hard-current</current><notes><para>Slack water</para></notes><rating><ratingvalue>8</ratingvalue></rating>")
     assert [member for member in dive(body) if member not in ("uuid", "started_at")] == [
-        "duration",
+        "submerged_time",
         "notes",
         "type",
         "rating",

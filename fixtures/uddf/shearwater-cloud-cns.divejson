@@ -11,7 +11,7 @@
       "uuid": "493dc166-437a-5dd1-b137-79a555bc5e5e",
       "number": 2,
       "started_at": "2026-09-08T15:21:53",
-      "duration": 2921,
+      "submerged_time": 2921,
       "notes": "Summary:\n\nEnvironment:\n\nGas:\n\nGear:\n\nIssues:",
       "max_depth": 19.1,
       "avg_depth": 11.0477839,

@@ -146,7 +146,7 @@ and §6.4a's own 0.4 to 1.2 bar bound refuses the other one outright.
 | --- | --- | --- |
 | `<MaxDepth>`, `<AvgDepth>` | `max_depth`, `avg_depth` | metres, ×1 |
 | `<BottomTemperature>` | `bottom_temperature` | °C, ×1 |
-| `<Duration>` | `duration` | seconds, ×1, rounded to a whole one |
+| `<Duration>` | `submerged_time` | seconds, ×1, rounded to a whole one |
 | `<SurfacePressure>` | the recording's `surface_pressure` | Pascal ÷ 100 000 |
 | `<CnsStart>`, `<CnsEnd>` | the recording's `cns_start`, `cns_end` | percent, ×1 |
 | `<OtuStart>`, `<OtuEnd>` | the recording's `otu_start`, `otu_end` | count, ×1 |
@@ -240,7 +240,7 @@ place to put them, and §6.4b is that place.
 | source | DiveJSON member | notes |
 | --- | --- | --- |
 | `<StartTime>` | `started_at` | wall clock, fraction kept, no offset supplied |
-| `<Duration>` | `duration` | the whole logged period |
+| `<Duration>` | `submerged_time` | the whole logged period |
 | `<Note>` | `notes` | stripped; nil on all 384 in hand |
 | `<MaxDepth>` | `max_depth` | a recorded reading, not a summary of the samples |
 | `<AvgDepth>` | `avg_depth` | dropped if it is deeper than `max_depth` |
@@ -258,9 +258,9 @@ profile rather than on the dive.
 `<Duration>` is the whole period the computer logged, and it is the only element in this
 format observed holding a dive's length. `<BottomTime>` is the time spent at depth and runs
 a third shorter — 1 028 s against 2 001 on the dive this reader is measured against — so it
-is not `duration`. `<DiveTime>`, which is the member the app-JSON reader prefers, is `i:nil`
-on every one of the 384 exports in hand: nothing here has seen a value of it, and building a
-preference order on a field nobody has seen would be a guess.
+is not `submerged_time`. `<DiveTime>`, which is the member the app-JSON reader prefers, is
+`i:nil` on every one of the 384 exports in hand: nothing here has seen a value of it, and
+building a preference order on a field nobody has seen would be a guess.
 
 `<Duration>` and `<AvgDepth>` are the figures this format states for the dive, so this
 reader derives neither ([`converting.md`](converting.md), *A dive's time in the water*). On

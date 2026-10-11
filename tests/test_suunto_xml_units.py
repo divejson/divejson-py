@@ -198,9 +198,9 @@ def test_a_ppo2_limit_is_already_bar() -> None:
     assert cylinder("<PO2>1.4</PO2>")["ppo2_limit"] == 1.4
 
 
-def test_a_duration_is_already_seconds() -> None:
+def test_a_submerged_time_is_already_seconds() -> None:
     """No clock to parse, unlike Subsurface's `M:SS`."""
-    assert one("<Duration>2001</Duration>")["duration"] == 2001
+    assert one("<Duration>2001</Duration>")["submerged_time"] == 2001
 
 
 # -- the cross-format known answer ----------------------------------------------------
@@ -230,7 +230,7 @@ def test_the_same_dive_read_from_fit_and_from_this_export_agrees() -> None:
     assert xml["started_at"] == "2021-04-06T11:16:42.6"
     assert fit["started_at"] == "2021-04-06T11:16:42+02:00"
     assert xml["max_depth"] == fit["max_depth"]
-    assert (xml["duration"], fit["duration"]) == (2001, 1991)
+    assert (xml["submerged_time"], fit["submerged_time"]) == (2001, 1991)
     assert (xml["avg_depth"], fit["avg_depth"]) == (17.73, 17.74)
     for member in ("cns_end", "otu_end"):
         assert xml["recordings"][0][member] == fit["recordings"][0][member], member

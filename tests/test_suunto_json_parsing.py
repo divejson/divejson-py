@@ -114,7 +114,7 @@ def test_a_header_that_states_no_activity_type_is_read_on() -> None:
         json.dumps({"DeviceLog": {"Header": {"DateTime": SUUNTO_STARTED_AT, "Duration": 2400}}}).encode(),
         exported_at=EXPORTED_AT,
     )
-    assert conversion.document["dives"][0]["duration"] == 2400
+    assert conversion.document["dives"][0]["submerged_time"] == 2400
 
 
 # -- time -----------------------------------------------------------------------------
@@ -333,33 +333,33 @@ def test_the_route_origin_states_no_error_even_beside_an_estimate() -> None:
 
 def test_dive_time_wins_over_duration_and_duration_is_the_fallback() -> None:
     """The in-water time against the whole logged period, which differ by minutes."""
-    assert _dive({"DiveTime": 4001.4, "Duration": 4302.208})["duration"] == 4001
-    assert _dive({"Duration": 2001})["duration"] == 2001
+    assert _dive({"DiveTime": 4001.4, "Duration": 4302.208})["submerged_time"] == 4001
+    assert _dive({"Duration": 2001})["submerged_time"] == 2001
 
 
-def test_a_zero_duration_is_a_placeholder_rather_than_a_dive_of_no_length() -> None:
-    """§6.2 gives `duration` `exclusiveMinimum: 0`, and the member's own rule decides."""
+def test_a_zero_submerged_time_is_a_placeholder_rather_than_a_dive_of_no_length() -> None:
+    """§6.2 gives `submerged_time` `exclusiveMinimum: 0`, and the member's own rule decides."""
     conversion = _conversion({"DiveTime": 0, "Duration": 2001})
-    assert conversion.document["dives"][0]["duration"] == 2001
-    assert any("cannot hold as a duration" in m for m in _messages(conversion, "absent"))
+    assert conversion.document["dives"][0]["submerged_time"] == 2001
+    assert any("cannot hold as a submerged time" in m for m in _messages(conversion, "absent"))
 
 
-def test_a_duration_that_rounds_to_zero_is_read_as_not_recorded() -> None:
+def test_a_submerged_time_that_rounds_to_zero_is_read_as_not_recorded() -> None:
     """The member's rule is asked about the whole seconds, not the fraction behind them.
 
     0.4 s is above §6.2's floor and the integer written from it is not, so a reader that
-    checks before it rounds writes a `duration: 0` its own validation then rejects — which
+    checks before it rounds writes a `submerged_time: 0` its own validation then rejects — which
     would lose the whole conversion over a header field.
     """
     conversion = _conversion({"DiveTime": 0.4, "Duration": 2001})
-    assert conversion.document["dives"][0]["duration"] == 2001
+    assert conversion.document["dives"][0]["submerged_time"] == 2001
     assert any("records DiveTime as 0.4 s" in m for m in _messages(conversion, "absent"))
 
 
-def test_a_negative_duration_is_read_as_not_recorded() -> None:
+def test_a_negative_submerged_time_is_read_as_not_recorded() -> None:
     conversion = _conversion({"DiveTime": -30})
-    assert "duration" not in conversion.document["dives"][0]
-    assert any("cannot hold as a duration" in m for m in _messages(conversion, "absent"))
+    assert "submerged_time" not in conversion.document["dives"][0]
+    assert any("cannot hold as a submerged time" in m for m in _messages(conversion, "absent"))
 
 
 # -- cylinders, the Ocean shape -------------------------------------------------------
@@ -750,7 +750,7 @@ def test_a_non_finite_number_is_read_as_not_recorded() -> None:
     body = json.dumps({"DeviceLog": {"Header": {"ActivityType": 51, "DateTime": SUUNTO_STARTED_AT}}})
     raw = body.replace('"DateTime"', '"Duration": Infinity, "DateTime"')
     dive = convert(raw.encode(), exported_at=EXPORTED_AT).document["dives"][0]
-    assert "duration" not in dive
+    assert "submerged_time" not in dive
 
 
 def test_a_boolean_is_not_a_reading() -> None:

@@ -372,8 +372,8 @@ readings beside 29 temperatures keeps both, rather than gaining 402 invented one
 
 ## A dive's time in the water
 
-§6.2's `duration` is the time the diver spent in the water as the computer counts it, and
-`avg_depth` the time-weighted mean depth over that time. Neither is the span of the
+§6.2's `submerged_time` is the time the diver spent in the water as the computer counts it,
+and `avg_depth` the time-weighted mean depth over that time. Neither is the span of the
 recording: a computer keeps recording at the surface for an end-of-dive delay — five
 minutes by default on a Suunto Ocean — in case the diver descends again, and its own dive
 time leaves those minutes out. The profile keeps them, being the device's (§6.4).
@@ -388,14 +388,14 @@ the one that applies it, since no FIT export of the Suunto app states a figure f
 
 **The derivation.** With the depth samples in time order, the interval from each sample to
 the next counts as in the water when that sample is strictly deeper than **1.2 m**. The
-dive's `duration` is the sum of the counted intervals, in whole seconds, halves away from
-zero; its `avg_depth` is the sum over counted intervals of the interval's length times the
-mean of its two depths, divided by the summed length, to two decimals. Both are `inferred`,
-listed under `extensions.divejson.inferred`, and each carries a report note in one sentence
-whatever the file, so that a logbook's report groups them rather than raising a group per
-dive. Where no interval counts — no depth samples, or no sample deeper than the threshold
-that another sample follows — both are absent from the derivation, and whatever wider
-figure the source does state stands in, as a reading and without an `inferred` mark.
+dive's `submerged_time` is the sum of the counted intervals, in whole seconds, halves away
+from zero; its `avg_depth` is the sum over counted intervals of the interval's length times
+the mean of its two depths, divided by the summed length, to two decimals. Both are
+`inferred`, listed under `extensions.divejson.inferred`, and each carries a report note in
+one sentence whatever the file, so that a logbook's report groups them rather than raising a
+group per dive. Where no interval counts — no depth samples, or no sample deeper than the
+threshold that another sample follows — both are absent from the derivation, and whatever
+wider figure the source does state stands in, as a reading and without an `inferred` mark.
 
 1.2 m is the documented default dive-start depth of both Suunto and Garmin. Over 46 Suunto
 Ocean app exports — a diver's personal files, which this repository does not carry — that

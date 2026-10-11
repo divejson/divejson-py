@@ -204,7 +204,7 @@ than an empty record (§6.4a). `fixtures/suunto_json/header-only.json` is that s
 | member | | into |
 | --- | --- | --- |
 | `Header.DateTime` | | `started_at`, offset and fraction preserved |
-| `Header.DiveTime`, else `Header.Duration` | | `duration` |
+| `Header.DiveTime`, else `Header.Duration` | | `submerged_time` |
 | `Header.Depth.Max` | | `max_depth` |
 | `Header.DepthAverage`, else `Header.Depth.Avg` | | `avg_depth` |
 | `Diving.StartTissue.CNS` × 100 | | the recording's `cns_start` |
@@ -250,9 +250,9 @@ this reader carries where a negative is a reading.
 **`DiveTime` before `Duration`, and the order is the mapping.** They are different
 quantities: `DiveTime` is the time in the water and `Duration` is the whole period the
 computer logged, which starts before the diver gets in and ends after they are back on the
-boat. On one file in hand they are 4 001 s and 4 302 s. §6.2's `duration` is the dive's, so
-the in-water figure wins where the export states it — which it does on the Ocean shape and
-not on the D5 shapes, where only `Duration` exists.
+boat. On one file in hand they are 4 001 s and 4 302 s. §6.2's `submerged_time` is the
+dive's, so the in-water figure wins where the export states it — which it does on the Ocean
+shape and not on the D5 shapes, where only `Duration` exists.
 
 The same dive's FIT export states no in-water figure, and the FIT reader derives one
 ([`converting.md`](converting.md), *A dive's time in the water*). On each Ocean pair here the
@@ -265,10 +265,10 @@ and 20.84 m against 4 001 s and 20.87 m for `suunto-ocean`, 3 063 s and 10.73 m 
 file in hand states both. Neither is derived: this export summarises its own dive, so both
 depths are readings.
 
-A zero reads by the member's own constraint. `duration`, `max_depth` and `avg_depth` are
-`> 0` in the schema, so a zero in any of them is a placeholder and is read as not recorded —
-and for `duration` the constraint is asked of the **whole seconds**, so a `DiveTime` of 0.4 s
-is read as not recorded too rather than written as a dive of no length;
+A zero reads by the member's own constraint. `submerged_time`, `max_depth` and `avg_depth`
+are `> 0` in the schema, so a zero in any of them is a placeholder and is read as not
+recorded — and for `submerged_time` the constraint is asked of the **whole seconds**, so a
+`DiveTime` of 0.4 s is read as not recorded too rather than written as a dive of no length;
 `cns_*` and `otu_*` are `≥ 0`, so the zero a first dive of the day starts on is an answer.
 An average depth deeper than the maximum cannot be, and the average is dropped.
 

@@ -59,7 +59,7 @@ def test_an_inferred_note_and_a_listed_member_arrive_together(source) -> None:
     """The report's `inferred` kind and `extensions.divejson.inferred` are one decision.
 
     This is the reader that can compute a value, so the coupling has teeth here in a way it
-    does not for the two XML readers. Every file here derives its duration and mean depth,
+    does not for the two XML readers. Every file here derives its submerged time and mean depth,
     none carrying a `dive_summary`. Either half without the other is a document saying two
     different things about itself.
     """
@@ -104,7 +104,7 @@ def test_the_ocean_dive_takes_its_maximum_from_the_session_and_derives_its_time_
     `frame.fields` into a dict by name would carry that instead — a document that validates
     perfectly and is wrong by a rounding error, on every Suunto file there is.
 
-    `duration` and `avg_depth` are the time in the water and the mean over it, derived from
+    `submerged_time` and `avg_depth` are the time in the water and the mean over it, derived from
     the samples: the session's 4301.72 s and 19.43 m run on through the five minutes the
     watch waits at the surface before closing the dive. Its JSON twin states 4001 s and
     20.87 m. `started_at` carries the +02:00 the `activity` message's two renderings of one
@@ -115,10 +115,10 @@ def test_the_ocean_dive_takes_its_maximum_from_the_session_and_derives_its_time_
     assert dive["max_depth"] == 45.91
     assert dive["avg_depth"] == 20.84
     assert dive["started_at"] == "2026-04-17T11:49:23+02:00"
-    assert dive["duration"] == 4010
+    assert dive["submerged_time"] == 4010
     assert dive["recordings"][0]["cns_end"] == 20.0
     assert dive["recordings"][0]["otu_end"] == 55.0
-    assert conversion.document["extensions"][PRODUCER_KEY][INFERRED] == ["dives/0/duration", "dives/0/avg_depth"]
+    assert conversion.document["extensions"][PRODUCER_KEY][INFERRED] == ["dives/0/submerged_time", "dives/0/avg_depth"]
     assert len([note for note in conversion.notes if note.kind == "inferred"]) == 2
 
 

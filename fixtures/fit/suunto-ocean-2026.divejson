@@ -10,7 +10,7 @@
     {
       "uuid": "1c81e561-6fc5-59c7-bcdc-5c144636e163",
       "started_at": "2026-09-08T15:17:38+03:00",
-      "duration": 3063,
+      "submerged_time": 3063,
       "max_depth": 19.04,
       "avg_depth": 10.73,
       "exit_position": {
@@ -7713,7 +7713,7 @@
         "name": "Suunto Ocean"
       },
       "inferred": [
-        "dives/0/duration",
+        "dives/0/submerged_time",
         "dives/0/avg_depth"
       ]
     }

@@ -10,7 +10,7 @@
     {
       "uuid": "c4b3ed00-9b9e-5374-9280-13b157ad8761",
       "started_at": "2025-03-10T09:55:48.83",
-      "duration": 3423,
+      "submerged_time": 3423,
       "max_depth": 31.95,
       "avg_depth": 16.6,
       "bottom_temperature": 25.0,

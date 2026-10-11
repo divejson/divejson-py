@@ -85,8 +85,8 @@ this corpus decodes to 4,339 frames for a 72-minute dive, so the cap is about 23
 times that, or roughly 28 hours of continuous logging.
 
 It **refuses rather than truncating**, because the summary comes last: stopping early and
-keeping what had arrived would discard the start time, the duration and the depths, and
-convert a confidently empty dive.
+keeping what had arrived would discard the start time, the time in the water and the depths,
+and convert a confidently empty dive.
 
 **The protocol version is recorded and not gated on.** It goes into
 `extensions.divejson.fit_protocol_version` — 2.0 on every file in this corpus, which
@@ -240,7 +240,7 @@ FIT has no field for what a device calls itself, so §6.4b's `name` has no sourc
 | field | | into |
 | --- | --- | --- |
 | `session.start_time` (2) | | `started_at`, in the zone below |
-| `dive_summary.bottom_time` (11) **untested**, else the derivation, else `session.total_elapsed_time` (7), else `total_timer_time` (8) | | `duration` |
+| `dive_summary.bottom_time` (11) **untested**, else the derivation, else `session.total_elapsed_time` (7), else `total_timer_time` (8) | | `submerged_time` |
 | `session.max_depth` (141), else `dive_summary.max_depth` (3) **untested**, else the depth samples | | `max_depth` |
 | `dive_summary.avg_depth` (2) **untested**, else the derivation, else `session.avg_depth` (140) | | `avg_depth` |
 | `dive_summary.start_cns` (5) **untested**, else `session.start_cns` (143) | | the recording's `cns_start` |
@@ -251,30 +251,30 @@ FIT has no field for what a device calls itself, so §6.4b's `name` has no sourc
 **The session's figures are the activity's, not the dive's.** `total_elapsed_time` is the
 activity's time, pauses included, and `total_timer_time` the same without them; a watch
 keeps the activity running through its end-of-dive delay after the diver surfaces, so both
-count minutes at the surface that §6.2's `duration` leaves out, and `avg_depth` is the mean
-over all of them. On the 28 Ocean files in a diver's hand — personal exports this repository
-does not carry — the records run 268 to 298 s past the last sample deeper than 0.75 m, and
-`total_timer_time` equals the same dive's app-JSON `Duration`, the whole logged period, to
-the millisecond; `suunto-ocean.fit`'s session states 4 302 s where the derivation counts
-4 010. The D5 closes its dive within seconds: its three files in hand run 0 to 10 s past
-that sample. No FIT export of the Suunto app states a `dive_summary`, so every one derives
-its `duration` and `avg_depth` by the rule in [`converting.md`](converting.md) (*A dive's
-time in the water*), and the session's figures stand in only where the derivation yields
-nothing, as readings and with no mark.
+count minutes at the surface that §6.2's `submerged_time` leaves out, and `avg_depth` is the
+mean over all of them. On the 28 Ocean files in a diver's hand — personal exports this
+repository does not carry — the records run 268 to 298 s past the last sample deeper than
+0.75 m, and `total_timer_time` equals the same dive's app-JSON `Duration`, the whole logged
+period, to the millisecond; `suunto-ocean.fit`'s session states 4 302 s where the derivation
+counts 4 010. The D5 closes its dive within seconds: its three files in hand run 0 to 10 s
+past that sample. No FIT export of the Suunto app states a `dive_summary`, so every one
+derives its `submerged_time` and `avg_depth` by the rule in [`converting.md`](converting.md)
+(*A dive's time in the water*), and the session's figures stand in only where the derivation
+yields nothing, as readings and with no mark.
 
 `dive_summary.bottom_time` is read first as the computer's own figure for the dive, which is
 the one field Subsurface's Garmin parser takes a dive time from. The profile defines it no
 further than its name, and whether a Descent's is the dive time it displays waits on a file;
 the row is untested until one arrives.
 
-**The duration, the mean depth and the oxygen accounting read the summary first, and the
-maximum depth reads the session first.** On a multi-dive Garmin file the session's figures
-cover the whole activity while the `dive_summary` describes the dive being read, which is
-why the dive's own figures take the summary where there is one. A maximum has no surface
-time to leave out, so the session's is the dive's on every file in hand, and the summary is
-the fallback for a device that summarises a dive in one message and not the other. The CNS
-and OTU totals, being the computer's own figures, land on the file's one recording (§6.4a)
-rather than on the dive.
+**The time in the water, the mean depth and the oxygen accounting read the summary first,
+and the maximum depth reads the session first.** On a multi-dive Garmin file the session's
+figures cover the whole activity while the `dive_summary` describes the dive being read,
+which is why the dive's own figures take the summary where there is one. A maximum has no
+surface time to leave out, so the session's is the dive's on every file in hand, and the
+summary is the fallback for a device that summarises a dive in one message and not the
+other. The CNS and OTU totals, being the computer's own figures, land on the file's one
+recording (§6.4a) rather than on the dive.
 
 A Garmin freediving activity writes a `dive_summary` per descent **plus** a session-level
 one, and `reference_mesg` (0) is what separates them: the summary referring to `session` is
@@ -335,12 +335,12 @@ its computer ran in. The DM5 XML path says which, because its files state it.
 
 ### What the samples give is `inferred`, and is listed
 
-The derived `duration` and `avg_depth`, and a `max_depth` taken from the depth samples, are
-this converter's own arithmetic, so each is `inferred` and the document lists the member
-under `extensions.divejson.inferred` (spec §5.4). Every `inferred` note this reader raises
-has its member on that list and every member on the list has a note; the two are one
-decision. Each derived figure's note is one sentence whatever the file, so a logbook's
-report groups them.
+The derived `submerged_time` and `avg_depth`, and a `max_depth` taken from the depth
+samples, are this converter's own arithmetic, so each is `inferred` and the document lists
+the member under `extensions.divejson.inferred` (spec §5.4). Every `inferred` note this
+reader raises has its member on that list and every member on the list has a note; the two
+are one decision. Each derived figure's note is one sentence whatever the file, so a
+logbook's report groups them.
 
 The derived `avg_depth` is the time-weighted mean over the intervals the derivation counts,
 each interval weighted by its length, so a device that samples faster on descent does not
