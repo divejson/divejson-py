@@ -709,21 +709,27 @@ resolves to nothing at all is reported as a source defect.
 `<gasdefinitions>` is not a collection of its own: DiveJSON carries the blend on the
 cylinder that held it, so a mix nothing links to travels nowhere.
 
-**A `<tankdata>`'s links are read whole**, in whatever order they come: one is resolved
-against the mixes and one against the gear ids `<equipment>` defines, the gear link
-becoming the cylinder's `gear_uuid` (§6.3) — a `<tank>`, ordinarily, though a vessel a writer
-had no `<tank>` for comes back as whatever its element reads as. The mix link is the one that ties the cylinder
-to its pressure channel, whichever comes first. **A cylinder keeps one vessel, and a vessel
-one cylinder per dive** (§3, rule 7): a second gear link on one `<tankdata>` is dropped with
-a note, a second `<tankdata>` of one dive linking a piece already linked keeps its gas and
-loses the link with a note, and a link to an id that is no gear piece is reported as an
-unknown reference, as any other link is.
+**A `<tankdata>`'s links are read whole**, in whatever order they come, and told apart by
+what each resolves to: one against the mixes and one against the gear ids `<equipment>`
+defines, the gear link becoming the cylinder's `gear_uuid` (§6.3) — a `<tank>`, ordinarily,
+though a vessel a writer had no `<tank>` for comes back as whatever its element reads as.
+The mix link is the one that ties the cylinder to its pressure channel, whichever comes
+first. **A cylinder holds one gas and is one vessel, and a vessel is one cylinder per dive**
+(§3, rule 7): a second mix link or a second gear link on one `<tankdata>` is dropped with a
+note, and a second `<tankdata>` of one dive linking a piece already linked keeps its gas and
+loses the link with a note. **A link that resolves to neither** — to an id the file gives
+something else, a site say, or to one it defines nowhere — is dropped with a note, unless the
+`<tankdata>` has no mix link at all. Then its first such link stays its gas link, read as
+it always was — the cylinder's mix noted as one `<gasdefinitions>` does not define — so a
+`<tankpressure ref>` naming the same id still ties its channel to this cylinder.
 
 **A linked `<tank>`'s volume stands in for a `<tankdata>` that gives none.** UDDF's own
 rule is that a volume the `<tank>` gives need not be repeated in a `<tankdata>` linking it,
 and a `<tankdata>` that does give one overrides it, so a file built the way UDDF asks
 carries the figure once, on the vessel; the reader takes it from there, with no finding,
-because that is where the source put it.
+because that is where the source put it. It does so for a `<tankdata>` whose link to that
+`<tank>` was dropped as a repeat too: the link is the source's statement of the cylinder's
+size whether or not the cylinder can keep it as its vessel.
 
 `converting.md`'s vessel-less cylinder is UDDF's `<tankdata>` with a gas link and no
 `<tankvolume>` — and no link to a `<tank>` that gives one; the absent start pressure it
