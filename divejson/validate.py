@@ -259,6 +259,7 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
         _check_reference_list(dive, "gear_uuids", known["gear"], "gear", here, issues)
         _check_embedded_references(dive, "people", known, here, issues)
         _check_embedded_references(dive, "sightings", known, here, issues)
+        _check_embedded_references(dive, "cylinders", known, here, issues)
         _check_tags(dive, here, issues)
 
         for cyl_index, cylinder in enumerate(dive.get("cylinders") or []):
@@ -444,6 +445,7 @@ class _EmbeddedReference(NamedTuple):
 _EMBEDDED_REFERENCES = {
     "people": _EmbeddedReference("person_uuid", "people", "person"),
     "sightings": _EmbeddedReference("species_uuid", "species", "species"),
+    "cylinders": _EmbeddedReference("gear_uuid", "gear", "gear item"),
 }
 
 
@@ -454,8 +456,10 @@ def _check_embedded_references(
 
     The schema cannot say the second. Two items referencing one record are two distinct
     objects to `uniqueItems` once anything else in them differs — a person's `role`, a
-    sighting's `count`. A person is on one occasion in one capacity, and two sightings of
-    one species on one dive would be two ways to say how many were seen.
+    sighting's `count`. A person is on one occasion in one capacity, two sightings of
+    one species on one dive would be two ways to say how many were seen, and a vessel is
+    one gas supply — a cylinder's `gear_uuid` is OPTIONAL, so only a present one is held
+    to either rule.
     """
     items = host.get(member)
     if not isinstance(items, list):

@@ -1972,3 +1972,121 @@ def test_the_type_and_the_mode_are_never_read_across() -> None:
     found = dive(before("<apparatus>open-scuba</apparatus>") + ONE_SAMPLE)
     assert found["type"] == "open_circuit"
     assert "mode" not in found["recordings"][0]
+
+
+# -- a cylinder's vessel: `<tank>` is the equipment, `<tankdata>` this dive's fill ----------------
+
+_AIR = '<gasdefinitions><mix id="m"><name>Air</name><o2>0.21</o2></mix></gasdefinitions>'
+
+
+def _kit(*pieces: str) -> str:
+    return f"<diver><owner><equipment>{''.join(pieces)}</equipment></owner></diver>"
+
+
+_STEEL = "<tank id='t1'><name>Sidemount steel</name><tankmaterial>steel</tankmaterial><tankvolume>0.012</tankvolume></tank>"
+
+
+def _linked(tanks: str, *pieces: str, samples: str = "") -> bytes:
+    return one_dive(f"{STARTED_AT}{tanks}{samples}", header=_kit(*pieces) + _AIR)
+
+
+def test_a_tank_carries_its_volume_and_material_into_the_gear_item() -> None:
+    gear = convert(_linked("", _STEEL)).document["gear"]
+    assert gear == [
+        {
+            "uuid": gear[0]["uuid"],
+            "name": "Sidemount steel",
+            "type": "cylinder",
+            "volume": 12.0,
+            "material": "steel",
+        }
+    ]
+
+
+def test_a_tank_volume_in_litres_is_read_as_the_cylinders_is() -> None:
+    data = _linked("", "<tank id='t1'><name>Twin</name><tankvolume>24</tankvolume></tank>")
+    conversion = convert(data)
+    assert conversion.document["gear"][0]["volume"] == 24.0
+    assert [(note.kind, note.where) for note in conversion.notes if "<tankvolume>" in note.message] == [
+        ("resolved", "gear/0")
+    ]
+
+
+def test_a_material_the_format_does_not_name_is_reported() -> None:
+    data = _linked("", "<tank id='t1'><name>Old</name><tankmaterial>bronze</tankmaterial></tank>")
+    conversion = convert(data)
+    assert "material" not in conversion.document["gear"][0]
+    assert any("does not name 'bronze'" in note.message for note in conversion.notes)
+
+
+@pytest.mark.parametrize(("element", "gear_type"), [("rebreather", "rebreather"), ("scooter", "scooter")])
+def test_a_rebreather_and_a_scooter_are_read_as_themselves(element: str, gear_type: str) -> None:
+    data = _linked("", f"<{element} id='p'><name>Unit</name></{element}>")
+    assert convert(data).document["gear"][0]["type"] == gear_type
+
+
+def test_a_cylinder_links_the_tank_it_is() -> None:
+    found = convert(_linked('<tankdata><link ref="m"/><link ref="t1"/><tankvolume>0.012</tankvolume></tankdata>', _STEEL))
+    vessel = found.document["gear"][0]["uuid"]
+    assert found.document["dives"][0]["cylinders"] == [{"volume": 12.0, "oxygen": 21.0, "gear_uuid": vessel}]
+
+
+def test_a_tank_link_first_keeps_the_gas_and_the_pressure_channel() -> None:
+    """The mix link is what the profile's `<tankpressure ref>` keys on, so reading only the
+    first `<link>` would cost a cylinder linked tank-first its gas and its channel."""
+    samples = '<samples><waypoint><depth>1.0</depth><divetime>0</divetime><tankpressure ref="m">20000000</tankpressure></waypoint></samples>'
+    found = dive(f'{STARTED_AT}<tankdata><link ref="t1"/><link ref="m"/></tankdata>{samples}', header=_kit(_STEEL) + _AIR)
+    assert found["cylinders"][0]["oxygen"] == 21.0
+    assert profile_of(found)["pressures"][0]["gas_number"] == found["cylinders"][0]["gas_number"] == 0
+
+
+def test_a_tankdata_with_no_volume_takes_its_tanks() -> None:
+    """UDDF's own rule: a `<tankdata>` linking a `<tank>` that states its volume need not
+    repeat it. Read as the source defines it, so nothing is reported."""
+    conversion = convert(_linked('<tankdata><link ref="t1"/><link ref="m"/></tankdata>', _STEEL))
+    assert conversion.document["dives"][0]["cylinders"][0]["volume"] == 12.0
+    assert not any("cylinder size" in note.message for note in conversion.notes)
+
+
+def test_a_tankdata_volume_overrides_its_tanks() -> None:
+    data = _linked('<tankdata><link ref="m"/><link ref="t1"/><tankvolume>0.011</tankvolume></tankdata>', _STEEL)
+    assert convert(data).document["dives"][0]["cylinders"][0]["volume"] == 11.0
+
+
+def test_a_vessel_linked_twice_on_a_dive_keeps_one_link() -> None:
+    """A vessel is one gas supply (§3 rule 7), and the validator would refuse the reader's own
+    output. The second cylinder keeps its gas, and the tank's size as the source states it."""
+    tanks = '<tankdata><link ref="m"/><link ref="t1"/></tankdata><tankdata><link ref="m"/><link ref="t1"/></tankdata>'
+    conversion = convert(_linked(tanks, _STEEL))
+    first, second = conversion.document["dives"][0]["cylinders"]
+    assert "gear_uuid" in first and "gear_uuid" not in second
+    assert second == {"volume": 12.0, "oxygen": 21.0}
+    assert [(note.kind, note.where) for note in conversion.notes if "already links" in note.message] == [
+        ("dropped", "dive/0/tankdata/1")
+    ]
+
+
+def test_a_second_vessel_on_one_tankdata_is_dropped() -> None:
+    other = "<tank id='t2'><name>Other</name></tank>"
+    conversion = convert(_linked('<tankdata><link ref="m"/><link ref="t1"/><link ref="t2"/></tankdata>', _STEEL, other))
+    vessels = {item["name"]: item["uuid"] for item in conversion.document["gear"]}
+    assert conversion.document["dives"][0]["cylinders"][0]["gear_uuid"] == vessels["Sidemount steel"]
+    assert any("a second vessel, 't2'" in note.message for note in conversion.notes)
+
+
+@pytest.mark.parametrize(
+    ("ref", "said"),
+    [("nowhere", "which nothing in the file defines"), ("rg", "neither a gas nor a piece of kit")],
+)
+def test_a_link_to_neither_a_gas_nor_kit_is_reported(ref: str, said: str) -> None:
+    conversion = convert(_linked(f'<tankdata><link ref="m"/><link ref="{ref}"/></tankdata>', _STEEL))
+    assert conversion.document["dives"][0]["cylinders"] == [{"oxygen": 21.0}]
+    assert [note.kind for note in conversion.notes if said in note.message] == ["dropped"]
+
+
+def test_a_lone_undefined_link_is_still_the_gas_link() -> None:
+    """How a `<tankdata>` with one link was always read: a channel naming the same undefined
+    mix keeps its tie to the cylinder."""
+    samples = '<samples><waypoint><depth>1.0</depth><divetime>0</divetime><tankpressure ref="x">20000000</tankpressure></waypoint></samples>'
+    found = dive(f'{STARTED_AT}<tankdata><link ref="x"/></tankdata>{samples}')
+    assert profile_of(found)["pressures"][0]["gas_number"] == found["cylinders"][0]["gas_number"]

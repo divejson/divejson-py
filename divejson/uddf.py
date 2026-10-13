@@ -221,9 +221,9 @@ _DATE_TIME = re.compile(
 
 # Where each of UDDF's typed equipment elements lands in §6.12's vocabulary. Everything
 # landing on `other` does so because the vocabulary has no value for it, not because the
-# source was silent: `<variouspieces>` is UDDF's own catch-all, and a scooter, a
-# rebreather, a weight belt, a compressor and a watch are equipment this format does not
-# yet name. Read the mapping off the rows rather than off any count of them.
+# source was silent: `<variouspieces>` is UDDF's own catch-all, a weight belt's quantity is
+# the dive's `weight`, a watch is a computer or jewellery, and a compressor is not kit
+# carried on a dive. Read the mapping off the rows rather than off any count of them.
 #
 # Public because the writer derives its own fidelity claim from it: a gear type survives a
 # round trip through UDDF exactly when reading the element it was written as returns that
@@ -241,9 +241,9 @@ GEAR_TYPE: dict[str, str] = {
     "lead": "other",
     "light": "light",
     "mask": "mask",
-    "rebreather": "other",
+    "rebreather": "rebreather",
     "regulator": "regulator",
-    "scooter": "other",
+    "scooter": "scooter",
     "suit": "wetsuit",
     "tank": "cylinder",
     "variouspieces": "other",
@@ -255,6 +255,9 @@ GEAR_TYPE: dict[str, str] = {
 # "shorty", "half-suit", "two-piece" and the rest — leaves `type` at `GEAR_TYPE`'s
 # `wetsuit`, which is what every one of them is.
 _DRYSUIT_TYPES = {"dry-suit", "drysuit", "hot-water-suit"}
+
+# `tankmaterialType`'s enumeration, which is §6.12's `material` spelled the same way.
+_TANK_MATERIALS = frozenset({"aluminium", "carbon", "steel"})
 
 # A `<setmarker>` whose text is exactly one of these is that event, rather than an event
 # with no type at all labelled with the word. It is what makes this format's own markers
@@ -576,6 +579,11 @@ class _Converter:
         self.site_uuids: dict[str, str] = {}
         self.trip_uuids: dict[str, str] = {}
         self.gear_uuids: dict[str, str] = {}
+        # A `<tank>`'s water capacity in litres by its own `@id`, for a `<tankdata>` that
+        # links it and gives no `<tankvolume>` of its own — UDDF's rule is that the linked
+        # tank's volume is the cylinder's then. Recorded whether or not this file carries the
+        # piece, like `gear_uuids`: an archive member's repeat is still this file's tank.
+        self.tank_volumes: dict[str, Decimal] = {}
         # `<divecomputer>` elements by their own `@id`, filled by `read_gear` and read by
         # `read_recordings`. Keyed on the element rather than on the gear uuid because the
         # two do not always both exist: §6.12 makes a gear item's `name` REQUIRED, so a
@@ -1661,11 +1669,14 @@ class _Converter:
             if claimed is None:
                 continue
             source_id = _attr(element, "id")
+            volume = self.tank_volume(element, where, report=carried) if kind == "tank" else None
             if source_id:
                 # Recorded before the row is written, and whether or not it is: a repeat of
                 # another archive member's record is not carried again, and this file's
                 # references to it still have to resolve to the one that is.
                 self.gear_uuids[source_id] = claimed
+                if volume is not None:
+                    self.tank_volumes[source_id] = volume
             if not carried:
                 continue
             # Only for a piece this file carries: a dropped piece's purchase goes with it, and
@@ -1692,9 +1703,50 @@ class _Converter:
             notes = self.notes_text(element)
             if notes:
                 item["notes"] = notes
+            if kind == "tank":
+                # `tankType`'s own two children, the vessel's facts (§6.12). Its rated
+                # pressure has no element, and nothing else in UDDF carries one.
+                if volume is not None:
+                    item["volume"] = float(volume)
+                material = self.tank_material(element, where)
+                if material is not None:
+                    item["material"] = material
 
             gear.append(item)
         return gear
+
+    def tank_volume(self, element: ET.Element, where: str, *, report: bool) -> Decimal | None:
+        """A `<tank>`'s `<tankvolume>` in litres, read the way a `<tankdata>`'s is.
+
+        `report` is false for a piece another archive member carries: its volume still
+        stands in for this file's `<tankdata>` linking it, and the finding is that member's.
+        """
+        raw = decimal_of(_text_of(element, "tankvolume"))
+        if raw is None:
+            return None
+        litres, reinterpreted = _volume_litres(raw)
+        if not recorded(litres, record="gear_item", member="volume"):
+            if report:
+                self.note(where, f"<tankvolume> reads as {litres} litres; the format records a size only when positive", "absent")
+            return None
+        if reinterpreted and report:
+            self.note(
+                where,
+                f"<tankvolume> is {raw}, too large to be the cubic metres UDDF specifies; read as {litres} litres, "
+                "which is how some builds of Subsurface write it",
+                "resolved",
+            )
+        return litres
+
+    def tank_material(self, element: ET.Element, where: str) -> str | None:
+        stated = _text_of(element, "tankmaterial")
+        if stated is None:
+            return None
+        material = stated.strip().lower()
+        if material in _TANK_MATERIALS:
+            return material
+        self.note(where, f"§6.12's material does not name {stated!r}; it is not read", "dropped")
+        return None
 
     def read_purchases(self, element: ET.Element, where: str) -> None:
         """A piece's `<purchase>`, numbered: the XSD allows one, and a file holding two keeps
@@ -2332,15 +2384,28 @@ class _Converter:
         The second return value is what the profile needs: `<tankpressure ref>` and
         `<switchmix ref>` both address a *mix*, so tying a channel to its cylinder means
         going back through the link that cylinder made.
+
+        A `<tankdata>` carries any number of `<link>`s, and the gas and the vessel are told
+        apart by what each one resolves to rather than by where it sits — a tank link first
+        would otherwise cost the cylinder its gas *and* its pressure channel.
         """
         cylinders: list[dict[str, Any]] = []
         mix_refs: list[str | None] = []
+        # The vessels this dive's cylinders already link, by gear uuid, to the `<tankdata>`
+        # that linked it: a vessel is one gas supply (spec §3 rule 7).
+        vessels: dict[str, int] = {}
         for index, tank in enumerate(_kids(element, "tankdata")):
             tank_where = f"{where}/tankdata/{index}"
             cylinder: dict[str, Any] = {}
+            mix_ref, vessel_ref, gear_uuid = self.tankdata_links(tank, tank_where, index, vessels)
 
             raw_volume = decimal_of(_text_of(tank, "tankvolume"))
-            if raw_volume is None:
+            if raw_volume is None and vessel_ref in self.tank_volumes:
+                # UDDF's own rule: a `<tankdata>` linking a `<tank>` that states its volume
+                # need not repeat it, and the tank's is then the cylinder's. Read as the
+                # source defines it, so no finding.
+                cylinder["volume"] = float(self.tank_volumes[vessel_ref])
+            elif raw_volume is None:
                 self.note(
                     tank_where,
                     "the source records no cylinder size; the cylinder carries its gas and pressures without "
@@ -2386,7 +2451,6 @@ class _Converter:
             if end is not None:
                 cylinder["end_pressure"] = float(end)
 
-            mix_ref = _attr(_kid(tank, "link"), "ref")
             if mix_ref is None:
                 self.note(tank_where, "the source records no gas for this cylinder; absent means not recorded, never air (spec §6.3)", "absent")
             elif mix_ref in self.mixes:
@@ -2399,9 +2463,80 @@ class _Converter:
                     "absent",
                 )
 
+            if gear_uuid is not None:
+                cylinder["gear_uuid"] = gear_uuid
             cylinders.append(cylinder)
             mix_refs.append(mix_ref)
         return cylinders, mix_refs
+
+    def tankdata_links(
+        self, tank: ET.Element, where: str, index: int, vessels: dict[str, int]
+    ) -> tuple[str | None, str | None, str | None]:
+        """A `<tankdata>`'s gas link, its vessel link, and the gear uuid the cylinder keeps.
+
+        The mix reference is what the profile keys on, and the `@id` of the linked tank is
+        whose volume stands in for a `<tankdata>` that gives none. The cylinder holds one
+        gas and is one vessel, so a second link to either is dropped, and so is a vessel
+        another `<tankdata>` of the dive already links — that cylinder keeps its gas, and
+        still takes the tank's volume, which is the source's statement of its size.
+
+        A link that resolves to neither is the gas link where the `<tankdata>` has no other,
+        which is how it was always read: a `<tankpressure ref>` naming the same undefined
+        mix still ties its channel to this cylinder.
+        """
+        mix_ref: str | None = None
+        vessel_ref: str | None = None
+        kept: str | None = None
+        unresolved: list[str] = []
+        for link in _kids(tank, "link"):
+            ref = _attr(link, "ref")
+            if ref is None:
+                continue
+            if ref in self.mixes:
+                if mix_ref is None:
+                    mix_ref = ref
+                else:
+                    self.note(
+                        where,
+                        f"the cylinder links a second gas, {ref!r}, and holds one; the first, {mix_ref!r}, is kept",
+                        "dropped",
+                    )
+            elif ref in self.gear_uuids:
+                if vessel_ref is not None:
+                    self.note(
+                        where,
+                        f"the cylinder links a second vessel, {ref!r}, and is one; the first, {vessel_ref!r}, is kept",
+                        "dropped",
+                    )
+                    continue
+                vessel_ref = ref
+                gear_uuid = self.gear_uuids[ref]
+                if gear_uuid in vessels:
+                    self.note(
+                        where,
+                        f"the cylinder links the vessel {ref!r}, which <tankdata> {vessels[gear_uuid]} of this dive "
+                        "already links, and a vessel is one gas supply; the cylinder keeps its gas and the link is "
+                        "dropped (spec §6.3)",
+                        "dropped",
+                    )
+                else:
+                    vessels[gear_uuid] = index
+                    kept = gear_uuid
+            else:
+                unresolved.append(ref)
+        if mix_ref is None and unresolved:
+            mix_ref = unresolved.pop(0)
+        for ref in unresolved:
+            if ref in self.source_ids:
+                self.note(
+                    where,
+                    f"a link points at {ref!r}, which is neither a gas nor a piece of kit this converter carries; "
+                    "the reference is dropped",
+                    "dropped",
+                )
+            else:
+                self.note(where, f"a link points at {ref!r}, which nothing in the file defines; the reference is dropped", "dropped")
+        return mix_ref, vessel_ref, kept
 
     def pressure_bar(self, text: str | None, where: str, member: str) -> Decimal | None:
         value = decimal_of(text)

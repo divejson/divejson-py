@@ -352,6 +352,90 @@ def test_one_species_sighted_on_two_dives_is_two_sightings() -> None:
     assert validate_document(_with_sightings([{"species_uuid": SPECIES}], [{"species_uuid": SPECIES}])) == []
 
 
+# -- §3 rule 1 reaches a dive's cylinders, and a vessel is one gas supply -------------------------
+
+VESSEL = "0198a6f0-9999-7050-8000-000000000050"
+
+
+def _with_cylinders(*cylinders: list[dict]) -> dict:
+    """One dive per list of cylinders, and the one gear item they can link."""
+    dives = [
+        {
+            "uuid": f"0198a6f0-9999-7001-8000-00000000000{index}",
+            "started_at": "2026-04-17T11:49:23+02:00",
+            "cylinders": listed,
+        }
+        for index, listed in enumerate(cylinders)
+    ]
+    return {
+        "format": "divejson",
+        "version": "1.0",
+        "exported_at": "2026-09-05T00:00:00+00:00",
+        "dives": dives,
+        "gear": [{"uuid": VESSEL, "name": "Sidemount steel", "type": "cylinder", "volume": 12}],
+    }
+
+
+def test_a_cylinder_links_a_gear_item_that_resolves() -> None:
+    assert validate_document(_with_cylinders([{"gear_uuid": VESSEL, "volume": 12}, {"volume": 7}])) == []
+    dangling = _with_cylinders([{"gear_uuid": VESSEL}, {"gear_uuid": NOWHERE}])
+    assert [str(issue) for issue in validate_document(dangling)] == [
+        f"dives/0/cylinders/1/gear_uuid: references {NOWHERE}, not present in gear"
+    ]
+
+
+def test_a_vessel_is_linked_from_one_cylinder_of_a_dive() -> None:
+    """Two cylinders differing in their gas are two objects to `uniqueItems`, so the schema
+    passes them and only this rule refuses them."""
+    twice = _with_cylinders([{"gear_uuid": VESSEL, "oxygen": 21}, {"gear_uuid": VESSEL, "oxygen": 50}])
+    assert [str(issue) for issue in validate_document(twice)] == [
+        f"dives/0/cylinders/1: gear item {VESSEL} is already listed at dives/0/cylinders/0"
+    ]
+
+
+def test_cylinders_with_no_link_are_never_a_repeat() -> None:
+    """The link is OPTIONAL — a rental, a vessel never recorded — so absence repeats freely."""
+    assert validate_document(_with_cylinders([{"oxygen": 21}, {"oxygen": 21, "volume": 12}])) == []
+
+
+def test_one_vessel_on_two_dives_is_two_dives_of_it() -> None:
+    """The rule is per dive: a cylinder filled on Monday and again on Tuesday."""
+    assert validate_document(_with_cylinders([{"gear_uuid": VESSEL}], [{"gear_uuid": VESSEL}])) == []
+
+
+# -- §6.14: a schedule runs on months, dives or hours of diving ----------------------------------
+
+
+def _with_schedule(**intervals: int) -> dict:
+    document = _with_cylinders([])
+    document["gear_service_schedules"] = [
+        {
+            "uuid": "0198a6f0-9999-7060-8000-000000000060",
+            "gear_uuid": VESSEL,
+            "type": "other",
+            "starts_on": "2026-01-01",
+            **intervals,
+        }
+    ]
+    return document
+
+
+def test_a_schedule_may_run_on_hours_alone() -> None:
+    document = _with_schedule(interval_hours=100, dive_time_at_start=0, next_due_at_dive_time=360000)
+    assert validate_document(document) == []
+
+
+def test_a_schedule_with_no_interval_is_refused() -> None:
+    assert [issue.path for issue in validate_document(_with_schedule())] == ["gear_service_schedules/0"]
+
+
+@pytest.mark.parametrize("hours", [0, -1])
+def test_an_hours_interval_is_positive(hours: int) -> None:
+    assert [issue.path for issue in validate_document(_with_schedule(interval_hours=hours))] == [
+        "gear_service_schedules/0/interval_hours"
+    ]
+
+
 # -- §3 rule 8: a tag is on a dive once, compared trimmed and case-folded ------------------------
 
 

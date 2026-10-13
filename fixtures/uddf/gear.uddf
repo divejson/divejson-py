@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<uddf xmlns="http://www.streit.cc/uddf/3.2/" version="3.2.2">
+  <generator>
+    <name>DiveJSON fixtures</name>
+  </generator>
+  <diver>
+    <owner id="owner">
+      <personal>
+        <firstname>Alex</firstname>
+        <lastname>Trim</lastname>
+      </personal>
+      <equipment>
+        <rebreather id="ccr">
+          <name>Closed-circuit unit</name>
+          <manufacturer id="ccr-maker">
+            <name>JJ-CCR</name>
+          </manufacturer>
+        </rebreather>
+        <scooter id="dpv">
+          <name>Scooter</name>
+        </scooter>
+        <tank id="tank-left">
+          <name>Sidemount steel, left</name>
+          <serialnumber>ST-1201</serialnumber>
+          <tankmaterial>steel</tankmaterial>
+          <tankvolume>0.012</tankvolume>
+        </tank>
+        <tank id="tank-right">
+          <name>Sidemount steel, right</name>
+          <tankmaterial>steel</tankmaterial>
+          <tankvolume>0.012</tankvolume>
+        </tank>
+        <tank id="tank-twin">
+          <name>Twin 12 manifold</name>
+          <notes>
+            <para>Recorded with its facts and on no dive here.</para>
+          </notes>
+          <tankmaterial>steel</tankmaterial>
+          <tankvolume>0.024</tankvolume>
+        </tank>
+      </equipment>
+    </owner>
+  </diver>
+  <divesite>
+    <site id="site-1">
+      <name>Condesito Wreck</name>
+      <geography>
+        <location>Las Galletas, Tenerife</location>
+        <latitude>28.001389</latitude>
+        <longitude>-16.653611</longitude>
+      </geography>
+    </site>
+  </divesite>
+  <gasdefinitions>
+    <mix id="mix-ean32">
+      <name>EAN32</name>
+      <o2>0.32</o2>
+      <he>0.00</he>
+    </mix>
+    <mix id="mix-ean50">
+      <name>EAN50</name>
+      <o2>0.50</o2>
+      <he>0.00</he>
+    </mix>
+  </gasdefinitions>
+  <profiledata>
+    <repetitiongroup id="rg-1">
+      <dive id="dive-1">
+        <informationbeforedive>
+          <link ref="site-1"/>
+          <divenumber>1</divenumber>
+          <datetime>2026-05-02T09:30:00+01:00</datetime>
+          <equipmentused>
+            <link ref="dpv"/>
+          </equipmentused>
+        </informationbeforedive>
+        <tankdata>
+          <link ref="tank-left"/>
+          <link ref="mix-ean32"/>
+          <tankpressurebegin>22000000</tankpressurebegin>
+          <tankpressureend>10000000</tankpressureend>
+        </tankdata>
+        <tankdata>
+          <link ref="mix-ean32"/>
+          <link ref="tank-right"/>
+          <link ref="tank-twin"/>
+          <tankvolume>0.012</tankvolume>
+          <tankpressurebegin>21000000</tankpressurebegin>
+          <tankpressureend>11000000</tankpressureend>
+        </tankdata>
+        <tankdata>
+          <link ref="mix-ean50"/>
+          <link ref="tank-left"/>
+          <tankpressurebegin>20000000</tankpressurebegin>
+        </tankdata>
+        <tankdata>
+          <link ref="mix-ean50"/>
+          <link ref="site-1"/>
+          <tankvolume>0.007</tankvolume>
+          <tankpressurebegin>20000000</tankpressurebegin>
+        </tankdata>
+        <samples>
+          <waypoint>
+            <depth>0</depth>
+            <divetime>0</divetime>
+            <tankpressure ref="mix-ean32">22000000</tankpressure>
+            <tankpressure ref="mix-ean32">21000000</tankpressure>
+          </waypoint>
+          <waypoint>
+            <depth>24.5</depth>
+            <divetime>600</divetime>
+            <tankpressure ref="mix-ean32">16000000</tankpressure>
+            <tankpressure ref="mix-ean32">16500000</tankpressure>
+          </waypoint>
+          <waypoint>
+            <depth>0</depth>
+            <divetime>2760</divetime>
+            <tankpressure ref="mix-ean32">10000000</tankpressure>
+            <tankpressure ref="mix-ean32">11000000</tankpressure>
+          </waypoint>
+        </samples>
+        <informationafterdive>
+          <greatestdepth>24.5</greatestdepth>
+          <diveduration>2760</diveduration>
+          <notes>
+            <para>A sidemount pair on one blend, each tank linked from its own tankdata: the left one linked tank-first and stating no volume, so its size is the tank's; the right one stating its own and linking the twinset as well, which is a second vessel for one cylinder. The two stages follow: one linking the left tank again, which a vessel cannot be twice on a dive, and one linking the dive site.</para>
+          </notes>
+        </informationafterdive>
+      </dive>
+      <dive id="dive-2">
+        <informationbeforedive>
+          <link ref="site-1"/>
+          <divenumber>2</divenumber>
+          <datetime>2026-05-02T14:05:00+01:00</datetime>
+          <equipmentused>
+            <link ref="ccr"/>
+          </equipmentused>
+        </informationbeforedive>
+        <informationafterdive>
+          <greatestdepth>18.1</greatestdepth>
+          <diveduration>3180</diveduration>
+        </informationafterdive>
+      </dive>
+    </repetitiongroup>
+  </profiledata>
+</uddf>
