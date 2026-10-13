@@ -194,6 +194,7 @@
       "additionalProperties": false
     },
     "cylinder": {
+      "description": "One gas supply on one dive. That a dive's cylinders link a gear item at most once is a rule the validator checks: uniqueItems compares whole cylinders, and two cylinders linking one vessel with different pressures are two different objects to it.",
       "type": "object",
       "properties": {
         "volume": { "type": "number", "exclusiveMinimum": 0 },
@@ -205,6 +206,7 @@
         "gas_number": { "type": "integer", "minimum": 0 },
         "role": { "enum": ["bottom", "deco", "diluent", "oxygen"] },
         "usage": { "enum": ["parallel", "staged"] },
+        "gear_uuid": { "$ref": "#/$defs/uuid" },
         "extensions": { "$ref": "#/$defs/extensions" }
       },
       "additionalProperties": false
@@ -535,16 +537,21 @@
         "type": {
           "enum": [
             "mask", "snorkel", "fins", "wetsuit", "drysuit", "vest", "hood",
-            "gloves", "boots", "bcd", "regulator", "computer", "cylinder",
-            "light", "smb", "mirror", "whistle", "reel", "knife", "line_cutter",
-            "shears", "compass", "camera", "other"
+            "gloves", "boots", "bcd", "regulator", "rebreather", "computer",
+            "transmitter", "cylinder", "light", "scooter", "smb", "mirror",
+            "whistle", "reel", "knife", "line_cutter", "shears", "compass",
+            "camera", "other"
           ]
         },
+        "volume": { "type": "number", "exclusiveMinimum": 0 },
+        "working_pressure": { "type": "number", "exclusiveMinimum": 0, "maximum": 350 },
+        "material": { "enum": ["steel", "aluminium", "carbon"] },
         "notes": { "$ref": "#/$defs/notes" },
         "rented": { "type": "boolean" },
         "archived": { "type": "boolean" },
         "archived_at": { "$ref": "#/$defs/date_time" },
         "dive_count": { "type": "integer", "minimum": 0 },
+        "dive_time": { "type": "integer", "minimum": 0 },
         "created_at": { "$ref": "#/$defs/date_time" },
         "extensions": { "$ref": "#/$defs/extensions" }
       },
@@ -577,11 +584,14 @@
         "starts_on": { "$ref": "#/$defs/date" },
         "interval_months": { "type": "integer", "exclusiveMinimum": 0 },
         "interval_dives": { "type": "integer", "exclusiveMinimum": 0 },
+        "interval_hours": { "type": "integer", "exclusiveMinimum": 0 },
         "dive_count_at_start": { "type": "integer", "minimum": 0 },
+        "dive_time_at_start": { "type": "integer", "minimum": 0 },
         "active": { "type": "boolean" },
         "last_service_on": { "$ref": "#/$defs/date" },
         "next_due_on": { "$ref": "#/$defs/date" },
         "next_due_at_dive_count": { "type": "integer", "minimum": 0 },
+        "next_due_at_dive_time": { "type": "integer", "minimum": 0 },
         "created_at": { "$ref": "#/$defs/date_time" },
         "extensions": { "$ref": "#/$defs/extensions" }
       },
@@ -589,7 +599,8 @@
       "additionalProperties": false,
       "anyOf": [
         { "required": ["interval_months"] },
-        { "required": ["interval_dives"] }
+        { "required": ["interval_dives"] },
+        { "required": ["interval_hours"] }
       ]
     },
     "gear_service_record": {
@@ -601,6 +612,7 @@
         "type": { "$ref": "#/$defs/service_type" },
         "serviced_on": { "$ref": "#/$defs/date" },
         "dive_count_at_service": { "type": "integer", "minimum": 0 },
+        "dive_time_at_service": { "type": "integer", "minimum": 0 },
         "label": { "type": "string", "maxLength": 120 },
         "performed_by": { "type": "string", "maxLength": 255 },
         "contact_uuid": { "$ref": "#/$defs/uuid" },

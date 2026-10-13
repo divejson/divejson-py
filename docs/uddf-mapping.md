@@ -94,7 +94,7 @@ in a converter, are in `converting.md`.
 | `air_temperature` | °C | `<airtemperature>` | Kelvin | K − 273.15 |
 | `cylinders[].start_pressure`, `.end_pressure` | bar | `<tankpressurebegin>`, `<tankpressureend>` | Pascal | ÷ 100 000 |
 | a recording's `surface_pressure` | bar | `<surfacepressure>` | Pascal | ÷ 100 000 |
-| `cylinders[].volume` | litres | `<tankvolume>` | cubic metres | × 1000, and see below |
+| `cylinders[].volume`, a gear item's `volume` | litres | `<tankvolume>` | cubic metres | × 1000, and see below |
 | `cylinders[].oxygen`, `.helium` | percent | `<o2>`, `<he>` | fraction | × 100, and see below |
 | `cylinders[].ppo2_limit` | bar | `<maximumpo2>` | bar | — the one pressure UDDF does not express in Pascal |
 | `weight` | kilograms | `<leadquantity>` | kilograms | — |
@@ -431,6 +431,13 @@ dropped; `manufacturer/name` becomes `brand`, `serialnumber` becomes `serial` an
 `notes/para` becomes `notes`. A dive's
 `informationbeforedive/equipmentused/link/@ref` becomes `dives[].gear_uuids`.
 
+**A `<tank>` carries its vessel's facts** (§6.12), two children more than any other piece:
+`<tankmaterial>` becomes `material`, its three values being UDDF's own spellings, and
+`<tankvolume>` becomes `volume`, in cubic metres or litres as a `<tankdata>`'s is
+(*`<tankvolume>`* below). UDDF has no element for a working pressure, so §6.12's
+`working_pressure` has no source here. A dive's cylinder names its vessel by a `<link>` on
+its `<tankdata>` (*Cylinders* below).
+
 **A piece that is not read takes its `<purchase>` with it.** A nameless piece, or a second
 one using an id another piece in the file already has, is dropped with the one finding that
 says so, and its `<purchase>` goes with it: the purchase gets no finding of its own, and its
@@ -446,21 +453,26 @@ computer it is the member that lets a writer recognise the kit item and a record
 device (§6.4b) as one machine without comparing names, and
 [`uddf-writing.md`](uddf-writing.md) is where that test is written down. `<model>` is not
 read: §6.12 has no member for it, and on a computer the model is the *device's*
-(§6.4b), read from the same element below.
+(§6.4b), read from the same element below. Nor are `<serviceinterval>` and
+`<nextservicedate>`, which every piece may carry: the first is whole days between services
+and the second a date, and neither is a schedule with history — no start, no baseline, no
+service performed — which is what §6.14 and §6.15 are.
 
 | UDDF element | `gear.type` |
 | --- | --- |
-| `mask`, `fins`, `gloves`, `boots`, `compass`, `knife`, `light`, `camera`, `regulator` | the same value |
+| `mask`, `fins`, `gloves`, `boots`, `compass`, `knife`, `light`, `camera`, `regulator`, `rebreather`, `scooter` | the same value |
 | `buoyancycontroldevice` | `bcd` |
 | `divecomputer` | `computer` |
 | `tank` | `cylinder` |
 | `videocamera` | `camera` |
 | `suit` | `drysuit` when `<suittype>` says so, else `wetsuit` |
-| `variouspieces`, `lead`, `scooter`, `rebreather`, `compressor`, `watch` | `other` |
+| `variouspieces`, `lead`, `compressor`, `watch` | `other` |
 
 The last row is translation rather than invention: `<variouspieces>` is UDDF's own
-catch-all, and a scooter and a weight belt are equipment this format's vocabulary does not
-yet name. `<equipmentconfiguration>` is skipped — it describes how the pieces are rigged
+catch-all, a weight belt's quantity is the dive's `weight` (§6.2), a watch is a computer or
+jewellery, and a compressor is not kit carried on a dive — so none of the three earns a
+value of its own. UDDF has no element for a `transmitter`, which is written as
+`<variouspieces>` ([`uddf-writing.md`](uddf-writing.md)) and so comes back as `other`. `<equipmentconfiguration>` is skipped — it describes how the pieces are rigged
 together, not a piece.
 
 **`<divecomputer>` is one element read two ways.** It is a piece of kit the diver owns, and
@@ -687,6 +699,7 @@ resolves to nothing at all is reported as a source defect.
 | UDDF | DiveJSON |
 | --- | --- |
 | `tankvolume` | `cylinders[].volume` |
+| `link/@ref` → a piece under `<equipment>` | `cylinders[].gear_uuid` |
 | `tankpressurebegin` | `cylinders[].start_pressure` |
 | `tankpressureend` | `cylinders[].end_pressure` |
 | `link/@ref` → `gasdefinitions/mix/o2` | `cylinders[].oxygen` |
@@ -696,8 +709,25 @@ resolves to nothing at all is reported as a source defect.
 `<gasdefinitions>` is not a collection of its own: DiveJSON carries the blend on the
 cylinder that held it, so a mix nothing links to travels nowhere.
 
+**A `<tankdata>`'s links are read whole**, in whatever order they come: one is resolved
+against the mixes and one against the gear ids `<equipment>` defines, the gear link
+becoming the cylinder's `gear_uuid` (§6.3) — a `<tank>`, ordinarily, though a vessel a writer
+had no `<tank>` for comes back as whatever its element reads as. The mix link is the one that ties the cylinder
+to its pressure channel, whichever comes first. **A cylinder keeps one vessel, and a vessel
+one cylinder per dive** (§3, rule 7): a second gear link on one `<tankdata>` is dropped with
+a note, a second `<tankdata>` of one dive linking a piece already linked keeps its gas and
+loses the link with a note, and a link to an id that is no gear piece is reported as an
+unknown reference, as any other link is.
+
+**A linked `<tank>`'s volume stands in for a `<tankdata>` that gives none.** UDDF's own
+rule is that a volume the `<tank>` gives need not be repeated in a `<tankdata>` linking it,
+and a `<tankdata>` that does give one overrides it, so a file built the way UDDF asks
+carries the figure once, on the vessel; the reader takes it from there, with no finding,
+because that is where the source put it.
+
 `converting.md`'s vessel-less cylinder is UDDF's `<tankdata>` with a gas link and no
-`<tankvolume>`; the absent start pressure it describes is `<tankpressurebegin>` of `0`. And
+`<tankvolume>` — and no link to a `<tank>` that gives one; the absent start pressure it
+describes is `<tankpressurebegin>` of `0`. And
 UDDF records no cylinder numbering at all, which is why the converter has none to carry and
 numbers only where a pressure channel or a gas switch needs it.
 
@@ -959,7 +989,9 @@ writes all three that way.
 | `<vessel>`, with its `<shiptype>`, `<marina>` and `<shipdimension>` | a boat, which §6.18 does not model: the operator is the contact and the vessel is reported. |
 | `<purchase>` | a piece of kit's price, date and shop. Its inline `<shop>` is read as a contact (*Contacts* above) and the purchase is reported — on a piece that is read; a dropped piece's goes with it (*Gear* above). |
 | `<mix><n2>`, `<ar>`, `<h2>` | §6.3 models the remainder as nitrogen and does not model argon or trace gases. |
-| `courses`, `certifications`, `gear_sets`, `gear service` | UDDF has no slot for any of them. |
+| `courses`, `gear_sets` | UDDF has no slot for either. |
+| `<owner><education><certification>` | the slot a diver's `certifications` (§6.16) would be read from, and no file in the corpus fills it. Not read. |
+| gear service — §6.14's schedules and §6.15's records | UDDF's `<serviceinterval>` and `<nextservicedate>` are on every piece, and neither is a schedule with history: the first is whole days between services and the second a date, with no start, no baseline and no service performed (*Gear* above). Neither is read. |
 | `<insurance><aliasname>`, `<issuedate>`, `<notes>` | §6.1's Insurance holds the insurer, the diver's identifier with it and the last day of cover, and none of these is any of the three. Each is reported. |
 | `<personal><membership>` | an organisation and a member id, which may be a club, a federation or an insurer, and nothing in the element says which: UDDF's own sample document gives it a diving federation. Read as an insurance, a club membership would come back as a policy nobody holds. |
 | every `<phone>` and `<mobilephone>` but the one read | §6.1 carries one phone, the way it carries one email, and so do §6.18 and §6.20. Each other is reported. |

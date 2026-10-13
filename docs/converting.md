@@ -259,6 +259,12 @@ about the dive, and the recording is where it lives.
   dive from a model string would fill a logbook's kit list with duplicates of one computer,
   which is why `ssrf-mapping.md` refused to, and that refusal stands. UDDF is the one
   source that carries both in one element, and its document says what that costs.
+- **A cylinder's vessel is the same case.** A working pressure is a fact of the vessel, which
+  §6.12 holds on the gear item a cylinder links (§6.3), and a source that states one on each
+  dive's cylinder — `.ssrf`'s `@workpressure`, Suunto XML's `<CylinderWorkPressure>` — names
+  no vessel to hang it on. A converter would have to mint one per dive to keep the figure,
+  filling the kit list with duplicates of one cylinder, and does not: the per-dive working
+  pressure stays unread, as each format's document says.
 - **A serial is opaque**, matched against other serials and never parsed — *Reading the
   source*'s ids-and-references rule, applied to hardware. This holds for both members that
   carry one: a device's

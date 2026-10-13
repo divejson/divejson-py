@@ -60,10 +60,11 @@ WRITE_FIXTURES = sorted((FIXTURES / "write" / "uddf").glob("*.divejson"))
 # logbook this format's own reference writer produced, and it survives the trip out and back
 # whole.
 #
-# **`gear` is one entry rather than nine**, and that is `_differences` rather than the
-# writer: it short-circuits a list-length mismatch to the bare path, and this pair's
-# read-back mints a fourth gear item (see `RETURNED`). The `gear/0/…`-`gear/2/…` entries
-# this set used to hold are inside that one line now.
+# **`gear` is one entry rather than one per lost member**, and that is `_differences` rather
+# than the writer: it short-circuits a list-length mismatch to the bare path, and this
+# pair's read-back mints a gear item the document never had (see `RETURNED`). What the
+# pieces lose — a vessel's rated pressure and dive time, every item's counts, flags and stamps —
+# is inside that one line, and the writer's report names each of them.
 LOST: dict[str, frozenset[str]] = {
     "opendiving": frozenset(),
     # An owner recorded by a date of birth alone, which comes back with its identity.

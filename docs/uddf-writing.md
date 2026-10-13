@@ -174,18 +174,18 @@ element, and each is reported — *What is never written* has why.
 
 Gear types land in `equipmentType`'s elements. A type UDDF's own vocabulary does not name
 goes to **`<variouspieces>`**, its catch-all, which a reader maps back to `other`; that is
-the same translation a reader makes for `<scooter>` and `<lead>` in the other direction, and
-it is reported, since the type did not survive.
+the same translation a reader makes for `<lead>` in the other direction, and it is
+reported, since the type did not survive.
 
 | `gear.type` | UDDF element | comes back as |
 | --- | --- | --- |
-| `mask`, `fins`, `gloves`, `boots`, `compass`, `knife`, `light`, `regulator` | the same name | itself |
+| `mask`, `fins`, `gloves`, `boots`, `compass`, `knife`, `light`, `regulator`, `rebreather`, `scooter` | the same name | itself |
 | `bcd` | `buoyancycontroldevice` | itself |
 | `computer` | `divecomputer` | itself |
 | `cylinder` | `tank` | itself |
 | `wetsuit`, `drysuit` | `suit`, with `<suittype>` | itself |
 | `other` | `variouspieces` | itself |
-| `snorkel`, `vest`, `hood`, `smb`, `mirror`, `whistle`, `reel`, `camera`, `line_cutter`, `shears` | `variouspieces` | `other` |
+| `snorkel`, `vest`, `hood`, `smb`, `mirror`, `whistle`, `reel`, `camera`, `line_cutter`, `shears`, `transmitter` | `variouspieces` | `other` |
 
 `camera` is in the last row for a schema reason rather than a vocabulary one: `cameraType`
 extends `ID_TYPE` rather than `namedType`, so a `<camera>` has no `<name>` at all and could
@@ -198,6 +198,12 @@ keeps its serial through a round trip like any other piece. On a `computer` it d
 than travel: it is what the fold below tests before any name, and it is what a folded
 element hands back to the gear item on the way in ([`uddf-mapping.md`](uddf-mapping.md)),
 which is what closes that round trip rather than merely surviving it.
+
+**A vessel's facts go out on its `<tank>`** (§6.12): `material` as `<tankmaterial>` and then
+`volume` as `<tankvolume>`, in cubic metres, after the piece's `<notes>` — `tankType` adds the
+two to `equipmentPieceType` in that order. No other element has either child, so on an item
+written as anything but a `<tank>` the two are reported, as `working_pressure` and
+`dive_time` are on every element.
 
 **Differs from the reference writer**: it sends `line_cutter` and `shears` to `<knife>`, on
 the grounds that they are cutting tools and that scattering a diver's cutting tools into the
@@ -701,7 +707,19 @@ gives that cylinder's pressure channel something valid to point at. "No mix reco
 does not model argon or trace gases.
 
 `cylinders[].role` and `cylinders[].usage` have no UDDF slot — the format has no manifold or
-sidemount representation at all, so there is nothing to write `usage` into.
+sidemount representation, so there is nothing to write `usage` into. A cylinder's vessel is
+the one thing about its hardware UDDF can say, below.
+
+**A cylinder linked to its vessel (§6.3) gets a second `<link>`**, after its mix's, naming
+the vessel's piece under `<equipment>`, and it keeps its own `<tankvolume>`: the vessel's
+`<tank>` carries one too. UDDF says a volume the `<tank>` gives need not be repeated in a
+`<tankdata>` linking it, and calls a file that repeats it less than thoroughly built, but it
+also makes the `<tankdata>` figure an override, so stating both is conforming — and the
+readers this export serves take a cylinder's size from `<tankdata>` alone and follow no
+equipment link (*Known consumer artefacts* below), so a size stated once, on the vessel,
+would reach them as no size at all. A linked cylinder that records no volume of its own
+writes none on `<tankdata>`, and a reader then takes its vessel's back, as UDDF defines the
+absence: the one shape here whose round trip gains a value.
 
 **UDDF records no cylinder numbering.** A reader recovers one by counting `<tankdata>`
 elements in file order, and only where the profile asks for a numbering — a pressure
@@ -848,7 +866,7 @@ writer leaves empty:
 | `gear_service_schedules`, `gear_service_records` | not written — see the note below |
 | `species`, and every dive's `sightings` | not written. The slot is `<informationafterdive><observations>`, whose `<species>` would carry a sighting's count as `<abundance>` and its note as `<notes>` — but a `<species>` sits under a class inside `<vertebrata>`, `<invertebrata>` or `<flora>`, and even the catch-all each group ends in, `<vertebratavarious>`, `<invertebratavarious>` or `<floravarious>`, is a choice among the three. §6.11 carries no classification, so a writer choosing one invents it (§5.4). The spelling UDDF gives for animals whose class is not known, their names in a `<fauna><notes>` paragraph, carries no count and no note and reads back as a remark, the reason an insurance's `number` is not written to `<notes>` either. `<site><ecology>` is no home for them: it is what a site is known for, where a sighting is what one dive saw |
 | a record's `created_at` | no slot on any of them |
-| `gear` `rented`, `archived`, `archived_at`, `dive_count` | no slot |
+| `gear` `rented`, `archived`, `archived_at`, `dive_count`, `dive_time`, `working_pressure`, and `volume` and `material` on an item not written as a `<tank>` | no slot |
 | `diver.emergency_contacts` | UDDF has no element for one, and `<owner>` describes the logbook's owner and nobody else |
 | `diver.insurances[].number` | `insuranceType` holds a `name`, `aliasname`, `issuedate`, `validdate` and `notes`, with nothing for the identifier the insurer knows the diver by. `<notes>` would read back as a remark, and `<personal><membership memberid>` as a membership, which a reader cannot tell from a club's |
 | `diver.portrait_file` | `<owner>` has no image element. A `<notes><link>` to a `<mediadata><image>` names a file by path, whose bytes a UDDF file does not carry, and reads back as a linked picture with no role — `uddf-mapping.md`'s *Diver* section says why no linked image is read as a portrait |
@@ -869,14 +887,13 @@ it is reported.
 
 **Three of those rows are "not written" rather than "no slot", and it is worth being exact
 about which.** The species row carries its own reason. For the other two,
-`uddf-mapping.md`'s *Deliberately not mapped* table groups `courses`,
-`certifications`, `gear_sets` and gear service under one reason, which is the right summary
-for a **reader**: nothing in the corpus emits any of them, so there is nothing to read.
-Going out, the schema does carry `<owner><education><certification>` and a pair of
-`<serviceinterval>`/`<nextservicedate>` elements on every equipment piece — neither of which
-is what DiveJSON holds (§6.13 keeps a schedule *and* the services performed against it,
-where UDDF's two elements are a plan on one piece with no history behind it), and neither of
-which any file on record uses. A writer that filled them would be the first to, with no
+`uddf-mapping.md`'s *Deliberately not mapped* table gives `courses` and `gear_sets` no slot
+and gives certifications and gear service rows of their own, each naming the element that
+exists and saying why it is not read. Going out, the schema does carry
+`<owner><education><certification>` and a pair of `<serviceinterval>`/`<nextservicedate>`
+elements on every equipment piece — neither of which is what DiveJSON holds (§6.14 keeps a
+schedule and §6.15 the services performed against it, where UDDF's two elements are a plan
+on one piece with no history behind it), and neither of which any file on record uses. A writer that filled them would be the first to, with no
 reader to check the guess against. Mapping either is a change to what the format says it
 carries, so it starts in the specification.
 
@@ -893,7 +910,9 @@ of `uddf-mapping.md`'s section of the same name.
   that saws between the real depth and the surface.
 - **Subsurface reads no trip element at all**, and the only equipment it reads is the dive
   computer's model. Trips and gear **are** written here — the loss is on the import side,
-  in `uddf.xslt`, and not in the encoding.
+  in `uddf.xslt`, and not in the encoding. The same stylesheet takes a cylinder's size from
+  `<tankvolume>` inside its `<tankdata>` loop and never from the `<tank>` it links, which is
+  why a linked cylinder's volume goes out on both.
 
 A writer for a specific consumer rather than for interchange should snap its channels onto
 the depth axis the way the reference writer does, and accept the loss that costs. That is a
