@@ -869,6 +869,103 @@ def test_gear_with_no_uddf_element_of_its_own_says_so(schema) -> None:
     assert "does not name 'shears'" in messages(source, "gear/0")[0]
 
 
+def test_a_rebreather_and_a_scooter_are_written_as_themselves(schema) -> None:
+    """Both have elements of their own, at their places in `equipmentType`'s sequence; a
+    transmitter has none and goes to the catch-all, saying so."""
+    source = document(
+        gear=[
+            {"uuid": "0198a6f0-9999-7005-8000-000000000005", "name": "Scooter", "type": "scooter"},
+            {"uuid": "0198a6f0-9999-7006-8000-000000000006", "name": "Regulator", "type": "regulator"},
+            {"uuid": "0198a6f0-9999-7007-8000-000000000007", "name": "CCR", "type": "rebreather"},
+            {"uuid": "0198a6f0-9999-7008-8000-000000000008", "name": "Mask", "type": "mask"},
+            {"uuid": GEAR_UUID, "name": "Pod", "type": "transmitter"},
+        ]
+    )
+    text = written(source, schema)
+    assert text.index("<mask") < text.index("<rebreather") < text.index("<regulator") < text.index("<scooter")
+    assert {item["name"]: item["type"] for item in read_back(source)["gear"]} == {
+        "Scooter": "scooter",
+        "Regulator": "regulator",
+        "CCR": "rebreather",
+        "Mask": "mask",
+        "Pod": "other",
+    }
+    assert messages(source, "gear/4") == [
+        "UDDF's equipment vocabulary does not name 'transmitter'; the piece is written as <variouspieces>, "
+        "which reads back as 'other'"
+    ]
+
+
+def test_a_cylinders_facts_are_written_on_its_tank(schema) -> None:
+    """`tankType` extends `equipmentPieceType`, so its two children follow the notes, the
+    suit's shape. A rated pressure and a lifetime figure have no element anywhere."""
+    vessel = {
+        "uuid": GEAR_UUID,
+        "name": "Sidemount steel",
+        "type": "cylinder",
+        "notes": "Left",
+        "volume": 12,
+        "working_pressure": 232,
+        "material": "steel",
+        "dive_time": 3600,
+    }
+    source = document(gear=[vessel])
+    text = written(source, schema)
+    assert re.search(r"</notes>\s*<tankmaterial>steel</tankmaterial>\s*<tankvolume>0.012</tankvolume>\s*</tank>", text)
+    assert read_back(source)["gear"][0] == {
+        "uuid": GEAR_UUID,
+        "name": "Sidemount steel",
+        "type": "cylinder",
+        "notes": "Left",
+        "volume": 12.0,
+        "material": "steel",
+    }
+    assert messages(source, "gear/0") == [
+        "UDDF has no slot for dive_time; it is not written",
+        "UDDF has no slot for working_pressure; it is not written",
+    ]
+
+
+def test_vessel_facts_on_a_piece_that_is_no_tank_are_reported(schema) -> None:
+    """Only `<tank>` has the children, and the format allows the members on any type."""
+    source = document(gear=[{"uuid": GEAR_UUID, "name": "Pony", "volume": 3, "material": "aluminium"}])
+    assert "<tankvolume>" not in written(source, schema)
+    assert messages(source, "gear/0")[:2] == [
+        "UDDF has no slot for material; it is not written",
+        "UDDF has no slot for volume; it is not written",
+    ]
+
+
+def _linked_dive(**cylinder: Any) -> dict[str, Any]:
+    source = one_dive(cylinders=[{"oxygen": 32, "start_pressure": 200, "gear_uuid": GEAR_UUID, **cylinder}])
+    source["gear"] = [{"uuid": GEAR_UUID, "name": "Sidemount steel", "type": "cylinder", "volume": 12}]
+    return source
+
+
+def test_a_linked_cylinder_links_its_tank_after_its_mix(schema) -> None:
+    """The volume is stated on both elements: UDDF allows the `<tankdata>` figure as an
+    override, and the readers this export serves take a size from `<tankdata>` alone."""
+    source = _linked_dive(volume=12)
+    text = written(source, schema)
+    tankdata = re.search(r"<tankdata>.*?</tankdata>", text, re.S)
+    assert tankdata is not None
+    assert re.findall(r'<link ref="([^"]+)"', tankdata.group(0))[1] == f"gear-{GEAR_UUID}"
+    assert "<tankvolume>0.012</tankvolume>" in tankdata.group(0)
+    assert text.count("<tankvolume>0.012</tankvolume>") == 2
+    assert read_back(source)["dives"][0]["cylinders"] == [
+        {"volume": 12.0, "start_pressure": 200.0, "oxygen": 32.0, "gear_uuid": GEAR_UUID}
+    ]
+    assert [where for _, where, _ in notes(source) if where.startswith(("gear", "dives/0/cylinders"))] == []
+
+
+def test_a_linked_cylinder_with_no_volume_comes_back_with_its_vessels(schema) -> None:
+    """The one shape whose round trip gains a value: the `<tankdata>` states no size, and
+    UDDF then makes the linked tank's the cylinder's."""
+    source = _linked_dive()
+    assert "<tankvolume>" not in re.search(r"<tankdata>.*?</tankdata>", written(source, schema), re.S).group(0)
+    assert read_back(source)["dives"][0]["cylinders"][0]["volume"] == 12.0
+
+
 def test_a_gear_finding_names_the_piece_it_is_about(schema) -> None:
     """The paths are the document's order and the elements are the schema's, and the two
     are different numbers — so a finding raised while writing a piece has to take its path

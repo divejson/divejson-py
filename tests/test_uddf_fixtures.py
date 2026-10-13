@@ -110,6 +110,33 @@ def test_the_mix_only_cylinder_keeps_its_gas_and_loses_only_its_size() -> None:
     assert "cylinders" not in dives[1]
 
 
+def test_the_gear_pair_keeps_one_link_per_vessel_and_per_cylinder() -> None:
+    """Each link the reader keeps, and each it drops, in the one pair carrying them all.
+
+    The left tank's `<tankdata>` links it first and states no volume, so the cylinder takes
+    the tank's 12 litres and still keeps its gas and its pressure channel; the right one's
+    links a second vessel, the twinset, which goes; the first stage links the left tank
+    again, which a vessel cannot be twice on a dive; and the second links the dive site.
+    """
+    conversion = convert((FIXTURES / "uddf" / "gear.uddf").read_bytes(), exported_at=EXPORTED_AT)
+    document = conversion.document
+    vessel = {item["name"]: item["uuid"] for item in document["gear"]}
+    cylinders = document["dives"][0]["cylinders"]
+    assert [cylinder.get("gear_uuid") for cylinder in cylinders] == [
+        vessel["Sidemount steel, left"],
+        vessel["Sidemount steel, right"],
+        None,
+        None,
+    ]
+    assert [cylinder["volume"] for cylinder in cylinders] == [12.0, 12.0, 12.0, 7.0]
+    assert [channel["gas_number"] for channel in document["dives"][0]["recordings"][0]["profile"]["pressures"]] == [0, 1]
+    assert [(note.where, note.kind) for note in conversion.notes if note.kind == "dropped"] == [
+        ("dive/0/tankdata/1", "dropped"),
+        ("dive/0/tankdata/2", "dropped"),
+        ("dive/0/tankdata/3", "dropped"),
+    ]
+
+
 def test_the_reference_implementations_own_identities_survive_the_round_trip() -> None:
     """`dive-<uuid>` ids come back as those uuids, rather than as fresh ones.
 

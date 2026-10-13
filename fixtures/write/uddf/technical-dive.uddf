@@ -3,7 +3,7 @@
   <generator>
     <name>divejson convert</name>
     <type>converter</type>
-    <version>0.14.0</version>
+    <version>0.25.0</version>
     <datetime>2026-08-28T12:00:00Z</datetime>
   </generator>
   <diver>
@@ -30,6 +30,18 @@
         </suit>
         <tank id="gear-0198a6f0-1111-7050-8000-000000000050">
           <name>Twin 12 manifold</name>
+          <tankmaterial>steel</tankmaterial>
+          <tankvolume>0.024</tankvolume>
+        </tank>
+        <tank id="gear-0198a6f0-1111-7053-8000-000000000053">
+          <name>Sidemount 12 left</name>
+          <tankmaterial>steel</tankmaterial>
+          <tankvolume>0.012</tankvolume>
+        </tank>
+        <tank id="gear-0198a6f0-1111-7054-8000-000000000054">
+          <name>Sidemount 12 right</name>
+          <tankmaterial>steel</tankmaterial>
+          <tankvolume>0.012</tankvolume>
         </tank>
         <variouspieces id="gear-0198a6f0-1111-7052-8000-000000000052">
           <name>EMT shears</name>
@@ -207,7 +219,6 @@
           <altitude>0</altitude>
           <equipmentused>
             <leadquantity>0</leadquantity>
-            <link ref="gear-0198a6f0-1111-7050-8000-000000000050" />
             <link ref="gear-0198a6f0-1111-7051-8000-000000000051" />
             <link ref="device-0" />
           </equipmentused>
@@ -217,12 +228,14 @@
         </informationbeforedive>
         <tankdata>
           <link ref="mix-1" />
+          <link ref="gear-0198a6f0-1111-7053-8000-000000000053" />
           <tankvolume>0.012</tankvolume>
           <tankpressurebegin>22000000</tankpressurebegin>
           <tankpressureend>8000000</tankpressureend>
         </tankdata>
         <tankdata>
           <link ref="mix-2" />
+          <link ref="gear-0198a6f0-1111-7054-8000-000000000054" />
           <tankvolume>0.012</tankvolume>
           <tankpressurebegin>21800000</tankpressurebegin>
           <tankpressureend>9500000</tankpressureend>

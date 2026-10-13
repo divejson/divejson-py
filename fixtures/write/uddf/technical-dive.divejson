@@ -73,7 +73,6 @@
         "0198a6f0-1111-7041-8000-000000000041"
       ],
       "gear_uuids": [
-        "0198a6f0-1111-7050-8000-000000000050",
         "0198a6f0-1111-7051-8000-000000000051"
       ],
       "sightings": [
@@ -103,7 +102,8 @@
           "ppo2_limit": 1.4,
           "gas_number": 1,
           "role": "bottom",
-          "usage": "parallel"
+          "usage": "parallel",
+          "gear_uuid": "0198a6f0-1111-7053-8000-000000000053"
         },
         {
           "volume": 12.0,
@@ -114,7 +114,8 @@
           "ppo2_limit": 1.4,
           "gas_number": 2,
           "role": "bottom",
-          "usage": "parallel"
+          "usage": "parallel",
+          "gear_uuid": "0198a6f0-1111-7054-8000-000000000054"
         },
         {
           "volume": 7.0,
@@ -713,11 +714,39 @@
       "uuid": "0198a6f0-1111-7050-8000-000000000050",
       "name": "Twin 12 manifold",
       "type": "cylinder",
+      "volume": 24.0,
+      "working_pressure": 232.0,
+      "material": "steel",
       "notes": "",
       "rented": false,
       "archived": false,
       "dive_count": 84,
+      "dive_time": 302400,
       "created_at": "2024-02-01T10:00:00+00:00"
+    },
+    {
+      "uuid": "0198a6f0-1111-7053-8000-000000000053",
+      "name": "Sidemount 12 left",
+      "type": "cylinder",
+      "volume": 12.0,
+      "working_pressure": 232.0,
+      "material": "steel",
+      "rented": false,
+      "dive_count": 1,
+      "dive_time": 5520,
+      "created_at": "2026-06-20T09:00:00+12:00"
+    },
+    {
+      "uuid": "0198a6f0-1111-7054-8000-000000000054",
+      "name": "Sidemount 12 right",
+      "type": "cylinder",
+      "volume": 12.0,
+      "working_pressure": 232.0,
+      "material": "steel",
+      "rented": false,
+      "dive_count": 1,
+      "dive_time": 5520,
+      "created_at": "2026-06-20T09:01:00+12:00"
     },
     {
       "uuid": "0198a6f0-1111-7051-8000-000000000051",
@@ -754,11 +783,26 @@
       "type": "visual_inspection",
       "starts_on": "2024-02-01",
       "interval_dives": 100,
+      "interval_hours": 50,
       "dive_count_at_start": 0,
+      "dive_time_at_start": 0,
       "active": true,
       "last_service_on": "2025-11-10",
       "next_due_at_dive_count": 184,
+      "next_due_at_dive_time": 482400,
       "created_at": "2024-02-01T10:06:00+00:00"
+    },
+    {
+      "uuid": "0198a6f0-1111-7072-8000-000000000072",
+      "gear_uuid": "0198a6f0-1111-7053-8000-000000000053",
+      "type": "other",
+      "label": "Valve service",
+      "starts_on": "2026-06-20",
+      "interval_hours": 100,
+      "dive_time_at_start": 0,
+      "active": true,
+      "next_due_at_dive_time": 360000,
+      "created_at": "2026-06-20T09:05:00+12:00"
     }
   ],
   "gear_service_records": [
@@ -769,6 +813,7 @@
       "type": "visual_inspection",
       "serviced_on": "2025-11-10",
       "dive_count_at_service": 84,
+      "dive_time_at_service": 302400,
       "performed_by": "M. Rewi",
       "contact_uuid": "0198a6f0-1111-7095-8000-000000000095",
       "notes": "Passed.",

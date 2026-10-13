@@ -1,0 +1,181 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-09-05T00:00:00+00:00",
+  "generator": {
+    "name": "divejson convert",
+    "version": "0.25.0"
+  },
+  "diver": {
+    "uuid": "d8b9bbd3-c66e-52c1-b8e8-d908f921af7e",
+    "name": "Alex Trim"
+  },
+  "dives": [
+    {
+      "uuid": "6ba5d47c-aeac-5754-ac67-c28c73e7981e",
+      "number": 1,
+      "started_at": "2026-05-02T09:30:00+01:00",
+      "submerged_time": 2760,
+      "notes": "A sidemount pair on one blend, each tank linked from its own tankdata: the left one linked tank-first and stating no volume, so its size is the tank's; the right one stating its own and linking the twinset as well, which is a second vessel for one cylinder. The two stages follow: one linking the left tank again, which a vessel cannot be twice on a dive, and one linking the dive site.",
+      "max_depth": 24.5,
+      "site_uuids": [
+        "b46b2efb-112c-5fc3-8566-50aee4c46ce8"
+      ],
+      "gear_uuids": [
+        "6d34b4dd-7ecf-5bb2-9494-d24edf9d5057"
+      ],
+      "cylinders": [
+        {
+          "volume": 12.0,
+          "start_pressure": 220.0,
+          "end_pressure": 100.0,
+          "oxygen": 32.0,
+          "helium": 0.0,
+          "gear_uuid": "d03b9c5c-6437-5904-9e59-475eb66d1289",
+          "gas_number": 0
+        },
+        {
+          "volume": 12.0,
+          "start_pressure": 210.0,
+          "end_pressure": 110.0,
+          "oxygen": 32.0,
+          "helium": 0.0,
+          "gear_uuid": "87a45a67-26ce-5a56-bade-2a92b27192ee",
+          "gas_number": 1
+        },
+        {
+          "volume": 12.0,
+          "start_pressure": 200.0,
+          "oxygen": 50.0,
+          "helium": 0.0,
+          "gas_number": 2
+        },
+        {
+          "volume": 7.0,
+          "start_pressure": 200.0,
+          "oxygen": 50.0,
+          "helium": 0.0,
+          "gas_number": 3
+        }
+      ],
+      "recordings": [
+        {
+          "profile": {
+            "duration": 2760000,
+            "depth": {
+              "times": [
+                0,
+                600000,
+                2760000
+              ],
+              "values": [
+                0,
+                2450,
+                0
+              ]
+            },
+            "pressures": [
+              {
+                "times": [
+                  0,
+                  600000,
+                  2760000
+                ],
+                "values": [
+                  2200,
+                  1600,
+                  1000
+                ],
+                "gas_number": 0
+              },
+              {
+                "times": [
+                  0,
+                  600000,
+                  2760000
+                ],
+                "values": [
+                  2100,
+                  1650,
+                  1100
+                ],
+                "gas_number": 1
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "uuid": "abef6704-789a-5048-b078-ba21af60f74b",
+      "number": 2,
+      "started_at": "2026-05-02T14:05:00+01:00",
+      "submerged_time": 3180,
+      "max_depth": 18.1,
+      "site_uuids": [
+        "b46b2efb-112c-5fc3-8566-50aee4c46ce8"
+      ],
+      "gear_uuids": [
+        "5fd50d24-ad61-53a8-909e-89426990a569"
+      ]
+    }
+  ],
+  "sites": [
+    {
+      "uuid": "b46b2efb-112c-5fc3-8566-50aee4c46ce8",
+      "name": "Condesito Wreck",
+      "location": {
+        "name": "Las Galletas, Tenerife"
+      },
+      "position": {
+        "latitude": 28.001389,
+        "longitude": -16.653611
+      }
+    }
+  ],
+  "gear": [
+    {
+      "uuid": "5fd50d24-ad61-53a8-909e-89426990a569",
+      "name": "Closed-circuit unit",
+      "brand": "JJ-CCR",
+      "type": "rebreather"
+    },
+    {
+      "uuid": "6d34b4dd-7ecf-5bb2-9494-d24edf9d5057",
+      "name": "Scooter",
+      "type": "scooter"
+    },
+    {
+      "uuid": "d03b9c5c-6437-5904-9e59-475eb66d1289",
+      "name": "Sidemount steel, left",
+      "serial": "ST-1201",
+      "type": "cylinder",
+      "volume": 12.0,
+      "material": "steel"
+    },
+    {
+      "uuid": "87a45a67-26ce-5a56-bade-2a92b27192ee",
+      "name": "Sidemount steel, right",
+      "type": "cylinder",
+      "volume": 12.0,
+      "material": "steel"
+    },
+    {
+      "uuid": "6372480d-c348-51f7-a4f7-72ecdfcd9da3",
+      "name": "Twin 12 manifold",
+      "type": "cylinder",
+      "notes": "Recorded with its facts and on no dive here.",
+      "volume": 24.0,
+      "material": "steel"
+    }
+  ],
+  "extensions": {
+    "divejson": {
+      "converted_from": "uddf",
+      "uddf_version": "3.2.2",
+      "source_generator": {
+        "name": "DiveJSON fixtures"
+      }
+    }
+  }
+}

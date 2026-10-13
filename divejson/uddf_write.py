@@ -127,7 +127,7 @@ _INDENT = "  "
 # Where each of §6.12's gear types lands in `equipmentType`. Every type UDDF's own
 # vocabulary does not name goes to `<variouspieces>`, which is UDDF's catch-all and which
 # the reader maps back to `other` — the same translation the reader makes in the other
-# direction for `<scooter>` and `<lead>`. The reference writer sends a line cutter and a
+# direction for `<lead>`. The reference writer sends a line cutter and a
 # pair of shears to `<knife>` instead, on the grounds that they are cutting tools; this one
 # does not, because `<knife>` asserts a knife where `<variouspieces>` asserts nothing, and
 # a converter's job is to lose the type honestly rather than to substitute a near one.
@@ -143,9 +143,13 @@ _EQUIPMENT_ELEMENT: dict[str, str] = {
     "boots": "boots",
     "bcd": "buoyancycontroldevice",
     "regulator": "regulator",
+    "rebreather": "rebreather",
     "computer": "divecomputer",
+    # A pressure transmitter has no element in UDDF's equipment vocabulary.
+    "transmitter": "variouspieces",
     "cylinder": "tank",
     "light": "light",
+    "scooter": "scooter",
     "smb": "variouspieces",
     "mirror": "variouspieces",
     "whistle": "variouspieces",
@@ -173,13 +177,19 @@ _EQUIPMENT_ORDER = (
     "knife",
     "light",
     "mask",
+    "rebreather",
     "regulator",
+    "scooter",
     "suit",
     "tank",
     "variouspieces",
 )
 
 _SUIT_TYPE = {"wetsuit": "wet-suit", "drysuit": "dry-suit"}
+
+# What a gear item's element carries, and what a `<tank>` carries beside it.
+_GEAR_CARRIED = frozenset({"uuid", "name", "brand", "serial", "type", "notes"})
+_TANK_CARRIED = frozenset({"volume", "material"})
 
 # The gear types whose element reads back as the same type, derived from the reader's own
 # map rather than restated. A second table here would be a second thing to get out of step,
@@ -1100,9 +1110,12 @@ class _Writer:
         by_tag: dict[str, list[tuple[int, dict[str, Any]]]] = {}
         for index, item in enumerate(items):
             where = f"gear/{index}"
-            self.unmapped(where, item, frozenset({"uuid", "name", "brand", "serial", "type", "notes"}))
             gear_type = item.get("type")
             tag = _EQUIPMENT_ELEMENT.get(gear_type, "variouspieces")
+            # A vessel's volume and material are `tankType`'s own children, so they are
+            # carried only by a piece written as a `<tank>`; on any other element there is
+            # nowhere to put them, and UDDF has no rated pressure on any.
+            self.unmapped(where, item, (_GEAR_CARRIED | _TANK_CARRIED) if tag == "tank" else _GEAR_CARRIED)
             if not gear_type:
                 # Every element in `equipmentType` *is* a type, so there is no way to write
                 # a piece without asserting one. The catch-all is the least of them, and it
@@ -1160,6 +1173,13 @@ class _Writer:
                     # After `<notes>`: `suitType` extends `equipmentPieceType` and its own
                     # sequence follows the base type's whole one.
                     _sub(piece, "suittype", _SUIT_TYPE[item["type"]])
+                if tag == "tank":
+                    # After `<notes>` for the suit's reason, `tankType`'s sequence being
+                    # material then volume.
+                    if item.get("material") is not None:
+                        _sub(piece, "tankmaterial", str(item["material"]))
+                    if item.get("volume") is not None:
+                        _sub(piece, "tankvolume", _num(_decimal(item["volume"]) / LITRES_PER_CUBIC_METRE))
             if tag == "divecomputer":
                 # After the kit list's own computers and inside their group, `equipmentType`
                 # being an `xs:sequence`: a device that folded into no gear item, or into one
@@ -1968,7 +1988,9 @@ class _Writer:
             self.unmapped(
                 cylinder_where,
                 cylinder,
-                frozenset({"volume", "start_pressure", "end_pressure", "oxygen", "helium", "ppo2_limit", "gas_number"}),
+                frozenset(
+                    {"volume", "start_pressure", "end_pressure", "oxygen", "helium", "ppo2_limit", "gas_number", "gear_uuid"}
+                ),
             )
             key = _mix_key(cylinder)
             occurrence = seen.get(key, 0)
@@ -1985,6 +2007,12 @@ class _Writer:
             # tankpressureend.
             tank = _sub(element, "tankdata")
             _sub(tank, "link", ref=mix_id)
+            if cylinder.get("gear_uuid"):
+                # The vessel's own `<tank>` states its volume too, and UDDF would have it
+                # stated there alone. It is repeated here, which UDDF allows as an override,
+                # because the readers this export serves — Subsurface's import, divelogs.de's —
+                # take a cylinder's size from `<tankdata>` and follow no equipment link.
+                _sub(tank, "link", ref=_uddf_id("gear", cylinder["gear_uuid"]))
             if cylinder.get("volume") is not None:
                 _sub(tank, "tankvolume", _num(_decimal(cylinder["volume"]) / LITRES_PER_CUBIC_METRE))
             start = cylinder.get("start_pressure")

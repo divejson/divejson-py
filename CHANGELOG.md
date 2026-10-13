@@ -7,6 +7,22 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **A cylinder links the gear item it is, the gear item carries the vessel's facts, and a
+  service rule can run on hours of diving.** The format gains a cylinder's `gear_uuid`, a
+  gear item's `volume`, `working_pressure`, `material` and `dive_time`, a schedule's
+  `interval_hours`, `dive_time_at_start` and `next_due_at_dive_time`, a record's
+  `dive_time_at_service`, and the gear types `rebreather`, `transmitter` and `scooter`.
+  `divejson validate` refuses a cylinder linking a gear item the document lacks, and one
+  dive's cylinders linking one gear item twice. The UDDF reader reads a `<tank>`'s
+  `<tankmaterial>` and `<tankvolume>` into its gear item, `<rebreather>` and `<scooter>` as
+  themselves, and every `<link>` of a `<tankdata>` rather than the first, so a tank link
+  ahead of the mix no longer costs the cylinder its gas and its pressure channel; a
+  `<tankdata>` with no volume of its own takes its linked tank's, and a second vessel on one
+  cylinder or one vessel on two of a dive's cylinders keeps one link and reports the rest.
+  The writer writes the two `<tank>` children, the vessel as a second `<link>` on the
+  cylinder's `<tankdata>` with the cylinder's own volume kept beside it, and a rebreather
+  and a scooter as their own elements.
+
 ## 0.25.0
 
 - **Breaking: a dive's time in the water is `submerged_time`, and `duration` is the
