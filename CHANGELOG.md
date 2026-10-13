@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.26.0
+
 - **A cylinder links the gear item it is, the gear item carries the vessel's facts, and a
   service rule can run on hours of diving.** The format gains a cylinder's `gear_uuid`, a
   gear item's `volume`, `working_pressure`, `material` and `dive_time`, a schedule's
