@@ -13,6 +13,9 @@
         <lastname>Trim</lastname>
       </personal>
       <equipment>
+        <buoyancycontroldevice id="gear-0198a6f0-1111-7057-8000-000000000057">
+          <name>Doubles wing</name>
+        </buoyancycontroldevice>
         <divecomputer id="device-0">
           <name>Deco</name>
           <manufacturer id="mfr-device-0">
@@ -45,6 +48,9 @@
         </tank>
         <variouspieces id="gear-0198a6f0-1111-7052-8000-000000000052">
           <name>EMT shears</name>
+        </variouspieces>
+        <variouspieces id="gear-0198a6f0-1111-7056-8000-000000000056">
+          <name>Steel backplate</name>
         </variouspieces>
       </equipment>
       <diveinsurances>

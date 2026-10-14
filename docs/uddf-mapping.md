@@ -471,8 +471,10 @@ service performed — which is what §6.14 and §6.15 are.
 The last row is translation rather than invention: `<variouspieces>` is UDDF's own
 catch-all, a weight belt's quantity is the dive's `weight` (§6.2), a watch is a computer or
 jewellery, and a compressor is not kit carried on a dive — so none of the three earns a
-value of its own. UDDF has no element for a `transmitter`, which is written as
-`<variouspieces>` ([`uddf-writing.md`](uddf-writing.md)) and so comes back as `other`. `<equipmentconfiguration>` is skipped — it describes how the pieces are rigged
+value of its own. UDDF has no element for a `transmitter` or a `backplate`, which are
+written as `<variouspieces>` ([`uddf-writing.md`](uddf-writing.md)) and so come back as
+`other`; a `wing` is written as the buoyancy control device it is, and so comes back as
+`bcd`. `<equipmentconfiguration>` is skipped — it describes how the pieces are rigged
 together, not a piece.
 
 **`<divecomputer>` is one element read two ways.** It is a piece of kit the diver owns, and

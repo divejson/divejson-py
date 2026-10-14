@@ -558,10 +558,10 @@
         "type": {
           "enum": [
             "mask", "snorkel", "fins", "wetsuit", "drysuit", "vest", "hood",
-            "gloves", "boots", "bcd", "regulator", "rebreather", "computer",
-            "transmitter", "cylinder", "light", "scooter", "smb", "mirror",
-            "whistle", "reel", "knife", "line_cutter", "shears", "compass",
-            "camera", "other"
+            "gloves", "boots", "bcd", "backplate", "wing", "regulator",
+            "rebreather", "computer", "transmitter", "cylinder", "light",
+            "scooter", "smb", "mirror", "whistle", "reel", "knife",
+            "line_cutter", "shears", "compass", "camera", "other"
           ]
         },
         "volume": { "type": "number", "exclusiveMinimum": 0 },

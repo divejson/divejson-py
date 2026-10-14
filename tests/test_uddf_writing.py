@@ -25,7 +25,7 @@ import xmlschema
 from helpers import ROOT, for_the_xsd
 
 from divejson import convert
-from divejson.uddf_write import compared, write_uddf
+from divejson.uddf_write import _EQUIPMENT_ELEMENT, compared, write_uddf
 from divejson.validate import load_schema
 
 STARTED_AT = "2026-04-17T11:49:23+02:00"
@@ -861,12 +861,60 @@ def test_gear_with_no_uddf_element_of_its_own_says_so(schema) -> None:
 
     The reference writer sends cutting tools to `<knife>` on the grounds that they are
     cutting tools; a converter does not, because `<knife>` asserts a knife where the
-    catch-all asserts nothing and the report can then say what was lost.
+    catch-all asserts nothing and the report can then say what was lost. An element naming
+    the broader kind is not a near one, which is why a wing is a `<buoyancycontroldevice>`
+    while a backplate, which UDDF has no element for, is not.
     """
-    source = document(gear=[{"uuid": GEAR_UUID, "name": "EMT shears", "type": "shears"}])
-    assert "<variouspieces" in written(source, schema)
-    assert read_back(source)["gear"][0]["type"] == "other"
+    source = document(
+        gear=[
+            {"uuid": GEAR_UUID, "name": "EMT shears", "type": "shears"},
+            {"uuid": "0198a6f0-9999-7006-8000-000000000006", "name": "Steel backplate", "type": "backplate"},
+        ]
+    )
+    text = written(source, schema)
+    assert text.count("<variouspieces") == 2 and "<buoyancycontroldevice" not in text
+    assert [item["type"] for item in read_back(source)["gear"]] == ["other", "other"]
     assert "does not name 'shears'" in messages(source, "gear/0")[0]
+    assert messages(source, "gear/1") == [
+        "UDDF's equipment vocabulary does not name 'backplate'; the piece is written as <variouspieces>, "
+        "which reads back as 'other'"
+    ]
+
+
+def test_a_wing_is_written_as_the_buoyancy_control_device_it_is(schema) -> None:
+    """UDDF's element for a BCD names the broader kind, so it says nothing false about a wing;
+    the reader brings it back as the general `bcd`, and the report says the type did not
+    survive, where a `bcd` written to the same element does."""
+    source = document(
+        gear=[
+            {"uuid": "0198a6f0-9999-7005-8000-000000000005", "name": "Doubles wing", "type": "wing"},
+            {"uuid": "0198a6f0-9999-7006-8000-000000000006", "name": "Jacket", "type": "bcd"},
+            {"uuid": "0198a6f0-9999-7007-8000-000000000007", "name": "Boots", "type": "boots"},
+            {"uuid": GEAR_UUID, "name": "Compass", "type": "compass"},
+        ]
+    )
+    text = written(source, schema)
+    assert text.count("<buoyancycontroldevice") == 2
+    assert text.index("<boots") < text.index("<buoyancycontroldevice") < text.index("<compass")
+    assert {item["name"]: item["type"] for item in read_back(source)["gear"]} == {
+        "Doubles wing": "bcd",
+        "Jacket": "bcd",
+        "Boots": "boots",
+        "Compass": "compass",
+    }
+    assert messages(source, "gear/0") == [
+        "UDDF's equipment vocabulary does not name 'wing'; the piece is written as <buoyancycontroldevice>, "
+        "which reads back as 'bcd'"
+    ]
+    assert messages(source, "gear/1") == []
+
+
+def test_every_gear_type_has_a_row_of_its_own_in_the_writers_map() -> None:
+    """The writer reads the map with the catch-all as its default, so a value the format gains
+    with no row would be written as `<variouspieces>` with a note and fail nothing. This is
+    the test that fails instead, and it fails on a row the format no longer has as well."""
+    enum = load_schema()["$defs"]["gear_item"]["properties"]["type"]["enum"]
+    assert set(_EQUIPMENT_ELEMENT) == set(enum)
 
 
 def test_a_rebreather_and_a_scooter_are_written_as_themselves(schema) -> None:
