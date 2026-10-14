@@ -15,7 +15,7 @@ check — no `invalid/` document can pin an absence of a rule — the one uuid c
 fixture is refused for another reason by any validator that does not know its member, the
 hosts a contact reference sits on, the corpus holding a dangling one on a trip part alone,
 the hosts a person reference sits on, the corpus holding its defects on a dive and a
-certification alone, what a sighting's two defects are reported as, the collections the
+certification alone, what a sighting's three defects are reported as, the collections the
 validator walks, which the schema can gain one of without it, what rule 8 counts as one
 tag — a fold one fixture cannot sweep — and, on a site, what each of the four rules reports,
 the name the fold of its other names starts from, and the half of an external id that makes
@@ -351,6 +351,16 @@ def test_a_species_is_sighted_on_a_dive_once_whatever_the_counts_say() -> None:
 def test_one_species_sighted_on_two_dives_is_two_sightings() -> None:
     """The rule is per list: a lionfish seen on Monday and on Tuesday was seen twice."""
     assert validate_document(_with_sightings([{"species_uuid": SPECIES}], [{"species_uuid": SPECIES}])) == []
+
+
+def test_a_sighting_carrying_a_count_and_a_band_is_refused_by_the_schema() -> None:
+    """§6.3a: a sighting has its number or its band, never both. The schema holds the rule, so
+    the refusal is the schema pass's, at the sighting's own path, and names the pair — not the
+    band as a member the schema does not define."""
+    both = _with_sightings([{"species_uuid": SPECIES, "count": 40, "abundance": "many"}])
+    [issue] = validate_document(both)
+    assert issue.path == "dives/0/sightings/0"
+    assert "['count', 'abundance']" in issue.message
 
 
 # -- §3 rule 1 reaches a dive's cylinders, and a vessel is one gas supply -------------------------

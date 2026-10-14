@@ -7,6 +7,14 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **A sighting carries an abundance band, and never both a band and a count.** §6.3a of
+  [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md)
+  gives a sighting `abundance`, one of `few` (2 to 10), `many` (11 to 100) or `abundant`
+  (101 and more), for a diver who read how many there were in a band rather than as a
+  number; one animal stays `count: 1`. `divejson validate` accepts the band and refuses a
+  sighting carrying both it and a count, a rule the schema holds. The UDDF writer loses a
+  dive's sightings whole, as before, and the reader does not change.
+
 ## 0.28.0
 
 - **The gear types `backplate` and `wing`.** §6.12 of

@@ -182,15 +182,17 @@
       "additionalProperties": false
     },
     "sighting": {
-      "description": "One species seen on one dive. That a dive's sightings name a species at most once is a rule the validator checks: uniqueItems compares whole sightings, and two sightings of one species with different counts are two different objects to it.",
+      "description": "One species seen on one dive. That a sighting carries at most one of count and abundance is a rule this schema holds. That a dive's sightings name a species at most once is a rule the validator checks: uniqueItems compares whole sightings, and two sightings of one species with different counts are two different objects to it.",
       "type": "object",
       "properties": {
         "species_uuid": { "$ref": "#/$defs/uuid" },
         "count": { "type": "integer", "exclusiveMinimum": 0 },
+        "abundance": { "enum": ["few", "many", "abundant"] },
         "notes": { "$ref": "#/$defs/notes" },
         "extensions": { "$ref": "#/$defs/extensions" }
       },
       "required": ["species_uuid"],
+      "not": { "required": ["count", "abundance"] },
       "additionalProperties": false
     },
     "cylinder": {
