@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.29.0
+
 - **A sighting carries an abundance band, and never both a band and a count.** §6.3a of
   [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md)
   gives a sighting `abundance`, one of `few` (2 to 10), `many` (11 to 100) or `abundant`
