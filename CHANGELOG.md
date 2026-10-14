@@ -7,6 +7,14 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **The gear types `backplate` and `wing`.** §6.12 of
+  [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md)
+  names a backplate-and-wing rig's parts apart, while a `bcd` stays the general word for a
+  buoyancy compensator, so `divejson validate` accepts both. The UDDF writer writes a wing
+  as a `<buoyancycontroldevice>`, which reads back as `bcd`, and a backplate as a
+  `<variouspieces>`, which reads back as `other`; each is reported as a type that did not
+  survive. The reader does not change.
+
 ## 0.27.0
 
 - **Breaking: a species' registry entries are its `external_ids`, and `aphia_id` and

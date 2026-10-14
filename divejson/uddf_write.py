@@ -124,13 +124,16 @@ GENERATOR_TYPE = "converter"
 
 _INDENT = "  "
 
-# Where each of §6.12's gear types lands in `equipmentType`. Every type UDDF's own
-# vocabulary does not name goes to `<variouspieces>`, which is UDDF's catch-all and which
-# the reader maps back to `other` — the same translation the reader makes in the other
-# direction for `<lead>`. The reference writer sends a line cutter and a
-# pair of shears to `<knife>` instead, on the grounds that they are cutting tools; this one
-# does not, because `<knife>` asserts a knife where `<variouspieces>` asserts nothing, and
-# a converter's job is to lose the type honestly rather than to substitute a near one.
+# Where each of §6.12's gear types lands in `equipmentType`. A type goes to the element
+# for what it is, and one UDDF's own vocabulary has no element for goes to
+# `<variouspieces>`, which is UDDF's catch-all and which the reader maps back to `other` —
+# the same translation the reader makes in the other direction for `<lead>`. A wing is a
+# buoyancy control device, so it goes to `<buoyancycontroldevice>` and reads back as the
+# general `bcd`. The reference writer sends a line cutter and a pair of shears to `<knife>`
+# instead, on the grounds that they are cutting tools; this one does not, because `<knife>`
+# asserts a knife where `<variouspieces>` asserts nothing, and a converter's job is to lose
+# the type honestly rather than to substitute a near one. An element naming the broader
+# kind, as the BCD's does for a wing, is not a near one: it says nothing false.
 _EQUIPMENT_ELEMENT: dict[str, str] = {
     "mask": "mask",
     "snorkel": "variouspieces",
@@ -142,6 +145,8 @@ _EQUIPMENT_ELEMENT: dict[str, str] = {
     "gloves": "gloves",
     "boots": "boots",
     "bcd": "buoyancycontroldevice",
+    "backplate": "variouspieces",
+    "wing": "buoyancycontroldevice",
     "regulator": "regulator",
     "rebreather": "rebreather",
     "computer": "divecomputer",
