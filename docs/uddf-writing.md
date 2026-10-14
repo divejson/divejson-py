@@ -172,20 +172,24 @@ reaches a document.
 An insurance's `number` and the diver's `emergency_contacts` and `portrait_file` have no
 element, and each is reported — *What is never written* has why.
 
-Gear types land in `equipmentType`'s elements. A type UDDF's own vocabulary does not name
-goes to **`<variouspieces>`**, its catch-all, which a reader maps back to `other`; that is
-the same translation a reader makes for `<lead>` in the other direction, and it is
-reported, since the type did not survive.
+Gear types land in `equipmentType`'s elements. A type UDDF names only by its broader kind
+goes to that kind's element: a `wing` is a buoyancy control device, so it is written as
+**`<buoyancycontroldevice>`**, which a reader maps back to `bcd`, §6.12's general word for
+one. A type UDDF's own vocabulary does not name at all goes to **`<variouspieces>`**, its
+catch-all, which a reader maps back to `other`; that is the same translation a reader makes
+for `<lead>` in the other direction. Either way the type did not survive, and it is
+reported.
 
 | `gear.type` | UDDF element | comes back as |
 | --- | --- | --- |
 | `mask`, `fins`, `gloves`, `boots`, `compass`, `knife`, `light`, `regulator`, `rebreather`, `scooter` | the same name | itself |
 | `bcd` | `buoyancycontroldevice` | itself |
+| `wing` | `buoyancycontroldevice` | `bcd` |
 | `computer` | `divecomputer` | itself |
 | `cylinder` | `tank` | itself |
 | `wetsuit`, `drysuit` | `suit`, with `<suittype>` | itself |
 | `other` | `variouspieces` | itself |
-| `snorkel`, `vest`, `hood`, `smb`, `mirror`, `whistle`, `reel`, `camera`, `line_cutter`, `shears`, `transmitter` | `variouspieces` | `other` |
+| `snorkel`, `vest`, `hood`, `smb`, `mirror`, `whistle`, `reel`, `camera`, `line_cutter`, `shears`, `transmitter`, `backplate` | `variouspieces` | `other` |
 
 `camera` is in the last row for a schema reason rather than a vocabulary one: `cameraType`
 extends `ID_TYPE` rather than `namedType`, so a `<camera>` has no `<name>` at all and could
@@ -209,7 +213,9 @@ written as anything but a `<tank>` the two are reported, as `working_pressure` a
 the grounds that they are cutting tools and that scattering a diver's cutting tools into the
 catch-all beside the SMB reads worse. A converter does not, because `<knife>` asserts a
 knife where `<variouspieces>` asserts nothing — losing a type honestly beats substituting a
-near one, and the report is what makes the loss visible either way.
+near one, and the report is what makes the loss visible either way. An element naming the
+type's broader kind is not a near one: `<buoyancycontroldevice>` says nothing of a wing that
+is not true of it, which is why a wing goes there rather than to the catch-all.
 
 **`equipmentType` is an `xs:sequence`, so a logbook's gear comes back grouped by type**
 rather than in the order the document listed it. Nothing is lost by that — every piece keeps
