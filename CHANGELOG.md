@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.27.0
+
 - **Breaking: a species' registry entries are its `external_ids`, and `aphia_id` and
   `wikidata_qid` are removed.** §6.11 of
   [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md)
