@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.28.0
+
 - **The gear types `backplate` and `wing`.** §6.12 of
   [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md)
   names a backplate-and-wing rig's parts apart, while a `bcd` stays the general word for a
