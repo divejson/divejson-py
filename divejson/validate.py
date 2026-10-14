@@ -4,9 +4,10 @@ Two passes, mirroring §3 of the specification: the JSON Schema (types, required
 enums, ranges, lengths, and the structural rules like Position objects), then the
 semantic requirements the schema cannot express — identifier uniqueness, referential
 closure, a record listed once in a list of references and a registry entry once in a site's
-external ids, a tag listed once on a dive or a site and a site's names each once when trimmed
-and case-folded, cross-member arithmetic, profile-series integrity and span, what a
-recording carries, the offset requirement on ``exported_at``, and the gradient-factor order.
+or a species' external ids, a tag listed once on a dive or a site and a site's names each
+once when trimmed and case-folded, cross-member arithmetic, profile-series integrity and
+span, what a recording carries, the offset requirement on ``exported_at``, and the
+gradient-factor order.
 
 §4's member order is a SHOULD, not a requirement on the document: a generic
 re-serialisation commonly sorts an object's members, and a document it produced is as
@@ -345,6 +346,9 @@ def _semantic_issues(doc: dict[str, Any]) -> list[Issue]:
         _check_other_names(site, here, issues)
         _check_external_ids(site, here, issues)
 
+    for index, species in enumerate(collections["species"]):
+        _check_external_ids(species, f"species/{index}", issues)
+
     for index, gear_set in enumerate(collections["gear_sets"]):
         _check_reference_list(
             gear_set, "gear_uuids", known["gear"], "gear", f"gear_sets/{index}", issues
@@ -541,14 +545,14 @@ def _check_other_names(site: dict[str, Any], path: str, issues: list[Issue]) -> 
     _check_folded(site.get("other_names"), listed, f"{path}/other_names", "other name", issues)
 
 
-def _check_external_ids(site: dict[str, Any], path: str, issues: list[Issue]) -> None:
-    """No two of a site's external ids naming one registry entry, compared exactly.
+def _check_external_ids(record: dict[str, Any], path: str, issues: list[Issue]) -> None:
+    """No two of a record's external ids naming one registry entry, compared exactly.
 
     The schema cannot say it, for rule 7's reason: an External Id may carry `extensions`, so
     two entries naming one pair are two different objects to `uniqueItems` whenever anything
     beside the pair differs. The pair alone decides.
     """
-    entries = site.get("external_ids")
+    entries = record.get("external_ids")
     if not isinstance(entries, list):
         return
     listed: dict[tuple[str, str], int] = {}
