@@ -493,6 +493,9 @@
       "sightings": [
         {
           "species_uuid": "0198a6f0-1111-7061-8000-000000000061"
+        },
+        {
+          "species_uuid": "0198a6f0-1111-7062-8000-000000000062"
         }
       ],
       "people": [
@@ -698,7 +701,16 @@
   "species": [
     {
       "uuid": "0198a6f0-1111-7060-8000-000000000060",
-      "aphia_id": 289445,
+      "external_ids": [
+        {
+          "registry": "worms",
+          "identifier": "289445"
+        },
+        {
+          "registry": "wikidata",
+          "identifier": "Q4006943"
+        }
+      ],
       "scientific_name": "Antipathella fiordensis",
       "common_name": "Fiordland black coral",
       "rank": "Species",
@@ -707,6 +719,19 @@
     {
       "uuid": "0198a6f0-1111-7061-8000-000000000061",
       "common_name": "carpet shark"
+    },
+    {
+      "uuid": "0198a6f0-1111-7062-8000-000000000062",
+      "external_ids": [
+        {
+          "registry": "com.example.fishcount",
+          "identifier": "FIO-0311"
+        },
+        {
+          "registry": "com.example.fishcount",
+          "identifier": "STW-0087"
+        }
+      ]
     }
   ],
   "gear": [
