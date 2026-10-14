@@ -355,9 +355,12 @@ def test_one_species_sighted_on_two_dives_is_two_sightings() -> None:
 
 def test_a_sighting_carrying_a_count_and_a_band_is_refused_by_the_schema() -> None:
     """§6.3a: a sighting has its number or its band, never both. The schema holds the rule, so
-    the refusal is the schema pass's, at the sighting's own path."""
+    the refusal is the schema pass's, at the sighting's own path, and names the pair — not the
+    band as a member the schema does not define."""
     both = _with_sightings([{"species_uuid": SPECIES, "count": 40, "abundance": "many"}])
-    assert [issue.path for issue in validate_document(both)] == ["dives/0/sightings/0"]
+    [issue] = validate_document(both)
+    assert issue.path == "dives/0/sightings/0"
+    assert "['count', 'abundance']" in issue.message
 
 
 # -- §3 rule 1 reaches a dive's cylinders, and a vessel is one gas supply -------------------------
