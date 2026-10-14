@@ -19,7 +19,8 @@ certification alone, what a sighting's two defects are reported as, the collecti
 validator walks, which the schema can gain one of without it, what rule 8 counts as one
 tag — a fold one fixture cannot sweep — and, on a site, what each of the four rules reports,
 the name the fold of its other names starts from, and the half of an external id that makes
-two entries two.
+two entries two — and, on a species, that rule 7 reaches its external ids too, and the arm
+of its identity rule that a registry entry satisfies with no name beside it.
 Everything already covered by a pair stays covered by the pair.
 """
 
@@ -559,3 +560,54 @@ def test_two_sites_may_share_one_registry_entry() -> None:
         {"uuid": "0198a6f0-9999-7002-8000-000000000003", "name": "Canyon", "external_ids": [entry]}
     )
     assert validate_document(document) == []
+
+
+# -- a species' external ids ----------------------------------------------------------------------
+
+SPECIES = "0198a6f0-9999-7002-8000-000000000004"
+
+
+def _species_issues(**members) -> list[str]:
+    """One species carrying `members` and nothing else, so `members` decides its identity."""
+    species = {"uuid": SPECIES, **members}
+    document = {"format": "divejson", "version": "1.0", "exported_at": "2026-09-05T00:00:00+00:00", "species": [species]}
+    return [str(issue) for issue in validate_document(document)]
+
+
+def test_one_registry_entry_twice_on_a_species_is_refused_on_the_pair_alone() -> None:
+    """Rule 7 reaches a species' list as it reaches a site's.
+
+    Not under `worms`: the schema already bounds a species to one entry there, which would
+    refuse the pair before this rule spoke.
+    """
+    entry = {"registry": "wikidata", "identifier": "Q1126155"}
+    assert _species_issues(
+        scientific_name="Amphiprion ocellaris",
+        external_ids=[entry, {**entry, "extensions": {"example.app": {"source": "catalogue"}}}],
+    ) == [
+        "species/0/external_ids/1: the wikidata entry 'Q1126155' is already listed at "
+        "species/0/external_ids/0 (spec §3 rule 7)"
+    ]
+
+
+def test_a_species_may_carry_several_entries_of_a_registry_other_than_worms() -> None:
+    assert _species_issues(
+        scientific_name="Amphiprion ocellaris",
+        external_ids=[{"registry": "example", "identifier": "1"}, {"registry": "example", "identifier": "2"}],
+    ) == []
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        {"registry": "worms", "identifier": "278400"},
+        {"registry": "inaturalist", "identifier": "47178"},
+    ],
+)
+def test_a_species_with_no_name_is_identified_by_one_registry_entry(entry: dict) -> None:
+    """The identity rule's registry arm, under the one registry it is keyed on and under any other.
+
+    The corpus's nameless species carries entries under an unnamed registry alone, so this is
+    the only place the `worms` side of that arm is exercised.
+    """
+    assert _species_issues(external_ids=[entry]) == []

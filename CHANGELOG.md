@@ -7,6 +7,19 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Breaking: a species' registry entries are its `external_ids`, and `aphia_id` and
+  `wikidata_qid` are removed.** §6.11 of
+  [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md)
+  gives a species the list a dive site carries, so one document spells one registry one way,
+  and the format names a third registry, `worms`, whose identifier is the AphiaID's digits.
+  A species carries at most one `worms` entry and is identified by a name or by one entry
+  under any registry. `divejson validate` refuses a species carrying either old member as an
+  undefined one, and one registry entry listed twice on a species as it does on a site;
+  a `worms` entry on any record, a site's included, is held to the digits where it was
+  carried as written before. Moving `"aphia_id": 127160` to
+  `"external_ids": [{"registry": "worms", "identifier": "127160"}]` is the whole fix, and a
+  `wikidata_qid` becomes a `wikidata` entry the same way.
+
 ## 0.26.0
 
 - **A cylinder links the gear item it is, the gear item carries the vessel's facts, and a

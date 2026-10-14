@@ -476,7 +476,7 @@
       "additionalProperties": false
     },
     "external_id": {
-      "description": "One entry of a dive site in a registry outside the logbook. A registry this version names holds its identifier to that registry's form; any other is carried as written.",
+      "description": "One entry of a dive site or a species in a registry outside the logbook. A registry this version names holds its identifier to that registry's form; any other is carried as written.",
       "type": "object",
       "properties": {
         "registry": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
@@ -503,6 +503,15 @@
           "then": {
             "properties": { "identifier": { "pattern": "^(node|way|relation)/[1-9][0-9]*$" } }
           }
+        },
+        {
+          "if": {
+            "properties": { "registry": { "const": "worms" } },
+            "required": ["registry"]
+          },
+          "then": {
+            "properties": { "identifier": { "pattern": "^[1-9][0-9]*$" } }
+          }
         }
       ]
     },
@@ -510,21 +519,33 @@
       "type": "object",
       "properties": {
         "uuid": { "$ref": "#/$defs/uuid" },
-        "aphia_id": { "type": "integer", "exclusiveMinimum": 0 },
+        "external_ids": {
+          "description": "The taxon's entries in registries outside the logbook, at most one of them under worms. uniqueItems rejects an entry written twice whole; that no two name the same registry and identifier is a rule the validator checks, since two such entries are two different objects to uniqueItems whenever anything beside the pair differs.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/external_id" },
+          "uniqueItems": true,
+          "contains": {
+            "properties": { "registry": { "const": "worms" } },
+            "required": ["registry"]
+          },
+          "minContains": 0,
+          "maxContains": 1
+        },
         "scientific_name": { "type": "string", "minLength": 1, "maxLength": 255 },
         "common_name": { "type": "string", "minLength": 1, "maxLength": 255 },
         "rank": { "type": "string", "maxLength": 64 },
-        "wikidata_qid": { "type": "string", "minLength": 1, "maxLength": 32 },
         "created_at": { "$ref": "#/$defs/date_time" },
         "extensions": { "$ref": "#/$defs/extensions" }
       },
       "required": ["uuid"],
       "additionalProperties": false,
       "anyOf": [
-        { "required": ["aphia_id"] },
         { "required": ["scientific_name"] },
         { "required": ["common_name"] },
-        { "required": ["wikidata_qid"] }
+        {
+          "properties": { "external_ids": { "minItems": 1 } },
+          "required": ["external_ids"]
+        }
       ]
     },
     "gear_item": {
