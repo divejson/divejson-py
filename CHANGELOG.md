@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.30.0
+
 - **A conversion says where each record it carried came from.** `Conversion.sources` maps
   the `uuid` of the diver and of every row the document carries to the path in the source
   it was read from, in the form a note's `where` takes, archive member included. A note
