@@ -28,6 +28,8 @@ CORPUS = sorted(
 def test_every_record_a_conversion_carries_says_where_it_came_from(source) -> None:
     conversion = convert(source.read_bytes(), exported_at=EXPORTED_AT)
     assert list(conversion.sources) == list(carried(conversion.document))
+    # One path, one record: otherwise a note at it names no record in particular.
+    assert len(set(conversion.sources.values())) == len(conversion.sources)
     for dive in conversion.document.get("dives", ()):
         assert conversion.sources[dive["uuid"]].startswith("dive/")
 
@@ -72,7 +74,9 @@ def test_a_uddf_dive_the_reader_skips_leaves_the_source_count_and_not_the_docume
 def test_an_ssrf_dive_the_reader_skips_leaves_the_source_count_and_not_the_documents() -> None:
     data = ssrf(
         "<divesites><site uuid='1' name='A'/><site uuid='1' name='B'/></divesites>"
-        f"<dives><dive/><dive {SSRF_STARTED_AT}/><dive date='2026-04-18' time='09:00:00'/></dives>"
+        f"<dives><dive/><dive {SSRF_STARTED_AT}/>"
+        "<dive date='2026-04-18' time='09:00:00'>"
+        "<divemaster>Mona</divemaster><buddy>Karim, Sam</buddy><buddy>Ahmed</buddy></dive></dives>"
     )
     conversion = convert(data)
     document = conversion.document
@@ -80,6 +84,13 @@ def test_an_ssrf_dive_the_reader_skips_leaves_the_source_count_and_not_the_docum
     assert {note.where for note in conversion.notes if note.kind == "dropped"} == {"dive/0", "site/1"}
     assert [conversion.sources[dive["uuid"]] for dive in document["dives"]] == ["dive/1", "dive/2"]
     assert [conversion.sources[site["uuid"]] for site in document["sites"]] == ["site/0"]
+    # A person is named inside a dive and is not that dive, so each has a path of its own.
+    assert {person["name"]: conversion.sources[person["uuid"]] for person in document["people"]} == {
+        "Karim": "dive/2/buddy/0",
+        "Sam": "dive/2/buddy/1",
+        "Ahmed": "dive/2/buddy/2",
+        "Mona": "dive/2/divemaster",
+    }
 
 
 def test_an_archive_names_the_member_that_carried_each_record() -> None:

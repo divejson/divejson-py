@@ -672,17 +672,16 @@ class _Converter:
         people: list[dict[str, Any]] = []
         held: dict[str, dict[str, Any]] = {}
         repeated: dict[str, str] = {}
-        named = [
-            (name.strip(), "buddy")
-            for field in children(element, "buddy")
-            for name in (text(field) or "").split(",")
-        ] + [
-            (text(field) or "", "guide")
+        # Each name at a path of its own rather than the dive's, which is the dive's: the
+        # buddy list counted across the dive's buddy fields, the way a reader reads it.
+        buddies = [name.strip() for field in children(element, "buddy") for name in (text(field) or "").split(",")]
+        named = [(name, "buddy", f"{where}/buddy/{index}") for index, name in enumerate(buddies)] + [
+            (text(field) or "", "guide", f"{where}/{local_name(field)}")
             for field in element
             if local_name(field) in ("divemaster", "diveguide")
         ]
-        for name, role in named:
-            uuid = self.person(name, where) if name else None
+        for name, role, at in named:
+            uuid = self.person(name, at) if name else None
             if uuid is None:
                 continue
             if uuid not in held:

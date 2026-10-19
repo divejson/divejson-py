@@ -109,8 +109,10 @@ document holds only the records it could carry: a dive with no start time, or on
 another's id, keeps its place in the source's count and has none in the document's. So
 source `dive/3` is not reliably the document's fourth dive, and `sources` is the join —
 every record the document carries, the diver and each collection's rows, against the path
-it was read from, written as a `where` is. A finding at `dive/3` or `dive/3/tankdata/1` is
-about the record whose source is `dive/3`.
+it was read from, written as a `where` is, and no two records at one path. A finding is
+about the record with the longest path its `where` starts with, segment by segment: one at
+`dive/3/tankdata/1` is about the dive read from `dive/3`, and one at `dive/3/buddy/0` about
+the person first named there rather than the dive.
 
 A dive's `submerged_time` is its time in the water and its `avg_depth` the mean over that time.
 Where a source states neither, a reader derives them from the depth samples, and

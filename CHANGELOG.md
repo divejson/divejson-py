@@ -13,8 +13,10 @@ this file is about the package, whose version moves independently.
   counts the source's records and a document only the ones it carries, so where a reader
   skips a dive — no start time, an id another dive took — source `dive/N` and the
   document's dive N part, and `sources` is how a note is joined to the record it concerns.
-  Every reader fills it; the field is required, so code constructing a `Conversion` itself
-  passes one.
+  No two records share a path, so the SSRF reader now places a person at the name that first
+  named them — `dive/N/buddy/K`, `dive/N/divemaster` — rather than at the dive, and reports
+  what it drops of a person's name there too. Every reader fills `sources`; the field is
+  required, so code constructing a `Conversion` itself passes one.
 
 ## 0.29.0
 
