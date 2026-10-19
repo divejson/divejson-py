@@ -76,7 +76,8 @@ def test_an_ssrf_dive_the_reader_skips_leaves_the_source_count_and_not_the_docum
         "<divesites><site uuid='1' name='A'/><site uuid='1' name='B'/></divesites>"
         f"<dives><dive/><dive {SSRF_STARTED_AT}/>"
         "<dive date='2026-04-18' time='09:00:00'>"
-        "<divemaster>Mona</divemaster><buddy>Karim, Sam</buddy><buddy>Ahmed</buddy></dive></dives>"
+        "<divemaster>Mona</divemaster><buddy>Karim, Sam</buddy><buddy>Ahmed</buddy>"
+        "<divemaster>Lena</divemaster><diveguide>Omar</diveguide></dive></dives>"
     )
     conversion = convert(data)
     document = conversion.document
@@ -89,7 +90,9 @@ def test_an_ssrf_dive_the_reader_skips_leaves_the_source_count_and_not_the_docum
         "Karim": "dive/2/buddy/0",
         "Sam": "dive/2/buddy/1",
         "Ahmed": "dive/2/buddy/2",
-        "Mona": "dive/2/divemaster",
+        "Mona": "dive/2/divemaster/0",
+        "Lena": "dive/2/divemaster/1",
+        "Omar": "dive/2/diveguide/0",
     }
 
 

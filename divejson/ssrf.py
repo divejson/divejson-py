@@ -672,14 +672,16 @@ class _Converter:
         people: list[dict[str, Any]] = []
         held: dict[str, dict[str, Any]] = {}
         repeated: dict[str, str] = {}
-        # Each name at a path of its own rather than the dive's, which is the dive's: the
-        # buddy list counted across the dive's buddy fields, the way a reader reads it.
+        # A person is claimed at the name itself, so that no two records share a path: the
+        # buddies counted as one list across the buddy fields, each guide spelling on its own.
         buddies = [name.strip() for field in children(element, "buddy") for name in (text(field) or "").split(",")]
-        named = [(name, "buddy", f"{where}/buddy/{index}") for index, name in enumerate(buddies)] + [
-            (text(field) or "", "guide", f"{where}/{local_name(field)}")
-            for field in element
-            if local_name(field) in ("divemaster", "diveguide")
-        ]
+        named = [(name, "buddy", f"{where}/buddy/{index}") for index, name in enumerate(buddies)]
+        guides: dict[str, int] = {}
+        for field in element:
+            tag = local_name(field)
+            if tag in ("divemaster", "diveguide"):
+                named.append((text(field) or "", "guide", f"{where}/{tag}/{guides.setdefault(tag, 0)}"))
+                guides[tag] += 1
         for name, role, at in named:
             uuid = self.person(name, at) if name else None
             if uuid is None:
