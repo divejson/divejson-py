@@ -11,7 +11,8 @@ functions; ``cli`` is a thin wrapper over them.
 An application reads a source in two calls. ``sniff(head)`` takes a bounded head of bytes
 — ``SNIFF_BYTES`` of them — and answers a format id, ``"zip"``, or ``None`` for bytes
 nothing here claims; ``convert(source)`` takes the whole thing and returns a
-``Conversion``: the document, and the notes that are the other half of the output.
+``Conversion``: the document, the notes that are the other half of the output, and the
+source path each record the document carries was read from.
 ``write_uddf(document)`` is the way back out, and returns the mirror of that — a
 ``Written``: the bytes, and the notes saying what UDDF could not hold.
 ``in_water(depths)`` is the derivation a reader applies where a source states no time in

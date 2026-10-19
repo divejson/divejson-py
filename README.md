@@ -101,7 +101,16 @@ divejson.sniff(head)          # a format id, "zip", or None — from divejson.SN
 conversion = divejson.convert(open("my-logbook.uddf", "rb"))
 conversion.document           # the DiveJSON document
 conversion.grouped()          # NoteGroup(kind, message, wheres), one per finding
+conversion.sources            # {record uuid: its path in the source}, e.g. "dive/3"
 ```
+
+A finding's `where` is a path into the source and counts the source's records, while the
+document holds only the records it could carry: a dive with no start time, or one repeating
+another's id, keeps its place in the source's count and has none in the document's. So
+source `dive/3` is not reliably the document's fourth dive, and `sources` is the join —
+every record the document carries, the diver and each collection's rows, against the path
+it was read from, written as a `where` is. A finding at `dive/3` or `dive/3/tankdata/1` is
+about the record whose source is `dive/3`.
 
 A dive's `submerged_time` is its time in the water and its `avg_depth` the mean over that time.
 Where a source states neither, a reader derives them from the depth samples, and

@@ -42,6 +42,7 @@ from io import BytesIO
 from typing import Any, BinaryIO, Protocol
 
 from .converter import (
+    COLLECTIONS,
     INFERRED,
     PRODUCER_KEY,
     Claimed,
@@ -53,6 +54,7 @@ from .converter import (
     SourceTooLargeError,
     UnsupportedSourceError,
     Written,
+    carried,
     header,
 )
 from .fit import FIT
@@ -89,10 +91,6 @@ SNIFF_BYTES = 8192
 # it.
 ZIP = "zip"
 ZIP_MAGIC = b"PK\x03\x04"
-
-# The collections a converted document can carry, in the order §4 puts them.
-COLLECTIONS = ("dives", "trips", "sites", "gear", "contacts", "people")
-
 
 class Adapter(Protocol):
     """What the registry needs of a source format.
@@ -392,7 +390,10 @@ def _merged(converted: list[tuple[str, Conversion]], *, exported_at: datetime) -
     issues = validate_document(document)
     if issues:
         raise NonConformingOutputError(issues)
-    return Conversion(document, tuple(notes))
+    # Through the merged document: an owner after the first carried one in its member's
+    # document and carries none in this one.
+    sources = {uuid: where for _, conversion in converted for uuid, where in conversion.sources.items()}
+    return Conversion(document, tuple(notes), {uuid: sources[uuid] for uuid in carried(document) if uuid in sources})
 
 
 def _recorded_owner(diver: dict[str, Any]) -> dict[str, Any]:
