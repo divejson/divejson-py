@@ -514,7 +514,7 @@ class _Converter:
             issues = validate_document(document)
             if issues:
                 raise NonConformingOutputError(issues)
-        return Conversion(document, tuple(self.notes))
+        return Conversion(document, tuple(self.notes), self.scope.sources(document))
 
     def provenance(self) -> dict[str, Any]:
         """What the file said about itself, and which of its members were computed.

@@ -171,7 +171,7 @@ RECORDING_CONTENT = ("device", "profile", "source_files", *READOUTS)
 # Every top-level collection §4 defines, in its own order: the records whose uuids share one
 # identifier space (§5.3) and that references resolve in. A collection missing from this
 # tuple is one whose duplicate uuids nothing sees and whose `created_at` nothing checks.
-# Wider than `registry.COLLECTIONS`, which is what a converted document can carry.
+# Wider than `converter.COLLECTIONS`, which is what a converted document can carry.
 COLLECTIONS = (
     "dives",
     "trips",

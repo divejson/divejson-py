@@ -324,7 +324,7 @@ class _Converter:
             issues = validate_document(document)
             if issues:
                 raise NonConformingOutputError(issues)
-        return Conversion(document, tuple(self.notes))
+        return Conversion(document, tuple(self.notes), self.scope.sources(document))
 
     def provenance(self) -> dict[str, Any]:
         """What the source file said about itself.
@@ -672,17 +672,18 @@ class _Converter:
         people: list[dict[str, Any]] = []
         held: dict[str, dict[str, Any]] = {}
         repeated: dict[str, str] = {}
-        named = [
-            (name.strip(), "buddy")
-            for field in children(element, "buddy")
-            for name in (text(field) or "").split(",")
-        ] + [
-            (text(field) or "", "guide")
-            for field in element
-            if local_name(field) in ("divemaster", "diveguide")
-        ]
-        for name, role in named:
-            uuid = self.person(name, where) if name else None
+        # A person is claimed at the name itself, so that no two records share a path: the
+        # buddies counted as one list across the buddy fields, each guide spelling on its own.
+        buddies = [name.strip() for field in children(element, "buddy") for name in (text(field) or "").split(",")]
+        named = [(name, "buddy", f"{where}/buddy/{index}") for index, name in enumerate(buddies)]
+        guides: dict[str, int] = {}
+        for field in element:
+            tag = local_name(field)
+            if tag in ("divemaster", "diveguide"):
+                named.append((text(field) or "", "guide", f"{where}/{tag}/{guides.setdefault(tag, 0)}"))
+                guides[tag] += 1
+        for name, role, at in named:
+            uuid = self.person(name, at) if name else None
             if uuid is None:
                 continue
             if uuid not in held:

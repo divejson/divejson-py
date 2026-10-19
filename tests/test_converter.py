@@ -42,7 +42,7 @@ from divejson.converter import (
 
 
 def _conversion(*notes: Note) -> Conversion:
-    return Conversion({}, notes)
+    return Conversion({}, notes, {})
 
 
 def _built(members: dict, notes: list | None = None) -> dict | None:

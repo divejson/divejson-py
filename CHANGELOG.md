@@ -7,6 +7,17 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **A conversion says where each record it carried came from.** `Conversion.sources` maps
+  the `uuid` of the diver and of every row the document carries to the path in the source
+  it was read from, in the form a note's `where` takes, archive member included. A note
+  counts the source's records and a document only the ones it carries, so where a reader
+  skips a dive — no start time, an id another dive took — source `dive/N` and the
+  document's dive N part, and `sources` is how a note is joined to the record it concerns.
+  No two records share a path, so the SSRF reader now places a person at the name that first
+  named them — `dive/N/buddy/K`, `dive/N/divemaster/K` — rather than at the dive, and reports
+  what it drops of a person's name there too. Every reader fills `sources`; the field is
+  required, so code constructing a `Conversion` itself passes one.
+
 ## 0.29.0
 
 - **A sighting carries an abundance band, and never both a band and a count.** §6.3a of

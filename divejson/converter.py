@@ -72,7 +72,7 @@ from __future__ import annotations
 import re
 import sys
 import uuid as uuid_pkg
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
@@ -267,10 +267,23 @@ def grouped(notes: Sequence[Note]) -> list[NoteGroup]:
 
 @dataclass(frozen=True, slots=True)
 class Conversion:
-    """A converted document and everything the conversion could not carry."""
+    """A converted document, everything the conversion could not carry, and where each
+    record it did carry came from.
+
+    `sources` maps the `uuid` of every record the document carries — the diver, and each
+    row of its collections — to the path in the source it was read from, written as a
+    note's `where` is, archive member and all, in the document's order. A note's path names
+    the source's record, and the source's count is not the document's: a dive a reader
+    could not carry — no start time, an id another dive already took — leaves its place in
+    the source's numbering and none in the document's, so `dive/2` in the source can be the
+    document's second dive. `sources` is what joins the two. A record two members of one
+    archive both define is carried once, and its path is the one in the member that
+    carried it.
+    """
 
     document: dict[str, Any]
     notes: tuple[Note, ...]
+    sources: dict[str, str]
 
     def grouped(self) -> list[NoteGroup]:
         return grouped(self.notes)
@@ -302,6 +315,19 @@ class Written:
 # drops a record that cannot be.
 Claimed = dict[str, tuple[str | None, str]]
 
+# The collections a converted document can carry, in the order §4 puts them.
+COLLECTIONS = ("dives", "trips", "sites", "gear", "contacts", "people")
+
+
+def carried(document: dict[str, Any]) -> Iterator[str]:
+    """The `uuid` of every record a converted document carries, in its order."""
+    diver = document.get("diver")
+    if diver is not None and "uuid" in diver:
+        yield diver["uuid"]
+    for member in COLLECTIONS:
+        for row in document.get(member, ()):
+            yield row["uuid"]
+
 
 @dataclass(frozen=True, slots=True)
 class Scope:
@@ -329,6 +355,15 @@ class Scope:
         operator takes from its trip part.
         """
         return f"#{index}" if self.member is None else f"{self.member}#{index}"
+
+    def sources(self, document: dict[str, Any]) -> dict[str, str]:
+        """Where each record `document` carries was read from, for its `Conversion`.
+
+        Read through the document rather than off the table, which is the whole archive's:
+        it holds every other member's claims too, among them the records this member
+        repeats and so does not carry.
+        """
+        return {uuid: self.claimed[uuid][1] for uuid in carried(document) if uuid in self.claimed}
 
     @property
     def validates_alone(self) -> bool:

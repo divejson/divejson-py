@@ -466,7 +466,7 @@ def test_an_inferred_path_is_re_indexed_for_its_place_in_the_merged_document(mon
             provenance = conversion.document["extensions"][PRODUCER_KEY]
             provenance[INFERRED] = ["dives/0/max_depth"]
             notes = (*conversion.notes, Note(scope.where("dive/0"), "read off the samples", "inferred"))
-            return Conversion(conversion.document, notes)
+            return Conversion(conversion.document, notes, conversion.sources)
 
     monkeypatch.setattr("divejson.registry.ADAPTERS", (Inferring(),))
     conversion = convert(_zip({"a.uddf": DIVELOGS, "b.uddf": SUBSURFACE}), exported_at=EXPORTED_AT)
