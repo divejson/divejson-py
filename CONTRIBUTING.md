@@ -99,6 +99,13 @@ rating of 7 of 10 read as 4 of 5 — where the converter decided only how to rea
 nothing. Reaching for `inferred` on a unit reading is the mistake, and it produces a document
 whose report and whose derived-value list disagree.
 
+Every finding carries a `code` from `divejson/codes.py` — the one an existing reader raises
+for the same habit, or a new entry there — and, where it is about one value of the document,
+that value's path as its `member`. Its sentence is for the diver at an import screen: it
+names the value as their logbook does, says what happened, and names no section of the
+specification, no member in code form and no reader, channel or axis.
+`tests/test_findings.py` holds every reader to all three.
+
 ## Adding a writer
 
 Writing a format back out is a **separate registration under the same id**. A writer is an

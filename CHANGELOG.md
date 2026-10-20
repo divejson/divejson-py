@@ -7,6 +7,22 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **A finding names its code and the member it is about, in a diver's words.** `Note` gains
+  `code`, the stable name of the habit it reports, and `member`, the document path of the
+  value it is about — `dives/0/cylinders/0/oxygen` — or `None` for a record or a file as a
+  whole; both are keyword fields with defaults, so a `Note` built positionally still is.
+  `divejson.NOTE_CODES` maps every code a reader raises to what it names, `NoteGroup` carries
+  its notes' code, and `divejson convert` prints it beside the kind. Every reader's sentence
+  is reworded for the diver reading an import: none cites a section of the specification,
+  writes a member in code form or speaks of readers, channels or "the format", and a
+  `<!DOCTYPE>` refusal no longer cites one either. An application matching sentences matches
+  codes instead, since the sentences are free to move and the codes are not. Under an
+  archive a member is re-indexed with its dive, as `extensions.divejson.inferred` is, and
+  every `inferred` finding names a member that list carries. A writer's notes carry neither.
+  For an adapter: the `Reporter` a helper reports through takes `code` as a required keyword
+  and `member` as an optional one, and `capped` takes the value's `label` where it took
+  `member`.
+
 ## 0.30.0
 
 - **A conversion says where each record it carried came from.** `Conversion.sources` maps

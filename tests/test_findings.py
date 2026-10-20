@@ -502,6 +502,8 @@ def test_the_static_check_reaches_the_sentences_built_away_from_the_call() -> No
         "UDDF's <current> has six steps and the logbook five; 'very-mild-current' is read as light, beside "
         "'mild-current'.",
         " records no seconds; read as :00.",
+        "The application that wrote this file marks the local time with a 'Z', the sign for UTC; read as a "
+        "local time without a time zone.",
         "The file records no maximum depth, so it was taken from the deepest reading of the depth profile.",
         "the site name",
         "the low gradient factor",
