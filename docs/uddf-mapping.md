@@ -242,6 +242,12 @@ The fifth shape, `<vessel>`, is a boat rather than an organisation and reads int
 a contact, so a reader never fills their `contact_uuid`: `<certification><organization>` is
 the agency, as text, and not the school.
 
+**A contact's `position` has no UDDF source.** None of the four shapes carries a
+`<geography>`, and `addressType` holds no coordinates, so nothing in a file places a base, a
+shop, an accommodation or an operator on a map. A `<trippart>`'s own `<geography>` is where
+the part was, which is the part's `location` (*Trips* below) and not the place it stayed at,
+so it is never read as its accommodation's position.
+
 **`contacts[]` lists the bases in file order, then the shops, then the contacts the trip parts
 add in part order, then those the kit list's purchases add**, and a contact's `roles` come in
 the order §6.18's table gives them. Neither order is a fact about the file — `roles` is a

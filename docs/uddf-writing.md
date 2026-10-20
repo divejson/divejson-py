@@ -532,8 +532,8 @@ reported `dropped`: a part that comes back without its accommodation is a loss t
 where one pointing at the other branch is a wrong answer nothing would.
 
 **A name-only `<divebase>` nothing in the file points at does not come back.** A contact with
-nothing to write but its name — no address, phone, email, website or notes, its roles and
-`created_at` having no slot — goes out as exactly the shape
+nothing to write but its name — no address, phone, email, website or notes, its roles,
+position and `created_at` having no slot — goes out as exactly the shape
 [`uddf-mapping.md`](uddf-mapping.md) skips as a placeholder wherever no dive links it and no
 `<accomodation>` copy carries its name, and there it is reported `dropped`. The ordinary case
 is a school only a course or a card names, those records having no slot at all; the other is
@@ -881,6 +881,7 @@ writer leaves empty:
 | a site's `external_ids`, `water_type`, `entry_types` and `tags` | no slot — *Sites and trips* above |
 | `sites[].location.position` and `bbox` | a site's `<name>` is its own, so the locality gets only `<geography><location>` and that slot holds `location.name`; `<geography>`'s coordinates are the site's pin, and the box has nowhere either — *Sites and trips* above has the asymmetry with a part |
 | `contacts[].roles` | no element; *Contacts* above says when it is reported |
+| `contacts[].position` | no slot: `<divebase>`, `<shop>` and `<accomodation>` carry no `<geography>`, and `addressType` holds no coordinates — only a `<site>` and a `<trippart>` have one, and a part's is where the part was |
 | `contact_uuid` on a course, a certification or a service record, and a certification's `instructor_uuid` | the record has no slot (above), and its reference goes with it |
 | `trips[].people`, `courses[].people` | `<trippart>` links only a dive base, and UDDF has no course; *People* above |
 | a dive's person reference with a role other than `buddy` or `guide`, or with `guide` where the dive has no `<divebase>` | the role has no spelling there; the reference goes out as a plain link, and *People* above says why |

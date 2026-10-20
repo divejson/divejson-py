@@ -153,6 +153,10 @@
         "region": "South Sinai",
         "country": "Egypt"
       },
+      "position": {
+        "latitude": 28.5038,
+        "longitude": 34.5153
+      },
       "notes": "Shore dives from the house reef, and jeeps to the Blue Hole.",
       "created_at": "2026-03-02T18:00:00+02:00"
     },
