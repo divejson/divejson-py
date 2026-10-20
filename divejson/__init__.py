@@ -12,7 +12,8 @@ An application reads a source in two calls. ``sniff(head)`` takes a bounded head
 — ``SNIFF_BYTES`` of them — and answers a format id, ``"zip"``, or ``None`` for bytes
 nothing here claims; ``convert(source)`` takes the whole thing and returns a
 ``Conversion``: the document, the notes that are the other half of the output, and the
-source path each record the document carries was read from.
+source path each record the document carries was read from. Each note names its habit by a
+code, one of ``NOTE_CODES``, and the document member it is about.
 ``write_uddf(document)`` is the way back out, and returns the mirror of that — a
 ``Written``: the bytes, and the notes saying what UDDF could not hold.
 ``in_water(depths)`` is the derivation a reader applies where a source states no time in
@@ -30,6 +31,7 @@ SPEC_VERSION = "1.0"
 # Imported below the two constants rather than at the top of the file: `validate` reads
 # `SPEC_VERSION` from this module as it imports, so the names it needs have to exist by
 # the time the import runs.
+from .codes import NOTE_CODES  # noqa: E402
 from .conform import compared  # noqa: E402
 from .converter import (  # noqa: E402
     IN_WATER_DEPTH,
@@ -81,6 +83,7 @@ from .validate import (  # noqa: E402
 
 __all__ = [
     "IN_WATER_DEPTH",
+    "NOTE_CODES",
     "SNIFF_BYTES",
     "SPEC_VERSION",
     "WRITTEN",

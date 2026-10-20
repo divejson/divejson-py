@@ -48,7 +48,22 @@ from typing import Any
 
 from .converter import Reporter, channel_floor, in_seconds, profile_members
 
-__all__ = ["Channel", "SampleAxis"]
+__all__ = ["CHANNEL_LABELS", "Channel", "SampleAxis"]
+
+# What a report calls each sampled quantity, so a finding names the reading as a diver's
+# computer does rather than by the document's own spelling of it.
+CHANNEL_LABELS: dict[str, str] = {
+    "depth": "depth",
+    "ceiling": "decompression ceiling",
+    "temperature": "water temperature",
+    "pressures": "tank pressure",
+    "ndl": "no-decompression time",
+    "tts": "time to surface",
+    "ppo2": "ppO₂",
+    "cns": "CNS",
+    "gradient_factor": "gradient factor",
+    "surface_gradient_factor": "surface gradient factor",
+}
 
 
 class Channel:
@@ -118,7 +133,7 @@ class SampleAxis:
     (`converter.in_seconds`) because the source and the diver both do.
     """
 
-    __slots__ = ("_note", "_where", "_noun", "_time_member", "_seen", "_offered", "_ordered")
+    __slots__ = ("_note", "_where", "_path", "_noun", "_time_member", "_seen", "_offered", "_ordered")
 
     def __init__(
         self,
@@ -127,9 +142,13 @@ class SampleAxis:
         *,
         noun: str = "sample",
         time_member: str = "time",
+        path: str | None = None,
     ) -> None:
         self._note = note
         self._where = where
+        # The document path of the profile this builds, which a finding about one of its
+        # channels names as its `member`; `None` where the caller cannot place it.
+        self._path = path
         self._noun = noun
         self._time_member = time_member
         # Every sample offered, not only the ones that found a place: a note's path counts
@@ -151,12 +170,20 @@ class SampleAxis:
         if at is None:
             self._note(
                 where,
-                f"the {self._noun} records no {self._time_member}, so it has no place on "
-                "the profile's time axis; dropped",
+                f"A {self._noun} records no {self._time_member}, so it has no place in the dive's profile and is "
+                "left out.",
                 "dropped",
+                code="sample_time_missing",
+                member=self._path,
             )
         elif at < 0:
-            self._note(where, f"the {self._noun} is at {in_seconds(at)} s, before the dive began; dropped", "dropped")
+            self._note(
+                where,
+                f"A {self._noun} is at {in_seconds(at)} s, before the dive began, and is left out.",
+                "dropped",
+                code="sample_before_start",
+                member=self._path,
+            )
         else:
             self._offered.append((at, payload))
 
@@ -168,9 +195,11 @@ class SampleAxis:
                 if kept and kept[-1][0] == at:
                     self._note(
                         self._where,
-                        f"two {self._noun}s are both at {in_seconds(at)} s, to the millisecond; the later one is "
-                        "dropped, because the format's sample times are strictly increasing (spec §6.5)",
+                        f"Two {self._noun}s are both at {in_seconds(at)} s, to the millisecond; the later one is left "
+                        "out, a profile holding one reading per instant.",
                         "dropped",
+                        code="readings_at_one_instant",
+                        member=self._path,
                     )
                     continue
                 kept.append((at, payload))
@@ -200,13 +229,15 @@ class SampleAxis:
         """
         for channel in (*channels.values(), *(channel for _, channel in pressures)):
             if channel.refused:
+                one = channel.refused == 1
                 self._note(
                     self._where,
-                    f"{channel.refused} of the dive's {channel.name} readings "
-                    f"{'is' if channel.refused == 1 else 'are'} negative, which is how a device spells a "
-                    f"readout it does not have; {'that sample is' if channel.refused == 1 else 'those samples are'} "
-                    "dropped from the channel, §6.4 recording it from zero up",
+                    f"{channel.refused} of the dive's {CHANNEL_LABELS.get(channel.name, channel.name)} readings "
+                    f"{'is' if one else 'are'} below zero, which is how a device writes a reading it does not "
+                    f"have; {'that reading is' if one else 'those readings are'} left out.",
                     "dropped",
+                    code="negative_readings",
+                    member=None if self._path is None else f"{self._path}/{channel.name}",
                 )
         filled: list[tuple[str, Channel]] = [(name, channel) for name, channel in channels.items() if len(channel)]
         pressed = sorted(((number, channel) for number, channel in pressures if len(channel)), key=lambda pair: pair[0])
@@ -219,9 +250,11 @@ class SampleAxis:
             subject = f"{self._noun} carries" if count == 1 else f"{self._noun}s carry"
             self._note(
                 self._where,
-                f"the dive's {count} {subject} a time but no reading this format can hold, so it "
-                "arrives with no profile at all rather than one of zero length",
+                f"The dive's {count} {subject} a time and no reading that can be kept, so the dive has no "
+                "profile.",
                 "dropped",
+                code="profile_empty",
+                member=self._path,
             )
             return None
 

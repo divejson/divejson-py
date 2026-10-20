@@ -22,7 +22,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from helpers import EXPORTED_AT, FIX_TAKEN, FIXTURES, profile_of
+from helpers import EXPORTED_AT, FIXTURES, profile_of
 
 from divejson import compared, convert
 from divejson.converter import INFERRED, PRODUCER_KEY
@@ -83,7 +83,7 @@ def test_this_reader_settles_no_scale_and_resolves_nothing_but_the_fix_taken(sou
     """
     conversion = convert(source.read_bytes(), exported_at=EXPORTED_AT)
     resolved = [note for note in conversion.notes if note.kind == "resolved"]
-    assert [note.where for note in resolved if not note.message.startswith(FIX_TAKEN)] == []
+    assert [note.where for note in resolved if note.code != "fix_chosen_by_accuracy"] == []
 
 
 def test_every_expected_document_has_an_input() -> None:
@@ -134,8 +134,9 @@ def test_the_only_mapped_member_the_ocean_session_leaves_empty_is_start_cns() ->
     conversion = convert(OCEAN.read_bytes(), exported_at=EXPORTED_AT)
     assert [note.kind for note in conversion.notes] == ["absent", "inferred", "inferred", "absent"]
     identity, unfilled = (note for note in conversion.notes if note.kind == "absent")
-    assert "its identity is derived from its position" in identity.message
-    assert "records no start_cns" in unfilled.message
+    assert identity.code == "identity_from_position"
+    assert (unfilled.code, unfilled.member) == ("oxygen_figure_missing", "dives/0/recordings/0/cns_start")
+    assert unfilled.message == "The file records no start CNS, so it is left empty."
 
 
 def test_the_ocean_profile_takes_each_channel_only_where_it_was_recorded() -> None:

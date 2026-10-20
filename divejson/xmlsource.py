@@ -56,7 +56,10 @@ class DoctypeRefusingTarget(ET.TreeBuilder):
     """
 
     def doctype(self, name: str, pubid: str | None, system: str | None) -> None:
-        raise DoctypeRefusedError(f"the document declares <!DOCTYPE {name}>, which this reader refuses (spec §9)")
+        raise DoctypeRefusedError(
+            f"the file declares <!DOCTYPE {name}>, and a file that declares a document type is not read, since one "
+            "can pull in content from outside the file"
+        )
 
 
 def local_name(element: ET.Element) -> str:

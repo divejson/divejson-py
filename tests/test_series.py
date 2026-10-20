@@ -13,21 +13,26 @@ from divejson.series import Channel, SampleAxis
 
 
 class Reported:
-    """A note sink that keeps what it was told, in order."""
+    """A note sink that keeps what it was told, in order, and the code and member beside."""
 
     def __init__(self) -> None:
         self.notes: list[tuple[str, str, NoteKind]] = []
+        self.codes: list[tuple[str, str | None]] = []
 
-    def __call__(self, where: str, message: str, kind: NoteKind) -> None:
+    def __call__(self, where: str, message: str, kind: NoteKind, *, code: str, member: str | None = None) -> None:
         self.notes.append((where, message, kind))
+        self.codes.append((code, member))
 
     @property
     def messages(self) -> list[str]:
         return [message for _, message, _ in self.notes]
 
 
+PROFILE = "dives/0/recordings/0/profile"
+
+
 def _axis(report: Reported) -> SampleAxis:
-    return SampleAxis(report, "dive/0", noun="record", time_member="timestamp")
+    return SampleAxis(report, "dive/0", noun="record", time_member="timestamp", path=PROFILE)
 
 
 # -- the axis -------------------------------------------------------------------------
@@ -52,10 +57,11 @@ def test_a_sample_with_no_time_is_dropped_and_reported_where_it_sat() -> None:
     assert report.notes == [
         (
             "dive/0/record/1",
-            "the record records no timestamp, so it has no place on the profile's time axis; dropped",
+            "A record records no timestamp, so it has no place in the dive's profile and is left out.",
             "dropped",
         )
     ]
+    assert report.codes == [("sample_time_missing", PROFILE)]
 
 
 def test_a_notes_path_counts_samples_in_document_order() -> None:
@@ -86,9 +92,10 @@ def test_a_sample_before_the_dive_began_is_dropped() -> None:
     # The report speaks the seconds a source and a diver both do, the axis's milliseconds
     # being an encoding.
     assert report.messages == [
-        "the record is at -1 s, before the dive began; dropped",
-        "the record is at -0.25 s, before the dive began; dropped",
+        "A record is at -1 s, before the dive began, and is left out.",
+        "A record is at -0.25 s, before the dive began, and is left out.",
     ]
+    assert {code for code, _ in report.codes} == {"sample_before_start"}
 
 
 def test_two_samples_on_one_millisecond_keep_the_first_and_report_the_second() -> None:
@@ -97,7 +104,8 @@ def test_two_samples_on_one_millisecond_keep_the_first_and_report_the_second() -
     axis.offer(30_000, "kept")
     axis.offer(30_000, "later")
     assert [pair[1] for pair in axis.ordered()] == ["kept"]
-    assert "two records are both at 30 s, to the millisecond" in report.messages[0]
+    assert "Two records are both at 30 s, to the millisecond" in report.messages[0]
+    assert report.codes == [("readings_at_one_instant", PROFILE)]
 
 
 def test_two_samples_inside_one_second_are_two_places_on_the_axis() -> None:
@@ -172,7 +180,8 @@ def test_samples_that_carry_a_time_and_no_reading_produce_no_profile_and_say_so(
     axis.ordered()
 
     assert axis.profile({"depth": Channel("depth")}) is None
-    assert "the dive's 2 records carry a time but no reading" in report.messages[0]
+    assert "The dive's 2 records carry a time and no reading" in report.messages[0]
+    assert report.codes == [("profile_empty", PROFILE)]
 
 
 def test_one_such_sample_is_reported_in_the_singular() -> None:
@@ -181,7 +190,7 @@ def test_one_such_sample_is_reported_in_the_singular() -> None:
     axis.offer(0, "nothing usable")
     axis.ordered()
     assert axis.profile({"depth": Channel("depth")}) is None
-    assert "the dive's 1 record carries a time" in report.messages[0]
+    assert "The dive's 1 record carries a time" in report.messages[0]
 
 
 def test_a_dive_whose_samples_all_lost_their_place_says_nothing_further() -> None:
@@ -257,14 +266,15 @@ def test_the_refusals_are_reported_once_per_channel_rather_than_once_per_sample(
     depth = Channel("depth")
     depth.record(0, 100)
     axis.profile({"depth": depth, "gradient_factor": channel})
-    assert [note for note in report.notes if "gradient_factor" in note[1]] == [
+    assert [note for note in report.notes if "gradient factor" in note[1]] == [
         (
             "dive/0",
-            "3 of the dive's gradient_factor readings are negative, which is how a device spells a readout "
-            "it does not have; those samples are dropped from the channel, §6.4 recording it from zero up",
+            "3 of the dive's gradient factor readings are below zero, which is how a device writes a reading it "
+            "does not have; those readings are left out.",
             "dropped",
         )
     ]
+    assert report.codes == [("negative_readings", f"{PROFILE}/gradient_factor")]
 
 
 def test_one_refusal_is_reported_in_the_singular() -> None:
@@ -277,7 +287,8 @@ def test_one_refusal_is_reported_in_the_singular() -> None:
     depth = Channel("depth")
     depth.record(0, 100)
     axis.profile({"depth": depth, "tts": channel})
-    assert any("1 of the dive's tts readings is negative" in note[1] for note in report.notes)
+    assert any("1 of the dive's time to surface readings is below zero" in note[1] for note in report.notes)
+    assert any("that reading is left out" in note[1] for note in report.notes)
 
 
 def test_the_profile_reads_down_section_6_4_whatever_order_the_channels_arrive_in() -> None:

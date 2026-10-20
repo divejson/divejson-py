@@ -97,7 +97,7 @@ def test_a_gas_this_export_never_recorded_is_absent_and_never_air() -> None:
     )
     cylinder = conversion.document["dives"][0]["cylinders"][0]
     assert "oxygen" not in cylinder and "helium" not in cylinder
-    assert any(note.kind == "absent" and "never air" in note.message for note in conversion.notes)
+    assert any(note.kind == "absent" and note.code == "gas_missing" for note in conversion.notes)
 
 
 # -- temperature ----------------------------------------------------------------------

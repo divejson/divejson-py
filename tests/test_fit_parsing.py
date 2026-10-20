@@ -42,6 +42,10 @@ def _messages(conversion, kind: str) -> list[str]:
     return [note.message for note in conversion.notes if note.kind == kind]
 
 
+def _codes(conversion, kind: str) -> list[str]:
+    return [note.code for note in conversion.notes if note.kind == kind]
+
+
 def _at(offset: int, **values):
     return message("record", timestamp=STARTED_AT + timedelta(seconds=offset), **values)
 
@@ -163,7 +167,7 @@ def test_a_file_with_no_activity_message_carries_the_utc_instant_and_says_so() -
     """
     conversion = _run(dive_file())
     assert conversion.document["dives"][0]["started_at"] == "2026-04-17T09:49:23+00:00"
-    assert any("local time zone cannot be recovered" in text for text in _messages(conversion, "absent"))
+    assert "start_time_in_utc" in _codes(conversion, "absent")
 
 
 def test_an_offset_no_zone_has_is_read_as_no_offset() -> None:
@@ -177,14 +181,14 @@ def test_an_offset_no_zone_has_is_read_as_no_offset() -> None:
     )
     conversion = _run(data)
     assert conversion.document["dives"][0]["started_at"] == "2026-04-17T09:49:23+00:00"
-    assert any("local time zone cannot be recovered" in text for text in _messages(conversion, "absent"))
+    assert "start_time_in_utc" in _codes(conversion, "absent")
 
 
 def test_a_session_with_no_start_time_drops_the_dive() -> None:
     """§6.2 makes `started_at` REQUIRED, and nothing else in a FIT can stand in for it."""
     conversion = _run(dive_file(session={"start_time": None}))
     assert "dives" not in conversion.document
-    assert any("the dive is dropped" in text for text in _messages(conversion, "dropped"))
+    assert "start_time_missing" in _codes(conversion, "dropped")
 
 
 # -- the summary scalars --------------------------------------------------------------
@@ -238,7 +242,7 @@ def test_a_dive_summary_supplies_a_depth_the_session_left_empty_and_it_is_record
     assert conversion.document["dives"][0]["max_depth"] == 32.41
     assert "avg_depth" not in conversion.document["dives"][0]
     assert "inferred" not in conversion.document["extensions"]["divejson"]
-    assert any("records no avg_depth" in text for text in _messages(conversion, "absent"))
+    assert "avg_depth_missing" in _codes(conversion, "absent")
 
 
 def test_the_oxygen_accounting_comes_from_the_dive_summary_before_the_session() -> None:
@@ -389,7 +393,7 @@ def test_a_computed_mean_deeper_than_the_recorded_maximum_is_dropped_and_says_no
     dive = conversion.document["dives"][0]
     assert dive["max_depth"] == 20.0
     assert "avg_depth" not in dive
-    assert any("is deeper than the greatest depth" in text for text in _messages(conversion, "dropped"))
+    assert "average_below_maximum" in _codes(conversion, "dropped")
     assert not any("avg_depth" in text for text in _messages(conversion, "inferred"))
     assert conversion.document["extensions"]["divejson"]["inferred"] == ["dives/0/submerged_time"]
 
@@ -413,7 +417,11 @@ def test_the_inferred_report_and_the_derived_list_name_the_same_members() -> Non
     assert conversion.document["dives"][0]["avg_depth"] == 10.0
     assert conversion.document["extensions"]["divejson"]["inferred"] == ["dives/0/max_depth"]
     assert len(_messages(conversion, "inferred")) == 1
-    assert "max_depth is computed from its own depth samples" in _messages(conversion, "inferred")[0]
+    assert "taken from the deepest reading of the depth profile" in _messages(conversion, "inferred")[0]
+    assert [(note.code, note.member) for note in conversion.notes if note.kind == "inferred"][0] == (
+        "max_depth_worked_out",
+        "dives/0/max_depth",
+    )
 
 
 def test_a_second_session_is_reported_and_not_converted() -> None:
@@ -501,7 +509,7 @@ def test_a_file_stating_one_gradient_factor_alone_yields_neither() -> None:
     conversion = _run(data)
     recordings = conversion.document["dives"][0].get("recordings") or [{}]
     assert "deco_model" not in recordings[0]
-    assert any("both or neither" in text for text in _messages(conversion, "dropped"))
+    assert "gradient_factor_unpaired" in _codes(conversion, "dropped")
 
 
 def test_the_tissue_model_is_read_only_where_the_message_states_one() -> None:
@@ -546,7 +554,7 @@ def test_a_disabled_gas_is_a_cylinder_nobody_dived() -> None:
     )
     conversion = _run(data)
     assert [c["oxygen"] for c in conversion.document["dives"][0]["cylinders"]] == [21.0]
-    dropped = [text for text in _messages(conversion, "dropped") if "records as disabled" in text]
+    dropped = [note.message for note in conversion.notes if note.code == "disabled_gases"]
     assert len(dropped) == 1, "the disabled-gas line is reported once, not once per reader of the list"
     assert "holds 2 gases" in dropped[0]
 
@@ -595,14 +603,15 @@ def test_a_mix_summing_past_a_hundred_percent_is_dropped_whole() -> None:
     data = dive_file(message("dive_gas", message_index=0, oxygen_content=60, helium_content=60, status="enabled"))
     conversion = _run(data)
     assert conversion.document["dives"][0]["cylinders"] == [{}]
-    assert any("sum above 100 percent" in text for text in _messages(conversion, "dropped"))
+    assert "gas_over_100_percent" in _codes(conversion, "dropped")
 
 
 def test_a_gas_the_device_recorded_nothing_about_is_not_read_as_air() -> None:
     """§6.3: absent oxygen means not recorded, never air."""
     conversion = _run(dive_file(message("dive_gas", message_index=0, status="enabled")))
     assert conversion.document["dives"][0]["cylinders"] == [{}]
-    assert any("never air" in text for text in _messages(conversion, "absent"))
+    assert any("rather than assumed to be air" in text for text in _messages(conversion, "absent"))
+    assert [note.member for note in conversion.notes if note.code == "gas_missing"] == ["dives/0/cylinders/0/oxygen"]
 
 
 # -- tank telemetry -------------------------------------------------------------------
@@ -680,7 +689,7 @@ def test_pressures_are_dropped_where_the_counts_do_not_match_exactly() -> None:
     )
     conversion = _run(data)
     assert conversion.document["dives"][0]["cylinders"] == [{"oxygen": 21.0}, {"oxygen": 50.0}]
-    assert any("2 gases and 1 cylinder pressure sources" in text for text in _messages(conversion, "dropped"))
+    assert any("2 gases and 1 tank pressure transmitters" in text for text in _messages(conversion, "dropped"))
 
 
 def test_telemetry_with_no_gas_list_at_all_becomes_the_cylinders() -> None:
@@ -816,7 +825,7 @@ def test_an_alert_the_device_gives_no_code_for_is_dropped_rather_than_failing_th
     )
     conversion = _run(data)
     assert "events" not in profile_of(conversion.document["dives"][0])
-    assert any("gives no code for" in text for text in _messages(conversion, "dropped"))
+    assert "alert_unnamed" in _codes(conversion, "dropped")
 
 
 def test_the_timer_event_every_file_carries_is_not_an_event_of_this_format() -> None:
@@ -841,7 +850,7 @@ def test_an_event_at_an_instant_the_samples_do_not_reach_is_dropped() -> None:
     )
     conversion = _run(data)
     assert "events" not in profile_of(conversion.document["dives"][0])
-    assert any("no place on the profile's time axis" in text for text in _messages(conversion, "dropped"))
+    assert "event_outside_profile" in _codes(conversion, "dropped")
 
 
 # -- the sample axis ------------------------------------------------------------------
@@ -872,7 +881,8 @@ def test_two_readings_of_one_channel_at_one_instant_report_the_collision() -> No
     data = dive_file(_at(0, depth=5.0), _at(0, depth=9.0), session={"total_elapsed_time": 60.0})
     conversion = _run(data)
     assert profile_of(conversion.document["dives"][0])["depth"]["values"] == [500]
-    assert any("two messages record a depth at one instant" in text for text in _messages(conversion, "dropped"))
+    assert any("Two records give a depth at one instant" in text for text in _messages(conversion, "dropped"))
+    assert "readings_at_one_instant" in _codes(conversion, "dropped")
 
 
 def test_a_record_before_the_session_started_is_dropped() -> None:
@@ -889,7 +899,7 @@ def test_samples_carrying_a_time_and_no_reading_produce_no_profile_at_all() -> N
     data = dive_file(_at(0, heart_rate=70), _at(30, heart_rate=72), session={"total_elapsed_time": 60.0})
     conversion = _run(data)
     assert profile_of(conversion.document["dives"][0]) is None
-    assert any("no reading this format can hold" in text for text in _messages(conversion, "dropped"))
+    assert "profile_empty" in _codes(conversion, "dropped")
 
 
 def test_a_file_with_no_samples_at_all_says_nothing_about_a_profile() -> None:

@@ -38,6 +38,10 @@ def _messages(conversion, kind: str | None = None) -> list[str]:
     return [note.message for note in conversion.notes if kind is None or note.kind == kind]
 
 
+def _codes(conversion, kind: str | None = None) -> list[str]:
+    return [note.code for note in conversion.notes if kind is None or note.kind == kind]
+
+
 # -- what this reader claims ----------------------------------------------------------
 
 
@@ -97,14 +101,14 @@ def test_a_dive_with_no_readable_start_time_is_dropped_and_reported() -> None:
         exported_at=EXPORTED_AT,
     )
     assert "dives" not in conversion.document
-    assert any("no start time this converter can read" in message for message in _messages(conversion))
+    assert "start_time_missing" in _codes(conversion)
 
 
 def test_an_activity_that_is_not_a_dive_is_dropped_before_anything_else_is_read() -> None:
     conversion = _conversion({"ActivityType": 3}, [suunto_sample(0, Depth=20.0)])
     assert "dives" not in conversion.document
     assert _messages(conversion, "dropped") == [
-        "the export records activity type 3, and this reader carries dives (type 51); the activity is dropped"
+        "The export records activity type 3, which is not a dive (type 51); it is left out."
     ]
 
 
@@ -134,7 +138,7 @@ def test_an_offset_with_no_colon_is_rewritten_and_never_invented() -> None:
 def test_a_start_time_with_no_offset_travels_alone_and_says_so() -> None:
     conversion = _conversion({"DateTime": "2026-04-17T11:49:23"})
     assert conversion.document["dives"][0]["started_at"] == "2026-04-17T11:49:23"
-    assert any("records no UTC offset" in message for message in _messages(conversion, "absent"))
+    assert "start_time_zone_missing" in _codes(conversion, "absent")
 
 
 def test_a_one_digit_fraction_survives_the_python_floor() -> None:
@@ -217,10 +221,11 @@ def test_one_channel_twice_on_a_millisecond_keeps_the_first_and_is_reported_once
     assert profile_of(conversion.document["dives"][0])["depth"]["values"] == [100, 2000]
     assert _messages(conversion, "dropped") == [
         (
-            "2 depth readings land on a millisecond the dive already has one at; the later reading is "
-            "dropped, because the format's sample times are strictly increasing (spec §6.5)"
+            "2 depth readings land on a millisecond the dive already has one at; the later reading is left out, "
+            "a profile holding one reading per instant."
         )
     ]
+    assert _codes(conversion, "dropped") == ["readings_at_one_instant"]
 
 
 # -- positions ------------------------------------------------------------------------
@@ -341,7 +346,7 @@ def test_a_zero_submerged_time_is_a_placeholder_rather_than_a_dive_of_no_length(
     """§6.2 gives `submerged_time` `exclusiveMinimum: 0`, and the member's own rule decides."""
     conversion = _conversion({"DiveTime": 0, "Duration": 2001})
     assert conversion.document["dives"][0]["submerged_time"] == 2001
-    assert any("cannot hold as a submerged time" in m for m in _messages(conversion, "absent"))
+    assert "dive_time_zero" in _codes(conversion, "absent")
 
 
 def test_a_submerged_time_that_rounds_to_zero_is_read_as_not_recorded() -> None:
@@ -359,7 +364,7 @@ def test_a_submerged_time_that_rounds_to_zero_is_read_as_not_recorded() -> None:
 def test_a_negative_submerged_time_is_read_as_not_recorded() -> None:
     conversion = _conversion({"DiveTime": -30})
     assert "submerged_time" not in conversion.document["dives"][0]
-    assert any("cannot hold as a submerged time" in m for m in _messages(conversion, "absent"))
+    assert "dive_time_zero" in _codes(conversion, "absent")
 
 
 # -- cylinders, the Ocean shape -------------------------------------------------------
@@ -531,7 +536,7 @@ def test_more_cylinders_than_one_dive_may_describe_are_capped_and_reported() -> 
     ]
     conversion = _conversion({}, switches)
     assert len(conversion.document["dives"][0]["cylinders"]) == 16
-    assert any("at most 16 are read" in message for message in _messages(conversion, "dropped"))
+    assert any("at most 16 are kept" in message for message in _messages(conversion, "dropped"))
 
 
 # -- cylinders, the D5 shape ----------------------------------------------------------
@@ -561,7 +566,7 @@ def test_a_mix_whose_halves_sum_above_a_hundred_is_dropped_entirely() -> None:
     conversion = _conversion(_gas_block(Oxygen=0.6, Helium=0.6))
     cylinder = conversion.document["dives"][0]["cylinders"][0]
     assert "oxygen" not in cylinder and "helium" not in cylinder
-    assert any("sum above 100 percent" in message for message in _messages(conversion, "dropped"))
+    assert "gas_over_100_percent" in _codes(conversion, "dropped")
 
 
 # -- the profile ----------------------------------------------------------------------
@@ -571,7 +576,7 @@ def test_samples_that_carry_a_time_and_no_reading_produce_no_profile() -> None:
     """A zero-length sampled record is a claim the source did not make."""
     conversion = _conversion({}, [suunto_sample(0, Speed=3.2), suunto_sample(60, Speed=3.4)])
     assert profile_of(conversion.document["dives"][0]) is None
-    assert any("no reading this format can hold" in message for message in _messages(conversion, "dropped"))
+    assert "profile_empty" in _codes(conversion, "dropped")
 
 
 def test_a_dive_that_recorded_no_samples_at_all_is_not_reported() -> None:
@@ -937,9 +942,9 @@ def test_a_negative_readout_is_dropped_by_the_channels_own_floor_and_reported() 
     assert profile["gradient_factor"] == {"times": [10_000], "values": [42]}
     # A zero surface gradient factor is a reading, and stays.
     assert profile["surface_gradient_factor"] == {"times": [0, 10_000], "values": [0, 30]}
-    dropped = _messages(conversion, "dropped")
+    refused = [note.member for note in conversion.notes if note.code == "negative_readings"]
     for channel in ("ndl", "tts", "gradient_factor"):
-        assert any(f"{channel} readings" in message and "negative" in message for message in dropped)
+        assert f"dives/0/recordings/0/profile/{channel}" in refused
 
 
 @pytest.mark.parametrize("spelling", ["gfSurface", "gtSurface"])

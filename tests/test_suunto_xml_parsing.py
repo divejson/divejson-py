@@ -77,7 +77,7 @@ def test_an_unrecorded_member_is_silent_rather_than_reported() -> None:
     nil, so the report would drown in them.
     """
     assert notes() == [
-        note for note in notes() if "no UTC offset" in note.message or "no id" in note.message
+        note for note in notes() if note.code in ("start_time_zone_missing", "identity_from_position")
     ]
 
 
@@ -141,7 +141,7 @@ def test_no_utc_offset_is_supplied_and_the_absence_is_reported() -> None:
     """
     found = convert(suunto_xml(started_at="2021-04-06T11:16:42.6"))
     assert "+" not in found.document["dives"][0]["started_at"]
-    assert any(note.kind == "absent" and "no UTC offset" in note.message for note in found.notes)
+    assert any(note.kind == "absent" and note.code == "start_time_zone_missing" for note in found.notes)
 
 
 def test_a_recorded_offset_is_not_a_shape_this_reader_accepts() -> None:
@@ -283,13 +283,13 @@ def test_an_end_pressure_above_the_start_is_dropped() -> None:
 def test_a_cylinder_with_no_gas_says_so_rather_than_reporting_air() -> None:
     found = convert(suunto_xml(suunto_mixtures("<Size>12</Size>")))
     assert found.document["dives"][0]["cylinders"][0] == {"volume": 12.0}
-    assert any(note.kind == "absent" and "never air" in note.message for note in found.notes)
+    assert any(note.kind == "absent" and note.code == "gas_missing" for note in found.notes)
 
 
 def test_a_mix_summing_past_a_hundred_percent_drops_both_halves() -> None:
     found = convert(suunto_xml(suunto_mixtures("<Oxygen>50</Oxygen><Helium>60</Helium>")))
     assert found.document["dives"][0]["cylinders"][0] == {}
-    assert any("sum above 100 percent" in note.message for note in found.notes)
+    assert any(note.code == "gas_over_100_percent" for note in found.notes)
 
 
 def test_the_mixture_type_is_not_read_as_the_cylinders_role() -> None:
@@ -445,7 +445,7 @@ def test_samples_carrying_a_time_and_nothing_else_produce_no_profile() -> None:
     """A zero-length sampled record is a claim the source did not make."""
     found = convert(suunto_xml(suunto_xml_samples("<Time>10</Time>", "<Time>20</Time>")))
     assert profile_of(found.document["dives"][0]) is None
-    assert any(note.kind == "dropped" and "no reading this format can hold" in note.message for note in found.notes)
+    assert any(note.kind == "dropped" and note.code == "profile_empty" for note in found.notes)
 
 
 @pytest.mark.parametrize(
@@ -474,10 +474,7 @@ def test_gas_switches_with_no_profile_to_sit_on_are_reported(samples: str) -> No
         )
     )
     assert profile_of(found.document["dives"][0]) is None
-    assert any(
-        note.kind == "dropped" and "no profile for a marker to sit on" in note.message
-        for note in found.notes
-    )
+    assert any(note.kind == "dropped" and note.code == "gas_changes_without_profile" for note in found.notes)
 
 
 def test_a_switch_survives_samples_that_carry_a_time_and_nothing_else() -> None:

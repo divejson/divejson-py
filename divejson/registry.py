@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import uuid
 import zipfile
+from dataclasses import replace
 from datetime import datetime
 from io import BytesIO
 from typing import Any, BinaryIO, Protocol
@@ -294,7 +295,7 @@ def _archive(
         raise MalformedArchiveError(f"the archive could not be read — {error}") from error
 
     if not names:
-        raise UnsupportedSourceError("the archive holds no files to convert")
+        raise UnsupportedSourceError("the archive holds no files to read")
     if max_members is not None and len(names) > max_members:
         raise SourceTooLargeError(
             f"the archive holds {len(names)} files, and at most {max_members} are read at once"
@@ -363,7 +364,11 @@ def _merged(converted: list[tuple[str, Conversion]], *, exported_at: datetime) -
     block, which is this converter's own statement about the whole archive.
     """
     documents = [conversion.document for _, conversion in converted]
-    notes: list[Note] = [note for _, conversion in converted for note in conversion.notes]
+    notes: list[Note] = [
+        note if note.member is None else replace(note, member=_moved(note.member, shift))
+        for (_, conversion), (_, shift) in zip(converted, _shifts(converted))
+        for note in conversion.notes
+    ]
 
     document = header(exported_at)
     owners = [(name, conversion.document["diver"]) for name, conversion in converted if "diver" in conversion.document]
@@ -374,9 +379,11 @@ def _merged(converted: list[tuple[str, Conversion]], *, exported_at: datetime) -
                 notes.append(
                     Note(
                         name,
-                        f"the logbook's owner is the one {owners[0][0]} records, and a logbook has one; "
-                        "what this file records about the owner is dropped (spec §6.1)",
+                        f"The logbook's owner is the one {owners[0][0]} records, and a logbook has one; what this "
+                        "file records about the owner differently is left out.",
                         "dropped",
+                        code="owner_differs",
+                        member="diver",
                     )
                 )
 
@@ -433,8 +440,11 @@ def _merged_provenance(converted: list[tuple[str, Conversion]], notes: list[Note
             notes.append(
                 Note(
                     "$",
-                    f"the archive's files disagree about {key}, so the merged logbook records none",
+                    f"The archive's files disagree about {_PROVENANCE_LABELS.get(key, 'where they came from')}, so "
+                    "the logbook records none.",
                     "dropped",
+                    code="archive_files_disagree",
+                    member=f"extensions/{PRODUCER_KEY}/{key}",
                 )
             )
 
@@ -462,14 +472,25 @@ def _shifted(block: dict[str, Any], shift: dict[str, int]) -> list[str]:
     `dives/0/max_depth` in the second file of an archive is `dives/7/max_depth` once the
     first file's seven dives sit in front of it, and a path that still named 0 would label
     the wrong dive as derived — which is worse than not labelling it, because §5.4's point
-    is that a reader can tell the two apart.
+    is that a reader can tell the two apart. A note's `member` moves the same way, so the
+    report and the list keep naming the same dive.
     """
-    moved = []
-    for path in block.get(INFERRED, ()):
-        collection, _, rest = path.partition("/")
-        index, _, tail = rest.partition("/")
-        if collection in shift and index.isdigit():
-            moved.append(f"{collection}/{int(index) + shift[collection]}/{tail}")
-        else:
-            moved.append(path)
-    return moved
+    return [_moved(path, shift) for path in block.get(INFERRED, ())]
+
+
+def _moved(path: str, shift: dict[str, int]) -> str:
+    collection, _, rest = path.partition("/")
+    index, slash, tail = rest.partition("/")
+    if collection in shift and index.isdigit():
+        return f"{collection}/{int(index) + shift[collection]}{slash}{tail}"
+    return path
+
+
+# What a report calls each provenance key an archive's files can disagree about.
+_PROVENANCE_LABELS: dict[str, str] = {
+    "converted_from": "which kind of file they are",
+    "source_generator": "the application that wrote them",
+    "ssrf_version": "the Subsurface file version they are written in",
+    "uddf_version": "the UDDF version they are written in",
+    "fit_protocol_version": "the FIT version they are written in",
+}
