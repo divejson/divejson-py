@@ -41,8 +41,7 @@ def test_the_summary_counts_what_was_carried(source, capsys) -> None:
 def test_the_report_names_what_the_source_did_not_carry(source, capsys) -> None:
     main(["convert", str(source)])
     out = capsys.readouterr().out
-    assert "no UTC offset" in out
-    assert "dive/0, dive/1" in out  # one finding, both its locations
+    assert "[start_time_zone_missing] dive/0, dive/1: The file gives the start time with no time zone" in out
 
 
 def test_every_report_line_says_which_kind_of_news_it_is(source, capsys) -> None:

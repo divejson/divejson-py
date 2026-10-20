@@ -327,8 +327,8 @@ def test_a_stay_folding_into_a_contact_another_file_carries_is_compared_and_repo
     (contact,) = conversion.document["contacts"]
     assert contact["phone"] == "+1 555" and contact["roles"] == ["dive_center"]
     found = [note.message for note in conversion.notes if note.where == "b.uddf/trip/0/trippart/0/accomodation"]
-    assert any("states its phone as '+2 999' where the contact has '+1 555'" in message for message in found)
-    assert any("what it adds there — the role accommodation — is not carried" in message for message in found)
+    assert any("gives its phone as '+2 999' where the contact has '+1 555'" in message for message in found)
+    assert any("what it adds there (the role accommodation) is not kept" in message for message in found)
 
 
 def test_one_file_naming_two_records_the_same_is_still_a_source_defect() -> None:
@@ -346,7 +346,7 @@ def test_one_file_naming_two_records_the_same_is_still_a_source_defect() -> None
     )
     conversion = convert(data, exported_at=EXPORTED_AT)
     assert len(conversion.document["sites"]) == 1
-    assert any("cannot share one identity" in note.message for note in conversion.notes)
+    assert [note.code for note in conversion.notes if "cannot share one" in note.message] == ["identifier_repeated"]
 
 
 def test_a_member_nothing_claims_refuses_the_whole_archive() -> None:
@@ -432,7 +432,11 @@ def test_provenance_the_members_disagree_about_is_dropped_and_reported() -> None
     conversion = convert(_zip({"a.uddf": SUBSURFACE, "b.uddf": DIVELOGS}), exported_at=EXPORTED_AT)
     provenance = conversion.document["extensions"][PRODUCER_KEY]
     assert "source_generator" not in provenance
-    assert any("disagree about source_generator" in note.message for note in conversion.notes)
+    [disagreeing] = [
+        note for note in conversion.notes if note.member == f"extensions/{PRODUCER_KEY}/source_generator"
+    ]
+    assert disagreeing.code == "archive_files_disagree"
+    assert "disagree about the application that wrote them" in disagreeing.message
 
 
 def test_a_uddf_archive_lists_nothing_as_inferred() -> None:

@@ -48,6 +48,10 @@ def messages(conversion) -> list[str]:
     return [note.message for note in conversion.notes]
 
 
+def codes(conversion) -> list[str]:
+    return [note.code for note in conversion.notes]
+
+
 # -- claiming the file ----------------------------------------------------------------
 
 
@@ -112,8 +116,7 @@ def test_the_namespace_is_the_one_the_mapping_document_records() -> None:
 
 def test_a_dive_has_no_id_so_its_identity_is_its_position_and_the_report_says_so() -> None:
     conversion = convert(one_ssrf_dive())
-    assert any("derived from its position in the file" in message for message in messages(conversion))
-    assert [note.kind for note in conversion.notes if "position in the file" in note.message] == ["absent"]
+    assert [note.kind for note in conversion.notes if note.code == "identity_from_position"] == ["absent"]
 
 
 def test_a_dives_identity_moves_when_the_files_order_moves() -> None:
@@ -141,7 +144,7 @@ def test_two_sites_sharing_one_uuid_is_a_source_defect() -> None:
     sites = "<site uuid='same' name='One'/><site uuid='same' name='Two'/>"
     conversion = convert(ssrf(f"<divesites>{sites}</divesites><dives/>"))
     assert [site["name"] for site in conversion.document["sites"]] == ["One"]
-    assert any("two records cannot share one identity" in message for message in messages(conversion))
+    assert "identifier_repeated" in codes(conversion)
 
 
 # -- the start time -------------------------------------------------------------------
@@ -151,7 +154,7 @@ def test_the_wall_clock_travels_alone_and_the_report_says_so() -> None:
     """`.ssrf` records no offset anywhere, and supplying one is §5.2's whole failure."""
     conversion = convert(one_ssrf_dive())
     assert conversion.document["dives"][0]["started_at"] == "2026-04-17T11:49:23"
-    assert any("no UTC offset" in message for message in messages(conversion))
+    assert "start_time_zone_missing" in codes(conversion)
 
 
 def test_a_time_of_day_with_no_seconds_is_read_as_the_minute_and_reported() -> None:
@@ -172,26 +175,23 @@ def test_a_date_with_no_time_of_day_is_a_date_only_start() -> None:
     assert [(note.kind, note.message) for note in conversion.notes if "time of day" in note.message] == [
         (
             "absent",
-            (
-                "the dive records a date with no time of day; read as a date-only start rather than as "
-                "midnight (spec §5.2)"
-            ),
+            "The dive records a date with no time of day, so it starts on that day rather than at midnight.",
         )
     ]
-    assert not any("no UTC offset" in message for message in messages(conversion))
+    assert "start_time_zone_missing" not in codes(conversion)
 
 
 @pytest.mark.parametrize("date", ["2002-02-30", "18-06-2002"])
 def test_a_date_alone_that_is_not_one_drops_the_dive(date: str) -> None:
     conversion = convert(ssrf(f"<dives><dive date='{date}'/></dives>"))
     assert "dives" not in conversion.document
-    assert any("the dive's date is not a date" in message for message in messages(conversion))
+    assert any("The dive's date is not a date" in message for message in messages(conversion))
 
 
 def test_a_dive_with_no_date_is_dropped_because_the_format_requires_a_start_time() -> None:
     conversion = convert(ssrf("<dives><dive number='1' time='08:00:00'/></dives>"))
     assert "dives" not in conversion.document
-    assert any("the dive is dropped" in message for message in messages(conversion))
+    assert codes(conversion) == ["start_time_missing"]
 
 
 @pytest.mark.parametrize(
@@ -268,7 +268,7 @@ def test_the_dives_own_scalars_come_from_the_first_element_and_the_rest_are_repo
     # Not reached past, either: the first element records no mean and no temperature, and
     # an absence on it is what that computer recorded.
     assert "avg_depth" not in found and "bottom_temperature" not in found
-    assert any("dropped rather than averaged or preferred" in message for message in messages(conversion))
+    assert "second_computer_summary" in codes(conversion)
 
 
 def test_an_element_that_yields_neither_a_device_nor_a_profile_yields_no_recording() -> None:
@@ -327,7 +327,7 @@ def test_a_site_with_no_name_goes_and_takes_the_references_to_it() -> None:
     conversion = convert(one_ssrf_dive("divesiteid='s1'", sites="<site uuid='s1'/>"))
     assert "sites" not in conversion.document
     assert "site_uuids" not in conversion.document["dives"][0]
-    assert any("could not carry" in message for message in messages(conversion))
+    assert "link_to_record_not_kept" in codes(conversion)
 
 
 def test_a_reference_to_a_site_nothing_defines_is_reported_as_the_source_defect_it_is() -> None:
@@ -408,7 +408,7 @@ def test_gps_that_is_not_two_numbers_is_dropped_and_named(gps: str) -> None:
     found, report = read_site(f"gps='{gps}'")
     assert "position" not in found
     assert report == [
-        ("dropped", f"<site gps> is {gps!r}, which is not two numbers, a latitude and a longitude; dropped")
+        ("dropped", f"<site gps> is {gps!r}, which is not two numbers, a latitude and a longitude; it is left out.")
     ]
 
 
@@ -416,14 +416,14 @@ def test_gps_that_is_not_two_numbers_is_dropped_and_named(gps: str) -> None:
 def test_gps_outside_wgs_84_is_dropped_by_the_shared_rule(gps: str) -> None:
     found, report = read_site(f"gps='{gps}'")
     assert "position" not in found
-    assert report == [("dropped", f"the coordinates {gps.replace(' ', ' / ')} are outside the WGS 84 range; dropped")]
+    assert report == [("dropped", f"The coordinates {gps.replace(' ', ' / ')} are not a place on Earth; they are left out.")]
 
 
 def test_an_exact_zero_pair_is_no_position_rather_than_null_island() -> None:
     """Subsurface omits `@gps` for a site at 0 / 0, so only a hand-edited file says this."""
     found, report = read_site("gps='0.000000 0.000000'")
     assert "position" not in found
-    assert [kind for kind, _ in report] == ["absent"] and "Null Island" in report[0][1]
+    assert [kind for kind, _ in report] == ["absent"] and "exactly 0 / 0" in report[0][1]
 
 
 @pytest.mark.parametrize("gps", ["28.478807 34.522936", "28,478807 34,522936"])
@@ -439,8 +439,8 @@ def test_a_nameless_site_goes_whole_under_its_one_note(gps: str) -> None:
     assert [(note.kind, note.message) for note in conversion.notes if note.where == "site/0"] == [
         (
             "dropped",
-            "the site has no name, which the format requires of one; it is dropped along with the references to "
-            "it, because a name cannot be invented (spec §6.10)",
+            "The site has no name, and a site cannot be logged without one; it is left out with every dive's link to "
+            "it, since a name cannot be made up.",
         )
     ]
 
@@ -540,7 +540,7 @@ def test_a_locality_past_the_name_bound_is_capped_and_reported() -> None:
     found, report = read_site(body=f"<geo cat='5' origin='0' value='{town}'/><geo cat='2' origin='0' value='{country}'/>")
     assert found["location"] == {"name": f"{town}, {country}"[:255]}
     assert report == [
-        ("dropped", "the site's locality is 302 characters; the format caps it at 255 and the rest is dropped")
+        ("dropped", "The site's locality is 302 characters long; the first 255 are kept and the rest is left out.")
     ]
 
 
@@ -610,8 +610,8 @@ def test_a_name_the_buddy_field_repeats_is_one_reference_and_the_repeat_is_repor
     assert named(document) == [("Ann Lee", "buddy")]
     assert (
         "dive/0",
-        "the dive's buddies name 'ann lee' more than once, and a person is listed on a dive once; the repeat is "
-        "dropped",
+        "The dive's buddies name 'ann lee' more than once, and a person is listed on a dive once; the repeat is "
+        "left out.",
     ) in report
 
 
@@ -643,7 +643,7 @@ def test_a_cylinder_with_no_gas_is_not_air() -> None:
     conversion = convert(one_ssrf_dive(body="<cylinder size='12.0 l' start='200.0 bar' end='80.0 bar'/>"))
     found = conversion.document["dives"][0]["cylinders"][0]
     assert "oxygen" not in found and found["volume"] == 12.0
-    assert any("never air" in message for message in messages(conversion))
+    assert [note.member for note in conversion.notes if note.code == "gas_missing"] == ["dives/0/cylinders/0/oxygen"]
 
 
 def test_a_cylinder_with_a_gas_and_no_vessel_keeps_the_gas() -> None:
@@ -659,8 +659,8 @@ def test_a_zero_start_pressure_is_a_devices_absent_marker() -> None:
     found = conversion.document["dives"][0]["cylinders"][0]
     assert "start_pressure" not in found
     assert found["end_pressure"] == 0.0
-    absent = [note for note in conversion.notes if "devices write to mean 'not recorded'" in note.message]
-    assert [note.kind for note in absent] == ["absent"]
+    absent = [note for note in conversion.notes if note.code == "start_pressure_zero"]
+    assert [(note.kind, note.member) for note in absent] == [("absent", "dives/0/cylinders/0/start_pressure")]
 
 
 def test_an_end_pressure_above_the_start_cannot_be_and_is_dropped() -> None:
@@ -677,7 +677,7 @@ def test_a_pressure_past_the_formats_ceiling_is_dropped() -> None:
 def test_a_mix_summing_past_a_hundred_percent_loses_both_halves() -> None:
     conversion = convert(one_ssrf_dive(body="<cylinder o2='71.0%' he='40.0%'/>"))
     assert conversion.document["dives"][0]["cylinders"][0] == {}
-    assert any("sum above 100 percent" in message for message in messages(conversion))
+    assert "gas_over_100_percent" in codes(conversion)
 
 
 def test_a_dive_carries_no_gas_numbering_because_nothing_in_the_file_needs_one() -> None:
@@ -708,7 +708,7 @@ def test_a_sample_with_no_time_has_no_place_on_the_axis() -> None:
         one_ssrf_computer("<sample time='0:00 min' depth='1.0 m'/><sample depth='9.0 m'/>")
     )
     assert profile_of(conversion.document["dives"][0])["depth"]["values"] == [100]
-    assert any("no place on the profile's time axis" in message for message in messages(conversion))
+    assert "sample_time_missing" in codes(conversion)
 
 
 def test_two_samples_on_one_second_keep_the_first() -> None:
@@ -718,7 +718,7 @@ def test_two_samples_on_one_second_keep_the_first() -> None:
         one_ssrf_computer("<sample time='0:30 min' depth='6.2 m'/><sample time='0:30 min' depth='6.4 m'/>")
     )
     assert profile_of(conversion.document["dives"][0])["depth"]["values"] == [620]
-    assert any("two samples are both at 30 s" in message for message in messages(conversion))
+    assert any("Two samples are both at 30 s" in message for message in messages(conversion))
 
 
 def test_samples_are_ordered_by_their_own_recorded_time() -> None:
@@ -733,7 +733,7 @@ def test_samples_carrying_a_time_and_no_reading_produce_no_profile_at_all() -> N
     """Rather than one with a bare `duration: 0`, which is a claim the source did not make."""
     conversion = convert(one_ssrf_computer("<sample time='0:00 min'/><sample time='1:00 min'/>"))
     assert profile_of(conversion.document["dives"][0]) is None
-    assert any("no profile at all" in message for message in messages(conversion))
+    assert "profile_empty" in codes(conversion)
 
 
 def test_a_dive_that_recorded_no_samples_says_nothing_at_all() -> None:
@@ -780,7 +780,8 @@ def test_on_a_dive_with_two_computers_it_is_the_primarys_and_says_so() -> None:
     ]
     resolved = [note for note in conversion.notes if note.kind == "resolved"]
     assert [note.where for note in resolved] == ["dive/0"]
-    assert "the dive states <dive cns> once and has 2 recordings" in resolved[0].message
+    assert "The dive states <dive cns> once and was recorded by 2 dive computers" in resolved[0].message
+    assert (resolved[0].code, resolved[0].member) == ("figure_given_to_first_computer", "dives/0/recordings/0/cns_end")
 
 
 def test_the_primary_is_the_first_recording_a_computer_yielded() -> None:

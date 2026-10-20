@@ -50,7 +50,7 @@ def _built(members: dict, notes: list | None = None) -> dict | None:
     collected = notes if notes is not None else []
     return deco_model(
         members,
-        note=lambda where, message, kind: collected.append(message),
+        note=lambda where, message, kind, *, code, member=None: collected.append(message),
         where="dive/0",
     )
 
@@ -265,7 +265,7 @@ def test_a_name_past_the_sections_cap_is_cut_and_reported() -> None:
     notes: list[str] = []
     built = _built({"name": "M" * 100}, notes)
     assert len(built["name"]) == MAX_MODEL_NAME
-    assert any("the format caps it at 64" in message for message in notes)
+    assert any("the first 64 are kept" in message for message in notes)
 
 
 @pytest.mark.parametrize("value", [-1, 101, 1000])
@@ -275,7 +275,7 @@ def test_a_gradient_factor_outside_the_schemas_range_takes_its_partner_with_it(v
     notes: list[str] = []
     assert _built({"gf_low": 30, "gf_high": value}, notes) is None
     assert any("whole percent from 0 to 100" in message for message in notes)
-    assert any("both or neither" in message for message in notes)
+    assert any("kept only as a pair" in message for message in notes)
 
 
 def test_a_conservatism_has_no_floor_and_a_zero_is_a_setting() -> None:
@@ -349,7 +349,7 @@ def test_the_recordings_members_come_out_in_the_sections_order() -> None:
 
 def _collected() -> tuple[list[tuple[str, str, str]], Any]:
     notes: list[tuple[str, str, str]] = []
-    return notes, lambda where, message, kind: notes.append((where, message, kind))
+    return notes, lambda where, message, kind, *, code, member=None: notes.append((where, message, kind))
 
 
 def test_a_dive_level_readout_joins_the_primary_recording_in_its_place() -> None:
@@ -368,7 +368,7 @@ def test_on_a_dive_with_two_recordings_it_is_the_primarys_and_says_so() -> None:
     onto_primary(recordings, {"otu_end": 31.0}, note=note, where="dive/0", stated="<dive otu>")
     assert recordings == [{"device": {"model": "A"}, "otu_end": 31.0}, {"device": {"model": "B"}}]
     assert [(where, kind) for where, _, kind in notes] == [("dive/0", "resolved")]
-    assert "the dive states <dive otu> once and has 2 recordings" in notes[0][1]
+    assert "The dive states <dive otu> once and was recorded by 2 dive computers" in notes[0][1]
 
 
 def test_on_a_dive_with_no_recording_it_is_a_recording_of_its_own() -> None:
@@ -432,7 +432,7 @@ def test_an_inverted_gradient_factor_pair_is_dropped_rather_than_reaching_valida
     assert _built({"algorithm": "buhlmann", "gf_low": 85, "gf_high": 50}, notes) == {
         "algorithm": "buhlmann"
     }
-    assert any("§3 rule 6" in message for message in notes)
+    assert any("the low cannot be above the high; both are left out" in message for message in notes)
 
 
 def test_an_equal_pair_is_not_inverted() -> None:

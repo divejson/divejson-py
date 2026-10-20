@@ -199,8 +199,8 @@ def test_reading_a_po2_as_pascal_is_reported_as_resolved() -> None:
     scale was decided, so nothing goes under `extensions.divejson.inferred`."""
     samples = "<waypoint><depth>1</depth><divetime>0</divetime><calculatedpo2>40000</calculatedpo2></waypoint>"
     conversion = convert(one_dive(f"{STARTED_AT}<samples>{samples}</samples>"))
-    resolved = [note for note in conversion.notes if "the Pascal the documentation states" in note.message]
-    assert [note.kind for note in resolved] == ["resolved"]
+    resolved = [note for note in conversion.notes if note.code == "ppo2_read_as_pascal"]
+    assert [(note.kind, note.member) for note in resolved] == [("resolved", "dives/0/recordings/0/profile/ppo2")]
 
 
 @pytest.mark.parametrize(

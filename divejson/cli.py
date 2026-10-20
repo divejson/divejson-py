@@ -356,8 +356,12 @@ def _kind(group: NoteGroup) -> str:
 
     The width is the longest kind rather than a number chosen by eye, so a fifth kind lines
     the column up by arriving rather than by anyone remembering to widen it.
+
+    A reader's finding carries its code beside the kind, the name a script or an application
+    keys on; a writer's note has none, and prints none.
     """
-    return f"{group.kind:<{_KIND_WIDTH}}"
+    kind = f"{group.kind:<{_KIND_WIDTH}}"
+    return f"{kind} [{group.code}]" if group.code else kind
 
 
 def _conform_command(corpus: Path, *, strict: bool, only: list[str], skip: list[str]) -> int:

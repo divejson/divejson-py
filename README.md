@@ -100,9 +100,22 @@ import divejson
 divejson.sniff(head)          # a format id, "zip", or None — from divejson.SNIFF_BYTES bytes
 conversion = divejson.convert(open("my-logbook.uddf", "rb"))
 conversion.document           # the DiveJSON document
-conversion.grouped()          # NoteGroup(kind, message, wheres), one per finding
+conversion.grouped()          # NoteGroup(kind, message, wheres, code), one per finding
 conversion.sources            # {record uuid: its path in the source}, e.g. "dive/3"
+divejson.NOTE_CODES           # {code: what it names}, every code a finding can carry
 ```
+
+A finding's sentence is written for a diver and may be reworded in any release; its `code`
+is not. It names the habit the finding reports — `gas_missing`, `start_pressure_zero`,
+`identity_from_position` — the same from every reader and whatever the figures in the
+sentence, so an application can leave out, reword or translate findings by code, and
+`NOTE_CODES` lists them all with what each names. A finding about one value of a dive, of
+its cylinders and computers, of a site or of the logbook's owner names that value's document
+path as its `member`, in the shape `extensions.divejson.inferred` lists derived values in —
+`dives/0/submerged_time`, `dives/0/cylinders/1/oxygen`; one about a record or a file as a
+whole names none, and so may one about a contact, a person, a trip or a piece of gear.
+Under an archive a `member` is re-indexed as that list is, and every `inferred` finding
+names a member the list carries.
 
 A finding's `where` is a path into the source and counts the source's records, while the
 document holds only the records it could carry: a dive with no start time, or one repeating
@@ -154,7 +167,7 @@ From Python:
 ```python
 written = divejson.write_uddf(document)
 written.data                  # the UDDF, as bytes
-written.grouped()             # NoteGroup(kind, message, wheres), one per finding
+written.grouped()             # NoteGroup(kind, message, wheres, code), one per finding
 ```
 
 ## Run a conformance corpus

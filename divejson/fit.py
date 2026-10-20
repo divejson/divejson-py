@@ -100,6 +100,17 @@ from .validate import validate_document
 # conformance corpus keeps its pairs in.
 FORMAT = "fit"
 
+# A FIT file is one dive written by one computer, so a finding's `member` is always under
+# the document's one dive and, for the computer's own figures, its one recording.
+DIVE = "dives/0"
+RECORDING = f"{DIVE}/recordings/0"
+
+# What a report calls each reading two records can both give at one instant.
+_READING_LABELS: dict[str, str] = {
+    "ceiling": "decompression ceiling",
+    "temperature": "water temperature",
+}
+
 # uuid5(NAMESPACE_URL, "https://divejson.org/ns/fit"). Fixed forever: changing it would
 # renumber every document any released version of this converter has produced from a FIT
 # file, and `docs/fit-mapping.md` *Identity* records the value as normative for any port.
@@ -566,8 +577,8 @@ class _Converter:
 
     # -- reporting ---------------------------------------------------------------
 
-    def note(self, where: str, message: str, kind: NoteKind) -> None:
-        self.notes.append(Note(self.scope.where(where), message, kind))
+    def note(self, where: str, message: str, kind: NoteKind, *, code: str, member: str | None = None) -> None:
+        self.notes.append(Note(self.scope.where(where), message, kind, code=code, member=member))
 
     # -- the run -----------------------------------------------------------------
 
@@ -646,12 +657,13 @@ class _Converter:
             note=self.note,
             where=where,
             labels={
-                "brand": "file_id.manufacturer",
-                "model": "file_id.product_name",
-                "serial": "the device's serial_number",
-                "firmware": "device_info.software_version",
-                "dive_number": "session.dive_number",
+                "brand": "the file's manufacturer",
+                "model": "the file's product name",
+                "serial": "the dive computer's serial number",
+                "firmware": "the dive computer's software version",
+                "dive_number": "the session's dive number",
             },
+            path=RECORDING,
         )
 
     def computer_info(self) -> fitdecode.FitDataMessage | None:
@@ -767,7 +779,11 @@ class _Converter:
             },
             note=self.note,
             where=where,
-            labels={"gf_low": "dive_settings.gf_low", "gf_high": "dive_settings.gf_high"},
+            labels={
+                "gf_low": "the dive settings' low gradient factor",
+                "gf_high": "the dive settings' high gradient factor",
+            },
+            path=RECORDING,
         )
 
     def session(self, where: str) -> fitdecode.FitDataMessage:
@@ -788,9 +804,10 @@ class _Converter:
         if self.scan.sessions > 1:
             self.note(
                 where,
-                f"the file describes {self.scan.sessions} sessions and this format's reader takes one dive "
-                "from a file; the first is converted and the rest are dropped",
+                f"The file describes {self.scan.sessions} sessions, and one dive is read from a FIT file; the first "
+                "session is the dive and the rest are left out.",
                 "dropped",
+                code="sessions_beyond_first",
             )
         return session
 
@@ -826,9 +843,9 @@ class _Converter:
         if not isinstance(start, datetime):
             self.note(
                 where,
-                "the session records no start time, and the format requires one; the dive is dropped "
-                "(spec §6.2)",
+                "The session records no start time, and a dive cannot be logged without one; it is left out.",
                 "dropped",
+                code="start_time_missing",
             )
             return None
 
@@ -836,9 +853,11 @@ class _Converter:
         if offset is None:
             self.note(
                 where,
-                "the file carries no activity message, so the local time zone cannot be recovered; the "
-                "start time is carried as the UTC instant the device recorded (spec §5.2)",
+                "The file does not say which time zone the dive was in, so its start time is given in UTC, as "
+                "the dive computer recorded it.",
                 "absent",
+                code="start_time_in_utc",
+                member=f"{DIVE}/started_at",
             )
         else:
             start = start.astimezone(offset)
@@ -862,8 +881,10 @@ class _Converter:
 
     # -- the summary scalars -----------------------------------------------------
 
-    def absent(self, member: str, source: str, where: str, *, record: str = "dive") -> None:
-        self.note(where, f"the file records no {source}, so the {record}'s {member} is not carried", "absent")
+    def absent(self, value: str, where: str, *, code: str, member: str, unless: str | None = None) -> None:
+        """A value the file does not record, `unless` saying what else would have supplied it."""
+        found = f"The file records no {value}" + (f", {unless}" if unless else "")
+        self.note(where, f"{found}, so it is left empty.", "absent", code=code, member=member)
 
     def read_submerged_time(
         self,
@@ -890,12 +911,13 @@ class _Converter:
             dive["submerged_time"] = derived.submerged_time
             self.note(
                 where,
-                "the file states no dive time on a dive summary, and its session's elapsed time covers the "
-                "whole recording, so the dive's submerged time is computed from its depth samples as the time "
-                f"they spend deeper than {IN_WATER_DEPTH} m (spec §5.4)",
+                "The file states no dive time, and its session's elapsed time covers the whole recording, so the "
+                f"dive time was worked out from the depth profile as the time spent deeper than {IN_WATER_DEPTH} m.",
                 "inferred",
+                code="dive_time_worked_out",
+                member=f"{DIVE}/submerged_time",
             )
-            self.inferred.append("dives/0/submerged_time")
+            self.inferred.append(f"{DIVE}/submerged_time")
             return
         seconds = _first(
             _number(_native(session, "total_elapsed_time")),
@@ -903,10 +925,11 @@ class _Converter:
         )
         if seconds is None:
             self.absent(
-                "submerged_time",
-                f"dive time on a dive summary or elapsed time on its session, and no depth samples deeper than "
-                f"{IN_WATER_DEPTH} m to derive one from",
+                "dive time or elapsed time",
                 where,
+                unless=f"and no depth reading deeper than {IN_WATER_DEPTH} m to work one out from",
+                code="dive_time_missing",
+                member=f"{DIVE}/submerged_time",
             )
             return
         submerged_time = rounded(seconds)
@@ -915,9 +938,11 @@ class _Converter:
         else:
             self.note(
                 where,
-                f"the session's elapsed time is {submerged_time} seconds; the format records a submerged time "
-                "only when it is positive",
+                f"The session's elapsed time is {submerged_time} seconds, which is no dive time; read as not "
+                "recorded.",
                 "absent",
+                code="dive_time_zero",
+                member=f"{DIVE}/submerged_time",
             )
 
     def read_depths(
@@ -959,14 +984,22 @@ class _Converter:
             if native is not None:
                 self.note(
                     where,
-                    f"the session's max_depth is {native} m; the format records a depth only when it is positive",
+                    f"The session's maximum depth is {native} m, which is no depth; read as not recorded.",
                     "absent",
+                    code="depth_zero",
+                    member=f"{DIVE}/max_depth",
                 )
             if deepest is not None and recorded(deepest, record="dive", member="max_depth"):
                 found["max_depth"] = deepest
                 derived_members.append("max_depth")
             else:
-                self.absent("max_depth", "max_depth on its session or on a dive summary", where)
+                self.absent(
+                    "maximum depth",
+                    where,
+                    unless="and no depth reading to take one from",
+                    code="max_depth_missing",
+                    member=f"{DIVE}/max_depth",
+                )
 
         stated = _number(_native(summary, "avg_depth"))
         whole = _number(_native(session, "avg_depth"))
@@ -980,24 +1013,28 @@ class _Converter:
         elif whole is not None:
             self.note(
                 where,
-                f"the session's avg_depth is {whole} m; the format records a depth only when it is positive",
+                f"The session's average depth is {whole} m, which is no depth; read as not recorded.",
                 "absent",
+                code="depth_zero",
+                member=f"{DIVE}/avg_depth",
             )
         else:
             self.absent(
-                "avg_depth",
-                f"avg_depth on a dive summary or on its session, and no depth samples deeper than {IN_WATER_DEPTH} m "
-                "to derive one from",
+                "average depth",
                 where,
+                unless=f"and no depth reading deeper than {IN_WATER_DEPTH} m to work one out from",
+                code="avg_depth_missing",
+                member=f"{DIVE}/avg_depth",
             )
 
         if "max_depth" in found and "avg_depth" in found and found["avg_depth"] > found["max_depth"]:
             self.note(
                 where,
-                f"the mean depth {found['avg_depth']} m is deeper than the greatest depth "
-                f"{found['max_depth']} m, which cannot be; the mean is dropped rather than either being "
-                "adjusted to fit (spec §6.2)",
+                f"The average depth {found['avg_depth']} m is deeper than the maximum depth {found['max_depth']} m, "
+                "which cannot be; the average is left out rather than either being adjusted to fit.",
                 "dropped",
+                code="average_below_maximum",
+                member=f"{DIVE}/avg_depth",
             )
             found.pop("avg_depth")
 
@@ -1009,17 +1046,18 @@ class _Converter:
                 continue
             if member == "max_depth":
                 message = (
-                    "the file records no max_depth on its session or on a dive summary, so the dive's max_depth "
-                    "is computed from its own depth samples (spec §5.4)"
+                    "The file records no maximum depth, so it was taken from the deepest reading of the depth "
+                    "profile."
                 )
+                code = "max_depth_worked_out"
             else:
                 message = (
-                    "the file states no mean depth on a dive summary, and its session's avg_depth covers the whole "
-                    "recording, so the dive's avg_depth is computed from its depth samples as their time-weighted "
-                    f"mean over the time they spend deeper than {IN_WATER_DEPTH} m (spec §5.4)"
+                    "The file states no average depth for the dive alone, so it was worked out from the depth "
+                    f"profile as the average over the time spent deeper than {IN_WATER_DEPTH} m."
                 )
-            self.note(where, message, "inferred")
-            self.inferred.append(f"dives/0/{member}")
+                code = "avg_depth_worked_out"
+            self.note(where, message, "inferred", code=code, member=f"{DIVE}/{member}")
+            self.inferred.append(f"{DIVE}/{member}")
 
     def read_oxygen(
         self,
@@ -1044,17 +1082,23 @@ class _Converter:
         so `otu_start` has no source at all — see `docs/fit-mapping.md`.
         """
         readouts: dict[str, float] = {}
-        for member, source in (("cns_start", "start_cns"), ("cns_end", "end_cns"), ("otu_end", "o2_toxicity")):
+        for member, source, label in (
+            ("cns_start", "start_cns", "start CNS"),
+            ("cns_end", "end_cns", "end CNS"),
+            ("otu_end", "o2_toxicity", "oxygen toxicity units"),
+        ):
             value = _first(_number(_native(summary, source)), _number(_native(session, source)))
             if value is None:
-                self.absent(member, f"{source} on its session or on a dive summary", where, record="recording")
+                self.absent(label, where, code="oxygen_figure_missing", member=f"{RECORDING}/{member}")
             elif recorded(value, record="recording", member=member):
                 readouts[member] = float(value)
             else:
                 self.note(
                     where,
-                    f"the session's {source} is {value}, which the format records only from zero up; dropped",
+                    f"The session's {label} is {value}, below zero, which it cannot be; it is left out.",
                     "dropped",
+                    code="oxygen_figure_negative",
+                    member=f"{RECORDING}/{member}",
                 )
         return readouts
 
@@ -1084,8 +1128,11 @@ class _Converter:
             return SALINITIES[value]
         self.note(
             where,
-            f"the device's water type setting is {value!r}, which this format has no value for; dropped",
+            f"The dive computer's water type setting is {value!r}, which is not one that can be kept; it is left "
+            "out.",
             "dropped",
+            code="water_setting_unknown",
+            member=f"{RECORDING}/salinity",
         )
         return None
 
@@ -1128,10 +1175,10 @@ class _Converter:
         before = [fix for fix in fixes if fix.at <= pivot]
         after = [fix for fix in fixes if fix.at > pivot]
         for member, side, outward in (("entry_position", "entry", before[::-1]), ("exit_position", "exit", after)):
-            taken = chosen_fix(outward, side=side, note=self.note)
+            taken = chosen_fix(outward, side=side, note=self.note, path=f"{DIVE}/{member}")
             if taken is None:
                 continue
-            found = position(taken.latitude, taken.longitude, note=self.note, where=taken.where)
+            found = position(taken.latitude, taken.longitude, note=self.note, where=taken.where, path=f"{DIVE}/{member}")
             if found is not None:
                 dive[member] = found
 
@@ -1163,16 +1210,17 @@ class _Converter:
         tanks = self.tank_pressures()
 
         if not gases:
-            cylinders = [self.cylinder(None, pressures, where) for _, pressures in tanks]
+            cylinders = [self.cylinder(None, pressures, where, index) for index, (_, pressures) in enumerate(tanks)]
             return cylinders, [sensor for sensor, _ in tanks]
 
         if tanks and len(tanks) != len(gases):
             self.note(
                 where,
-                f"the file records {len(gases)} gases and {len(tanks)} cylinder pressure sources, and nothing "
-                "in it says which belongs to which; the pressures are dropped rather than attached to a "
-                "cylinder they may not have been measured in",
+                f"The file records {len(gases)} gases and {len(tanks)} tank pressure transmitters, and nothing in "
+                "it says which belongs to which; the tank pressures are left out rather than given to a cylinder "
+                "they may not have been measured in.",
                 "dropped",
+                code="tank_pressures_unmatched",
             )
             tanks = []
 
@@ -1181,7 +1229,8 @@ class _Converter:
         # cylinder rather than fail.
         paired = [pressures for _, pressures in tanks] or [(None, None)] * len(gases)
         cylinders = [
-            self.cylinder(gas, pressures, where) for gas, pressures in zip(gases, paired, strict=True)
+            self.cylinder(gas, pressures, where, index)
+            for index, (gas, pressures) in enumerate(zip(gases, paired, strict=True))
         ]
         return cylinders, [sensor for sensor, _ in tanks]
 
@@ -1217,9 +1266,10 @@ class _Converter:
         if dropped:
             self.note(
                 where,
-                f"the device's gas list holds {dropped} gases it records as disabled, which are configured "
-                "and were not carried on this dive; dropped",
+                f"The dive computer's gas list holds {dropped} gases set as disabled, which were not carried on "
+                "this dive; they are left out.",
                 "dropped",
+                code="disabled_gases",
             )
         return [indexed[index] for index in sorted(indexed)] + unindexed
 
@@ -1289,8 +1339,10 @@ class _Converter:
         gas: fitdecode.FitDataMessage | None,
         pressures: tuple[Decimal | None, Decimal | None],
         where: str,
+        index: int,
     ) -> dict[str, Any]:
-        """One `dive_gas`, plus its pod's pressures where the two paired.
+        """One `dive_gas`, plus its pod's pressures where the two paired, as the dive's
+        cylinder `index`.
 
         No unit conversion: the profile defines `oxygen_content` and `helium_content` as
         whole percent and a tank pressure as bar, which is what §6.3 holds. `gas` is
@@ -1302,6 +1354,7 @@ class _Converter:
         file, so it is in `docs/fit-mapping.md` and not in the report: a line per cylinder
         saying the format cannot hold something would say it of every FIT ever written.
         """
+        path = f"{DIVE}/cylinders/{index}"
         cylinder: dict[str, Any] = {}
         blend: dict[str, float] = {}
         for member, source in (("oxygen", "oxygen_content"), ("helium", "helium_content")):
@@ -1311,45 +1364,56 @@ class _Converter:
             if not 0 <= percent <= 100:
                 self.note(
                     where,
-                    f"a gas records {source.replace('_content', '')} at {percent} percent, outside the 0 to "
-                    "100 a mix can be; dropped",
+                    f"A gas records {member} at {percent} percent, outside the 0 to 100 a mix can be; it is left out.",
                     "dropped",
+                    code="gas_percent_out_of_range",
+                    member=f"{path}/{member}",
                 )
                 continue
             blend[member] = float(percent)
         if blend.get("oxygen", 0.0) + blend.get("helium", 0.0) > 100:
             self.note(
                 where,
-                "a gas's oxygen and helium sum above 100 percent, which no mix can; both are dropped "
-                "(spec §6.3)",
+                "A gas's oxygen and helium add up to more than 100 percent, which no mix can; both are left out.",
                 "dropped",
+                code="gas_over_100_percent",
+                member=path,
             )
             blend = {}
         elif gas is not None and not blend:
             self.note(
                 where,
-                "the device records no gas for one of this dive's cylinders; absent means not recorded, "
-                "never air (spec §6.3)",
+                "No gas is recorded for one of this dive's cylinders, so it is left empty rather than assumed to "
+                "be air.",
                 "absent",
+                code="gas_missing",
+                member=f"{path}/oxygen",
             )
 
-        start, end = (self.pressure(value, where) for value in pressures)
+        start, end = (
+            self.pressure(value, where, f"{path}/{member}")
+            for value, member in zip(pressures, ("start_pressure", "end_pressure"))
+        )
         if start is not None and not recorded(start, record="cylinder", member="start_pressure"):
             # §6.3 is explicit: a recorded zero start pressure is a device's absent-marker
             # rather than a measurement, and writers must not emit one.
             self.note(
                 where,
-                "a cylinder's start pressure is 0 bar, which devices write to mean 'not recorded'; read as "
-                "not recorded (spec §6.3)",
+                "A cylinder's start pressure is 0 bar, which dive computers write to mean 'not recorded'; read as "
+                "not recorded.",
                 "absent",
+                code="start_pressure_zero",
+                member=f"{path}/start_pressure",
             )
             start = None
         if start is not None and end is not None and end > start:
             self.note(
                 where,
-                f"a cylinder's end pressure {end} bar is above its start pressure {start} bar, which cannot "
-                "be; the end pressure is dropped",
+                f"A cylinder's end pressure {end} bar is above its start pressure {start} bar, which cannot be; the "
+                "end pressure is left out.",
                 "dropped",
+                code="end_pressure_above_start",
+                member=f"{path}/end_pressure",
             )
             end = None
         if start is not None:
@@ -1367,14 +1431,17 @@ class _Converter:
             cylinder["role"] = "diluent"
         return cylinder
 
-    def pressure(self, bar: Decimal | None, where: str) -> Decimal | None:
+    def pressure(self, bar: Decimal | None, where: str, path: str) -> Decimal | None:
         if bar is None:
             return None
         if not 0 <= bar <= MAX_CYLINDER_PRESSURE:
             self.note(
                 where,
-                f"a cylinder pressure of {bar} bar is outside the 0 to 350 the format allows; dropped",
+                f"A cylinder pressure of {bar} bar is outside the 0 to {MAX_CYLINDER_PRESSURE} bar a cylinder can "
+                "hold; it is left out.",
                 "dropped",
+                code="pressure_out_of_range",
+                member=path,
             )
             return None
         return bar
@@ -1391,15 +1458,17 @@ class _Converter:
         recorded no start time falls back to its earliest reading, which is the only other
         thing that can put a sample at zero.
         """
-        axis = SampleAxis(self.note, where, noun="record", time_member="timestamp")
+        axis = SampleAxis(self.note, where, noun="record", time_member="timestamp", path=f"{RECORDING}/profile")
         for _ in range(self.scan.undated):
             axis.offer(None, None)
-        for channel in self.scan.collisions:
+        for reading in self.scan.collisions:
             self.note(
                 where,
-                f"two messages record a {channel} at one instant; the later reading is dropped, because the "
-                "format's sample times are strictly increasing (spec §6.5)",
+                f"Two records give a {_READING_LABELS.get(reading, reading)} at one instant; the later one is left "
+                "out, a profile holding one reading per instant.",
                 "dropped",
+                code="readings_at_one_instant",
+                member=f"{RECORDING}/profile",
             )
         if not self.scan.points:
             return axis
@@ -1505,9 +1574,11 @@ class _Converter:
             if placed is None:
                 self.note(
                     where,
-                    "an event is recorded at an instant the dive's samples do not reach, so it has no place "
-                    "on the profile's time axis; dropped",
+                    "An event is recorded at an instant the dive's profile does not reach, so it has no place in "
+                    "it and is left out.",
                     "dropped",
+                    code="event_outside_profile",
+                    member=f"{RECORDING}/profile/events",
                 )
                 continue
             event: dict[str, Any] = {"time": placed, "type": kind} if kind else {"time": placed}
@@ -1524,7 +1595,13 @@ class _Converter:
                 # so an alert with nothing at all to say is dropped rather than failing the
                 # whole conversion.
                 if data is None:
-                    self.note(where, "the device records an alert it gives no code for; dropped", "dropped")
+                    self.note(
+                        where,
+                        "The dive computer records an alert without saying which; it is left out.",
+                        "dropped",
+                        code="alert_unnamed",
+                        member=f"{RECORDING}/profile/events",
+                    )
                     continue
                 event["label"] = str(data)
             events.append(event)

@@ -190,7 +190,7 @@ def test_a_unit_the_table_does_not_carry_is_dropped_rather_than_guessed(attribut
     """
     conversion = convert(one_ssrf_dive(f"{attribute}='{written}'"))
     assert set(conversion.document["dives"][0]) == {"uuid", "started_at"}
-    assert any("where this reader reads it in" in note.message for note in conversion.notes)
+    assert any(note.code == "unit_unexpected" for note in conversion.notes)
 
 
 def test_a_whole_file_in_one_unrecognised_unit_reports_one_line_per_member() -> None:

@@ -73,11 +73,11 @@ import re
 import sys
 import uuid as uuid_pkg
 from collections.abc import Callable, Iterable, Iterator, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from functools import cache
-from typing import Any, Literal, overload
+from typing import Any, Literal, Protocol, overload
 
 from . import SPEC_VERSION, __version__
 from .validate import READOUTS, Issue, load_schema
@@ -96,6 +96,7 @@ __all__ = [
     "MILLISECONDS_PER_SECOND",
     "PRODUCER_KEY",
     "READOUTS",
+    "SHARED_READOUT",
     "TENTHS_PER_UNIT",
     "Claimed",
     "Conversion",
@@ -140,7 +141,10 @@ __all__ = [
     "roles_in_order",
     "rounded",
     "shared_readout",
+    "shared_readout_member",
     "site_members",
+    "told",
+    "unplaced",
     "zero_is_an_answer",
 ]
 
@@ -210,9 +214,17 @@ NoteKind = Literal["absent", "inferred", "resolved", "dropped"]
 # left open, and the whole thing, uncarriable.
 NOTE_KINDS: tuple[NoteKind, ...] = ("absent", "inferred", "resolved", "dropped")
 
-# How the helpers below add a line to the report they were called from. An adapter's own
-# `note` method, which knows the archive member the path belongs under.
-Reporter = Callable[[str, str, NoteKind], None]
+class Reporter(Protocol):
+    """How the helpers below add a line to the report they were called from.
+
+    An adapter's own `note` method, which knows the archive member the path belongs under.
+    `code` is required here, unlike on `Note` itself, so that an emission without one is a
+    type error rather than a finding no consumer can tell apart from another.
+    """
+
+    def __call__(
+        self, where: str, message: str, kind: NoteKind, *, code: str, member: str | None = None
+    ) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -227,11 +239,21 @@ class Note:
     `kind` is required rather than defaulted: a note whose kind nobody chose would be
     filed under whichever value looked harmless, and the kinds are what a reader groups
     the report by.
+
+    `code` names the habit the note reports, one of `NOTE_CODES`, and stays put when the
+    sentence is reworded, so an application can curate, suppress or translate findings by
+    it. `member` is the document path the note is about, in the shape
+    `extensions.divejson.inferred` uses — `dives/0/submerged_time`,
+    `dives/0/cylinders/1/oxygen` — and `None` for a note about a record or a file as a
+    whole. Both default, for a caller building a `Note` positionally; a writer's notes carry
+    neither, their `where` being a document path already.
     """
 
     where: str
     message: str
     kind: NoteKind
+    code: str = field(default="", kw_only=True)
+    member: str | None = field(default=None, kw_only=True)
 
     def __str__(self) -> str:
         return f"{self.where}: {self.message}"
@@ -239,11 +261,29 @@ class Note:
 
 @dataclass(frozen=True, slots=True)
 class NoteGroup:
-    """Notes sharing a kind and a message, with every place they were raised."""
+    """Notes sharing a kind and a message, with every place they were raised.
+
+    `code` is the first note's, and one sentence template has one code, so a group's notes
+    share it.
+    """
 
     kind: NoteKind
     message: str
     wheres: list[str]
+    code: str = ""
+
+
+def unplaced(notes: list[Note], since: int, record: str) -> None:
+    """Clear the `member` of every note raised since `since` that is about `record`.
+
+    For a reader that names a record's document path while still reading it, and then does
+    not carry the record after all: the path it named is the next record's, so a note left
+    naming it would be about a value that is someone else's.
+    """
+    for index in range(since, len(notes)):
+        member = notes[index].member
+        if member is not None and (member == record or member.startswith(f"{record}/")):
+            notes[index] = replace(notes[index], member=None)
 
 
 def grouped(notes: Sequence[Note]) -> list[NoteGroup]:
@@ -260,7 +300,7 @@ def grouped(notes: Sequence[Note]) -> list[NoteGroup]:
     for note in notes:
         key = (note.kind, note.message)
         if key not in groups:
-            groups[key] = NoteGroup(note.kind, note.message, [])
+            groups[key] = NoteGroup(note.kind, note.message, [], note.code)
         groups[key].wheres.append(note.where)
     return list(groups.values())
 
@@ -630,16 +670,29 @@ def in_seconds(milliseconds: int) -> str:
 MAX_NAME = 255
 
 
-def capped(value: str, limit: int, *, note: Reporter, where: str, member: str) -> str:
-    """A source string cut to the length the format allows, reporting what was cut."""
+def capped(
+    value: str, limit: int, *, note: Reporter, where: str, label: str, path: str | None = None
+) -> str:
+    """A source string cut to the length the format allows, reporting what was cut.
+
+    `label` names the value as a diver reads it — "the site name" — and `path` is the
+    document member it lands in, for the note's `member`.
+    """
     if len(value) <= limit:
         return value
     note(
         where,
-        f"{member} is {len(value)} characters; the format caps it at {limit} and the rest is dropped",
+        f"{told(label)} is {len(value)} characters long; the first {limit} are kept and the rest is left out.",
         "dropped",
+        code="text_shortened",
+        member=path,
     )
     return value[:limit]
+
+
+def told(text: str) -> str:
+    """`text` with its first letter capitalised, for a label that opens a report's sentence."""
+    return text[:1].upper() + text[1:]
 
 
 # -- recordings and devices ----------------------------------------------------------
@@ -664,6 +717,7 @@ def device(
     note: Reporter,
     where: str,
     labels: dict[str, str] | None = None,
+    path: str | None = None,
 ) -> dict[str, Any] | None:
     """§6.4b's Device from whatever one reader read about the hardware, or nothing at all.
 
@@ -675,7 +729,8 @@ def device(
 
     `labels` names the source's own spelling of a member for the report — `<serialnumber>`,
     `Device.Info.SW` — so a note keeps speaking the format's language the way
-    `SampleAxis`'s `noun` does.
+    `SampleAxis`'s `noun` does. `path` is the recording the device belongs to, so a note's
+    `member` can name the device's own.
     """
     labels = labels or {}
     built: dict[str, Any] = {}
@@ -687,7 +742,8 @@ def device(
         if not trimmed:
             continue
         built[member] = capped(
-            trimmed, limit, note=note, where=where, member=labels.get(member, f"the device's {member}")
+            trimmed, limit, note=note, where=where,
+            label=labels.get(member, _DEVICE_LABELS[member]), path=_under(path, f"device/{member}"),
         )
     counter = members.get("dive_number")
     if isinstance(counter, int) and not isinstance(counter, bool):
@@ -696,11 +752,28 @@ def device(
         else:
             note(
                 where,
-                f"{labels.get('dive_number', 'the device counter')} is {counter}, and the format records "
-                "a device's counter from zero up; dropped",
+                f"{told(labels.get('dive_number', 'the dive computer counter'))} is {counter}, and a dive count "
+                "cannot be below zero; it is left out.",
                 "dropped",
+                code="dive_counter_negative",
+                member=_under(path, "device/dive_number"),
             )
     return built or None
+
+
+# What a report calls each of a device's strings where the reader names no source spelling.
+_DEVICE_LABELS: dict[str, str] = {
+    "brand": "the dive computer's brand",
+    "model": "the dive computer's model",
+    "serial": "the dive computer's serial number",
+    "firmware": "the dive computer's firmware version",
+    "name": "the dive computer's name",
+}
+
+
+def _under(path: str | None, tail: str) -> str | None:
+    """A document path below `path`, or nothing where the caller could not place the record."""
+    return None if path is None else f"{path}/{tail}"
 
 
 # §6.4c's own cap on the device's name for its model — `"Suunto Fused RGBM 2"`,
@@ -715,6 +788,7 @@ def deco_model(
     note: Reporter,
     where: str,
     labels: dict[str, str] | None = None,
+    path: str | None = None,
 ) -> dict[str, Any] | None:
     """§6.4c's Deco Model from what a reader read about the algorithm, or nothing at all.
 
@@ -738,9 +812,11 @@ def deco_model(
     reading, and the schema is what says so.
 
     `labels` names the source's own spelling of a member for the report —
-    `<gradientfactorlow>`, `dive_settings.gf_high` — the way `device`'s does.
+    `<gradientfactorlow>`, the session's high gradient factor — the way `device`'s does, and
+    `path` is the recording the model belongs to, the way `device`'s is.
     """
-    labels = labels or {}
+    labels = {**_DECO_LABELS, **(labels or {})}
+    model = _under(path, "deco_model")
     built: dict[str, Any] = {}
 
     algorithm = members.get("algorithm")
@@ -751,7 +827,7 @@ def deco_model(
     if isinstance(name, str) and name.strip():
         built["name"] = capped(
             name.strip(), MAX_MODEL_NAME, note=note, where=where,
-            member=labels.get("name", "the model's name"),
+            label=labels["name"], path=_under(model, "name"),
         )
 
     # §6.4c writes the pair both or neither, which `dependentRequired` enforces in the
@@ -768,9 +844,11 @@ def deco_model(
         else:
             note(
                 where,
-                f"{labels.get(member, member)} is {value}, and §6.4c records a gradient factor as a whole "
-                f"percent from 0 to {ceiling}; dropped",
+                f"{told(labels[member])} is {value}, and a gradient factor is a whole percent from 0 to "
+                f"{ceiling}; it is left out.",
                 "dropped",
+                code="gradient_factor_out_of_range",
+                member=_under(model, member),
             )
     if len(pair) == 2 and pair["gf_low"] > pair["gf_high"]:
         # §3's rule 6, which the schema cannot express and this converter's own output is
@@ -781,10 +859,11 @@ def deco_model(
         # is supposed to resolve to an omission and a note (`docs/converting.md`).
         note(
             where,
-            f"{labels.get('gf_low', 'gf_low')} is {pair['gf_low']} and "
-            f"{labels.get('gf_high', 'gf_high')} is {pair['gf_high']}, and §3 rule 6 records a low no higher "
-            "than its high; both are dropped, the source not saying which of the two is wrong",
+            f"{told(labels['gf_low'])} is {pair['gf_low']} and {labels['gf_high']} is {pair['gf_high']}, and the "
+            "low cannot be above the high; both are left out, the file not saying which of the two is wrong.",
             "dropped",
+            code="gradient_factors_inverted",
+            member=model,
         )
     elif len(pair) == 2:
         built.update(pair)
@@ -793,9 +872,11 @@ def deco_model(
         missing = "gf_high" if member == "gf_low" else "gf_low"
         note(
             where,
-            f"{labels.get(member, member)} is {value} and {labels.get(missing, missing)} is not recorded; "
-            "§6.4c carries the two gradient factors both or neither, so the one is dropped",
+            f"{told(labels[member])} is {value} and {labels[missing]} is not recorded; gradient factors are "
+            "kept only as a pair, so this one is left out.",
             "dropped",
+            code="gradient_factor_unpaired",
+            member=_under(model, member),
         )
 
     conservatism = members.get("conservatism")
@@ -803,6 +884,15 @@ def deco_model(
         built["conservatism"] = conservatism
 
     return built or None
+
+
+# What a report calls each part of a decompression model where the reader names no source
+# spelling.
+_DECO_LABELS: dict[str, str] = {
+    "name": "the decompression model's name",
+    "gf_low": "the low gradient factor",
+    "gf_high": "the high gradient factor",
+}
 
 
 @cache
@@ -877,6 +967,7 @@ def onto_primary(
     note: Reporter,
     where: str,
     stated: str,
+    path: str | None = None,
 ) -> None:
     """A readout the source states once for the whole **dive**, onto the recording it is.
 
@@ -888,8 +979,9 @@ def onto_primary(
     the readout is a recording of its own, which §6.4a allows — a CNS figure copied off a
     wrist into a hand-kept log is a record of the dive nothing else produces.
 
-    `stated` names the source's own spelling for the report, the way `device`'s labels do.
-    The list is changed in place.
+    `stated` names the source's own spelling for the report, the way `device`'s labels do,
+    and `path` is the dive's document path, for the note's `member`. The list is changed in
+    place.
     """
     if not readouts:
         return
@@ -900,7 +992,14 @@ def onto_primary(
         return
     recordings[0] = _in_order({**recordings[0], **readouts})
     if len(recordings) > 1:
-        note(where, shared_readout(stated, len(recordings)), "resolved")
+        note(
+            where, shared_readout(stated, len(recordings)), "resolved",
+            code=SHARED_READOUT, member=shared_readout_member(path, readouts),
+        )
+
+
+# The code of `shared_readout`'s finding, for the two roads that reach it.
+SHARED_READOUT = "figure_given_to_first_computer"
 
 
 def shared_readout(stated: str, count: int) -> str:
@@ -911,10 +1010,19 @@ def shared_readout(stated: str, count: int) -> str:
     recording is built rather than onto it afterwards — and one finding is one sentence.
     """
     return (
-        f"the dive states {stated} once and has {count} recordings, and a readout is one computer's "
-        "figure; read as the primary recording's, the file not saying which computer computed it "
-        "(spec §6.4a)"
+        f"The dive states {stated} once and was recorded by {count} dive computers; it is read as the "
+        "first computer's figure, the file not saying which computer worked it out."
     )
+
+
+def shared_readout_member(path: str | None, readouts: Iterable[str]) -> str | None:
+    """The member a `shared_readout` finding is about: the primary's one readout, or the
+    primary recording where the dive states more than one."""
+    if path is None:
+        return None
+    stated = list(readouts)
+    primary = f"{path}/recordings/0"
+    return f"{primary}/{stated[0]}" if len(stated) == 1 else primary
 
 
 # -- contacts -------------------------------------------------------------------------
@@ -1043,9 +1151,10 @@ class Identities:
         if source_id is None:
             self._note(
                 where,
-                f"the source gives this {kind} no id, so its identity is derived from its position in the "
-                "file and will move if the file's order changes (spec §5.3)",
+                f"The file gives this {kind} no identifier, so it is identified by its place in the file, which "
+                "changes if the file's order does.",
                 "absent",
+                code="identity_from_position",
             )
             # Prefixed by the archive member this file is, so that two members whose
             # records carry no ids do not derive one identity from one position.
@@ -1062,9 +1171,10 @@ class Identities:
 
         self._note(
             where,
-            f"a second {kind} carries the id {source_id!r}, already used by {claimed[derived][1]}; the "
-            "record is dropped, because two records cannot share one identity (spec §5.3)",
+            f"A second {kind} carries the identifier {source_id!r}, which {claimed[derived][1]} already has; it is "
+            "left out, since two records cannot share one.",
             "dropped",
+            code="identifier_repeated",
         )
         return None, False
 
@@ -1073,7 +1183,12 @@ class Identities:
 
 
 def position(
-    latitude: Decimal | None, longitude: Decimal | None, *, note: Reporter, where: str
+    latitude: Decimal | None,
+    longitude: Decimal | None,
+    *,
+    note: Reporter,
+    where: str,
+    path: str | None = None,
 ) -> dict[str, float] | None:
     """A §6 Position from a recorded coordinate pair, or `None` where there is not one.
 
@@ -1083,21 +1198,37 @@ def position(
     like an answer: divelogs.de puts it on every site in its export, and a reader that
     trusts Null Island pins a Red Sea wreck into the Atlantic. And a pair outside WGS 84's
     own range is not a place at all.
+
+    `path` is the document member the position lands in — a site's `position`, a dive's
+    `entry_position` — for the note's `member`.
     """
     if latitude is None or longitude is None:
         if latitude is not None or longitude is not None:
-            note(where, "only one half of a coordinate pair was recorded, and a position needs both; dropped (spec §6)", "dropped")
+            note(
+                where,
+                "Only one half of a coordinate pair is recorded, and a position needs both; it is left out.",
+                "dropped",
+                code="position_incomplete",
+                member=path,
+            )
         return None
     if latitude == 0 and longitude == 0:
         note(
             where,
-            "the coordinates are exactly 0.000000 / 0.000000, which writers emit to mean 'unknown'; read as "
-            "no position rather than as Null Island",
+            "The coordinates are exactly 0 / 0, which files use to mean 'unknown', so no position is recorded.",
             "absent",
+            code="position_zero",
+            member=path,
         )
         return None
     if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
-        note(where, f"the coordinates {latitude} / {longitude} are outside the WGS 84 range; dropped", "dropped")
+        note(
+            where,
+            f"The coordinates {latitude} / {longitude} are not a place on Earth; they are left out.",
+            "dropped",
+            code="position_out_of_range",
+            member=path,
+        )
         return None
     return {"latitude": float(latitude), "longitude": float(longitude)}
 
@@ -1193,7 +1324,7 @@ class Fix:
     error: Decimal | None = None
 
 
-def chosen_fix(fixes: Sequence[Fix], *, side: str, note: Reporter) -> Fix | None:
+def chosen_fix(fixes: Sequence[Fix], *, side: str, note: Reporter, path: str | None = None) -> Fix | None:
     """The fix that places one side of a dive, out of that side's fixes ordered from the split.
 
     `docs/converting.md`'s *Where a fix belongs*, for every format: on each side of the
@@ -1215,7 +1346,8 @@ def chosen_fix(fixes: Sequence[Fix], *, side: str, note: Reporter) -> Fix | None
     A fix taken that is not the nearest is a `resolved` finding at the fix taken, in one
     sentence whatever the file, so a logbook's report groups it: the source recorded every
     candidate and this converter decided which one places the dive. The nearest kept raises
-    nothing, the rule having changed no answer.
+    nothing, the rule having changed no answer. `path` is the position the fix places — a
+    dive's `exit_position` — for the finding's `member`.
     """
     if not fixes:
         return None
@@ -1227,10 +1359,12 @@ def chosen_fix(fixes: Sequence[Fix], *, side: str, note: Reporter) -> Fix | None
             if fix is not nearest:
                 note(
                     fix.where,
-                    f"this fix is taken as the dive's {side}: the fix nearest the deepest sample does not state "
-                    f"a horizontal error of {FIX_ERROR_BOUND} m or less, and this is the nearest within "
-                    f"{in_seconds(FIX_WINDOW)} s of it that does",
+                    f"This fix is taken as the dive's {side}: the one nearest the dive's deepest point does not "
+                    f"state an accuracy of {FIX_ERROR_BOUND} m or better, and this is the nearest within "
+                    f"{in_seconds(FIX_WINDOW)} s of it that does.",
                     "resolved",
+                    code="fix_chosen_by_accuracy",
+                    member=path,
                 )
             return fix
     return nearest

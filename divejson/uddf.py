@@ -105,7 +105,11 @@ from .converter import (
     roles_in_order,
     rounded,
     in_seconds,
+    SHARED_READOUT,
     shared_readout,
+    shared_readout_member,
+    told,
+    unplaced,
     site_members,
 )
 from .series import Channel, SampleAxis
@@ -315,17 +319,21 @@ CURRENT: dict[str, str] = {
     "very-hard-current": "extreme",
 }
 
-# The reads above that decide something, and what the report says of each.
+# The reads above that decide something, and the code and sentence the report gives each.
 _RESOLVED_READS = {
     ("apparatus", "rebreather"): (
-        "UDDF's <apparatus> 'rebreather' names closed and semi-closed circuits alike; read as "
-        "'closed_circuit' (spec §6.2)"
+        "rebreather_read_as_closed_circuit",
+        "UDDF's <apparatus> 'rebreather' names closed and semi-closed circuits alike; read as closed circuit.",
     ),
     ("current", "very-mild-current"): (
-        "UDDF's <current> has six steps and the format's five; 'very-mild-current' is read as 'light', "
-        "beside 'mild-current' (spec §6.2)"
+        "current_read_as_light",
+        "UDDF's <current> has six steps and the logbook five; 'very-mild-current' is read as light, beside "
+        "'mild-current'.",
     ),
 }
+
+# What a report calls each dive member an enumeration lands in.
+_ENUMERATED_LABELS = {"type": "dive type", "current": "current", "entry_type": "entry type"}
 
 # `ratingvalueType`'s range. The format rates a dive 1 to 5, so a UDDF rating reads as half of
 # itself rounded up — 8 as 4 and 7 as 4 too — reported `resolved`: every read lands the value
@@ -389,16 +397,16 @@ PERCENT_GRADIENT_FACTORS: dict[str, str] = {
 # the scale is a property of the generator, so a line per waypoint would be one fact about
 # the file written out a hundred and twenty-eight times.
 PERCENT_GRADIENT_NOTE = (
-    "the generator writes gradient factors in whole percent where the documentation's "
-    "examples show a fraction; read as the percent §6.4 records (spec §6.4c)"
+    "The application that wrote this file gives gradient factors in whole percent where the UDDF "
+    "documentation's examples show a fraction; read as percent."
 )
 
 # What the report says when that rule fires. `resolved` rather than `inferred` because the
 # digits written are the ones the source recorded and only their meaning was in doubt, so
 # nothing goes under `extensions.divejson.inferred`.
 LOCAL_CLOCK_NOTE = (
-    "the generator writes the local wall clock with a `Z` suffix; read as a wall clock "
-    "with no offset (spec §5.2)"
+    "The application that wrote this file marks the local time with a 'Z', the sign for UTC; read as a "
+    "local time without a time zone."
 )
 
 
@@ -523,7 +531,7 @@ def _date_time(text: str) -> tuple[str | None, str | None]:
     note = None
     hour, minute, second = parts["hour"], parts["minute"], parts["second"]
     if second is None:
-        note = f"{text.strip()!r} records no seconds; read as :00"
+        note = f"{text.strip()!r} records no seconds; read as :00."
         second = "00"
 
     try:
@@ -629,10 +637,10 @@ class _Converter:
 
     # -- reporting ---------------------------------------------------------------
 
-    def note(self, where: str, message: str, kind: NoteKind) -> None:
+    def note(self, where: str, message: str, kind: NoteKind, *, code: str, member: str | None = None) -> None:
         """One line of the report, at a path into the source this conversion read."""
         if not self.muted:
-            self.notes.append(Note(self.scope.where(where), message, kind))
+            self.notes.append(Note(self.scope.where(where), message, kind, code=code, member=member))
 
     # -- the generator table -----------------------------------------------------
 
@@ -666,10 +674,10 @@ class _Converter:
 
     # -- text --------------------------------------------------------------------
 
-    def capped(self, value: str, limit: int, where: str, member: str) -> str:
-        return capped(value, limit, note=self.note, where=where, member=member)
+    def capped(self, value: str, limit: int, where: str, label: str, path: str | None = None) -> str:
+        return capped(value, limit, note=self.note, where=where, label=label, path=path)
 
-    def email(self, value: str | None, where: str) -> str | None:
+    def email(self, value: str | None, where: str, path: str | None = None) -> str | None:
         """`<contact><email>` when it is an address §6.1 can hold, and nothing when it is not.
 
         Every other source string reaches a member the format types as free text, where the
@@ -683,20 +691,25 @@ class _Converter:
         if value is None:
             return None
         if not _EMAIL.match(value):
-            self.note(where, f"the recorded email {value!r} is not an address; read as no email recorded", "dropped")
+            self.note(
+                where, f"The email address {value!r} is not an address; it is left out.", "dropped",
+                code="email_unreadable", member=path,
+            )
             return None
         if len(value) > MAX_EMAIL:
             self.note(
                 where,
-                f"the recorded email is {len(value)} characters and the format allows {MAX_EMAIL}; an address "
-                "cut short is a wrong one, so it is dropped",
+                f"The email address is {len(value)} characters long, more than the {MAX_EMAIL} kept, and a shortened "
+                "address is a wrong one; it is left out.",
                 "dropped",
+                code="email_too_long",
+                member=path,
             )
             return None
         return value
 
     def phone(
-        self, contact: ET.Element | None, where: str, *, section: str = "§6.1", whose: str = "the owner"
+        self, contact: ET.Element | None, where: str, *, whose: str = "the owner", path: str | None = None
     ) -> str | None:
         """The first `<phone>`, else the first `<mobilephone>`, reporting every other one.
 
@@ -716,21 +729,25 @@ class _Converter:
         for tag, value in recorded[1:]:
             self.note(
                 where,
-                f"{section} carries one phone, the first {whose} records; <{tag}> {value!r} is not read",
+                f"One phone number is kept, the first {whose} records; <{tag}> {value!r} is left out.",
                 "dropped",
+                code="phone_beyond_first",
+                member=path,
             )
         _, value = recorded[0]
         if len(value) > MAX_PHONE:
             self.note(
                 where,
-                f"the recorded phone is {len(value)} characters and the format allows {MAX_PHONE}; a number cut "
-                "short is a wrong one, so it is dropped",
+                f"The phone number is {len(value)} characters long, more than the {MAX_PHONE} kept, and a shortened "
+                "number is a wrong one; it is left out.",
                 "dropped",
+                code="phone_too_long",
+                member=path,
             )
             return None
         return value
 
-    def date_of(self, element: ET.Element | None, where: str, member: str) -> str | None:
+    def date_of(self, element: ET.Element | None, where: str, label: str, path: str | None = None) -> str | None:
         """The date an `encapsulatedDateTimeType` holds, taken off the front of its `<datetime>`.
 
         The slot is an `xs:dateTime` and §6.1's members are dates, so a time of day is one a
@@ -742,7 +759,10 @@ class _Converter:
             return None
         value, _ = _date_time(raw)
         if value is None:
-            self.note(where, f"{member} is {raw!r}, which is not a date; dropped", "dropped")
+            self.note(
+                where, f"{told(label)} is {raw!r}, which is not a date; it is left out.", "dropped",
+                code="date_unreadable", member=path,
+            )
             return None
         return value[:10]
 
@@ -758,7 +778,7 @@ class _Converter:
 
     # -- geometry ----------------------------------------------------------------
 
-    def position(self, geography: ET.Element | None, where: str) -> dict[str, float] | None:
+    def position(self, geography: ET.Element | None, where: str, path: str | None = None) -> dict[str, float] | None:
         """A Position from `<geography>`, reading an empty element as no coordinate.
 
         Subsurface writes `<latitude/>` for a site it has no coordinates for; everything
@@ -769,6 +789,7 @@ class _Converter:
             decimal_of(_text_of(geography, "longitude")),
             note=self.note,
             where=where,
+            path=path,
         )
 
     # -- the run -----------------------------------------------------------------
@@ -882,13 +903,19 @@ class _Converter:
             text for text in (_text_of(personal, part) for part in ("firstname", "middlename", "lastname")) if text
         ]
         recorded: dict[str, Any] = {
-            "email": self.email(_text_of(contact, "email"), where),
-            "phone": self.phone(contact, where),
-            "born_on": self.date_of(_kid(personal, "birthdate"), where, "the date of birth"),
+            "email": self.email(_text_of(contact, "email"), where, "diver/email"),
+            "phone": self.phone(contact, where, path="diver/phone"),
+            "born_on": self.date_of(_kid(personal, "birthdate"), where, "the date of birth", "diver/born_on"),
             "insurances": self.read_insurances(owner, where),
         }
         if not names and not any(recorded.values()):
-            self.note(where, "the source records nothing about the logbook's owner; no diver is written (spec §6.1)", "absent")
+            self.note(
+                where,
+                "The file records nothing about the logbook's owner, so no diver is written.",
+                "absent",
+                code="owner_not_recorded",
+                member="diver",
+            )
             return None
 
         claimed, carried = self.uuid_for("diver", _attr(owner, "id"), where, 0)
@@ -896,7 +923,7 @@ class _Converter:
         if claimed is not None and carried:
             diver["uuid"] = claimed
         if names:
-            diver["name"] = self.capped(" ".join(names), MAX_NAME, where, "the diver's name")
+            diver["name"] = self.capped(" ".join(names), MAX_NAME, where, "the diver's name", "diver/name")
         diver.update((member, value) for member, value in recorded.items() if value)
         return diver
 
@@ -916,13 +943,13 @@ class _Converter:
             if not provider:
                 self.note(
                     here,
-                    "the insurance has no name, which the format requires of one as its insurer; it is dropped "
-                    "(spec §6.1)",
+                    "An insurance has no insurer's name, and one cannot be kept without it; it is left out.",
                     "dropped",
+                    code="insurance_unnamed",
                 )
                 continue
             insurance: dict[str, Any] = {"provider": self.capped(provider, MAX_NAME, here, "the insurer's name")}
-            expires_on = self.date_of(_kid(element, "validdate"), here, "the insurance's validdate")
+            expires_on = self.date_of(_kid(element, "validdate"), here, "the insurance's <validdate>")
             if expires_on:
                 insurance["expires_on"] = expires_on
             aliases = (_text(kid) for kid in _kids(element, "aliasname"))
@@ -932,7 +959,10 @@ class _Converter:
             if any(_text(para) for para in _kids(_kid(element, "notes"), "para")):
                 unread.append("<notes>")
             for what in unread:
-                self.note(here, f"§6.1's Insurance has no member for {what}; it is not read", "dropped")
+                self.note(
+                    here, f"An insurance's {what} has no place in the logbook; it is left out.", "dropped",
+                    code="detail_not_kept",
+                )
             insurances.append(insurance)
         return insurances
 
@@ -958,9 +988,10 @@ class _Converter:
             if not names:
                 self.note(
                     where,
-                    "the buddy has no name, which the format requires of a person; it is dropped, and every "
-                    "link to it with it (spec §6.20)",
+                    "The buddy has no name, and a person cannot be kept without one; it is left out with every link "
+                    "to it.",
                     "dropped",
+                    code="person_unnamed",
                 )
                 if source_id:
                     self.unread_people.add(source_id)
@@ -993,24 +1024,30 @@ class _Converter:
         recorded: dict[str, Any] = {
             "uuid": uuid,
             "name": self.capped(name, MAX_NAME, where, "the person's name"),
-            "email": self.contact_email(contact, where, section="§6.20", whose="the person"),
-            "phone": self.phone(contact, where, section="§6.20", whose="the person"),
+            "email": self.contact_email(contact, where, whose="the person"),
+            "phone": self.phone(contact, where, whose="the person"),
             "notes": self.notes_text(element),
         }
         for child in element:
             tag = local_name(child)
             if tag not in _PERSON_READ:
-                self.note(where, f"§6.20 has no member for <{tag}>; it is not read", "dropped")
+                self.not_kept(where, f"<{tag}>", "a buddy")
         personal = _kid(element, "personal")
         for child in personal if personal is not None else ():
             tag = local_name(child)
             if tag not in _NAME_PARTS and _states(child):
-                self.note(where, f"§6.20 has no member for <personal><{tag}>; it is not read", "dropped")
+                self.not_kept(where, f"<personal><{tag}>", "a buddy")
         for child in contact if contact is not None else ():
             tag = local_name(child)
             if tag not in _PERSON_CONTACT_READ and _carries(child):
-                self.note(where, f"§6.20 has no member for <contact><{tag}>; it is not read", "dropped")
+                self.not_kept(where, f"<contact><{tag}>", "a buddy")
         return {member: recorded[member] for member in person_members() if recorded.get(member)}
+
+    def not_kept(self, where: str, said: str, on: str) -> None:
+        """What a record's element holds that the logbook has nowhere to keep."""
+        self.note(
+            where, f"{said} on {on} has no place in the logbook; it is left out.", "dropped", code="detail_not_kept"
+        )
 
     def read_guides(self) -> None:
         """Every `<divebase><guide>` by its `@id`, to the buddy its one `<link>` names.
@@ -1045,9 +1082,10 @@ class _Converter:
             if not name:
                 self.note(
                     where,
-                    "the site has no name, which the format requires of one; it is dropped along with the "
-                    "references to it, because a name cannot be invented (spec §6.10)",
+                    "The site has no name, and a site cannot be logged without one; it is left out with every dive's "
+                    "link to it, since a name cannot be made up.",
                     "dropped",
+                    code="site_unnamed",
                 )
                 continue
             claimed, carried = self.uuid_for("site", _attr(element, "id"), where, index)
@@ -1062,8 +1100,11 @@ class _Converter:
             if not carried:
                 continue
 
-            site: dict[str, Any] = {"uuid": claimed, "name": self.capped(name, MAX_NAME, where, "the site name")}
-            other_names = self.other_names(element, site["name"], where)
+            path = f"sites/{len(sites)}"
+            site: dict[str, Any] = {
+                "uuid": claimed, "name": self.capped(name, MAX_NAME, where, "the site name", f"{path}/name")
+            }
+            other_names = self.other_names(element, site["name"], where, path)
             if other_names:
                 site["other_names"] = other_names
             geography = _kid(element, "geography")
@@ -1073,14 +1114,16 @@ class _Converter:
                 # **site's** pin, not the locality's centre (§6.10), and UDDF has no element
                 # for the place's extent — so a site read from here never arrives with a
                 # `location.position` or a `bbox`.
-                site["location"] = {"name": self.capped(location, MAX_NAME, where, "the site's locality")}
-            position = self.position(geography, where)
+                site["location"] = {
+                    "name": self.capped(location, MAX_NAME, where, "the site's locality", f"{path}/location/name")
+                }
+            position = self.position(geography, where, f"{path}/position")
             if position:
                 site["position"] = position
-            altitude = self.altitude(geography, where)
+            altitude = self.altitude(geography, where, f"{path}/altitude")
             if altitude is not None:
                 site["altitude"] = altitude
-            site.update(self.depth_range(_kid(element, "sitedata"), where))
+            site.update(self.depth_range(_kid(element, "sitedata"), where, path))
             notes = self.notes_text(element)
             if notes:
                 site["notes"] = notes
@@ -1089,7 +1132,7 @@ class _Converter:
             sites.append({member: site[member] for member in site_members() if member in site})
         return sites
 
-    def other_names(self, element: ET.Element, name: str, where: str) -> list[str]:
+    def other_names(self, element: ET.Element, name: str, where: str, path: str) -> list[str]:
         """`<aliasname>` as §6.10's `other_names`, in file order.
 
         One that repeats the site's name or an earlier alias under §3's comparison is not
@@ -1102,14 +1145,14 @@ class _Converter:
             alias = _text(kid)
             if not alias:
                 continue
-            alias = self.capped(alias, MAX_NAME, where, "the site's other name")
+            alias = self.capped(alias, MAX_NAME, where, "the site's other name", f"{path}/other_names")
             if folded(alias) in seen:
                 continue
             seen.add(folded(alias))
             names.append(alias)
         return names
 
-    def depth_range(self, sitedata: ET.Element | None, where: str) -> dict[str, float]:
+    def depth_range(self, sitedata: ET.Element | None, where: str, path: str) -> dict[str, float]:
         """`<sitedata>`'s `<minimumdepth>` and `<maximumdepth>` as §6.10's depth range.
 
         A depth above the surface is dropped alone. A shallow end deeper than the deep end
@@ -1122,16 +1165,21 @@ class _Converter:
             if value is None:
                 continue
             if not recorded(value, record="dive_site", member=member):
-                self.note(where, f"<{tag}> is {value} m, above the surface; dropped", "dropped")
+                self.note(
+                    where, f"<{tag}> is {value} m, above the surface; it is left out.", "dropped",
+                    code="site_depth_above_surface", member=f"{path}/{member}",
+                )
                 continue
             depths[member] = value
         shallow, deep = depths.get("depth_from"), depths.get("depth_to")
         if shallow is not None and deep is not None and shallow > deep:
             self.note(
                 where,
-                f"the <minimumdepth> {shallow} m is deeper than the <maximumdepth> {deep} m, which cannot be; both "
-                "are dropped rather than either being adjusted to fit (spec §6.10)",
+                f"The <minimumdepth> {shallow} m is deeper than the <maximumdepth> {deep} m, which cannot be; both are "
+                "left out rather than either being adjusted to fit.",
                 "dropped",
+                code="site_depths_inverted",
+                member=path,
             )
             return {}
         return {member: float(value) for member, value in depths.items()}
@@ -1157,9 +1205,9 @@ class _Converter:
                 if tag in read or said in reported or (inside and not _states(child)):
                     continue
                 reported.add(said)
-                self.note(where, f"§6.10 has no member for {said}; it is not read", "dropped")
+                self.not_kept(where, said, "a site")
 
-    def altitude(self, parent: ET.Element | None, where: str) -> int | None:
+    def altitude(self, parent: ET.Element | None, where: str, path: str | None = None) -> int | None:
         """An `<altitude>` on §6.2's range, which a site's shares; a dive's sits in
         `<informationbeforedive>` and a site's in `<geography>`."""
         altitude = integer_of(decimal_of(_text_of(parent, "altitude")))
@@ -1167,7 +1215,14 @@ class _Converter:
             return None
         if MIN_ALTITUDE <= altitude <= MAX_ALTITUDE:
             return altitude
-        self.note(where, f"<altitude> is {altitude} m, outside the -450 to 6500 the format allows; dropped", "dropped")
+        self.note(
+            where,
+            f"<altitude> is {altitude} m, outside the {MIN_ALTITUDE} to {MAX_ALTITUDE} m a dive can be at; it is left "
+            "out.",
+            "dropped",
+            code="altitude_out_of_range",
+            member=path,
+        )
         return None
 
     # -- contacts -------------------------------------------------------------------
@@ -1194,10 +1249,10 @@ class _Converter:
             if name and not carries and source_id not in linked and name.casefold() not in named:
                 self.note(
                     where,
-                    f"the <divebase> {name!r} records nothing but its name and nothing in the file links it, "
-                    "which is the placeholder a writer emits for want of a dive base; it is not read as a "
-                    "contact (spec §6.18)",
+                    f"The <divebase> {name!r} records nothing but its name and nothing in the file links it, which is "
+                    "how an application fills the place of a dive base it does not have; it is not kept as a contact.",
                     "dropped",
+                    code="placeholder_dive_base",
                 )
                 if source_id:
                     self.unread_contacts.add(source_id)
@@ -1240,9 +1295,10 @@ class _Converter:
         if not name:
             self.note(
                 where,
-                f"the <{local_name(element)}> has no name, which the format requires of a contact; it is "
-                "dropped, and every link to it with it (spec §6.18)",
+                f"The <{local_name(element)}> has no name, and a contact cannot be kept without one; it is left out "
+                "with every link to it.",
                 "dropped",
+                code="contact_unnamed",
             )
             if source_id:
                 self.unread_contacts.add(source_id)
@@ -1279,8 +1335,9 @@ class _Converter:
         if not name:
             self.note(
                 where,
-                f"the <{tag}> has no name, which the format requires of a contact; it is dropped (spec §6.18)",
+                f"The <{tag}> has no name, and a contact cannot be kept without one; it is left out.",
                 "dropped",
+                code="contact_unnamed",
             )
             return None
         standing = self.contact_names.get(name.casefold())
@@ -1294,16 +1351,18 @@ class _Converter:
                 elif standing[member] != value:
                     self.note(
                         where,
-                        f"the <{tag}> folds into the contact {standing['name']!r} by name, and states its {member} "
-                        f"as {value!r} where the contact has {standing[member]!r}; the contact's stands",
+                        f"The <{tag}> is the contact {standing['name']!r} by name, and gives its {member} as {value!r} "
+                        f"where the contact has {standing[member]!r}; the contact's is kept.",
                         "dropped",
+                        code="contact_details_differ",
                     )
             if added and standing["uuid"] not in self.carried_contacts:
                 self.note(
                     where,
-                    f"the <{tag}> folds into the contact {standing['name']!r}, which another file of the archive "
-                    f"carries, and what it adds there — {', '.join(added)} — is not carried",
+                    f"The <{tag}> is the contact {standing['name']!r} by name, which another file of the archive "
+                    f"carries, and what it adds there ({', '.join(added)}) is not kept.",
                     "dropped",
+                    code="contact_additions_not_kept",
                 )
             return str(standing["uuid"])
         claimed, carried = self.uuid_for("contact", _attr(element, "id"), where, position)
@@ -1346,7 +1405,7 @@ class _Converter:
         """
         contact = _kid(element, "contact")
         contents = {
-            "phone": self.phone(contact, where, section="§6.18", whose="the contact"),
+            "phone": self.phone(contact, where, whose="the contact"),
             "email": self.contact_email(contact, where),
             "website": self.website(contact, where),
             "address": self.address(_kid(element, "address"), where),
@@ -1357,21 +1416,20 @@ class _Converter:
             if tag in _SHAPE_READ or (tag == "guide" and _attr(child, "id") in self.linked_guides):
                 continue
             said = f"<{tag}> {_text(child)!r}" if tag == "aliasname" and _text(child) else f"<{tag}>"
-            self.note(where, f"§6.18 has no member for {said}; it is not read", "dropped")
+            self.not_kept(where, said, "a contact")
         for child in contact if contact is not None else ():
             tag = local_name(child)
             if tag not in _CONTACT_BLOCK_READ and _carries(child):
-                self.note(where, f"§6.18 has no member for <contact><{tag}>; it is not read", "dropped")
+                self.not_kept(where, f"<contact><{tag}>", "a contact")
         return {member: value for member, value in contents.items() if value}
 
-    def contact_email(
-        self, contact: ET.Element | None, where: str, *, section: str = "§6.18", whose: str = "the contact"
-    ) -> str | None:
+    def contact_email(self, contact: ET.Element | None, where: str, *, whose: str = "the contact") -> str | None:
         """The first `<email>`, on the owner's terms (`email`), reporting every other one."""
         recorded = [value for value in (_text(kid) for kid in _kids(contact, "email")) if value]
         for value in recorded[1:]:
             self.note(
-                where, f"{section} carries one email, the first {whose} records; {value!r} is not read", "dropped"
+                where, f"One email address is kept, the first {whose} records; {value!r} is left out.", "dropped",
+                code="email_beyond_first",
             )
         return self.email(recorded[0], where) if recorded else None
 
@@ -1388,23 +1446,26 @@ class _Converter:
             return None
         for value in recorded[1:]:
             self.note(
-                where, f"§6.18 carries one website, the first the contact records; {value!r} is not read", "dropped"
+                where, f"One website is kept, the first the contact records; {value!r} is left out.", "dropped",
+                code="website_beyond_first",
             )
         value = recorded[0]
         if not _ABSOLUTE_URI.match(value):
             self.note(
                 where,
-                f"the recorded homepage {value!r} is not an absolute URL with its scheme; read as no website "
-                "recorded rather than given a scheme the file never stated",
+                f"The homepage {value!r} is not a full web address with its scheme; it is left out rather than given "
+                "one the file never stated.",
                 "dropped",
+                code="website_unreadable",
             )
             return None
         if len(value) > MAX_WEBSITE:
             self.note(
                 where,
-                f"the recorded homepage is {len(value)} characters and the format allows {MAX_WEBSITE}; an address "
-                "cut short is a wrong one, so it is dropped",
+                f"The homepage is {len(value)} characters long, more than the {MAX_WEBSITE} kept, and a shortened "
+                "address is a wrong one; it is left out.",
                 "dropped",
+                code="website_too_long",
             )
             return None
         return value
@@ -1422,9 +1483,10 @@ class _Converter:
         if not _text_of(element, "country"):
             self.note(
                 where,
-                "the address records no <country>, which §6.19 requires as the anchor every other part is "
-                "read inside; the address is dropped",
+                "The address records no <country>, which every other part of it is read inside; the address is left "
+                "out.",
                 "dropped",
+                code="address_without_country",
             )
             return None
         address: dict[str, str] = {}
@@ -1453,7 +1515,10 @@ class _Converter:
             name = _text_of(element, "name")
             first, first_part = first_part, first_part + len(_kids(element, "trippart"))
             if not name:
-                self.note(where, "the trip has no name, which the format requires of one; it is dropped (spec §6.8)", "dropped")
+                self.note(
+                    where, "The trip has no name, and a trip cannot be kept without one; it is left out.", "dropped",
+                    code="trip_unnamed",
+                )
                 continue
 
             claimed, carried = self.uuid_for("trip", _attr(element, "id"), where, index)
@@ -1509,15 +1574,19 @@ class _Converter:
                     continue
                 value, _ = _date_time(raw)
                 if value is None:
-                    self.note(part_where, f"{attribute} is {raw!r}, which is not a date; dropped", "dropped")
+                    self.note(
+                        part_where, f"The part's {attribute} is {raw!r}, which is not a date; it is left out.", "dropped",
+                        code="date_unreadable",
+                    )
                 else:
                     dates[member] = value[:10]
             starts, ends = dates.get("starts_on"), dates.get("ends_on")
             if starts is not None and ends is not None and ends < starts:
                 self.note(
                     part_where,
-                    f"the part ends on {ends}, before it starts on {starts}; the end date is dropped",
+                    f"The part ends on {ends}, before it starts on {starts}; the end date is left out.",
                     "dropped",
+                    code="trip_part_ends_before_start",
                 )
                 ends = None
 
@@ -1533,9 +1602,10 @@ class _Converter:
                 if part_name and part_name != place:
                     self.note(
                         part_where,
-                        f"the part's <name> {part_name!r} differs from its <geography><location>, which is "
-                        "the place's name; §6.9a gives a part no name of its own, so it is not read",
+                        f"The part's <name> {part_name!r} differs from its <geography><location>, which is the place's "
+                        "name; a trip part keeps no name of its own, so it is left out.",
                         "dropped",
+                        code="trip_part_name_not_kept",
                     )
             elif part_name:
                 location = {"name": self.capped(part_name, MAX_NAME, part_where, "the trip part's name")}
@@ -1551,13 +1621,14 @@ class _Converter:
                 kept = (
                     "the rest of the part is kept"
                     if starts is not None or ends is not None or stay is not None
-                    else "the part records no dates and no stay either, so nothing of it is carried"
+                    else "the part records no dates and no stay either, so nothing of it is kept"
                 )
                 self.note(
                     part_where,
-                    f"the trip part names no place in its <name> or its <geography><location>, and the "
-                    f"format requires a location's name; the place is dropped and {kept} (spec §6.9)",
+                    "The trip part names no place in its <name> or its <geography><location>, and a place cannot be "
+                    f"kept without a name; the place is left out and {kept}.",
                     "dropped",
+                    code="trip_part_place_unnamed",
                 )
 
             part_notes = self.notes_text(part)
@@ -1593,9 +1664,10 @@ class _Converter:
             named = _text_of(vessel, "name")
             self.note(
                 f"{where}/vessel",
-                f"the <vessel>{f' {named!r}' if named else ''} is a boat, which §6.18 does not model; it and "
-                "everything it records about the boat are not read, the operator being the contact",
+                f"The <vessel>{f' {named!r}' if named else ''} is a boat, which the logbook does not keep; it and "
+                "everything it records about the boat are left out, the operator being the contact.",
                 "dropped",
+                code="vessel_not_kept",
             )
         for tag, role in _STAYS.items():
             shape = _kid(part, tag)
@@ -1615,7 +1687,7 @@ class _Converter:
         """
         stated = _attr(part, "type")
         if stated is not None:
-            self.note(where, f"§6.9a has no member for the part's type {stated!r}; it is not read", "dropped")
+            self.not_kept(where, f"The type {stated!r}", "a trip part")
         for link in _kids(part, "link"):
             ref = _attr(link, "ref")
             if ref is None:
@@ -1623,14 +1695,16 @@ class _Converter:
             if ref in self.contact_uuids:
                 self.note(
                     where,
-                    f"the part links the contact {ref!r}, saying the diver dived with it during the part; §6.9a "
-                    "records where the diver stayed, and whom a dive was with is the dive's, so the link is "
-                    "dropped (spec §6.9a)",
+                    f"The part links the contact {ref!r}, saying the diver dived with it during the part; a trip part "
+                    "records where the diver stayed, and whom a dive was with belongs to the dive, so the link is left "
+                    "out.",
                     "dropped",
+                    code="trip_part_link_not_kept",
                 )
             else:
                 self.note(
-                    where, f"the part links {ref!r}, and §6.9a has no member a link fills; it is dropped", "dropped"
+                    where, f"The part links {ref!r}, which a trip part has no place for; the link is left out.",
+                    "dropped", code="trip_part_link_not_kept",
                 )
 
     # -- gear --------------------------------------------------------------------
@@ -1660,9 +1734,9 @@ class _Converter:
             if not name:
                 self.note(
                     where,
-                    f"the <{kind}> has no name, which the format requires of a gear item; it is dropped "
-                    "(spec §6.12)",
+                    f"The <{kind}> has no name, and a piece of gear cannot be kept without one; it is left out.",
                     "dropped",
+                    code="gear_unnamed",
                 )
                 continue
             claimed, carried = self.uuid_for("gear", _attr(element, "id"), where, index)
@@ -1727,16 +1801,27 @@ class _Converter:
         litres, reinterpreted = _volume_litres(raw)
         if not recorded(litres, record="gear_item", member="volume"):
             if report:
-                self.note(where, f"<tankvolume> reads as {litres} litres; the format records a size only when positive", "absent")
+                self.size_zero(where, litres, None)
             return None
         if reinterpreted and report:
-            self.note(
-                where,
-                f"<tankvolume> is {raw}, too large to be the cubic metres UDDF specifies; read as {litres} litres, "
-                "which is how some builds of Subsurface write it",
-                "resolved",
-            )
+            self.size_as_litres(where, raw, litres, None)
         return litres
+
+    def size_zero(self, where: str, litres: Decimal, path: str | None) -> None:
+        self.note(
+            where, f"<tankvolume> reads as {litres} litres, which is no size; read as not recorded.", "absent",
+            code="cylinder_size_zero", member=path,
+        )
+
+    def size_as_litres(self, where: str, raw: Decimal, litres: Decimal, path: str | None) -> None:
+        self.note(
+            where,
+            f"<tankvolume> is {raw}, too large to be the cubic metres UDDF specifies; read as {litres} litres, which is "
+            "how some versions of Subsurface write it.",
+            "resolved",
+            code="cylinder_size_read_as_litres",
+            member=path,
+        )
 
     def tank_material(self, element: ET.Element, where: str) -> str | None:
         stated = _text_of(element, "tankmaterial")
@@ -1745,7 +1830,10 @@ class _Converter:
         material = stated.strip().lower()
         if material in _TANK_MATERIALS:
             return material
-        self.note(where, f"§6.12's material does not name {stated!r}; it is not read", "dropped")
+        self.note(
+            where, f"The tank material {stated!r} is not one the logbook names; it is left out.", "dropped",
+            code="tank_material_unknown",
+        )
         return None
 
     def read_purchases(self, element: ET.Element, where: str) -> None:
@@ -1765,9 +1853,10 @@ class _Converter:
         read = shop is not None and self.read_inline(shop, "shop", f"{where}/shop", f"{where}/shop") is not None
         self.note(
             where,
-            "§6.12 has no member for the piece's <purchase>, its price and its date; it is not read"
-            + (", and the shop it names is read as a contact" if read else ""),
+            "A piece's <purchase>, its price and its date, has no place in the logbook and is left out"
+            + (", and the shop it names is kept as a contact." if read else "."),
             "dropped",
+            code="purchase_not_kept",
         )
 
     # -- gases -------------------------------------------------------------------
@@ -1794,16 +1883,23 @@ class _Converter:
                 if reinterpreted:
                     self.note(
                         where,
-                        f"<{tag}> is {raw}, above the 1.0 the documentation describes; read as {percent} percent "
-                        "rather than as a fraction",
+                        f"<{tag}> is {raw}, above the 1.0 the UDDF documentation describes; read as {percent} percent "
+                        "rather than as a fraction.",
                         "resolved",
+                        code="gas_read_as_percent",
                     )
                 if not 0 <= percent <= 100:
-                    self.note(where, f"<{tag}> reads as {percent} percent, outside the 0 to 100 a fraction can be; dropped", "dropped")
+                    self.note(
+                        where, f"<{tag}> reads as {percent} percent, outside the 0 to 100 a mix can be; it is left out.",
+                        "dropped", code="gas_percent_out_of_range",
+                    )
                     continue
                 mix[member] = float(percent)
             if mix.get("oxygen", 0.0) + mix.get("helium", 0.0) > 100:
-                self.note(where, "oxygen and helium sum above 100 percent, which no mix can; both are dropped (spec §6.3)", "dropped")
+                self.note(
+                    where, "Oxygen and helium add up to more than 100 percent, which no mix can; both are left out.",
+                    "dropped", code="gas_over_100_percent",
+                )
                 mix.pop("oxygen", None)
                 mix.pop("helium", None)
 
@@ -1812,7 +1908,13 @@ class _Converter:
                 if MIN_PO2_LIMIT <= ppo2_limit <= MAX_PO2_LIMIT:
                     mix["ppo2_limit"] = float(ppo2_limit)
                 else:
-                    self.note(where, f"<maximumpo2> is {ppo2_limit} bar, outside the 0.4 to 2.0 the format allows; dropped", "dropped")
+                    self.note(
+                        where,
+                        f"<maximumpo2> is {ppo2_limit} bar, outside the {MIN_PO2_LIMIT} to {MAX_PO2_LIMIT} bar a limit "
+                        "can be; it is left out.",
+                        "dropped",
+                        code="ppo2_limit_out_of_range",
+                    )
             self.mixes[source_id] = mix
 
     def read_deco_models(self) -> None:
@@ -1836,7 +1938,7 @@ class _Converter:
                 if source_id is not None:
                     self.deco_models[source_id] = model
 
-    def read_deco_model(self, before: ET.Element | None, where: str) -> dict[str, Any] | None:
+    def read_deco_model(self, before: ET.Element | None, where: str, recording_path: str) -> dict[str, Any] | None:
         """The §6.4c model a dive links, or nothing where it links none.
 
         Only `<buehlmann>` is mapped. `<vpm>` and `<rgbm>` are on the not-mapped list with
@@ -1852,9 +1954,11 @@ class _Converter:
             if local_name(model) != "buehlmann":
                 self.note(
                     where,
-                    f"the dive's decompression model is a <{local_name(model)}>, and §6.4c names the two "
-                    "families a file in hand states; the model is dropped rather than read as one of them",
+                    f"The dive's decompression model is a <{local_name(model)}>, which is not one that can be named; "
+                    "it is left out rather than read as another.",
                     "dropped",
+                    code="deco_model_unknown",
+                    member=f"{recording_path}/deco_model",
                 )
                 return None
             return deco_model(
@@ -1866,6 +1970,7 @@ class _Converter:
                 note=self.note,
                 where=where,
                 labels={"gf_low": "<gradientfactorlow>", "gf_high": "<gradientfactorhigh>"},
+                path=recording_path,
             )
         return None
 
@@ -1883,7 +1988,7 @@ class _Converter:
         if not self.percent_gradient_factors:
             return rounded(value * PERCENT_PER_FRACTION)
         if not self.reported_gradient_scale:
-            self.note("$", PERCENT_GRADIENT_NOTE, "resolved")
+            self.note("$", PERCENT_GRADIENT_NOTE, "resolved", code="gradient_factors_read_as_percent")
             self.reported_gradient_scale = True
         return rounded(value)
 
@@ -1900,19 +2005,30 @@ class _Converter:
         return [dive for group in _kids(profiledata, "repetitiongroup") for dive in _kids(group, "dive")]
 
     def read_dives(self) -> list[dict[str, Any]]:
-        dives = []
+        dives: list[dict[str, Any]] = []
         for index, element in enumerate(self.dive_elements()):
-            dive = self.read_dive(element, index)
-            if dive is not None:
+            path = f"dives/{len(dives)}"
+            since = len(self.notes)
+            dive = self.read_dive(element, index, path)
+            if dive is None:
+                unplaced(self.notes, since, path)
+            else:
                 dives.append(dive)
         return dives
 
-    def read_dive(self, element: ET.Element, index: int) -> dict[str, Any] | None:
+    def read_dive(self, element: ET.Element, index: int, path: str) -> dict[str, Any] | None:
+        """One `<dive>`, to be carried at `path` in the document if it is carried at all.
+
+        Everything the dive states once — its profile, its mode, its model, its surface
+        pressure — goes to its first recording, so that is where a finding about one of
+        them points.
+        """
         where = f"dive/{index}"
+        primary = f"{path}/recordings/0"
         before = _kid(element, "informationbeforedive")
         after = _kid(element, "informationafterdive")
 
-        started_at = self.read_started_at(before, where)
+        started_at = self.read_started_at(before, where, path)
         if started_at is None:
             return None
         claimed, carried = self.uuid_for("dive", _attr(element, "id"), where, index)
@@ -1931,7 +2047,13 @@ class _Converter:
             if recorded(submerged_time, record="dive", member="submerged_time"):
                 dive["submerged_time"] = submerged_time
             else:
-                self.note(where, f"<diveduration> is {submerged_time} seconds; the format records a submerged time only when it is positive", "absent")
+                self.note(
+                    where,
+                    f"<diveduration> is {submerged_time} seconds, which is no dive time; read as not recorded.",
+                    "absent",
+                    code="dive_time_zero",
+                    member=f"{path}/submerged_time",
+                )
 
         notes = self.notes_text(after)
         if notes:
@@ -1939,21 +2061,23 @@ class _Converter:
 
         # The diver's statement of what kind of dive it was, and never the recording's `mode`
         # read across: a backup computer in gauge mode was on an open-circuit dive (§6.4a).
-        dive_type = self.enumerated(before, "apparatus", APPARATUS, where, "type")
+        dive_type = self.enumerated(before, "apparatus", APPARATUS, where, "type", path)
         if dive_type is not None:
             dive["type"] = dive_type
-        rating = self.rating(after, where)
+        rating = self.rating(after, where, path)
         if rating is not None:
             dive["rating"] = rating
 
-        max_depth = self.positive(decimal_of(_text_of(after, "greatestdepth")), where, "<greatestdepth>", "max_depth")
-        avg_depth = self.positive(decimal_of(_text_of(after, "averagedepth")), where, "<averagedepth>", "avg_depth")
+        max_depth = self.positive(decimal_of(_text_of(after, "greatestdepth")), where, "<greatestdepth>", "max_depth", path)
+        avg_depth = self.positive(decimal_of(_text_of(after, "averagedepth")), where, "<averagedepth>", "avg_depth", path)
         if max_depth is not None and avg_depth is not None and avg_depth > max_depth:
             self.note(
                 where,
-                f"the mean depth {avg_depth} m is deeper than the greatest depth {max_depth} m, which cannot be; "
-                "the mean is dropped rather than either being adjusted to fit (spec §6.2)",
+                f"The average depth {avg_depth} m is deeper than the maximum depth {max_depth} m, which cannot be; the "
+                "average is left out rather than either being adjusted to fit.",
                 "dropped",
+                code="average_below_maximum",
+                member=f"{path}/avg_depth",
             )
             avg_depth = None
         if max_depth is not None:
@@ -1970,7 +2094,10 @@ class _Converter:
             if recorded(visibility, record="dive", member="visibility"):
                 dive["visibility"] = float(visibility)
             else:
-                self.note(where, f"<visibility> is {visibility} m; dropped", "dropped")
+                self.note(
+                    where, f"<visibility> is {visibility} m, below zero; it is left out.", "dropped",
+                    code="visibility_negative", member=f"{path}/visibility",
+                )
 
         used = _kid(before, "equipmentused")
         weight = decimal_of(_text_of(used, "leadquantity"))
@@ -1982,19 +2109,22 @@ class _Converter:
             if recorded(weight, record="dive", member="weight"):
                 dive["weight"] = float(weight)
             else:
-                self.note(where, f"<leadquantity> is {weight} kg; dropped", "dropped")
+                self.note(
+                    where, f"<leadquantity> is {weight} kg, below zero; it is left out.", "dropped",
+                    code="weight_negative", member=f"{path}/weight",
+                )
 
-        altitude = self.altitude(before, where)
+        altitude = self.altitude(before, where, f"{path}/altitude")
         if altitude is not None:
             dive["altitude"] = altitude
 
         air = decimal_of(_text_of(before, "airtemperature"))
         if air is not None:
             dive["air_temperature"] = float(air - KELVIN_OFFSET)
-        current = self.enumerated(after, "current", CURRENT, where, "current")
+        current = self.enumerated(after, "current", CURRENT, where, "current", path)
         if current is not None:
             dive["current"] = current
-        entry_type = self.enumerated(before, "platform", PLATFORM, where, "entry_type")
+        entry_type = self.enumerated(before, "platform", PLATFORM, where, "entry_type", path)
         if entry_type is not None:
             dive["entry_type"] = entry_type
 
@@ -2007,9 +2137,18 @@ class _Converter:
             if MIN_SURFACE_PRESSURE <= bar <= MAX_SURFACE_PRESSURE:
                 readouts["surface_pressure"] = float(bar)
             else:
-                self.note(where, f"<surfacepressure> reads as {bar} bar, outside the 0.4 to 1.2 the format allows; dropped", "dropped")
+                self.note(
+                    where,
+                    f"<surfacepressure> reads as {bar} bar, outside the {MIN_SURFACE_PRESSURE} to {MAX_SURFACE_PRESSURE} "
+                    "bar air pressure can be at a dive site; it is left out.",
+                    "dropped",
+                    code="surface_pressure_out_of_range",
+                    member=f"{primary}/surface_pressure",
+                )
 
-        trip_uuid = self.reference(_attr(_kid(before, "tripmembership"), "ref"), self.trip_uuids, where, "trip")
+        trip_uuid = self.reference(
+            _attr(_kid(before, "tripmembership"), "ref"), self.trip_uuids, where, "trip", f"{path}/trip_uuid"
+        )
         if trip_uuid:
             dive["trip_uuid"] = trip_uuid
         # A site first where an id names both a site and a contact, and a contact before a
@@ -2030,42 +2169,47 @@ class _Converter:
             and ref not in to_contacts
             and (ref in self.person_uuids or ref in self.unread_people or ref in self.guides)
         ]
-        contact_uuid = self.dive_contact(to_contacts, where)
+        contact_uuid = self.dive_contact(to_contacts, where, f"{path}/contact_uuid")
         if contact_uuid:
             dive["contact_uuid"] = contact_uuid
         to_sites = [ref for ref in links if ref not in to_contacts and ref not in to_people]
-        site_uuids = self.references(to_sites, self.site_uuids, where, "dive site")
+        site_uuids = self.references(to_sites, self.site_uuids, where, "dive site", f"{path}/site_uuids")
         if site_uuids:
             dive["site_uuids"] = site_uuids
-        gear_uuids = self.references([_attr(link, "ref") for link in _kids(used, "link")], self.gear_uuids, where, "gear item")
+        gear_uuids = self.references(
+            [_attr(link, "ref") for link in _kids(used, "link")], self.gear_uuids, where, "piece of gear",
+            f"{path}/gear_uuids",
+        )
         if gear_uuids:
             dive["gear_uuids"] = gear_uuids
-        people = self.dive_people(to_people, where)
+        people = self.dive_people(to_people, where, f"{path}/people")
         if people:
             dive["people"] = people
 
-        cylinders, mix_refs = self.read_cylinders(element, where)
-        profile, needs_gas_numbers, mode = self.read_profile(element, where, mix_refs)
+        cylinders, mix_refs = self.read_cylinders(element, where, path)
+        profile, needs_gas_numbers, mode = self.read_profile(element, where, mix_refs, primary)
         if needs_gas_numbers:
             for gas_number, cylinder in enumerate(cylinders):
                 cylinder["gas_number"] = gas_number
             self.note(
                 where,
-                "UDDF records no gas numbering, so the dive's cylinders are numbered from 0 in the order the "
-                "file lists them, to tie each pressure channel and gas switch to its cylinder (spec §6.5)",
+                "UDDF records no gas numbers, so the dive's cylinders are numbered from 0 in the order the file lists "
+                "them, to tie each tank pressure and gas switch to its cylinder.",
                 "absent",
+                code="gas_numbers_assigned",
+                member=f"{path}/cylinders",
             )
         if cylinders:
             dive["cylinders"] = cylinders
         recordings = self.read_recordings(
-            before, used, profile, mode, self.read_deco_model(before, where), readouts, where
+            before, used, profile, mode, self.read_deco_model(before, where, primary), readouts, where, path
         )
         if recordings:
             dive["recordings"] = recordings
         return dive
 
     def enumerated(
-        self, parent: ET.Element | None, tag: str, table: dict[str, str], where: str, member: str
+        self, parent: ET.Element | None, tag: str, table: dict[str, str], where: str, member: str, path: str
     ) -> str | None:
         """One of §6.2's vocabularies off a UDDF enumeration, through its table above.
 
@@ -2077,14 +2221,22 @@ class _Converter:
             return None
         value = table.get(stated)
         if value is None:
-            self.note(where, f"<{tag}> is {stated!r}, which §6.2's {member} has no value for; it is not read", "dropped")
+            self.note(
+                where,
+                f"<{tag}> is {stated!r}, which the logbook's {_ENUMERATED_LABELS[member]} has no value for; it is left "
+                "out.",
+                "dropped",
+                code="value_unknown",
+                member=f"{path}/{member}",
+            )
             return None
         resolved = _RESOLVED_READS.get((tag, stated))
         if resolved is not None:
-            self.note(where, resolved, "resolved")
+            code, message = resolved
+            self.note(where, message, "resolved", code=code, member=f"{path}/{member}")
         return value
 
-    def rating(self, after: ET.Element | None, where: str) -> int | None:
+    def rating(self, after: ET.Element | None, where: str, path: str) -> int | None:
         """`<rating><ratingvalue>` on the format's 1 to 5, as half of UDDF's 1 to 10 rounded up."""
         stated = decimal_of(_text_of(after, "rating", "ratingvalue"))
         if stated is None:
@@ -2092,17 +2244,21 @@ class _Converter:
         if stated != stated.to_integral_value() or not MIN_UDDF_RATING <= stated <= MAX_UDDF_RATING:
             self.note(
                 where,
-                f"<ratingvalue> is {stated}, and UDDF rates a dive in whole steps from 1 to 10; dropped",
+                f"<ratingvalue> is {stated}, and UDDF rates a dive in whole steps from 1 to 10; it is left out.",
                 "dropped",
+                code="rating_out_of_range",
+                member=f"{path}/rating",
             )
             return None
         steps = int(stated)
         rating = (steps + 1) // 2
         self.note(
             where,
-            f"UDDF rates a dive 1 to 10 and the format 1 to 5; <ratingvalue> {steps} is read as {rating}, half "
-            "of it rounded up (spec §6.2)",
+            f"UDDF rates a dive 1 to 10 and the logbook 1 to 5; <ratingvalue> {steps} is read as {rating}, half of it "
+            "rounded up.",
             "resolved",
+            code="rating_halved",
+            member=f"{path}/rating",
         )
         return rating
 
@@ -2115,8 +2271,10 @@ class _Converter:
         model: dict[str, Any] | None,
         readouts: dict[str, float],
         where: str,
+        path: str,
     ) -> list[dict[str, Any]]:
-        """A §6.4a Recording per `<divecomputer>` the dive links, in link order.
+        """A §6.4a Recording per `<divecomputer>` the dive links, in link order, for the dive at
+        `path`.
 
         UDDF states a dive's `<samples>`, its `<internaldivenumber>` and its
         `<surfacepressure>` **once per dive** and never once per computer, so all three go
@@ -2150,17 +2308,20 @@ class _Converter:
             if counter is not None:
                 self.note(
                     where,
-                    "the dive records the computer's own dive counter and links no <divecomputer> for it "
-                    "to belong to, so there is no device to carry it; dropped (spec §6.4b)",
+                    "The dive records the dive computer's own dive count and links no <divecomputer> for it to belong "
+                    "to; it is left out.",
                     "dropped",
+                    code="dive_counter_without_computer",
                 )
             built = recording(profile=profile, mode=mode, deco_model=model, readouts=readouts)
             return [built] if built is not None else []
 
         recordings: list[dict[str, Any]] = []
         for index, element in enumerate(linked):
+            slot = f"{path}/recordings/{len(recordings)}"
+            since = len(self.notes)
             built = recording(
-                device=self.read_device(element, counter if index == 0 else None, where),
+                device=self.read_device(element, counter if index == 0 else None, where, slot),
                 # The mode and the model go where the profile goes, and for the same
                 # reason: UDDF states `<divemode>` on the dive's one sample stream and links
                 # its `<decomodel>` from the dive, never from a computer, so a dive linking
@@ -2170,14 +2331,19 @@ class _Converter:
                 readouts=readouts if index == 0 else None,
                 profile=profile if index == 0 else None,
             )
-            if built is not None:
+            if built is None:
+                unplaced(self.notes, since, slot)
+            else:
                 recordings.append(built)
         if readouts and len(recordings) > 1:
-            self.note(where, shared_readout("<surfacepressure>", len(recordings)), "resolved")
+            self.note(
+                where, shared_readout("<surfacepressure>", len(recordings)), "resolved",
+                code=SHARED_READOUT, member=shared_readout_member(path, readouts),
+            )
         return recordings
 
     def read_device(
-        self, element: ET.Element, counter: int | None, where: str
+        self, element: ET.Element, counter: int | None, where: str, path: str
     ) -> dict[str, Any] | None:
         """One linked `<divecomputer>` as a §6.4b Device.
 
@@ -2214,48 +2380,75 @@ class _Converter:
                 "name": "<name>",
                 "dive_number": "<internaldivenumber>",
             },
+            path=path,
         )
 
-    def read_started_at(self, before: ET.Element | None, where: str) -> str | None:
+    def read_started_at(self, before: ET.Element | None, where: str, path: str) -> str | None:
+        started = f"{path}/started_at"
         raw = _text_of(before, "datetime")
         if raw is None:
             self.note(
                 where,
-                "the dive records no <datetime>, and the format requires a start time; the dive is dropped "
-                "(spec §6.2)",
+                "The dive records no <datetime>, and a dive cannot be logged without a start time; it is left out.",
                 "dropped",
+                code="start_time_missing",
             )
             return None
         started_at, forgiven = _date_time(raw)
         if started_at is None:
-            self.note(where, f"<datetime> is {raw!r}, which is not a date and time; the dive is dropped (spec §6.2)", "dropped")
+            self.note(
+                where,
+                f"<datetime> is {raw!r}, which is not a date and time, and a dive cannot be logged without a start "
+                "time; it is left out.",
+                "dropped",
+                code="start_time_unreadable",
+            )
             return None
         if "T" not in started_at:
             # A date-only start (§5.2): the day was recorded and the time of day was not,
             # and midnight would be a time the file never stated. An offset beside a bare
             # date has nowhere to go, a date carrying none.
-            self.note(where, f"{forgiven}; read as a date-only start rather than as midnight (spec §5.2)", "absent")
+            self.note(
+                where,
+                f"{forgiven}, so the dive starts on that day rather than at midnight.",
+                "absent",
+                code="start_time_of_day_missing",
+                member=started,
+            )
             stated = _DATE_TIME.match(raw.strip())
             if stated is not None and stated["offset"] is not None:
-                self.note(where, f"{raw.strip()!r} records a UTC offset beside a date alone, which a date cannot carry; dropped", "dropped")
+                self.note(
+                    where,
+                    f"{raw.strip()!r} records a time zone beside a date alone, which a date cannot carry; it is left "
+                    "out.",
+                    "dropped",
+                    code="start_time_zone_on_a_date",
+                    member=started,
+                )
             return started_at
         if forgiven:
-            self.note(where, forgiven, "absent")
+            self.note(where, forgiven, "absent", code="start_time_seconds_missing", member=started)
         if self.local_clock_with_z and started_at.endswith(("Z", "z")):
             # The generator table firing. `<generator><datetime>` is left alone under this
             # rule and every other — it is the export instant, a fact about the run rather
             # than logbook data.
-            self.note(where, LOCAL_CLOCK_NOTE, "resolved")
+            self.note(where, LOCAL_CLOCK_NOTE, "resolved", code="start_time_z_read_as_local", member=started)
             # And the no-offset note below is not also emitted, because it would be false:
             # the source *did* record something in that position and this reader decided
             # what it meant. Saying "the source recorded no UTC offset" beside a `resolved`
             # finding that says otherwise is two report lines disagreeing about one value.
             return started_at[:-1]
         if not _has_offset(started_at):
-            self.note(where, "the source recorded no UTC offset on the dive's start time; the wall clock travels alone (spec §5.2)", "absent")
+            self.note(
+                where,
+                "The file gives the start time with no time zone, so it is kept as a local time.",
+                "absent",
+                code="start_time_zone_missing",
+                member=started,
+            )
         return started_at
 
-    def positive(self, value: Decimal | None, where: str, source: str, member: str) -> Decimal | None:
+    def positive(self, value: Decimal | None, where: str, source: str, member: str, path: str) -> Decimal | None:
         """A measurement the format records only when it is above zero.
 
         Zero is what this format's own UDDF writer emits for a depth it never had —
@@ -2266,10 +2459,13 @@ class _Converter:
         """
         if value is None or recorded(value, record="dive", member=member):
             return value
-        self.note(where, f"{source} is {value}, which the format records only when positive; read as not recorded", "absent")
+        self.note(
+            where, f"{source} is {value}, which is no depth; read as not recorded.", "absent",
+            code="depth_zero", member=f"{path}/{member}",
+        )
         return None
 
-    def dive_contact(self, refs: list[str], where: str) -> str | None:
+    def dive_contact(self, refs: list[str], where: str, path: str) -> str | None:
         """The contact a dive's `<link>`s name — a `<divebase>` or a `<shop>` — or nothing.
 
         UDDF's prose names buddies and sites as this link's targets, and its XSD lets it name
@@ -2282,21 +2478,24 @@ class _Converter:
             if ref not in self.contact_uuids:
                 self.note(
                     where,
-                    f"a link points at the contact {ref!r}, which is not read; the reference goes with it",
+                    f"A link points at the contact {ref!r}, which is not kept; the link goes with it.",
                     "dropped",
+                    code="link_to_record_not_kept",
+                    member=path,
                 )
             elif self.contact_uuids[ref] not in found:
                 found.append(self.contact_uuids[ref])
         if len(found) > 1:
             self.note(
                 where,
-                f"the dive links {len(found)} contacts and §6.2 carries one; the first is kept and the rest are "
+                f"The dive links {len(found)} contacts and keeps one; the first is kept and the rest are left out.",
                 "dropped",
-                "dropped",
+                code="contacts_beyond_first",
+                member=path,
             )
         return found[0] if found else None
 
-    def dive_people(self, refs: list[str], where: str) -> list[dict[str, Any]]:
+    def dive_people(self, refs: list[str], where: str, path: str) -> list[dict[str, Any]]:
         """The people a dive's `<link>`s name, each once, with the role each link gives.
 
         A link to a buddy reads as UDDF's own prose reads it — "the cross-referenced person is
@@ -2315,9 +2514,11 @@ class _Converter:
                 if buddy is None or buddy not in self.person_uuids:
                     self.note(
                         where,
-                        f"a link points at the guide {ref!r}, whose own link names no buddy that is read; the "
-                        "reference goes with it",
+                        f"A link points at the guide {ref!r}, whose own link names no buddy that is kept; the link goes "
+                        "with it.",
                         "dropped",
+                        code="link_to_record_not_kept",
+                        member=path,
                     )
                     continue
             elif ref in self.person_uuids:
@@ -2325,8 +2526,10 @@ class _Converter:
             else:
                 self.note(
                     where,
-                    f"a link points at the buddy {ref!r}, which is not read; the reference goes with it",
+                    f"A link points at the buddy {ref!r}, which is not kept; the link goes with it.",
                     "dropped",
+                    code="link_to_record_not_kept",
+                    member=path,
                 )
                 continue
             uuid = self.person_uuids[buddy]
@@ -2341,17 +2544,21 @@ class _Converter:
         for uuid, (buddy, count) in repeated.items():
             self.note(
                 where,
-                f"the dive links the buddy {buddy!r} {count} times, and a person is listed on a dive once; one "
-                f"reference is kept, as {held[uuid]['role']}, and the rest are dropped",
+                f"The dive links the buddy {buddy!r} {count} times, and a person is listed on a dive once; one link is "
+                f"kept, as {held[uuid]['role']}, and the rest are left out.",
                 "dropped",
+                code="person_named_twice",
+                member=path,
             )
         return people
 
-    def reference(self, ref: str | None, table: dict[str, str], where: str, kind: str) -> str | None:
-        resolved = self.references([ref], table, where, kind)
+    def reference(self, ref: str | None, table: dict[str, str], where: str, kind: str, path: str) -> str | None:
+        resolved = self.references([ref], table, where, kind, path)
         return resolved[0] if resolved else None
 
-    def references(self, refs: list[str | None], table: dict[str, str], where: str, kind: str) -> list[str]:
+    def references(
+        self, refs: list[str | None], table: dict[str, str], where: str, kind: str, path: str
+    ) -> list[str]:
         """Resolved references, in source order, without repeats.
 
         Order is meaningful — §5.3 makes the first `site_uuids` entry the primary site —
@@ -2365,7 +2572,7 @@ class _Converter:
                 if table[ref] not in resolved:
                     resolved.append(table[ref])
             elif ref not in self.source_ids:
-                self.note(where, f"a link points at {ref!r}, which nothing in the file defines; the reference is dropped", "dropped")
+                self.link_to_nothing(where, ref, path)
             elif ref not in self.mixes and ref not in self.deco_models:
                 # A `<link>` under `informationbeforedive` addresses a site here — a contact's
                 # and a person's were taken off before (`dive_contact`, `dive_people`) — and one
@@ -2373,12 +2580,23 @@ class _Converter:
                 # converter carries nowhere is worth a note; a gas reference is not, and neither
                 # is a decompression model — that one resolves in `read_deco_model` and was
                 # reported there if it went nowhere.
-                self.note(where, f"a link points at {ref!r}, which is not a {kind} this converter carries; the reference is dropped", "dropped")
+                self.note(
+                    where, f"A link points at {ref!r}, which is not a {kind} that is kept; the link is left out.",
+                    "dropped", code="link_to_unknown_kind", member=path,
+                )
         return resolved
+
+    def link_to_nothing(self, where: str, ref: str, path: str | None) -> None:
+        self.note(
+            where, f"A link points at {ref!r}, which nothing in the file defines; the link is left out.", "dropped",
+            code="link_to_nothing", member=path,
+        )
 
     # -- cylinders ---------------------------------------------------------------
 
-    def read_cylinders(self, element: ET.Element, where: str) -> tuple[list[dict[str, Any]], list[str | None]]:
+    def read_cylinders(
+        self, element: ET.Element, where: str, dive: str
+    ) -> tuple[list[dict[str, Any]], list[str | None]]:
         """A dive's `<tankdata>` as Cylinders, plus the mix each one links to.
 
         The second return value is what the profile needs: `<tankpressure ref>` and
@@ -2396,8 +2614,9 @@ class _Converter:
         vessels: dict[str, int] = {}
         for index, tank in enumerate(_kids(element, "tankdata")):
             tank_where = f"{where}/tankdata/{index}"
+            path = f"{dive}/cylinders/{index}"
             cylinder: dict[str, Any] = {}
-            mix_ref, vessel_ref, gear_uuid = self.tankdata_links(tank, tank_where, index, vessels)
+            mix_ref, vessel_ref, gear_uuid = self.tankdata_links(tank, tank_where, index, vessels, path)
 
             raw_volume = decimal_of(_text_of(tank, "tankvolume"))
             if raw_volume is None and vessel_ref in self.tank_volumes:
@@ -2408,42 +2627,46 @@ class _Converter:
             elif raw_volume is None:
                 self.note(
                     tank_where,
-                    "the source records no cylinder size; the cylinder carries its gas and pressures without "
-                    "one (spec §6.3)",
+                    "The file records no cylinder size, so it is left empty.",
                     "absent",
+                    code="cylinder_size_missing",
+                    member=f"{path}/volume",
                 )
             else:
                 litres, reinterpreted = _volume_litres(raw_volume)
                 if reinterpreted:
-                    self.note(
-                        tank_where,
-                        f"<tankvolume> is {raw_volume}, too large to be the cubic metres UDDF specifies; read as "
-                        f"{litres} litres, which is how some builds of Subsurface write it",
-                        "resolved",
-                    )
+                    self.size_as_litres(tank_where, raw_volume, litres, f"{path}/volume")
                 if recorded(litres, record="cylinder", member="volume"):
                     cylinder["volume"] = float(litres)
                 else:
-                    self.note(tank_where, f"<tankvolume> reads as {litres} litres; the format records a size only when positive", "absent")
+                    self.size_zero(tank_where, litres, f"{path}/volume")
 
-            start = self.pressure_bar(_text_of(tank, "tankpressurebegin"), tank_where, "<tankpressurebegin>")
-            end = self.pressure_bar(_text_of(tank, "tankpressureend"), tank_where, "<tankpressureend>")
+            start = self.pressure_bar(
+                _text_of(tank, "tankpressurebegin"), tank_where, "<tankpressurebegin>", f"{path}/start_pressure"
+            )
+            end = self.pressure_bar(
+                _text_of(tank, "tankpressureend"), tank_where, "<tankpressureend>", f"{path}/end_pressure"
+            )
             if start is not None and not recorded(start, record="cylinder", member="start_pressure"):
                 # §6.3 is explicit: a recorded zero start pressure is a device's
                 # absent-marker rather than a measurement, and writers must not emit it.
                 self.note(
                     tank_where,
-                    "the start pressure is 0 bar, which devices write to mean 'not recorded'; read as not "
-                    "recorded (spec §6.3)",
+                    "The start pressure is 0 bar, which dive computers write to mean 'not recorded'; read as not "
+                    "recorded.",
                     "absent",
+                    code="start_pressure_zero",
+                    member=f"{path}/start_pressure",
                 )
                 start = None
             if start is not None and end is not None and end > start:
                 self.note(
                     tank_where,
-                    f"the end pressure {end} bar is above the start pressure {start} bar, which cannot be; the "
-                    "end pressure is dropped",
+                    f"The end pressure {end} bar is above the start pressure {start} bar, which cannot be; the end "
+                    "pressure is left out.",
                     "dropped",
+                    code="end_pressure_above_start",
+                    member=f"{path}/end_pressure",
                 )
                 end = None
             if start is not None:
@@ -2452,15 +2675,23 @@ class _Converter:
                 cylinder["end_pressure"] = float(end)
 
             if mix_ref is None:
-                self.note(tank_where, "the source records no gas for this cylinder; absent means not recorded, never air (spec §6.3)", "absent")
+                self.note(
+                    tank_where,
+                    "No gas is recorded for this cylinder, so it is left empty rather than assumed to be air.",
+                    "absent",
+                    code="gas_missing",
+                    member=f"{path}/oxygen",
+                )
             elif mix_ref in self.mixes:
                 cylinder.update(self.mixes[mix_ref])
             else:
                 self.note(
                     tank_where,
-                    f"the cylinder links to the gas {mix_ref!r}, which <gasdefinitions> does not define; its mix "
-                    "is not recorded",
+                    f"The cylinder links the gas {mix_ref!r}, which <gasdefinitions> does not define, so its gas is left "
+                    "empty.",
                     "absent",
+                    code="gas_link_to_nothing",
+                    member=f"{path}/oxygen",
                 )
 
             if gear_uuid is not None:
@@ -2470,7 +2701,7 @@ class _Converter:
         return cylinders, mix_refs
 
     def tankdata_links(
-        self, tank: ET.Element, where: str, index: int, vessels: dict[str, int]
+        self, tank: ET.Element, where: str, index: int, vessels: dict[str, int], path: str
     ) -> tuple[str | None, str | None, str | None]:
         """A `<tankdata>`'s gas link, its vessel link, and the gear uuid the cylinder keeps.
 
@@ -2498,15 +2729,19 @@ class _Converter:
                 else:
                     self.note(
                         where,
-                        f"the cylinder links a second gas, {ref!r}, and holds one; the first, {mix_ref!r}, is kept",
+                        f"The cylinder links a second gas, {ref!r}, and holds one; the first, {mix_ref!r}, is kept.",
                         "dropped",
+                        code="second_gas_link",
+                        member=path,
                     )
             elif ref in self.gear_uuids:
                 if vessel_ref is not None:
                     self.note(
                         where,
-                        f"the cylinder links a second vessel, {ref!r}, and is one; the first, {vessel_ref!r}, is kept",
+                        f"The cylinder links a second tank, {ref!r}, and is one; the first, {vessel_ref!r}, is kept.",
                         "dropped",
+                        code="second_tank_link",
+                        member=f"{path}/gear_uuid",
                     )
                     continue
                 vessel_ref = ref
@@ -2514,10 +2749,11 @@ class _Converter:
                 if gear_uuid in vessels:
                     self.note(
                         where,
-                        f"the cylinder links the vessel {ref!r}, which <tankdata> {vessels[gear_uuid]} of this dive "
-                        "already links, and a vessel is one gas supply; the cylinder keeps its gas and the link is "
-                        "dropped (spec §6.3)",
+                        f"The cylinder links the tank {ref!r}, which <tankdata> {vessels[gear_uuid]} of this dive already "
+                        "links, and one tank is one gas supply; the cylinder keeps its gas and the link is left out.",
                         "dropped",
+                        code="tank_linked_twice",
+                        member=f"{path}/gear_uuid",
                     )
                 else:
                     vessels[gear_uuid] = index
@@ -2530,28 +2766,37 @@ class _Converter:
             if ref in self.source_ids:
                 self.note(
                     where,
-                    f"a link points at {ref!r}, which is neither a gas nor a piece of kit this converter carries; "
-                    "the reference is dropped",
+                    f"A link points at {ref!r}, which is neither a gas nor a piece of gear that is kept; the link is "
+                    "left out.",
                     "dropped",
+                    code="link_to_unknown_kind",
+                    member=path,
                 )
             else:
-                self.note(where, f"a link points at {ref!r}, which nothing in the file defines; the reference is dropped", "dropped")
+                self.link_to_nothing(where, ref, path)
         return mix_ref, vessel_ref, kept
 
-    def pressure_bar(self, text: str | None, where: str, member: str) -> Decimal | None:
+    def pressure_bar(self, text: str | None, where: str, label: str, path: str) -> Decimal | None:
         value = decimal_of(text)
         if value is None:
             return None
         bar = value / PASCAL_PER_BAR
         if not 0 <= bar <= MAX_CYLINDER_PRESSURE:
-            self.note(where, f"{member} reads as {bar} bar, outside the 0 to 350 the format allows; dropped", "dropped")
+            self.note(
+                where,
+                f"{label} reads as {bar} bar, outside the 0 to {MAX_CYLINDER_PRESSURE} bar a cylinder can hold; it is "
+                "left out.",
+                "dropped",
+                code="pressure_out_of_range",
+                member=path,
+            )
             return None
         return bar
 
     # -- profile -----------------------------------------------------------------
 
     def read_profile(
-        self, element: ET.Element, where: str, mix_refs: list[str | None]
+        self, element: ET.Element, where: str, mix_refs: list[str | None], recording_path: str
     ) -> tuple[dict[str, Any] | None, bool, str | None]:
         """`<samples><waypoint>` as a Profile, whether gas numbers are needed, and the mode.
 
@@ -2578,7 +2823,8 @@ class _Converter:
         # `<divetime>` is `xs:float` seconds, and a fraction it states keeps its place on the
         # millisecond axis: `legacy-writer.uddf`'s `30` and `30.4` share a second and are
         # two instants here, both kept.
-        axis = SampleAxis(self.note, where, noun="waypoint", time_member="<divetime>")
+        profile_path = f"{recording_path}/profile"
+        axis = SampleAxis(self.note, where, noun="waypoint", time_member="<divetime>", path=profile_path)
         for waypoint in _kids(samples, "waypoint"):
             axis.offer(milliseconds(decimal_of(_text_of(waypoint, "divetime"))), waypoint)
 
@@ -2621,9 +2867,11 @@ class _Converter:
                 if in_pascal and not reported_pascal_po2:
                     self.note(
                         where,
-                        "<calculatedpo2> is above 10, so it is the Pascal the documentation states rather than "
-                        "the bar current writers emit; read as Pascal",
+                        "<calculatedpo2> is above 10, so it is read as the Pascal the UDDF documentation states rather "
+                        "than the bar most files give.",
                         "resolved",
+                        code="ppo2_read_as_pascal",
+                        member=f"{profile_path}/ppo2",
                     )
                     reported_pascal_po2 = True
                 ppo2.record(at, po2)
@@ -2636,16 +2884,25 @@ class _Converter:
             if factor is not None:
                 gradient_factor.record(at, factor)
 
-            mode = self.waypoint_mode(waypoint, mode, at, where)
+            mode = self.waypoint_mode(waypoint, mode, at, where, f"{recording_path}/mode")
 
-            for cylinder_index, tenths in self.waypoint_pressures(waypoint, where, at, cylinders_of_mix, len(mix_refs)):
+            for cylinder_index, tenths in self.waypoint_pressures(
+                waypoint, where, at, cylinders_of_mix, len(mix_refs), f"{profile_path}/pressures"
+            ):
                 channel = pressures.setdefault(cylinder_index, Channel("pressures"))
                 # Asked before the reading is offered rather than read off `record`'s
                 # answer, which has two refusals in it: a pressure channel carries no floor
                 # and so can only be refused for the second, but a caller that reported a
                 # floor refusal as a collision would be saying the wrong thing quietly.
                 if channel.taken(at):
-                    self.note(where, f"two tank pressures at {in_seconds(at)} s resolve to the same cylinder; the later one is dropped", "dropped")
+                    self.note(
+                        where,
+                        f"Two tank pressures at {in_seconds(at)} s belong to the same cylinder; the later one is left "
+                        "out.",
+                        "dropped",
+                        code="readings_at_one_instant",
+                        member=f"{profile_path}/pressures",
+                    )
                     continue
                 channel.record(at, tenths)
                 needs_gas_numbers = True
@@ -2670,9 +2927,11 @@ class _Converter:
                 elif ref is not None:
                     self.note(
                         where,
-                        f"a gas switch at {in_seconds(at)} s names the gas {ref!r}, which no cylinder on this dive links "
-                        "to; the switch is kept without saying what it was to (spec §6.6)",
+                        f"A gas switch at {in_seconds(at)} s names the gas {ref!r}, which no cylinder on this dive links "
+                        "to; the switch is kept without saying which cylinder it was to.",
                         "absent",
+                        code="gas_switch_target_unknown",
+                        member=f"{profile_path}/events",
                     )
                 events.append(event)
 
@@ -2708,7 +2967,7 @@ class _Converter:
         return rounded(value / PASCAL_PER_PO2_HUNDREDTH), True
 
     def waypoint_mode(
-        self, waypoint: ET.Element, standing: str | None, at: int, where: str
+        self, waypoint: ET.Element, standing: str | None, at: int, where: str, path: str
     ) -> str | None:
         """One waypoint's `<divemode @type>` against the mode the recording already has.
 
@@ -2738,9 +2997,11 @@ class _Converter:
             said = "no dive mode" if stated is None else f"the dive mode {stated!r}"
             self.note(
                 where,
-                f"a waypoint records {said}, which is not one of the five UDDF spells; the recording's mode "
-                "is left unrecorded rather than assumed (spec §6.4a)",
+                f"A waypoint records {said}, which is not one of the five UDDF names; the dive computer's mode is "
+                "left empty rather than assumed.",
                 "dropped",
+                code="dive_mode_unknown",
+                member=path,
             )
             return standing
         if standing is None:
@@ -2748,10 +3009,11 @@ class _Converter:
         if mode != standing:
             self.note(
                 where,
-                f"the dive mode changes to {stated!r} at {in_seconds(at)} s, and §6.4a records one mode for a "
-                "recording; the change is dropped, there being no event a converter could label without "
-                "inventing the device's wording (spec §5.4)",
+                f"The dive mode changes to {stated!r} at {in_seconds(at)} s, and one dive computer's record keeps one "
+                "mode; the change is left out.",
                 "dropped",
+                code="dive_mode_change",
+                member=path,
             )
         return standing
 
@@ -2762,6 +3024,7 @@ class _Converter:
         at: int,
         cylinders_of_mix: dict[str, list[int]],
         tank_count: int,
+        path: str,
     ) -> Iterator[tuple[int, int]]:
         """Each `<tankpressure>` on one waypoint, as `(cylinder index, tenths of a bar)`.
 
@@ -2784,9 +3047,11 @@ class _Converter:
                 if tank_count != 1:
                     self.note(
                         where,
-                        f"a tank pressure at {in_seconds(at)} s names no cylinder, and the dive has {tank_count}; the "
-                        "reading is dropped rather than guessed onto one",
+                        f"A tank pressure at {in_seconds(at)} s names no cylinder, and the dive has {tank_count}; the "
+                        "reading is left out rather than guessed onto one.",
                         "dropped",
+                        code="tank_pressure_unassigned",
+                        member=path,
                     )
                     continue
                 index = 0
@@ -2797,9 +3062,11 @@ class _Converter:
                 if position >= len(candidates):
                     self.note(
                         where,
-                        f"a tank pressure at {in_seconds(at)} s names the gas {ref!r}, which no further cylinder on this "
-                        "dive links to; the reading is dropped",
+                        f"A tank pressure at {in_seconds(at)} s names the gas {ref!r}, which no further cylinder on this "
+                        "dive links to; the reading is left out.",
                         "dropped",
+                        code="tank_pressure_unassigned",
+                        member=path,
                     )
                     continue
                 index = candidates[position]

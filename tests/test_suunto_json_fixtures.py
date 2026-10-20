@@ -21,7 +21,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from helpers import EXPORTED_AT, FIX_TAKEN, FIXTURES, profile_of
+from helpers import EXPORTED_AT, FIXTURES, profile_of
 
 from divejson import compared, convert
 from divejson.converter import INFERRED, PRODUCER_KEY
@@ -90,7 +90,7 @@ def test_this_reader_settles_no_scale_and_resolves_nothing_but_the_fix_taken(sou
     """
     conversion = convert(source.read_bytes(), exported_at=EXPORTED_AT)
     resolved = [note for note in conversion.notes if note.kind == "resolved"]
-    assert [note.where for note in resolved if not note.message.startswith(FIX_TAKEN)] == []
+    assert [note.where for note in resolved if note.code != "fix_chosen_by_accuracy"] == []
 
 
 def test_every_expected_document_has_an_input() -> None:
@@ -142,8 +142,9 @@ def test_the_ocean_carries_no_gas_mixture_and_says_so_per_cylinder() -> None:
     conversion = convert(OCEAN.read_bytes(), exported_at=EXPORTED_AT)
     for cylinder in conversion.document["dives"][0]["cylinders"]:
         assert "oxygen" not in cylinder and "helium" not in cylinder and "volume" not in cylinder
-    mixture = [note for note in conversion.notes if "no gas mixture" in note.message]
+    mixture = [note for note in conversion.notes if note.code == "gas_missing"]
     assert len(mixture) == 2 and {note.kind for note in mixture} == {"absent"}
+    assert [note.member for note in mixture] == ["dives/0/cylinders/0/oxygen", "dives/0/cylinders/1/oxygen"]
 
 
 def test_the_pressure_channel_outlives_the_end_pressure() -> None:

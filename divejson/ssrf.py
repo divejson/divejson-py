@@ -84,6 +84,7 @@ from .converter import (
     recording,
     rounded,
     site_members,
+    unplaced,
 )
 from .series import Channel, SampleAxis
 from .validate import folded, validate_document
@@ -247,22 +248,25 @@ class _Converter:
 
     # -- reporting ---------------------------------------------------------------
 
-    def note(self, where: str, message: str, kind: NoteKind) -> None:
+    def note(self, where: str, message: str, kind: NoteKind, *, code: str, member: str | None = None) -> None:
         """One line of the report, at a path into the source this conversion read."""
-        self.notes.append(Note(self.scope.where(where), message, kind))
+        self.notes.append(Note(self.scope.where(where), message, kind, code=code, member=member))
 
-    def capped(self, value: str, limit: int, where: str, member: str) -> str:
-        return capped(value, limit, note=self.note, where=where, member=member)
+    def capped(self, value: str, limit: int, where: str, label: str, path: str | None = None) -> str:
+        return capped(value, limit, note=self.note, where=where, label=label, path=path)
 
     # -- measurements ------------------------------------------------------------
 
-    def measure(self, raw: str | None, unit: str, where: str, member: str) -> Decimal | None:
+    def measure(
+        self, raw: str | None, unit: str, where: str, label: str, path: str | None = None
+    ) -> Decimal | None:
         """One attribute as a number in `unit`, or nothing at all, reporting either way.
 
         The unit written in the file has to be the one this member is read in. A different
         one is a real reading — an imperial export's `'150.6 ft'` — that this reader will
         not convert by a factor no file in hand has checked, so it is dropped and named.
-        Reading it at the metric scale would put a dive at 150 metres.
+        Reading it at the metric scale would put a dive at 150 metres. `label` names the
+        attribute for the report and `path` the document member it is headed for.
         """
         if raw is None:
             return None
@@ -272,15 +276,20 @@ class _Converter:
         # text would turn one habit of the file into hundreds of separate report lines.
         match = _MEASUREMENT.match(raw)
         if match is None:
-            self.note(where, f"{member} is not a number with a unit after it; dropped", "dropped")
+            self.note(
+                where, f"{label} is not a number with a unit after it, and is left out.", "dropped",
+                code="not_a_number", member=path,
+            )
             return None
         found = match.group("unit") or ""
         if found != unit:
             self.note(
                 where,
-                f"{member} is recorded in {found or 'no unit'}, where this reader reads it in "
-                f"{unit or 'no unit'}; dropped rather than read at a scale nothing states",
+                f"{label} is recorded in {found or 'no unit'} where {unit or 'no unit'} is expected; it is left out "
+                "rather than read at a scale nothing states.",
                 "dropped",
+                code="unit_unexpected",
+                member=path,
             )
             return None
         # `UNITS[unit]` on a unit this module never registered is a `KeyError`, which is the
@@ -289,13 +298,15 @@ class _Converter:
         if value is None:
             self.note(
                 where,
-                f"{member} is recorded in {unit or 'no unit'} with something that is not a number in front of "
-                "it; dropped",
+                f"{label} is recorded in {unit or 'no unit'} with something that is not a number in front of it, "
+                "and is left out.",
                 "dropped",
+                code="not_a_number",
+                member=path,
             )
         return value
 
-    def positive(self, value: Decimal | None, where: str, member: str, source: str) -> Decimal | None:
+    def positive(self, value: Decimal | None, where: str, member: str, source: str, path: str) -> Decimal | None:
         """A measurement the format records only when it is above zero.
 
         Subsurface writes `max='0.0 m'` for a dive whose depth it never had, so reading the
@@ -305,7 +316,10 @@ class _Converter:
         """
         if value is None or recorded(value, record="dive", member=member):
             return value
-        self.note(where, f"{source} is {value}, which the format records only when positive; read as not recorded", "absent")
+        self.note(
+            where, f"{source} is {value}, which is no depth; read as not recorded.", "absent",
+            code="depth_zero", member=path,
+        )
         return None
 
     # -- the run -----------------------------------------------------------------
@@ -376,9 +390,10 @@ class _Converter:
             if not name:
                 self.note(
                     where,
-                    "the site has no name, which the format requires of one; it is dropped along with the "
-                    "references to it, because a name cannot be invented (spec §6.10)",
+                    "The site has no name, and a site cannot be logged without one; it is left out with every dive's "
+                    "link to it, since a name cannot be made up.",
                     "dropped",
+                    code="site_unnamed",
                 )
                 continue
             claimed, carried = self.identities.for_record("site", source_id, where, index)
@@ -392,11 +407,14 @@ class _Converter:
             if not carried:
                 continue
 
-            site: dict[str, Any] = {"uuid": claimed, "name": self.capped(name, MAX_NAME, where, "the site name")}
-            locality = self.read_locality(element, where)
+            path = f"sites/{len(sites)}"
+            site: dict[str, Any] = {
+                "uuid": claimed, "name": self.capped(name, MAX_NAME, where, "the site name", f"{path}/name")
+            }
+            locality = self.read_locality(element, where, path)
             if locality:
                 site["location"] = {"name": locality}
-            pin = self.read_position(attribute(element, "gps"), where)
+            pin = self.read_position(attribute(element, "gps"), where, f"{path}/position")
             if pin:
                 site["position"] = pin
             prose = [part for part in (attribute(element, "description"), text(child(element, "notes"))) if part]
@@ -405,7 +423,7 @@ class _Converter:
             sites.append({member: site[member] for member in site_members() if member in site})
         return sites
 
-    def read_position(self, raw: str | None, where: str) -> dict[str, float] | None:
+    def read_position(self, raw: str | None, where: str, path: str) -> dict[str, float] | None:
         """`@gps` as a Position: two decimals, latitude first, separated by whitespace.
 
         Subsurface writes each half from an integer count of micro-degrees, `%u.%06u` with a
@@ -420,11 +438,17 @@ class _Converter:
             return None
         halves = [decimal_of(half) for half in raw.split()]
         if len(halves) != 2 or halves[0] is None or halves[1] is None:
-            self.note(where, f"<site gps> is {raw!r}, which is not two numbers, a latitude and a longitude; dropped", "dropped")
+            self.note(
+                where,
+                f"<site gps> is {raw!r}, which is not two numbers, a latitude and a longitude; it is left out.",
+                "dropped",
+                code="position_unreadable",
+                member=path,
+            )
             return None
-        return position(halves[0], halves[1], note=self.note, where=where)
+        return position(halves[0], halves[1], note=self.note, where=where, path=path)
 
-    def read_locality(self, element: ET.Element, where: str) -> str | None:
+    def read_locality(self, element: ET.Element, where: str, path: str) -> str | None:
         """`<geo>` as the site's place name: its town, its region and its country.
 
         Joined with ", ", and a part equal to an earlier one — compared whole, trimmed and
@@ -454,7 +478,7 @@ class _Converter:
                 parts.append(part)
         if not parts:
             return None
-        return self.capped(", ".join(parts), MAX_NAME, where, "the site's locality")
+        return self.capped(", ".join(parts), MAX_NAME, where, "the site's locality", f"{path}/location/name")
 
     # -- dives -------------------------------------------------------------------
 
@@ -479,27 +503,32 @@ class _Converter:
             elif name == "trip":
                 self.note(
                     f"trip/{trips}",
-                    "the source groups these dives into a trip; the dives are carried and the grouping is not, "
-                    "because no Subsurface file in hand carries a <trip> to read its dates and place from "
-                    "(spec §6.8)",
+                    "The file groups these dives into a trip; the dives are kept and the trip is not, its dates and "
+                    "place not being read from a Subsurface file.",
                     "dropped",
+                    code="trip_not_read",
                 )
                 trips += 1
                 found.extend(children(element, "dive"))
         return found
 
     def read_dives(self) -> list[dict[str, Any]]:
-        dives = []
+        dives: list[dict[str, Any]] = []
         for index, element in enumerate(self.dive_elements()):
-            dive = self.read_dive(element, index)
-            if dive is not None:
+            path = f"dives/{len(dives)}"
+            since = len(self.notes)
+            dive = self.read_dive(element, index, path)
+            if dive is None:
+                unplaced(self.notes, since, path)
+            else:
                 dives.append(dive)
         return dives
 
-    def read_dive(self, element: ET.Element, index: int) -> dict[str, Any] | None:
+    def read_dive(self, element: ET.Element, index: int, path: str) -> dict[str, Any] | None:
+        """One `<dive>`, to be carried at `path` in the document if it is carried at all."""
         where = f"dive/{index}"
 
-        started_at = self.read_started_at(element, where)
+        started_at = self.read_started_at(element, where, path)
         if started_at is None:
             return None
         # `<dive>` carries no id of any kind, so every dive takes the positional stand-in
@@ -510,17 +539,25 @@ class _Converter:
             return None
 
         dive: dict[str, Any] = {"uuid": claimed}
-        number = integer_of(self.measure(attribute(element, "number"), "", where, "<dive number>"))
+        number = integer_of(self.measure(attribute(element, "number"), "", where, "<dive number>", f"{path}/number"))
         if number is not None:
             dive["number"] = number
         dive["started_at"] = started_at
 
-        submerged_time = integer_of(self.measure(attribute(element, "duration"), "min", where, "<dive duration>"))
+        submerged_time = integer_of(
+            self.measure(attribute(element, "duration"), "min", where, "<dive duration>", f"{path}/submerged_time")
+        )
         if submerged_time is not None:
             if recorded(submerged_time, record="dive", member="submerged_time"):
                 dive["submerged_time"] = submerged_time
             else:
-                self.note(where, f"<dive duration> is {submerged_time} seconds; the format records a submerged time only when it is positive", "absent")
+                self.note(
+                    where,
+                    f"<dive duration> is {submerged_time} seconds, which is no dive time; read as not recorded.",
+                    "absent",
+                    code="dive_time_zero",
+                    member=f"{path}/submerged_time",
+                )
 
         notes = text(child(element, "notes"))
         if notes:
@@ -538,45 +575,53 @@ class _Converter:
             if recorded(value, record="recording", member=member):
                 readouts[member] = float(value)
             else:
-                self.note(where, f"<dive {source}> is {value}, which the format records only from zero up; dropped", "dropped")
+                self.note(
+                    where,
+                    f"<dive {source}> is {value}, below zero, which it cannot be; it is left out.",
+                    "dropped",
+                    code="oxygen_figure_negative",
+                    member=f"{path}/recordings/0/{member}",
+                )
 
         if attribute(element, "visibility") is not None:
             self.note(
                 where,
-                "visibility is a five-star rating here and metres in this format, so the rating is dropped "
-                "rather than read as a distance — Subsurface's own UDDF export of the same logbook writes it "
-                "as metres, and the two documents differ there by design (spec §6.2)",
+                "Visibility is a five-star rating here where the logbook keeps it in metres, so the rating is left "
+                "out rather than read as a distance.",
                 "dropped",
+                code="visibility_is_a_rating",
+                member=f"{path}/visibility",
             )
         if self.measure(attribute(element, "sac"), "l/min", where, "<dive sac>") is not None:
             self.note(
                 where,
-                "the dive records a surface air consumption, which this format has no member for; dropped",
+                "The dive records a surface air consumption, which the logbook has no place for; it is left out.",
                 "dropped",
+                code="air_consumption_not_kept",
             )
 
-        site_uuid = self.site_reference(attribute(element, "divesiteid"), where)
+        site_uuid = self.site_reference(attribute(element, "divesiteid"), where, path)
         if site_uuid:
             dive["site_uuids"] = [site_uuid]
         people = self.read_people(element, where)
         if people:
             dive["people"] = people
 
-        cylinders = self.read_cylinders(element, where)
+        cylinders = self.read_cylinders(element, where, path)
         if cylinders:
             dive["cylinders"] = cylinders
 
-        recordings = self.read_recordings(element, dive, where)
+        recordings = self.read_recordings(element, dive, where, path)
         # On the `<dive>` rather than on a `<divecomputer>`, so they go where
         # `docs/converting.md` sends a dive-level readout: the primary recording, or one of
         # their own where no computer yielded one.
         stated = " and ".join(f"<dive {member[:3]}>" for member in readouts)
-        onto_primary(recordings, readouts, note=self.note, where=where, stated=stated)
+        onto_primary(recordings, readouts, note=self.note, where=where, stated=stated, path=path)
         if recordings:
             dive["recordings"] = recordings
         return dive
 
-    def read_started_at(self, element: ET.Element, where: str) -> str | None:
+    def read_started_at(self, element: ET.Element, where: str, path: str) -> str | None:
         """`@date` and `@time` as a §5.2 local wall clock, with no offset supplied.
 
         **`.ssrf` records no time zone anywhere** — not on a dive, not in `<settings>`, not
@@ -597,48 +642,76 @@ class _Converter:
         """
         date = attribute(element, "date")
         clock = attribute(element, "time")
+        started = f"{path}/started_at"
         if date is None:
             self.note(
                 where,
-                "the dive records no date, and the format requires a start time; the dive is dropped (spec §6.2)",
+                "The dive records no date, and a dive cannot be logged without a start time; it is left out.",
                 "dropped",
+                code="start_time_missing",
             )
             return None
         if clock is None:
             if _DATE.match(date) is None or not _calendar_date(date):
-                self.note(where, "the dive's date is not a date; the dive is dropped (spec §6.2)", "dropped")
+                self.note(
+                    where,
+                    "The dive's date is not a date, and a dive cannot be logged without a start time; it is left out.",
+                    "dropped",
+                    code="start_time_unreadable",
+                )
                 return None
             self.note(
                 where,
-                "the dive records a date with no time of day; read as a date-only start rather than as "
-                "midnight (spec §5.2)",
+                "The dive records a date with no time of day, so it starts on that day rather than at midnight.",
                 "absent",
+                code="start_time_of_day_missing",
+                member=started,
             )
             return date
 
         parts = _TIME.match(clock)
         if _DATE.match(date) is None or parts is None:
-            self.note(where, "the dive's date and time are not a date and time; the dive is dropped (spec §6.2)", "dropped")
+            self.note(
+                where,
+                "The dive's date and time are not a date and time, and a dive cannot be logged without a start "
+                "time; it is left out.",
+                "dropped",
+                code="start_time_unreadable",
+            )
             return None
         if parts["second"] is None:
-            self.note(where, "the dive's time of day records no seconds; read as :00", "absent")
+            self.note(
+                where,
+                "The dive's time of day records no seconds; read as :00.",
+                "absent",
+                code="start_time_seconds_missing",
+                member=started,
+            )
         started_at = f"{date}T{parts['hour']}:{parts['minute']}:{parts['second'] or '00'}"
         try:
             # Calendar validity, which no pattern can check: Subsurface will not write a
             # 30th of February and a file someone edited by hand might.
             datetime.fromisoformat(started_at)
         except ValueError:
-            self.note(where, "the dive's date and time are not a date and time; the dive is dropped (spec §6.2)", "dropped")
+            self.note(
+                where,
+                "The dive's date and time are not a date and time, and a dive cannot be logged without a start "
+                "time; it is left out.",
+                "dropped",
+                code="start_time_unreadable",
+            )
             return None
 
         self.note(
             where,
-            "the source records no UTC offset on the dive's start time; the wall clock travels alone (spec §5.2)",
+            "The file gives the start time with no time zone, so it is kept as a local time.",
             "absent",
+            code="start_time_zone_missing",
+            member=started,
         )
         return started_at + (parts["fraction"] or "")
 
-    def site_reference(self, ref: str | None, where: str) -> str | None:
+    def site_reference(self, ref: str | None, where: str, path: str) -> str | None:
         """`@divesiteid` against the sites this file defined.
 
         Three answers, and the middle one is why the ids are collected separately from the
@@ -650,9 +723,21 @@ class _Converter:
         if ref in self.site_uuids:
             return self.site_uuids[ref]
         if ref in self.site_ids:
-            self.note(where, f"the dive names the site {ref!r}, which this converter could not carry; the reference is dropped", "dropped")
+            self.note(
+                where,
+                f"The dive names the site {ref!r}, which could not be kept; the link to it is left out.",
+                "dropped",
+                code="link_to_record_not_kept",
+                member=f"{path}/site_uuids",
+            )
         else:
-            self.note(where, f"the dive names the site {ref!r}, which <divesites> does not define; the reference is dropped", "dropped")
+            self.note(
+                where,
+                f"The dive names the site {ref!r}, which <divesites> does not define; the link to it is left out.",
+                "dropped",
+                code="link_to_nothing",
+                member=f"{path}/site_uuids",
+            )
         return None
 
     # -- people ------------------------------------------------------------------
@@ -696,9 +781,10 @@ class _Converter:
         for name in repeated.values():
             self.note(
                 where,
-                f"the dive's buddies name {name!r} more than once, and a person is listed on a dive once; the "
-                "repeat is dropped",
+                f"The dive's buddies name {name!r} more than once, and a person is listed on a dive once; the repeat "
+                "is left out.",
                 "dropped",
+                code="person_named_twice",
             )
         return people
 
@@ -717,12 +803,13 @@ class _Converter:
             return None
         self.person_uuids[key] = claimed
         if carried:
-            self.people.append({"uuid": claimed, "name": self.capped(name, MAX_NAME, where, "the person's name")})
+            path = f"people/{len(self.people)}/name"
+            self.people.append({"uuid": claimed, "name": self.capped(name, MAX_NAME, where, "the person's name", path)})
         return claimed
 
     # -- cylinders ---------------------------------------------------------------
 
-    def read_cylinders(self, element: ET.Element, where: str) -> list[dict[str, Any]]:
+    def read_cylinders(self, element: ET.Element, where: str, dive: str) -> list[dict[str, Any]]:
         """A dive's `<cylinder>` elements as §6.3 Cylinders.
 
         Nothing on a `.ssrf` dive refers to a cylinder by number — this reader maps no
@@ -733,39 +820,51 @@ class _Converter:
         cylinders: list[dict[str, Any]] = []
         for index, tank in enumerate(children(element, "cylinder")):
             tank_where = f"{where}/cylinder/{index}"
+            path = f"{dive}/cylinders/{index}"
             cylinder: dict[str, Any] = {}
 
-            litres = self.measure(attribute(tank, "size"), "l", tank_where, "<cylinder size>")
+            litres = self.measure(attribute(tank, "size"), "l", tank_where, "<cylinder size>", f"{path}/volume")
             if litres is None:
                 self.note(
                     tank_where,
-                    "the source records no cylinder size; the cylinder carries its gas and pressures without "
-                    "one (spec §6.3)",
+                    "The file records no cylinder size, so it is left empty.",
                     "absent",
+                    code="cylinder_size_missing",
+                    member=f"{path}/volume",
                 )
             elif recorded(litres, record="cylinder", member="volume"):
                 cylinder["volume"] = float(litres)
             else:
-                self.note(tank_where, f"<cylinder size> is {litres} litres; the format records a size only when positive", "absent")
+                self.note(
+                    tank_where,
+                    f"<cylinder size> is {litres} litres, which is no size; read as not recorded.",
+                    "absent",
+                    code="cylinder_size_zero",
+                    member=f"{path}/volume",
+                )
 
-            start = self.pressure(attribute(tank, "start"), tank_where, "<cylinder start>")
-            end = self.pressure(attribute(tank, "end"), tank_where, "<cylinder end>")
+            start = self.pressure(attribute(tank, "start"), tank_where, "<cylinder start>", f"{path}/start_pressure")
+            end = self.pressure(attribute(tank, "end"), tank_where, "<cylinder end>", f"{path}/end_pressure")
             if start is not None and not recorded(start, record="cylinder", member="start_pressure"):
                 # §6.3 is explicit: a recorded zero start pressure is a device's
                 # absent-marker rather than a measurement, and writers must not emit one.
                 self.note(
                     tank_where,
-                    "the start pressure is 0 bar, which devices write to mean 'not recorded'; read as not "
-                    "recorded (spec §6.3)",
+                    "The start pressure is 0 bar, which dive computers write to mean 'not recorded'; read as not "
+                    "recorded.",
                     "absent",
+                    code="start_pressure_zero",
+                    member=f"{path}/start_pressure",
                 )
                 start = None
             if start is not None and end is not None and end > start:
                 self.note(
                     tank_where,
-                    f"the end pressure {end} bar is above the start pressure {start} bar, which cannot be; the "
-                    "end pressure is dropped",
+                    f"The end pressure {end} bar is above the start pressure {start} bar, which cannot be; the end "
+                    "pressure is left out.",
                     "dropped",
+                    code="end_pressure_above_start",
+                    member=f"{path}/end_pressure",
                 )
                 end = None
             if start is not None:
@@ -773,20 +872,27 @@ class _Converter:
             if end is not None:
                 cylinder["end_pressure"] = float(end)
 
-            self.read_mix(tank, cylinder, tank_where)
+            self.read_mix(tank, cylinder, tank_where, path)
             cylinders.append(cylinder)
         return cylinders
 
-    def pressure(self, raw: str | None, where: str, member: str) -> Decimal | None:
-        bar = self.measure(raw, "bar", where, member)
+    def pressure(self, raw: str | None, where: str, label: str, path: str) -> Decimal | None:
+        bar = self.measure(raw, "bar", where, label, path)
         if bar is None:
             return None
         if not 0 <= bar <= MAX_CYLINDER_PRESSURE:
-            self.note(where, f"{member} is {bar} bar, outside the 0 to 350 the format allows; dropped", "dropped")
+            self.note(
+                where,
+                f"{label} is {bar} bar, outside the 0 to {MAX_CYLINDER_PRESSURE} bar a cylinder can hold; it is left "
+                "out.",
+                "dropped",
+                code="pressure_out_of_range",
+                member=path,
+            )
             return None
         return bar
 
-    def read_mix(self, tank: ET.Element, cylinder: dict[str, Any], where: str) -> None:
+    def read_mix(self, tank: ET.Element, cylinder: dict[str, Any], where: str, path: str) -> None:
         """`@o2` and `@he` as percentages, which is how Subsurface writes them.
 
         Both carry their `%` in the text, so neither is UDDF's fraction-or-percent
@@ -794,24 +900,42 @@ class _Converter:
         """
         blend: dict[str, float] = {}
         for member, source in (("oxygen", "o2"), ("helium", "he")):
-            percent = self.measure(attribute(tank, source), "%", where, f"<cylinder {source}>")
+            percent = self.measure(attribute(tank, source), "%", where, f"<cylinder {source}>", f"{path}/{member}")
             if percent is None:
                 continue
             if not 0 <= percent <= 100:
-                self.note(where, f"<cylinder {source}> is {percent} percent, outside the 0 to 100 a mix can be; dropped", "dropped")
+                self.note(
+                    where,
+                    f"<cylinder {source}> is {percent} percent, outside the 0 to 100 a mix can be; it is left out.",
+                    "dropped",
+                    code="gas_percent_out_of_range",
+                    member=f"{path}/{member}",
+                )
                 continue
             blend[member] = float(percent)
         if blend.get("oxygen", 0.0) + blend.get("helium", 0.0) > 100:
-            self.note(where, "oxygen and helium sum above 100 percent, which no mix can; both are dropped (spec §6.3)", "dropped")
+            self.note(
+                where,
+                "Oxygen and helium add up to more than 100 percent, which no mix can; both are left out.",
+                "dropped",
+                code="gas_over_100_percent",
+                member=path,
+            )
             return
         if not blend:
-            self.note(where, "the source records no gas for this cylinder; absent means not recorded, never air (spec §6.3)", "absent")
+            self.note(
+                where,
+                "No gas is recorded for this cylinder, so it is left empty rather than assumed to be air.",
+                "absent",
+                code="gas_missing",
+                member=f"{path}/oxygen",
+            )
         cylinder.update(blend)
 
     # -- the dive computer -------------------------------------------------------
 
     def read_recordings(
-        self, element: ET.Element, dive: dict[str, Any], where: str
+        self, element: ET.Element, dive: dict[str, Any], where: str, path: str
     ) -> list[dict[str, Any]]:
         """Every `<divecomputer>` on the dive as a §6.4a Recording, in file order.
 
@@ -834,19 +958,23 @@ class _Converter:
         for index, computer in enumerate(children(element, "divecomputer")):
             here = f"{where}/divecomputer/{index}"
             if index == 0:
-                self.read_summary(computer, dive, where)
+                self.read_summary(computer, dive, where, path)
             else:
                 self.drop_summary(computer, here)
+            slot = f"{path}/recordings/{len(recordings)}"
+            since = len(self.notes)
             built = recording(
-                device=self.read_device(computer, here),
-                started_at=self.read_recording_start(computer, dive["started_at"], here),
-                profile=self.read_profile(computer, here),
+                device=self.read_device(computer, here, slot),
+                started_at=self.read_recording_start(computer, dive["started_at"], here, slot),
+                profile=self.read_profile(computer, here, slot),
             )
-            if built is not None:
+            if built is None:
+                unplaced(self.notes, since, slot)
+            else:
                 recordings.append(built)
         return recordings
 
-    def read_device(self, computer: ET.Element, where: str) -> dict[str, Any] | None:
+    def read_device(self, computer: ET.Element, where: str, path: str) -> dict[str, Any] | None:
         """`@model` and the two `<extradata>` keys as a §6.4b Device.
 
         `@model` was read and refused until this section existed, and the reason it was
@@ -880,10 +1008,11 @@ class _Converter:
                 "serial": "the Serial <extradata>",
                 "firmware": "the FW Version <extradata>",
             },
+            path=path,
         )
 
     def read_recording_start(
-        self, computer: ET.Element, dive_start: str, where: str
+        self, computer: ET.Element, dive_start: str, where: str, path: str
     ) -> str | None:
         """`<divecomputer @date @time>` where it states a start of its own.
 
@@ -901,16 +1030,25 @@ class _Converter:
             return None
         parts = _TIME.match(clock)
         if _DATE.match(date) is None or parts is None:
-            self.note(where, "the computer's own date and time are not a date and time; dropped", "dropped")
+            self.computer_start_unreadable(where, path)
             return None
         started_at = f"{date}T{parts['hour']}:{parts['minute']}:{parts['second'] or '00'}"
         try:
             datetime.fromisoformat(started_at)
         except ValueError:
-            self.note(where, "the computer's own date and time are not a date and time; dropped", "dropped")
+            self.computer_start_unreadable(where, path)
             return None
         started_at += parts["fraction"] or ""
         return None if started_at == dive_start else started_at
+
+    def computer_start_unreadable(self, where: str, path: str) -> None:
+        self.note(
+            where,
+            "The dive computer's own date and time are not a date and time; they are left out.",
+            "dropped",
+            code="computer_start_unreadable",
+            member=f"{path}/started_at",
+        )
 
     def drop_summary(self, computer: ET.Element, where: str) -> None:
         """A later element's `<depth>` and `<temperature>`, reported rather than read.
@@ -925,12 +1063,13 @@ class _Converter:
             return
         self.note(
             where,
-            "the dive's greatest depth, mean depth and water temperature are the first <divecomputer>'s, "
-            "and this one records its own; they are dropped rather than averaged or preferred (spec §6.2)",
+            "The dive's maximum depth, average depth and water temperature are the first dive computer's, and "
+            "this one records its own; they are left out rather than averaged or preferred.",
             "dropped",
+            code="second_computer_summary",
         )
 
-    def read_summary(self, computer: ET.Element, dive: dict[str, Any], where: str) -> None:
+    def read_summary(self, computer: ET.Element, dive: dict[str, Any], where: str, path: str) -> None:
         """`<depth>` and `<temperature>` as the dive's own scalars.
 
         These are readings the computer reported rather than summaries of the samples, and
@@ -944,14 +1083,23 @@ class _Converter:
         `drop_summary` refuses in the other direction.
         """
         depth = child(computer, "depth")
-        max_depth = self.positive(self.measure(attribute(depth, "max"), "m", where, "<depth max>"), where, "max_depth", "<depth max>")
-        avg_depth = self.positive(self.measure(attribute(depth, "mean"), "m", where, "<depth mean>"), where, "avg_depth", "<depth mean>")
+        deepest, mean = f"{path}/max_depth", f"{path}/avg_depth"
+        max_depth = self.positive(
+            self.measure(attribute(depth, "max"), "m", where, "<depth max>", deepest), where, "max_depth", "<depth max>",
+            deepest,
+        )
+        avg_depth = self.positive(
+            self.measure(attribute(depth, "mean"), "m", where, "<depth mean>", mean), where, "avg_depth", "<depth mean>",
+            mean,
+        )
         if max_depth is not None and avg_depth is not None and avg_depth > max_depth:
             self.note(
                 where,
-                f"the mean depth {avg_depth} m is deeper than the greatest depth {max_depth} m, which cannot be; "
-                "the mean is dropped rather than either being adjusted to fit (spec §6.2)",
+                f"The average depth {avg_depth} m is deeper than the maximum depth {max_depth} m, which cannot be; the "
+                "average is left out rather than either being adjusted to fit.",
                 "dropped",
+                code="average_below_maximum",
+                member=mean,
             )
             avg_depth = None
         if max_depth is not None:
@@ -959,13 +1107,16 @@ class _Converter:
         if avg_depth is not None:
             dive["avg_depth"] = float(avg_depth)
 
-        water = self.measure(attribute(child(computer, "temperature"), "water"), "C", where, "<temperature water>")
+        water = self.measure(
+            attribute(child(computer, "temperature"), "water"), "C", where, "<temperature water>",
+            f"{path}/bottom_temperature",
+        )
         if water is not None:
             dive["bottom_temperature"] = float(water)
 
     # -- profile -----------------------------------------------------------------
 
-    def read_profile(self, computer: ET.Element, where: str) -> dict[str, Any] | None:
+    def read_profile(self, computer: ET.Element, where: str, path: str) -> dict[str, Any] | None:
         """`<sample>` as a Profile.
 
         Subsurface writes a sample's depth every time and its other readings **only when
@@ -978,7 +1129,7 @@ class _Converter:
         if not samples:
             return None
 
-        axis = SampleAxis(self.note, where, noun="sample", time_member="time")
+        axis = SampleAxis(self.note, where, noun="sample", time_member="time", path=f"{path}/profile")
         for sample in samples:
             axis.offer(milliseconds(self.measure(attribute(sample, "time"), "min", where, "<sample time>")), sample)
 

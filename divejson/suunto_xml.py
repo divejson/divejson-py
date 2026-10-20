@@ -101,6 +101,11 @@ __all__ = [
 # conformance corpus keeps its pairs in. `suunto_xml` rather than `suunto`, because the
 # same vendor's mobile application exports a different format that this package also reads.
 FORMAT = "suunto_xml"
+
+# One document is one dive written by one computer, so a finding's `member` is always under
+# the document's one dive and, for the computer's own figures, its one recording.
+DIVE = "dives/0"
+RECORDING = f"{DIVE}/recordings/0"
 ROOT = "dive"
 
 # The datacontract namespace every one of these documents declares on its root element.
@@ -301,26 +306,29 @@ class _Converter:
 
     # -- reporting ---------------------------------------------------------------
 
-    def note(self, where: str, message: str, kind: NoteKind) -> None:
+    def note(self, where: str, message: str, kind: NoteKind, *, code: str, member: str | None = None) -> None:
         """One line of the report, at a path into the source this conversion read."""
-        self.notes.append(Note(self.scope.where(where), message, kind))
+        self.notes.append(Note(self.scope.where(where), message, kind, code=code, member=member))
 
     # -- readings ----------------------------------------------------------------
 
-    def number(self, element: ET.Element | None, name: str, where: str) -> Decimal | None:
+    def number(
+        self, element: ET.Element | None, name: str, where: str, path: str | None = None
+    ) -> Decimal | None:
         """One element's text as a number, reporting text that is not one.
 
         A nil or empty element is silent: the source recorded nothing, and this format says
         so on every member of every document, so a line per unfilled member would be the
         whole datacontract restated once per dive. Text that is *present* and unreadable is
-        a different thing and is reported.
+        a different thing and is reported. `path` is the document member the number is
+        headed for, where there is one, for the note's `member`.
         """
         raw = _recorded_text(element, name)
         if raw is None:
             return None
         value = decimal_of(raw)
         if value is None:
-            self.note(where, f"<{name}> is not a number this reader can carry; dropped", "dropped")
+            self.note(where, f"<{name}> is not a number, and is left out.", "dropped", code="not_a_number", member=path)
         return value
 
     def scalar(
@@ -338,17 +346,23 @@ class _Converter:
         `read_submerged_time` of its own — an integer member has to be rounded *before* its
         constraint is asked about, and that ordering is the point of separating them.
         """
-        value = self.number(self.root, name, where)
+        path = f"{DIVE if record == 'dive' else RECORDING}/{member}"
+        value = self.number(self.root, name, where, path)
         if value is None:
             return
         if recorded(value, record=record, member=member):
             target[member] = float(value)
+        elif record == "dive":
+            # A depth, the only dive member through here with a floor: a zero is the
+            # computer never having had one, as every other reader reads it.
+            self.note(
+                where, f"<{name}> is {value}, which is no depth; read as not recorded.", "absent",
+                code="depth_zero", member=path,
+            )
         else:
             self.note(
-                where,
-                f"<{name}> is {value}, which is not a value the format's `{member}` can hold; read as "
-                "not recorded",
-                "absent",
+                where, f"<{name}> is {value}, below zero, which it cannot be; it is left out.", "dropped",
+                code="oxygen_figure_negative", member=path,
             )
 
     # -- the run -----------------------------------------------------------------
@@ -483,6 +497,7 @@ class _Converter:
                 "firmware": "<Software>",
                 "dive_number": "<DiveNumberInSerie>",
             },
+            path=RECORDING,
         )
 
     def read_mode(self, where: str) -> str | None:
@@ -500,16 +515,18 @@ class _Converter:
         *stated* value this reader has no table row for is reported, the way an unreadable
         number is; a nil element is not, for the reason `number` gives.
         """
-        stated = self.number(self.root, "Mode", where)
+        stated = self.number(self.root, "Mode", where, f"{RECORDING}/mode")
         if stated is None:
             return None
         mode = DIVE_MODES.get(stated)
         if mode is None:
             self.note(
                 where,
-                f"the export records dive mode {stated}, which is not one the corpus this reader was built "
-                "against states; the recording's mode is left unrecorded rather than assumed (spec §6.4a)",
+                f"The export records the dive mode {stated}, which is not one that can be read; the dive "
+                "computer's mode is left empty rather than assumed.",
                 "dropped",
+                code="dive_mode_unknown",
+                member=f"{RECORDING}/mode",
             )
         return mode
 
@@ -532,10 +549,15 @@ class _Converter:
         if mode == FREEDIVE:
             return None
         return deco_model(
-            {"conservatism": integer_of(self.number(self.root, "PersonalMode", where))},
+            {
+                "conservatism": integer_of(
+                    self.number(self.root, "PersonalMode", where, f"{RECORDING}/deco_model/conservatism")
+                )
+            },
             note=self.note,
             where=where,
             labels={"conservatism": "<PersonalMode>"},
+            path=RECORDING,
         )
 
     def read_started_at(self, where: str) -> str | None:
@@ -557,27 +579,37 @@ class _Converter:
         if raw is None:
             self.note(
                 where,
-                "the export records no <StartTime>, and the format requires a start time; the dive is "
-                "dropped (spec §6.2)",
+                "The export records no <StartTime>, and a dive cannot be logged without a start time; it is left "
+                "out.",
                 "dropped",
+                code="start_time_missing",
             )
             return None
         read = _date_time(raw)
         if read is None:
             self.note(
                 where,
-                "<StartTime> is not a date and time this reader can carry; the dive is dropped (spec §6.2)",
+                "<StartTime> is not a date and time, and a dive cannot be logged without a start time; it is left "
+                "out.",
                 "dropped",
+                code="start_time_unreadable",
             )
             return None
         started_at, seconds = read
         if not seconds:
-            self.note(where, "<StartTime> records no seconds; read as :00", "absent")
+            self.note(
+                where,
+                "<StartTime> records no seconds; read as :00.",
+                "absent",
+                code="start_time_seconds_missing",
+                member=f"{DIVE}/started_at",
+            )
         self.note(
             where,
-            "the source records no UTC offset on the dive's start time; the wall clock travels alone "
-            "(spec §5.2)",
+            "The file gives the start time with no time zone, so it is kept as a local time.",
             "absent",
+            code="start_time_zone_missing",
+            member=f"{DIVE}/started_at",
         )
         return started_at
 
@@ -598,7 +630,7 @@ class _Converter:
         checking before rounding lets that one through and fails the converter's own
         validation. The other readers in this package round first for the same reason.
         """
-        value = self.number(self.root, "Duration", where)
+        value = self.number(self.root, "Duration", where, f"{DIVE}/submerged_time")
         if value is None:
             return
         seconds = rounded(value)
@@ -607,9 +639,10 @@ class _Converter:
         else:
             self.note(
                 where,
-                f"<Duration> is {value} s, which the format cannot hold as a submerged time (§6.2 admits a "
-                "positive whole number of seconds); read as not recorded",
+                f"<Duration> is {value} s, which is no dive time; read as not recorded.",
                 "absent",
+                code="dive_time_zero",
+                member=f"{DIVE}/submerged_time",
             )
 
     def read_depths(self, dive: dict[str, Any], where: str) -> None:
@@ -625,9 +658,11 @@ class _Converter:
         if maximum is not None and average is not None and average > maximum:
             self.note(
                 where,
-                f"the average depth {average} m is deeper than the greatest depth {maximum} m, which cannot "
-                "be; the average is dropped rather than either being adjusted to fit (spec §6.2)",
+                f"The average depth {average} m is deeper than the maximum depth {maximum} m, which cannot be; the "
+                "average is left out rather than either being adjusted to fit.",
                 "dropped",
+                code="average_below_maximum",
+                member=f"{DIVE}/avg_depth",
             )
             del dive["avg_depth"]
 
@@ -647,13 +682,15 @@ class _Converter:
         wrote it in — so reading it would break `converting.md`'s refuse-rather-than-guess
         rule for a member whose every recorded value here is zero in either unit.
         """
-        for name in ("Visibility", "Weather", "Weight"):
+        for name, member in (("Visibility", "visibility"), ("Weather", "weather"), ("Weight", "weight")):
             if _recorded_text(self.root, name) is not None:
                 self.note(
                     where,
-                    f"<{name}> comes from the desktop application's dive-conditions panel in a unit the "
-                    "export does not state, so it is dropped rather than read at a scale nothing states",
+                    f"<{name}> comes from the desktop application's dive conditions in a unit the export does not "
+                    "state, so it is left out rather than read at a scale nothing states.",
                     "dropped",
+                    code="unit_not_stated",
+                    member=f"{DIVE}/{member}",
                 )
 
     def read_surface_pressure(self, readouts: dict[str, float], where: str) -> None:
@@ -664,16 +701,18 @@ class _Converter:
         exports in hand lands in 103 100 to 106 700, which is barometric on the Pascal
         reading and a hundred metres of seawater on the millibar one.
         """
-        pascal = self.number(self.root, "SurfacePressure", where)
+        pascal = self.number(self.root, "SurfacePressure", where, f"{RECORDING}/surface_pressure")
         if pascal is None:
             return
         bar = pascal / PASCALS_PER_BAR
         if not MIN_SURFACE_PRESSURE <= bar <= MAX_SURFACE_PRESSURE:
             self.note(
                 where,
-                f"the export records a surface pressure of {bar} bar, outside the "
-                f"{MIN_SURFACE_PRESSURE} to {MAX_SURFACE_PRESSURE} the format allows; dropped",
+                f"The export records a surface pressure of {bar} bar, outside the {MIN_SURFACE_PRESSURE} to "
+                f"{MAX_SURFACE_PRESSURE} bar air pressure can be at a dive site; it is left out.",
                 "dropped",
+                code="surface_pressure_out_of_range",
+                member=f"{RECORDING}/surface_pressure",
             )
             return
         readouts["surface_pressure"] = float(bar)
@@ -686,9 +725,11 @@ class _Converter:
         if len(mixtures) > MAX_CYLINDERS:
             self.note(
                 where,
-                f"the export describes {len(mixtures)} cylinders, and at most {MAX_CYLINDERS} are read from "
-                "one dive; the rest are dropped",
+                f"The export describes {len(mixtures)} cylinders, and at most {MAX_CYLINDERS} are kept for one dive; "
+                "the rest are left out.",
                 "dropped",
+                code="cylinders_beyond_limit",
+                member=f"{DIVE}/cylinders",
             )
             mixtures = mixtures[:MAX_CYLINDERS]
         return [
@@ -706,16 +747,17 @@ class _Converter:
         would confidently label a deco bottle "bottom". `<Name>` is nil on every mixture and
         §6.3 has no member for it either way.
         """
+        path = f"{DIVE}/cylinders/{number}"
         cylinder: dict[str, Any] = {}
 
-        litres = self.number(mixture, "Size", where)
+        litres = self.number(mixture, "Size", where, f"{path}/volume")
         if litres is not None and recorded(litres, record="cylinder", member="volume"):
             cylinder["volume"] = float(litres)
 
-        self.read_pressures(mixture, cylinder, where)
-        self.read_mix(mixture, cylinder, where)
+        self.read_pressures(mixture, cylinder, where, path)
+        self.read_mix(mixture, cylinder, where, path)
 
-        po2 = self.number(mixture, "PO2", where)
+        po2 = self.number(mixture, "PO2", where, f"{path}/ppo2_limit")
         if po2 is not None:
             if MIN_PO2_LIMIT <= po2 <= MAX_PO2_LIMIT:
                 # Already bar here (`<PO2>1.4</PO2>`), where the app's JSON export of the
@@ -724,9 +766,11 @@ class _Converter:
             else:
                 self.note(
                     where,
-                    f"the cylinder records a ppO₂ limit of {po2} bar, outside the {MIN_PO2_LIMIT} to "
-                    f"{MAX_PO2_LIMIT} the format allows; dropped",
+                    f"The cylinder records a ppO₂ limit of {po2} bar, outside the {MIN_PO2_LIMIT} to "
+                    f"{MAX_PO2_LIMIT} bar a limit can be; it is left out.",
                     "dropped",
+                    code="ppo2_limit_out_of_range",
+                    member=f"{path}/ppo2_limit",
                 )
 
         return _Cylinder(
@@ -736,7 +780,7 @@ class _Converter:
             switches=self.read_switch_times(mixture, where),
         )
 
-    def read_pressures(self, mixture: ET.Element, cylinder: dict[str, Any], where: str) -> None:
+    def read_pressures(self, mixture: ET.Element, cylinder: dict[str, Any], where: str, path: str) -> None:
         """`<StartPressure>` and `<EndPressure>`, in millibar, as one absent-marker pair.
 
         A cylinder with no transmitter has **both** written as `0`, and that pair is this
@@ -749,18 +793,20 @@ class _Converter:
         untransmitted tank in a logbook. A zero end pressure beside a *recorded* start is
         left alone, which is the reading §6.3's `minimum: 0` asks for.
         """
-        start = self.pressure(mixture, "StartPressure", where)
-        end = self.pressure(mixture, "EndPressure", where)
+        start = self.pressure(mixture, "StartPressure", where, f"{path}/start_pressure")
+        end = self.pressure(mixture, "EndPressure", where, f"{path}/end_pressure")
         if start is not None and not recorded(start, record="cylinder", member="start_pressure"):
             paired = end == 0
             self.note(
                 where,
-                "the cylinder's start and end pressures are both 0 bar, which this export writes for a "
-                "cylinder that had no transmitter; read as not recorded (spec §6.3)"
+                "The cylinder's start and end pressures are both 0 bar, which this export writes for a cylinder "
+                "with no transmitter; read as not recorded."
                 if paired
-                else "the cylinder's start pressure is 0 bar, which devices write to mean 'not recorded'; "
-                "read as not recorded (spec §6.3)",
+                else "The cylinder's start pressure is 0 bar, which dive computers write to mean 'not recorded'; "
+                "read as not recorded.",
                 "absent",
+                code="start_pressure_zero",
+                member=f"{path}/start_pressure",
             )
             start = None
             if paired:
@@ -768,9 +814,11 @@ class _Converter:
         if start is not None and end is not None and end > start:
             self.note(
                 where,
-                f"the end pressure {end} bar is above the start pressure {start} bar, which cannot be; the "
-                "end pressure is dropped",
+                f"The end pressure {end} bar is above the start pressure {start} bar, which cannot be; the end "
+                "pressure is left out.",
                 "dropped",
+                code="end_pressure_above_start",
+                member=f"{path}/end_pressure",
             )
             end = None
         if start is not None:
@@ -778,22 +826,25 @@ class _Converter:
         if end is not None:
             cylinder["end_pressure"] = float(end)
 
-    def pressure(self, mixture: ET.Element, name: str, where: str) -> Decimal | None:
+    def pressure(self, mixture: ET.Element, name: str, where: str, path: str) -> Decimal | None:
         """One cylinder pressure in bar from the millibar this export writes."""
-        millibar = self.number(mixture, name, where)
+        millibar = self.number(mixture, name, where, path)
         if millibar is None:
             return None
         bar = millibar / MILLIBAR_PER_BAR
         if not 0 <= bar <= MAX_CYLINDER_PRESSURE:
             self.note(
                 where,
-                f"<{name}> is {bar} bar, outside the 0 to {MAX_CYLINDER_PRESSURE} the format allows; dropped",
+                f"<{name}> is {bar} bar, outside the 0 to {MAX_CYLINDER_PRESSURE} bar a cylinder can hold; it is "
+                "left out.",
                 "dropped",
+                code="pressure_out_of_range",
+                member=path,
             )
             return None
         return bar
 
-    def read_mix(self, mixture: ET.Element, cylinder: dict[str, Any], where: str) -> None:
+    def read_mix(self, mixture: ET.Element, cylinder: dict[str, Any], where: str, path: str) -> None:
         """`<Oxygen>` and `<Helium>`, already whole percent.
 
         The app's JSON export of the same dive writes both as 0-1 fractions, which is the
@@ -803,30 +854,35 @@ class _Converter:
         """
         blend: dict[str, float] = {}
         for member, name in (("oxygen", "Oxygen"), ("helium", "Helium")):
-            percent = self.number(mixture, name, where)
+            percent = self.number(mixture, name, where, f"{path}/{member}")
             if percent is None:
                 continue
             if not 0 <= percent <= 100:
                 self.note(
                     where,
-                    f"<{name}> is {percent} percent, outside the 0 to 100 a mix can be; dropped",
+                    f"<{name}> is {percent} percent, outside the 0 to 100 a mix can be; it is left out.",
                     "dropped",
+                    code="gas_percent_out_of_range",
+                    member=f"{path}/{member}",
                 )
                 continue
             blend[member] = float(percent)
         if blend.get("oxygen", 0.0) + blend.get("helium", 0.0) > 100:
             self.note(
                 where,
-                "oxygen and helium sum above 100 percent, which no mix can; both are dropped (spec §6.3)",
+                "Oxygen and helium add up to more than 100 percent, which no mix can; both are left out.",
                 "dropped",
+                code="gas_over_100_percent",
+                member=path,
             )
             return
         if not blend:
             self.note(
                 where,
-                "the export records no gas for this cylinder; absent means not recorded, never air "
-                "(spec §6.3)",
+                "No gas is recorded for this cylinder, so it is left empty rather than assumed to be air.",
                 "absent",
+                code="gas_missing",
+                member=f"{path}/oxygen",
             )
         cylinder.update(blend)
 
@@ -854,7 +910,13 @@ class _Converter:
             if placed is None:
                 continue
             if placed < 0:
-                self.note(at, f"the gas change is at {in_seconds(placed)} s, before the dive began; dropped", "dropped")
+                self.note(
+                    at,
+                    f"A gas change is at {in_seconds(placed)} s, before the dive began, and is left out.",
+                    "dropped",
+                    code="gas_change_before_start",
+                    member=f"{RECORDING}/profile/events",
+                )
                 continue
             times.append(placed)
         return times
@@ -893,7 +955,7 @@ class _Converter:
         if not samples:
             return self.without_a_profile(events, where)
 
-        axis = SampleAxis(self.note, where, noun="sample", time_member="<Time>")
+        axis = SampleAxis(self.note, where, noun="sample", time_member="<Time>", path=f"{RECORDING}/profile")
         for index, sample in enumerate(samples):
             axis.offer(milliseconds(self.number(sample, "Time", f"{where}/sample/{index}")), sample)
 
@@ -928,12 +990,15 @@ class _Converter:
                 else:
                     out_of_range += 1
         if out_of_range:
+            one = out_of_range == 1
             self.note(
                 where,
-                f"{out_of_range} {'sample records' if out_of_range == 1 else 'samples record'} a tank "
-                f"pressure outside the 0 to {MAX_CYLINDER_PRESSURE} bar the format allows; "
-                f"{'that reading is' if out_of_range == 1 else 'those readings are'} dropped",
+                f"{out_of_range} {'sample records' if one else 'samples record'} a tank pressure outside the 0 to "
+                f"{MAX_CYLINDER_PRESSURE} bar a cylinder can hold; {'that reading is' if one else 'those readings are'} "
+                "left out.",
                 "dropped",
+                code="tank_pressure_readings_out_of_range",
+                member=f"{RECORDING}/profile/pressures",
             )
 
         pressures = self.label_pressures(pressure, cylinders, where)
@@ -977,10 +1042,11 @@ class _Converter:
         if events:
             self.note(
                 where,
-                f"the export records {len(events)} gas "
-                f"{'change' if len(events) == 1 else 'changes'} and the dive has no profile for a marker "
-                "to sit on; dropped (spec §6.4)",
+                f"The export records {len(events)} gas {'change' if len(events) == 1 else 'changes'}, and the dive "
+                f"has no profile to mark {'it' if len(events) == 1 else 'them'} on; left out.",
                 "dropped",
+                code="gas_changes_without_profile",
+                member=f"{RECORDING}/profile/events",
             )
         return None
 
@@ -1012,19 +1078,22 @@ class _Converter:
         if len(claiming) > 1:
             self.note(
                 where,
-                f"{len(claiming)} cylinders record a <TransmitterId> and the sample stream carries one "
-                "unlabelled <Pressure>, so which readings are whose is not in the file; the pressure "
-                "channel is dropped rather than attached to one of them",
+                f"{len(claiming)} cylinders record a <TransmitterId> and the samples carry one unlabelled "
+                "<Pressure>, so which readings are whose is not in the file; the tank pressures are left out "
+                "rather than given to one of them.",
                 "dropped",
+                code="tank_pressures_unmatched",
+                member=f"{RECORDING}/profile/pressures",
             )
             return ()
         if len(cylinders) >= MAX_CYLINDERS:
             self.note(
                 where,
-                "the samples carry tank pressures for a cylinder the export lists nowhere, and this dive "
-                f"already describes the {MAX_CYLINDERS} cylinders that are read from one; the pressure "
-                "channel is dropped",
+                "The samples carry tank pressures for a cylinder the export lists nowhere, and the dive already "
+                f"has the {MAX_CYLINDERS} cylinders kept for one; the tank pressures are left out.",
                 "dropped",
+                code="tank_pressures_unmatched",
+                member=f"{RECORDING}/profile/pressures",
             )
             return ()
         # Evidence of a tank is evidence of a tank: the readings become a cylinder of their
@@ -1034,10 +1103,12 @@ class _Converter:
         cylinders.append(added)
         self.note(
             where,
-            "the samples carry tank pressures and no cylinder records a <TransmitterId>, so the readings "
-            "arrive as a cylinder of their own with no gas, no size and no start or end pressure — the "
-            "export records none of those for it",
+            "The samples carry tank pressures and no cylinder records a <TransmitterId>, so the readings make a "
+            "cylinder of their own, with no gas, size or start and end pressure, the export recording none of "
+            "those for it.",
             "absent",
+            code="cylinder_from_tank_pressures",
+            member=f"{DIVE}/cylinders/{added.number}",
         )
         return ((added.number, pressure),)
 

@@ -31,6 +31,10 @@ def messages(data: bytes) -> list[str]:
     return [note.message for note in convert(data).notes]
 
 
+def codes(data: bytes) -> list[str]:
+    return [note.code for note in convert(data).notes]
+
+
 # -- root shapes ---------------------------------------------------------------------
 
 
@@ -151,7 +155,7 @@ def test_null_island_is_not_a_position() -> None:
     header = "<divesite><site id='s'><name>SS Thistlegorm</name><geography><location>Red Sea</location><latitude>0.000000</latitude><longitude>0.000000</longitude></geography></site></divesite>"
     conversion = convert(one_dive(STARTED_AT, header=header))
     assert "position" not in conversion.document["sites"][0]
-    assert any("Null Island" in note.message for note in conversion.notes)
+    assert [note.member for note in conversion.notes if note.code == "position_zero"] == ["sites/0/position"]
 
 
 def test_a_cylinder_with_no_gas_does_not_get_air() -> None:
@@ -188,7 +192,7 @@ def test_an_offset_less_start_time_stays_offset_less() -> None:
     data = one_dive(before(datetime_text="2026-04-17T11:49:23"))
     found = convert(data).document["dives"][0]
     assert found["started_at"] == "2026-04-17T11:49:23"
-    assert any("no UTC offset" in message for message in messages(data))
+    assert "start_time_zone_missing" in codes(data)
 
 
 def test_a_recorded_offset_travels_unchanged() -> None:
@@ -227,10 +231,8 @@ def test_a_date_with_no_time_of_day_is_a_date_only_start(written: str) -> None:
     assert found == [
         (
             "absent",
-            (
-                f"{written.strip()!r} records a date with no time of day; read as a date-only start rather "
-                "than as midnight (spec §5.2)"
-            ),
+            f"{written.strip()!r} records a date with no time of day, so the dive starts on that day rather than at "
+            "midnight.",
         )
     ]
     # No wall clock, so no offset for it to be missing.
@@ -241,7 +243,7 @@ def test_an_offset_beside_a_date_alone_is_dropped() -> None:
     """A date carries no offset, and one written beside it has nowhere to go."""
     data = one_dive(before(datetime_text="2002-06-18+02:00"))
     assert convert(data).document["dives"][0]["started_at"] == "2002-06-18"
-    assert any("a UTC offset beside a date alone" in message for message in messages(data))
+    assert "start_time_zone_on_a_date" in codes(data)
 
 
 def test_a_date_that_is_not_one_drops_the_dive() -> None:
@@ -253,7 +255,7 @@ def test_a_dive_with_no_start_time_is_dropped_rather_than_dated() -> None:
     data = one_dive("<informationafterdive><greatestdepth>18.4</greatestdepth></informationafterdive>")
     conversion = convert(data)
     assert "dives" not in conversion.document
-    assert any("the dive is dropped" in note.message for note in conversion.notes)
+    assert any(note.code == "start_time_missing" for note in conversion.notes)
 
 
 def test_a_site_with_no_name_is_dropped_along_with_the_reference_to_it() -> None:
@@ -262,7 +264,7 @@ def test_a_site_with_no_name_is_dropped_along_with_the_reference_to_it() -> None
     conversion = convert(one_dive(before("<link ref='s'/>"), header=header))
     assert "sites" not in conversion.document
     assert "site_uuids" not in conversion.document["dives"][0]
-    assert any("cannot be invented" in note.message for note in conversion.notes)
+    assert any(note.code == "site_unnamed" for note in conversion.notes)
 
 
 def test_an_owner_with_nothing_recorded_is_no_diver_at_all() -> None:
@@ -339,7 +341,7 @@ def test_a_birthdate_that_is_not_a_date_is_dropped_and_reported() -> None:
     birthdate = "<birthdate><datetime>1919-02-30</datetime></birthdate>"
     diver, notes = read_owner(owner(f"<firstname>Sam</firstname><lastname>Reef</lastname>{birthdate}"))
     assert diver is not None and "born_on" not in diver
-    assert notes == [("dropped", "diver", "the date of birth is '1919-02-30', which is not a date; dropped")]
+    assert notes == [("dropped", "diver", "The date of birth is '1919-02-30', which is not a date; it is left out.")]
 
 
 def test_the_first_phone_is_read_and_every_other_is_reported() -> None:
@@ -351,8 +353,8 @@ def test_the_first_phone_is_read_and_every_other_is_reported() -> None:
     diver, notes = read_owner(owner(rest=contact))
     assert diver is not None and diver["phone"] == "+44 7700 900123"
     assert [message for _, _, message in notes] == [
-        "§6.1 carries one phone, the first the owner records; <phone> '+44 20 7946 0000' is not read",
-        "§6.1 carries one phone, the first the owner records; <mobilephone> '+44 7700 900999' is not read",
+        "One phone number is kept, the first the owner records; <phone> '+44 20 7946 0000' is left out.",
+        "One phone number is kept, the first the owner records; <mobilephone> '+44 7700 900999' is left out.",
     ]
 
 
@@ -371,8 +373,8 @@ def test_a_phone_past_the_bound_is_dropped_rather_than_cut() -> None:
             "dropped",
             "diver",
             (
-                "the recorded phone is 33 characters and the format allows 32; a number cut short is a wrong "
-                "one, so it is dropped"
+                "The phone number is 33 characters long, more than the 32 kept, and a shortened number is a wrong "
+                "one; it is left out."
             ),
         )
     ]
@@ -387,8 +389,8 @@ def test_an_email_past_the_bound_is_dropped_rather_than_cut() -> None:
             "dropped",
             "diver",
             (
-                f"the recorded email is {len(address)} characters and the format allows 255; an address cut "
-                "short is a wrong one, so it is dropped"
+                f"The email address is {len(address)} characters long, more than the 255 kept, and a shortened "
+                "address is a wrong one; it is left out."
             ),
         )
     ]
@@ -420,7 +422,7 @@ def test_an_insurance_with_no_name_is_dropped_and_reported() -> None:
         (
             "dropped",
             "diver/insurance/0",
-            "the insurance has no name, which the format requires of one as its insurer; it is dropped (spec §6.1)",
+            "An insurance has no insurer's name, and one cannot be kept without it; it is left out.",
         )
     ]
 
@@ -432,7 +434,7 @@ def test_an_insurers_name_past_the_bound_is_capped_and_reported() -> None:
     diver, notes = read_owner(owner(rest=f"<diveinsurances>{insurance}</diveinsurances>"))
     assert diver is not None and diver["insurances"] == [{"provider": "D" * 255}]
     assert [(kind, where) for kind, where, _ in notes] == [("dropped", "diver/insurance/0")]
-    assert "the insurer's name is 300 characters" in notes[0][2]
+    assert "The insurer's name is 300 characters long" in notes[0][2]
 
 
 def test_what_an_insurance_carries_beyond_its_three_members_is_reported() -> None:
@@ -445,9 +447,9 @@ def test_what_an_insurance_carries_beyond_its_three_members_is_reported() -> Non
     diver, notes = read_owner(owner(rest=rest))
     assert diver is not None and diver["insurances"] == [{"provider": "DAN Europe", "expires_on": "2027-03-31"}]
     assert [message for _, _, message in notes] == [
-        "§6.1's Insurance has no member for <aliasname> 'DAN'; it is not read",
-        "§6.1's Insurance has no member for <issuedate>; it is not read",
-        "§6.1's Insurance has no member for <notes>; it is not read",
+        "An insurance's <aliasname> 'DAN' has no place in the logbook; it is left out.",
+        "An insurance's <issuedate> has no place in the logbook; it is left out.",
+        "An insurance's <notes> has no place in the logbook; it is left out.",
     ]
 
 
@@ -646,7 +648,7 @@ def test_a_trippart_naming_no_place_keeps_its_dates_and_loses_its_coordinates() 
         "<longitude>31.24</longitude></geography></trippart>"
     )
     assert trip["parts"] == [{"starts_on": "2026-04-25", "ends_on": "2026-04-26"}]
-    assert "the place is dropped and the rest of the part is kept" in "\n".join(messages)
+    assert "the place is left out and the rest of the part is kept" in "\n".join(messages)
 
 
 def test_a_trippart_naming_no_place_and_undated_says_that_nothing_of_it_is_carried() -> None:
@@ -660,7 +662,7 @@ def test_a_trippart_naming_no_place_and_undated_says_that_nothing_of_it_is_carri
         "<latitude>30.04</latitude><longitude>31.24</longitude></geography></trippart>"
     )
     assert "parts" not in trip
-    assert "the part records no dates and no stay either, so nothing of it is carried" in "\n".join(messages)
+    assert "the part records no dates and no stay either, so nothing of it is kept" in "\n".join(messages)
 
 
 def test_a_trippart_with_neither_a_name_nor_a_date_produces_no_part() -> None:
@@ -729,11 +731,11 @@ def test_a_depth_above_the_surface_goes_alone_and_a_reversed_pair_goes_together(
     which of the two is wrong, so neither is kept."""
     site, report = site_of("<sitedata><maximumdepth>18</maximumdepth><minimumdepth>-2</minimumdepth></sitedata>")
     assert (site.get("depth_from"), site["depth_to"]) == (None, 18.0)
-    assert report == ["<minimumdepth> is -2 m, above the surface; dropped"]
+    assert report == ["<minimumdepth> is -2 m, above the surface; it is left out."]
 
     site, report = site_of("<sitedata><maximumdepth>5</maximumdepth><minimumdepth>12</minimumdepth></sitedata>")
     assert "depth_from" not in site and "depth_to" not in site
-    assert "both are dropped" in report[0]
+    assert "both are left out" in report[0]
 
     site, report = site_of("<sitedata><minimumdepth>0</minimumdepth></sitedata>")
     assert site["depth_from"] == 0.0 and report == []
@@ -742,7 +744,7 @@ def test_a_depth_above_the_surface_goes_alone_and_a_reversed_pair_goes_together(
 def test_a_sites_altitude_outside_the_format_range_is_dropped_and_reported() -> None:
     site, report = site_of("<geography><location>Lake Titicaca</location><altitude>8000</altitude></geography>")
     assert "altitude" not in site
-    assert report == ["<altitude> is 8000 m, outside the -450 to 6500 the format allows; dropped"]
+    assert report == ["<altitude> is 8000 m, outside the -450 to 6500 m a dive can be at; it is left out."]
 
 
 def test_what_a_site_records_and_the_format_does_not_is_named_once_per_element() -> None:
@@ -758,7 +760,7 @@ def test_what_a_site_records_and_the_format_does_not_is_named_once_per_element()
         "<wreck><name>B</name></wreck></sitedata>"
         "<rating><ratingvalue>7</ratingvalue></rating><rating><ratingvalue>9</ratingvalue></rating>"
     )
-    named = [message.removeprefix("§6.10 has no member for ").removesuffix("; it is not read") for message in report]
+    named = [message.removesuffix(" on a site has no place in the logbook; it is left out.") for message in report]
     assert named == [
         "<environment>",
         "<ecology>",
@@ -830,7 +832,7 @@ def test_a_dive_linking_a_base_or_a_shop_carries_it_as_its_contact_and_not_as_a_
     assert base != shop
     assert (
         "dive/0",
-        "the dive links 2 contacts and §6.2 carries one; the first is kept and the rest are dropped",
+        "The dive links 2 contacts and keeps one; the first is kept and the rest are left out.",
     ) in report
     assert not [message for _, message in report if "not a dive site" in message]
 
@@ -842,7 +844,7 @@ def test_the_placeholder_base_a_writer_emits_is_skipped_and_reported() -> None:
         dive_linking(),
     )
     assert "contacts" not in document
-    assert [where for where, message in report if "placeholder" in message] == ["divebase/0"]
+    assert [where for where, message in report if "fills the place of a dive base" in message] == ["divebase/0"]
 
 
 def one_part(part: str) -> str:
@@ -890,7 +892,7 @@ def test_a_contact_with_no_name_is_dropped_and_the_link_to_it_with_it() -> None:
     )
     assert "contacts" not in document and "contact_uuid" not in document["dives"][0]
     assert any(where == "divebase/0" and "has no name" in message for where, message in report)
-    assert any(where == "dive/0" and "which is not read" in message for where, message in report)
+    assert any(where == "dive/0" and "which is not kept" in message for where, message in report)
 
 
 def test_an_inline_accommodation_folds_into_the_base_it_names() -> None:
@@ -913,7 +915,7 @@ def test_an_inline_accommodation_folds_into_the_base_it_names() -> None:
     assert contact["address"] == {"city": "Dahab", "country": "Egypt"}
     assert document["trips"][0]["parts"][0]["accommodation_uuid"] == contact["uuid"]
     assert any(
-        where == "trip/0/trippart/0/accomodation" and "states its phone as '+20 69 555 0100'" in message
+        where == "trip/0/trippart/0/accomodation" and "gives its phone as '+20 69 555 0100'" in message
         for where, message in report
     )
 
@@ -1047,8 +1049,8 @@ def test_a_contacts_phone_email_and_website_are_read_on_the_owners_terms_and_the
     assert {"phone", "email", "website"}.isdisjoint(contact)
     reported = "\n".join(message for where, message in report if where == "divebase/0")
     for said in ("<aliasname> 'BHD'", "<rating>", "<contact><language>", "<contact><fax>", "'+20 100'",
-                 "'desk@bluehole.example' is not read", "'https://bluehole.example/' is not read",
-                 "not an address", "not an absolute URL", "a number cut short"):
+                 "'desk@bluehole.example' is left out", "'https://bluehole.example/' is left out",
+                 "not an address", "not a full web address", "a shortened number"):
         assert said in reported
 
 
@@ -1132,8 +1134,8 @@ def test_a_buddy_with_no_name_is_dropped_and_every_link_to_it_with_it() -> None:
         dive_linking("b1"),
     )
     assert "people" not in document and "people" not in document["dives"][0]
-    assert [where for where, message in report if "the buddy has no name" in message] == ["buddy/0", "buddy/1"]
-    assert ("dive/0", "a link points at the buddy 'b1', which is not read; the reference goes with it") in report
+    assert [where for where, message in report if "The buddy has no name" in message] == ["buddy/0", "buddy/1"]
+    assert ("dive/0", "A link points at the buddy 'b1', which is not kept; the link goes with it.") in report
 
 
 def test_what_a_person_does_not_carry_is_reported_and_never_dropped_in_silence() -> None:
@@ -1163,7 +1165,7 @@ def test_what_a_person_does_not_carry_is_reported_and_never_dropped_in_silence()
     reported = [message for where, message in report if where == "buddy/0"]
     for said in ("<address>", "<equipment>", "<medical>", "<education>", "<divepermissions>", "<diveinsurances>",
                  "<personal><membership>", "<personal><birthdate>", "<contact><language>", "<contact><homepage>",
-                 "'+44 2' is not read", "'ada@work.example' is not read"):
+                 "'+44 2' is left out", "'ada@work.example' is left out"):
         assert sum(said in message for message in reported) == 1, said
     # An empty `<sex/>` records nothing, so there is nothing to report.
     assert not [message for message in reported if "<sex>" in message]
@@ -1205,7 +1207,7 @@ def test_a_dive_linking_a_bases_guide_names_its_buddy_as_the_guide() -> None:
     assert references(document) == [("Moh", "guide")]
     assert document["dives"][0]["contact_uuid"] == document["contacts"][0]["uuid"]
     assert [message for where, message in report if where == "divebase/0"] == [
-        "§6.18 has no member for <guide>; it is not read"
+        "<guide> on a contact has no place in the logbook; it is left out."
     ]
 
 
@@ -1225,7 +1227,7 @@ def test_a_person_linked_twice_is_one_reference_at_the_first_links_place(links, 
     )
     assert references(document) == expected
     (repeat,) = [message for where, message in report if where == "dive/0" and "times" in message]
-    assert f"one reference is kept, as {expected[0][1]}, and the rest are dropped" in repeat
+    assert f"one link is kept, as {expected[0][1]}, and the rest are left out" in repeat
 
 
 def test_a_guide_whose_link_names_no_buddy_that_is_read_takes_the_reference_with_it() -> None:
@@ -1238,15 +1240,14 @@ def test_a_guide_whose_link_names_no_buddy_that_is_read_takes_the_reference_with
     assert "people" not in document["dives"][0]
     assert (
         "dive/0",
-        "a link points at the guide 'g1', whose own link names no buddy that is read; the reference goes with it",
+        "A link points at the guide 'g1', whose own link names no buddy that is kept; the link goes with it.",
     ) in report
 
 
 def test_a_link_to_something_no_reader_carries_is_still_reported() -> None:
     """A link to an id this reader carries nowhere — here the owner's — is dropped with a note."""
     _, report = contacts_of(buddies(buddy("b1", "Moh")), dive_linking("owner", "b1"))
-    assert ("dive/0", "a link points at 'owner', which is not a dive site this converter carries; the reference is "
-            "dropped") in report
+    assert ("dive/0", "A link points at 'owner', which is not a dive site that is kept; the link is left out.") in report
 
 
 def test_the_empty_buddy_shearwater_cloud_writes_is_reported() -> None:
@@ -1254,7 +1255,7 @@ def test_the_empty_buddy_shearwater_cloud_writes_is_reported() -> None:
     report says what became of it."""
     conversion = convert((FIXTURES / "uddf" / "shearwater-cloud-cns.uddf").read_bytes())
     assert "people" not in conversion.document
-    assert [note.where for note in conversion.notes if "the buddy has no name" in note.message] == ["buddy/0"]
+    assert [note.where for note in conversion.notes if note.code == "person_unnamed"] == ["buddy/0"]
 
 
 # -- identity ------------------------------------------------------------------------
@@ -1289,14 +1290,14 @@ def test_two_records_of_one_kind_sharing_an_id_is_reported_and_the_second_droppe
     )
     conversion = convert(one_dive(STARTED_AT, header=header))
     assert [site["name"] for site in conversion.document["sites"]] == ["One"]
-    assert any("cannot share one identity" in note.message for note in conversion.notes)
+    assert any(note.code == "identifier_repeated" for note in conversion.notes)
 
 
 def test_a_record_with_no_id_gets_a_positional_identity_and_says_so() -> None:
     header = "<divesite><site><name>Unnamed by its writer</name></site></divesite>"
     conversion = convert(one_dive(STARTED_AT, header=header))
     assert len(conversion.document["sites"]) == 1
-    assert any("derived from its position" in note.message for note in conversion.notes)
+    assert any(note.code == "identity_from_position" for note in conversion.notes)
 
 
 # -- the profile ---------------------------------------------------------------------
@@ -1357,7 +1358,7 @@ def test_a_dropped_waypoint_is_reported_at_its_own_position_in_the_file() -> Non
         "<waypoint><depth>3.0</depth></waypoint>"
     )
     conversion = convert(one_dive(f"{STARTED_AT}<samples>{samples}</samples>"))
-    dropped = [note.where for note in conversion.notes if "no place on the profile" in note.message]
+    dropped = [note.where for note in conversion.notes if note.code == "sample_time_missing"]
     assert dropped == ["dive/0/waypoint/0", "dive/0/waypoint/2"]
 
 
@@ -1387,7 +1388,7 @@ def test_waypoints_landing_on_one_millisecond_keep_the_first() -> None:
     found = profile_of(convert(data).document["dives"][0])
     assert found["depth"]["times"] == [30_400]
     assert found["depth"]["values"] == [100]
-    assert any("two waypoints are both at 30.4 s" in message for message in messages(data))
+    assert any("Two waypoints are both at 30.4 s" in message for message in messages(data))
 
 
 def test_waypoints_with_no_usable_reading_produce_no_profile_and_say_so() -> None:
@@ -1405,13 +1406,13 @@ def test_waypoints_with_no_usable_reading_produce_no_profile_and_say_so() -> Non
     )
     data = one_dive(f"{STARTED_AT}<samples>{samples}</samples>")
     assert profile_of(convert(data).document["dives"][0]) is None
-    assert "the dive's 2 waypoints carry a time but no reading this format can hold" in " ".join(messages(data))
+    assert "The dive's 2 waypoints carry a time and no reading that can be kept" in " ".join(messages(data))
 
 
 def test_the_report_counts_one_waypoint_in_the_singular() -> None:
     """A diver reads these lines. `1 waypoints` is the tell that nobody did."""
     data = one_dive(f"{STARTED_AT}<samples><waypoint><depth/><divetime>0</divetime></waypoint></samples>")
-    assert "the dive's 1 waypoint carries a time but no reading this format can hold" in " ".join(messages(data))
+    assert "The dive's 1 waypoint carries a time and no reading that can be kept" in " ".join(messages(data))
 
 
 def test_a_dive_with_no_samples_at_all_is_not_reported() -> None:
@@ -1427,7 +1428,7 @@ def test_a_waypoint_with_no_time_has_no_place_on_the_axis() -> None:
     samples = "<waypoint><depth>1.0</depth></waypoint><waypoint><depth>2.0</depth><divetime>10</divetime></waypoint>"
     data = one_dive(f"{STARTED_AT}<samples>{samples}</samples>")
     assert profile_of(convert(data).document["dives"][0])["depth"]["times"] == [10_000]
-    assert any("no place on the profile's time axis" in message for message in messages(data))
+    assert "sample_time_missing" in codes(data)
 
 
 def test_two_cylinders_on_one_blend_keep_separate_pressure_channels() -> None:
@@ -1559,7 +1560,7 @@ def test_a_counter_with_no_computer_to_belong_to_is_reported() -> None:
     nothing; §6.4b puts the counter on a device and there is no device to put it on."""
     data = one_dive(before("<internaldivenumber>118</internaldivenumber>"))
     assert "recordings" not in convert(data).document["dives"][0]
-    assert any("no device to carry it" in message for message in messages(data))
+    assert "dive_counter_without_computer" in codes(data)
 
 
 SURFACE = "<surfacepressure>101300</surfacepressure>"
@@ -1592,7 +1593,8 @@ def test_on_a_dive_linking_two_computers_it_is_the_first_ones_and_says_so() -> N
     ]
     resolved = [note for note in conversion.notes if note.kind == "resolved"]
     assert [note.where for note in resolved] == ["dive/0"]
-    assert "the dive states <surfacepressure> once and has 2 recordings" in resolved[0].message
+    assert "The dive states <surfacepressure> once and was recorded by 2 dive computers" in resolved[0].message
+    assert resolved[0].member == "dives/0/recordings/0/surface_pressure"
 
 
 def test_the_surface_pressure_carries_the_first_link_past_the_carve_out() -> None:
@@ -1745,7 +1747,7 @@ def test_a_gradient_factor_pair_outside_the_range_takes_the_other_half_with_it()
         "algorithm": "buhlmann"
     }
     assert any("whole percent from 0 to 100" in message for message in messages(data))
-    assert any("both or neither" in message for message in messages(data))
+    assert "gradient_factor_unpaired" in codes(data)
 
 
 def test_an_inverted_gradient_factor_pair_costs_the_pair_and_not_the_file() -> None:
@@ -1760,7 +1762,7 @@ def test_an_inverted_gradient_factor_pair_costs_the_pair_and_not_the_file() -> N
     )
     body = before('<link ref="m" />') + ONE_SAMPLE
     assert _recording(body, header=header)["deco_model"] == {"algorithm": "buhlmann"}
-    assert any("§3 rule 6" in message for message in messages(one_dive(body, header=header)))
+    assert "gradient_factors_inverted" in codes(one_dive(body, header=header))
 
 
 @pytest.mark.parametrize(
@@ -1802,7 +1804,7 @@ def test_a_mid_dive_mode_change_is_dropped_rather_than_labelled() -> None:
     body = f"{STARTED_AT}<samples>{samples}</samples>"
     assert _recording(body)["mode"] == "open_circuit"
     assert "events" not in _recording(body)["profile"]
-    assert any("the dive mode changes to" in message for message in messages(one_dive(body)))
+    assert "dive_mode_change" in codes(one_dive(body))
 
 
 @pytest.mark.parametrize("attribute", ['type="gauge"', ""])
@@ -1813,7 +1815,7 @@ def test_a_dive_mode_uddf_does_not_spell_is_reported_rather_than_assumed(attribu
     assert "mode" not in _recording(body)
     said = "the dive mode 'gauge'" if attribute else "no dive mode"
     assert any(
-        f"a waypoint records {said}, which is not one of the five UDDF spells" in message
+        f"A waypoint records {said}, which is not one of the five UDDF names" in message
         for message in messages(one_dive(body))
     )
 
@@ -1900,7 +1902,7 @@ def test_a_platform_the_format_has_no_entry_type_for_is_reported(written: str) -
     body = before(f"<platform>{written}</platform>")
     assert "entry_type" not in dive(body)
     assert _reported(body) == [
-        ("dropped", f"<platform> is {written!r}, which §6.2's entry_type has no value for; it is not read")
+        ("dropped", f"<platform> is {written!r}, which the logbook's entry type has no value for; it is left out.")
     ]
 
 
@@ -1932,8 +1934,8 @@ def test_a_rating_is_half_of_uddfs_rounded_up_and_says_so(written: str, rating: 
     assert _reported(body) == [
         (
             "resolved",
-            f"UDDF rates a dive 1 to 10 and the format 1 to 5; <ratingvalue> {written} is read as {rating}, half "
-            "of it rounded up (spec §6.2)",
+            f"UDDF rates a dive 1 to 10 and the logbook 1 to 5; <ratingvalue> {written} is read as {rating}, half "
+            "of it rounded up.",
         )
     ]
 
@@ -2016,7 +2018,7 @@ def test_a_material_the_format_does_not_name_is_reported() -> None:
     data = _linked("", "<tank id='t1'><name>Old</name><tankmaterial>bronze</tankmaterial></tank>")
     conversion = convert(data)
     assert "material" not in conversion.document["gear"][0]
-    assert any("does not name 'bronze'" in note.message for note in conversion.notes)
+    assert any(note.code == "tank_material_unknown" and "'bronze'" in note.message for note in conversion.notes)
 
 
 @pytest.mark.parametrize(("element", "gear_type"), [("rebreather", "rebreather"), ("scooter", "scooter")])
@@ -2071,12 +2073,12 @@ def test_a_second_vessel_on_one_tankdata_is_dropped() -> None:
     conversion = convert(_linked('<tankdata><link ref="m"/><link ref="t1"/><link ref="t2"/></tankdata>', _STEEL, other))
     vessels = {item["name"]: item["uuid"] for item in conversion.document["gear"]}
     assert conversion.document["dives"][0]["cylinders"][0]["gear_uuid"] == vessels["Sidemount steel"]
-    assert any("a second vessel, 't2'" in note.message for note in conversion.notes)
+    assert any("a second tank, 't2'" in note.message for note in conversion.notes)
 
 
 @pytest.mark.parametrize(
     ("ref", "said"),
-    [("nowhere", "which nothing in the file defines"), ("rg", "neither a gas nor a piece of kit")],
+    [("nowhere", "which nothing in the file defines"), ("rg", "neither a gas nor a piece of gear")],
 )
 def test_a_link_to_neither_a_gas_nor_kit_is_reported(ref: str, said: str) -> None:
     conversion = convert(_linked(f'<tankdata><link ref="m"/><link ref="{ref}"/></tankdata>', _STEEL))
