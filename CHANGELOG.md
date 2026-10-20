@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.31.0
+
 - **A finding names its code and the member it is about, in a diver's words.** `Note` gains
   `code`, the stable name of the habit it reports, and `member`, the document path of the
   value it is about — `dives/0/cylinders/0/oxygen` — or `None` for a record or a file as a
