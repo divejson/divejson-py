@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.32.0
+
 - **A contact carries its position.** §6.18 of
   [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md)
   gives a contact an OPTIONAL `position` — where its door, pier or mooring is — so
