@@ -153,10 +153,12 @@ LOST: dict[str, frozenset[str]] = {
             "gear",
             "dives/0/gear_uuids",
             # The contact goes out as a `<divebase>` with a copy on the first part, which say
-            # `dive_center` and `accommodation` back of its four roles; its `created_at` and
-            # its producer's extension have no slot. Its references from the course, the card
-            # and the service record go with those records, which are lost whole above.
+            # `dive_center` and `accommodation` back of its four roles; its position, its
+            # `created_at` and its producer's extension have no slot. Its references from the
+            # course, the card and the service record go with those records, which are lost
+            # whole above.
             "contacts/0/roles",
+            "contacts/0/position",
             "contacts/0/created_at",
             "contacts/0/extensions",
             # An `instructor` and a `student` have no spelling on a dive, and the third dive's
@@ -177,8 +179,10 @@ LOST: dict[str, frozenset[str]] = {
             "certifications",
             "gear_service_records",
             "dives/0/course_uuid",
-            # Blue Hole Divers: a base and a copy say two of its four roles back.
+            # Blue Hole Divers: a base and a copy say two of its four roles back, and a base
+            # has no slot for its position.
             "contacts/0/roles",
+            "contacts/0/position",
             "contacts/0/created_at",
             # Grandma's house and the liveaboard: a base and the copies say `dive_center` and
             # `accommodation`, which is not what either recorded.

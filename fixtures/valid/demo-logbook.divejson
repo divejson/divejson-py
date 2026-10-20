@@ -4237,6 +4237,10 @@
         "region": "Santa Cruz de Tenerife",
         "country": "Spain"
       },
+      "position": {
+        "latitude": 28.0828,
+        "longitude": -16.7366
+      },
       "notes": "Boat dives from the harbour; rooms above the shop.",
       "created_at": "2026-08-10T15:07:16.981530Z"
     }

@@ -703,6 +703,7 @@
         "email": { "type": "string", "format": "email", "maxLength": 255 },
         "website": { "type": "string", "format": "uri", "maxLength": 512 },
         "address": { "$ref": "#/$defs/address" },
+        "position": { "$ref": "#/$defs/position" },
         "notes": { "$ref": "#/$defs/notes" },
         "created_at": { "$ref": "#/$defs/date_time" },
         "extensions": { "$ref": "#/$defs/extensions" }

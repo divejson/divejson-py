@@ -917,6 +917,10 @@
         "region": "Southland",
         "country": "New Zealand"
       },
+      "position": {
+        "latitude": -44.6722,
+        "longitude": 167.9237
+      },
       "notes": "Runs the fiord boat, fills trimix, and has bunks above the shop.",
       "created_at": "2026-06-01T08:30:00+12:00",
       "extensions": {
