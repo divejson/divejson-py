@@ -57,7 +57,6 @@ NOTE_CODES: dict[str, str] = {
     "avg_depth_worked_out": "the average depth was worked out from the depth profile",
     "depth_zero": "a depth of zero or less is read as not recorded",
     "average_below_maximum": "the average depth is deeper than the maximum; the average is left out",
-    "value_not_recorded": "a figure the file writes to mean 'not recorded' is read as not recorded",
     "visibility_is_a_rating": "the file rates visibility in stars where the logbook keeps metres; it is left out",
     "visibility_negative": "a visibility below zero is left out",
     "weight_negative": "a weight below zero is left out",

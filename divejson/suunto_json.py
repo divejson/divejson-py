@@ -976,8 +976,8 @@ class _Converter:
             cylinder["volume"] = float(volume)
 
         pressures = (
-            self.bar(_number(gas.get("StartPressure")), where, path),
-            self.bar(_number(gas.get("EndPressure")), where, path),
+            self.bar(_number(gas.get("StartPressure")), where, f"{path}/start_pressure"),
+            self.bar(_number(gas.get("EndPressure")), where, f"{path}/end_pressure"),
         )
         self.set_pressures(cylinder, pressures, where, path)
 
@@ -1063,7 +1063,13 @@ class _Converter:
             cylinder: dict[str, Any] = {}
             first, last = pressures.get(number, (None, None))
             self.set_pressures(
-                cylinder, (self.pressure(first, where, path), self.pressure(last, where, path)), where, path
+                cylinder,
+                (
+                    self.pressure(first, where, f"{path}/start_pressure"),
+                    self.pressure(last, where, f"{path}/end_pressure"),
+                ),
+                where,
+                path,
             )
             self.gas_missing(where, path)
             cylinders.append(cylinder)

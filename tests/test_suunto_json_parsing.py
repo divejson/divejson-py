@@ -503,6 +503,9 @@ def test_a_pressure_past_what_the_format_allows_is_dropped() -> None:
     conversion = _conversion(_gas_block(StartPressure=40_000_000))
     assert conversion.document["dives"][0]["cylinders"] == [{"role": "bottom"}]
     assert any("outside the 0 to 350" in message for message in _messages(conversion, "dropped"))
+    assert [note.member for note in conversion.notes if note.code == "pressure_out_of_range"] == [
+        "dives/0/cylinders/0/start_pressure"
+    ]
 
 
 def test_a_transmitter_reading_past_that_range_is_dropped_too() -> None:
@@ -527,6 +530,9 @@ def test_a_transmitter_reading_past_that_range_is_dropped_too() -> None:
         cylinder = conversion.document["dives"][0]["cylinders"][0]
         assert dropped not in cylinder and kept in cylinder
         assert any("outside the 0 to 350" in message for message in _messages(conversion, "dropped"))
+        assert [note.member for note in conversion.notes if note.code == "pressure_out_of_range"] == [
+            f"dives/0/cylinders/0/{dropped}"
+        ]
 
 
 def test_more_cylinders_than_one_dive_may_describe_are_capped_and_reported() -> None:

@@ -1390,7 +1390,10 @@ class _Converter:
                 member=f"{path}/oxygen",
             )
 
-        start, end = (self.pressure(value, where, path) for value in pressures)
+        start, end = (
+            self.pressure(value, where, f"{path}/{member}")
+            for value, member in zip(pressures, ("start_pressure", "end_pressure"))
+        )
         if start is not None and not recorded(start, record="cylinder", member="start_pressure"):
             # §6.3 is explicit: a recorded zero start pressure is a device's absent-marker
             # rather than a measurement, and writers must not emit one.

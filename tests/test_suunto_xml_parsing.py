@@ -203,6 +203,20 @@ def test_a_zero_depth_is_a_placeholder_and_a_zero_oxygen_clock_is_a_reading() ->
     assert found["recordings"][0]["cns_start"] == 0.0
 
 
+def test_a_refused_depth_and_oxygen_figure_carry_the_codes_every_reader_gives_them() -> None:
+    """One habit, one code, whichever reader raised it: an application keying on them sees
+    this export's too."""
+    found = [
+        (note.kind, note.code, note.member)
+        for note in notes("<MaxDepth>0</MaxDepth><CnsEnd>-1</CnsEnd>")
+        if note.code not in ("start_time_zone_missing", "identity_from_position")
+    ]
+    assert found == [
+        ("absent", "depth_zero", "dives/0/max_depth"),
+        ("dropped", "oxygen_figure_negative", "dives/0/recordings/0/cns_end"),
+    ]
+
+
 def test_an_average_deeper_than_the_maximum_drops_the_average() -> None:
     found = one("<MaxDepth>20.5</MaxDepth><AvgDepth>25.1</AvgDepth>")
     assert found["max_depth"] == 20.5

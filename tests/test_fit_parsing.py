@@ -734,6 +734,9 @@ def test_a_pressure_past_the_formats_ceiling_is_dropped() -> None:
     conversion = _run(data)
     assert conversion.document["dives"][0]["cylinders"] == [{"end_pressure": 64.0}]
     assert any("outside the 0 to 350" in text for text in _messages(conversion, "dropped"))
+    assert [note.member for note in conversion.notes if note.code == "pressure_out_of_range"] == [
+        "dives/0/cylinders/0/start_pressure"
+    ]
 
 
 def test_a_bare_tank_summary_naming_a_pod_and_no_pressures_grows_no_cylinder() -> None:

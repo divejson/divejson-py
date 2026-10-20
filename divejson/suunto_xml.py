@@ -352,13 +352,17 @@ class _Converter:
             return
         if recorded(value, record=record, member=member):
             target[member] = float(value)
+        elif record == "dive":
+            # A depth, the only dive member through here with a floor: a zero is the
+            # computer never having had one, as every other reader reads it.
+            self.note(
+                where, f"<{name}> is {value}, which is no depth; read as not recorded.", "absent",
+                code="depth_zero", member=path,
+            )
         else:
             self.note(
-                where,
-                f"<{name}> is {value}, which dive computers write to mean 'not recorded'; read as not recorded.",
-                "absent",
-                code="value_not_recorded",
-                member=path,
+                where, f"<{name}> is {value}, below zero, which it cannot be; it is left out.", "dropped",
+                code="oxygen_figure_negative", member=path,
             )
 
     # -- the run -----------------------------------------------------------------
