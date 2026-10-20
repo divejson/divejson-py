@@ -1185,6 +1185,22 @@ def test_a_contact_that_is_only_a_shop_goes_out_as_a_shop_and_says_its_role_back
     assert messages(source, "contacts/0") == []
 
 
+def test_a_contacts_position_has_no_slot_and_is_reported(schema) -> None:
+    """A base's and a shop's address carry no coordinates, and neither has a `<geography>`."""
+    source = one_dive(contact_uuid=CONTACT_UUID)
+    source["contacts"] = [
+        contact(
+            roles=["dive_center"],
+            address={"city": "Dahab", "country": "Egypt"},
+            position={"latitude": 28.5, "longitude": 34.5},
+        )
+    ]
+    text = written(source, schema)
+    assert "28.5" not in text
+    assert "position" not in read_back(source)["contacts"][0]
+    assert messages(source, "contacts/0") == ["UDDF has no slot for position; it is not written"]
+
+
 @pytest.mark.parametrize(
     ("roles", "said"),
     [

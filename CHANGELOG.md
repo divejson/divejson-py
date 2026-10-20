@@ -7,6 +7,13 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **A contact carries its position.** §6.18 of
+  [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md)
+  gives a contact an OPTIONAL `position` — where its door, pier or mooring is — so
+  `divejson validate` accepts one. UDDF's dive base and shop have no `<geography>` and their
+  address carries no coordinates, so the UDDF writer leaves the position out and reports it
+  dropped, as it does a contact's `created_at`. The reader does not change.
+
 ## 0.31.0
 
 - **A finding names its code and the member it is about, in a diver's words.** `Note` gains
