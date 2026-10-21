@@ -125,7 +125,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.15"
 
       - name: Work out the version, and write it into the two files that carry it
         id: bump

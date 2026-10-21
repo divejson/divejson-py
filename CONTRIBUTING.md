@@ -51,8 +51,8 @@ divejson conform fixtures --strict
 
 The tests cover the converter — the unit conversions above all, where a wrong factor
 produces a document that validates perfectly and describes a dive nobody took. CI runs
-them on the Python floor, on a current version, and on the version the applications that
-install this package run; it also builds the sdist, builds the wheel from *that*, and
+them on the Python floor, on a current version, on the version the applications that
+install this package run, and on the newest; it also builds the sdist, builds the wheel from *that*, and
 checks that an installed copy resolves the schema it carries with no checkout anywhere
 near it. That last one is the failure this arrangement is most exposed to: the package
 and the corpus sit in one tree here and in different worlds everywhere else.
