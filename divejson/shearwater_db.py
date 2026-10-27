@@ -59,9 +59,11 @@ from .converter import (
     NoteKind,
     Reporter,
     Scope,
+    decimal_of,
     deco_model,
     device,
     header,
+    integer_of,
     recorded,
     recording,
     rounded,
@@ -1112,8 +1114,10 @@ class _Converter:
         if raw is None or str(raw).strip() == "":
             return None
         text = str(raw).strip()
-        if re.fullmatch(r"-?\d+", text):
-            return int(text)
+        # Through `decimal_of`, so a number too long to carry is no number rather than a crash.
+        number = integer_of(decimal_of(text)) if re.fullmatch(r"-?\d+", text) else None
+        if number is not None:
+            return number
         self.note(
             where, "Shearwater Cloud's dive number is not a number, and is left out.", "dropped",
             code="not_a_number", member=f"{path}/number",
@@ -1409,7 +1413,7 @@ class _Converter:
                 tenths = struct.unpack_from(">H", closing0, 4)[0]
                 stated = summary.get("MaxDepth")
                 checks.append(
-                    ("the maximum depth", None if not isinstance(stated, (int, float)) else round(stated * 10), tenths)
+                    ("the maximum depth", _scaled(stated, 10), tenths)
                 )
         if details is not None:
             checks.append(
@@ -1421,7 +1425,7 @@ class _Converter:
                 checks.append(
                     (
                         "the surface pressure",
-                        None if not isinstance(surface, (int, float)) else round(surface),
+                        _scaled(surface, 1),
                         struct.unpack_from(">H", log.openings[1], 16)[0],
                     )
                 )
@@ -1437,6 +1441,16 @@ class _Converter:
                 "dropped",
                 code="summary_disagrees",
             )
+
+
+def _scaled(value: Any, scale: int) -> int | None:
+    """A sidecar's number times `scale`, to the nearest whole — or nothing for one that is not
+    a number this package can carry, `NaN` and `1e999` among them: a cross-check never fails
+    the file."""
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return None
+    figure = decimal_of(repr(value))
+    return None if figure is None else rounded(figure * scale)
 
 
 def _first_tank(raw: Any) -> dict[str, Any] | None:

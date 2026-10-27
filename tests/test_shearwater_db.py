@@ -229,6 +229,25 @@ def test_a_log_with_no_logbook_details_converts_from_the_log_alone() -> None:
     assert "number" not in dive and device_of(dive)["dive_number"] == 8
 
 
+@pytest.mark.parametrize(
+    "sidecar",
+    ['{"DiveTimeInSeconds": 3718, "MaxDepth": NaN}', '{"DiveTimeInSeconds": 3718, "MaxDepth": 1e999}'],
+    ids=["nan", "overflow"],
+)
+def test_a_summary_holding_no_finite_number_cannot_fail_the_file(sidecar) -> None:
+    conversion = _conversion(sw.database([sw.row(sw.log([sw.sample()]), data_bytes_3=sidecar.encode())]))
+    assert len(conversion.document["dives"]) == 1
+
+
+def test_a_logbook_number_too_long_to_carry_is_reported_not_raised() -> None:
+    data = sw.database(
+        [sw.row(sw.log([sw.sample()]))], details=[{"DiveId": "1588035071789987697", "DiveNumber": "9" * 5000}]
+    )
+    conversion = _conversion(data)
+    assert "number" not in conversion.document["dives"][0]
+    assert "not_a_number" in _codes(conversion, "dropped")
+
+
 def test_the_logbooks_number_is_the_diver_and_the_counter_is_the_devices() -> None:
     data = sw.database(
         [sw.row(sw.log([sw.sample()], number=3))], details=[{"DiveId": "1588035071789987697", "DiveNumber": "112"}]
