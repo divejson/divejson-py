@@ -46,6 +46,7 @@ from .converter import (
     deco_model,
     device,
     header,
+    recorded,
     recording,
     rounded,
 )
@@ -241,15 +242,15 @@ class _Converter:
         dive: dict[str, Any] = {"uuid": claimed, "started_at": started_at}
 
         seconds = _whole(self.log, "maxTime")
-        if seconds is not None and seconds > 0:
+        if seconds is not None and recorded(seconds, record="dive", member="submerged_time"):
             dive["submerged_time"] = seconds
         elif seconds is not None:
             self.note(
-                where, "<maxTime> is 0 s, which is no dive time; read as not recorded.", "absent",
+                where, f"<maxTime> is {seconds} s, which is no dive time; read as not recorded.", "absent",
                 code="dive_time_zero", member=f"{DIVE}/submerged_time",
             )
         depth = _number(self.log, "maxDepth")
-        if depth is not None and depth > 0:
+        if depth is not None and recorded(depth, record="dive", member="max_depth"):
             dive["max_depth"] = float(depth * METRES_PER_FOOT if imperial else depth)
         elif depth is not None:
             self.note(
@@ -452,7 +453,7 @@ class _Converter:
             value = _number(self.log, name)
             if value is None:
                 continue
-            if value >= 0:
+            if recorded(value, record="recording", member=member):
                 readouts[member] = float(value)
             else:
                 self.note(

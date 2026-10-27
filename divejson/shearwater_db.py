@@ -62,6 +62,7 @@ from .converter import (
     deco_model,
     device,
     header,
+    recorded,
     recording,
     rounded,
 )
@@ -1044,7 +1045,7 @@ class _Converter:
         dive["started_at"] = self.read_started_at(log, ticks, where, path)
 
         seconds = struct.unpack(">I", b"\x00" + closing0[6:9])[0]
-        if seconds > 0:
+        if recorded(seconds, record="dive", member="submerged_time"):
             dive["submerged_time"] = seconds
         else:
             self.note(
@@ -1052,7 +1053,7 @@ class _Converter:
                 "absent", code="dive_time_zero", member=f"{path}/submerged_time",
             )
         tenths = struct.unpack_from(">H", closing0, 4)[0]
-        if tenths > 0:
+        if recorded(tenths, record="dive", member="max_depth"):
             depth = Decimal(tenths) / 10
             dive["max_depth"] = float(depth * METRES_PER_FOOT if log.imperial else depth)
         else:
@@ -1322,8 +1323,11 @@ class _Converter:
                 code="surface_pressure_out_of_range",
                 member=f"{path}/recordings/0/surface_pressure",
             )
-        readouts["cns_start"] = float(struct.unpack_from(">H", log.openings[0], 10)[0])
-        readouts["cns_end"] = float(struct.unpack_from(">H", log.closings[0], 10)[0])
+        # Unsigned on the device, so the schema's floor is asked only to keep the rule one place.
+        for member, record in (("cns_start", log.openings[0]), ("cns_end", log.closings[0])):
+            percent = struct.unpack_from(">H", record, 10)[0]
+            if recorded(percent, record="recording", member=member):
+                readouts[member] = float(percent)
         return readouts
 
     def report_records(self, log: _Log, where: str, path: str) -> None:
