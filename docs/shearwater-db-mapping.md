@@ -117,8 +117,9 @@ unpacks to more than it is stored as:
 One dive per `log_data` row whose `format` is `sw-pnf` and whose `format_version` is `0` —
 every row seen. A row stored any other way — `sw-clouddb` and `sw-predator` are the tags
 other sources report — a log that does not unpack to its declared length or to whole 32-byte
-records, a log missing a required record, and a body beginning `FF FF`, the older
-Predator-style layout, are each reported `dropped`, naming the row's `file_name` and the
+records, a log missing a required record, a body beginning `FF FF`, the older
+Predator-style layout, and a row whose `log_id` is null — the column every export declares
+`not null`, and the dive's identity — are each reported `dropped`, naming the row's `file_name` and the
 reason, and the other rows convert.
 
 `dive_details` is joined on `log_data.log_id = dive_details.DiveId`. A log with no
@@ -383,7 +384,7 @@ no `resolved` finding.
   a tank whose readings are all a transmitter status; tank readings no cylinder sits in the
   place of, arriving as a cylinder of their own.
 - **`dropped`** — a log stored another way, empty, past the ceiling, not unpacking to its
-  length, missing a required record, in the Predator layout or deleted; a logbook row with no
+  length, missing a required record, in the Predator layout, deleted or with no `log_id`; a logbook row with no
   log; the time zone the computer holds; a mode, deco model or water setting with no value; a
   surface pressure out of range; a switched-off gas; a firmware byte that is not decimal; a
   model code that disagrees with the name; a summary that disagrees with the log; every field

@@ -209,6 +209,13 @@ def test_a_log_stored_past_the_value_cap_is_reported_and_the_rest_convert() -> N
     assert "is stored in" in note.message and note.where == "dive/1"
 
 
+def test_a_log_with_no_identifier_is_reported_rather_than_numbered_by_place() -> None:
+    table = sw.LOG_DATA.replace('"log_id" varchar primary key not null', '"log_id" varchar')
+    data = sw.database([sw.row(sw.log([sw.sample()]), log_id=None)], tables=[table], version=None)
+    conversion = _conversion(data)
+    assert "dives" not in conversion.document and _codes(conversion) == ["dive_log_unreadable"]
+
+
 def test_the_legacy_predator_layout_is_reported() -> None:
     body = b"\xff\xff" + bytes(30) + sw.log([sw.sample()])
     conversion = _conversion(sw.database([sw.row(body)]))
