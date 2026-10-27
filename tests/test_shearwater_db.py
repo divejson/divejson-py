@@ -200,6 +200,15 @@ def test_a_log_whose_length_is_wrong_is_refused_before_it_inflates(declared, say
     assert says in note.message and note.where == "dive/1"
 
 
+def test_a_log_stored_past_the_value_cap_is_reported_and_the_rest_convert() -> None:
+    body = sw.log([sw.sample()])
+    oversized = sw.blob(body, trailing=b"\x00" * (MAX_LOG_SIZE + 70_000))
+    conversion = _conversion(sw.database([sw.row(body), sw.row(body, log_id="second", data_bytes_1=oversized)]))
+    assert len(conversion.document["dives"]) == 1
+    [note] = [note for note in conversion.notes if note.code == "dive_log_unreadable"]
+    assert "is stored in" in note.message and note.where == "dive/1"
+
+
 def test_the_legacy_predator_layout_is_reported() -> None:
     body = b"\xff\xff" + bytes(30) + sw.log([sw.sample()])
     conversion = _conversion(sw.database([sw.row(body)]))

@@ -670,7 +670,7 @@ class _LogRow:
 
     rowid: int
     index: int
-    log_id: str
+    log_id: str | None
     file_name: str | None
     format: Any
     format_version: Any
@@ -686,15 +686,19 @@ class _LogRow:
     @property
     def refusal(self) -> str | None:
         """Why the reader leaves this row's log packed, as a clause for the report."""
+        if self.log_id is None:
+            return "carries no identifier the reader can hold"
         if self.format != LOG_FORMAT:
             return "is stored in a form other than the dive computer's own log"
         if self.format_version != LOG_FORMAT_VERSION:
             return "is stored in a version of the dive computer's log that is not read"
         if not self.is_blob or self.stored is None or self.stored < 4:
             return "holds no dive computer log"
+        if self.stored > MAX_LOG_SIZE + MAX_PAGE_SIZE:
+            return f"is stored in {self.stored} bytes, more than a dive computer's log is read to"
         if self.declared == 0:
             return "declares that it is empty"
-        if self.declared > MAX_LOG_SIZE or self.stored > MAX_LOG_SIZE + MAX_PAGE_SIZE:
+        if self.declared > MAX_LOG_SIZE:
             return f"declares {self.declared} bytes, more than the {MAX_LOG_SIZE} a dive computer's log is read to"
         return None
 
@@ -795,9 +799,13 @@ class _Database:
         return found
 
     def log_rows(self) -> list[_LogRow]:
+        # A log's head is read only where the blob fits the connection's value cap: reading
+        # one past it raises, and would refuse the whole file for one row's problem. `length`
+        # of a blob reads only its header.
+        head = f"CASE WHEN length(data_bytes_1) <= {MAX_LOG_SIZE + MAX_PAGE_SIZE} THEN substr(data_bytes_1, 1, 4) END"
         rows = self.rows(
-            "SELECT rowid, log_id, file_name, format, format_version, length(data_bytes_1), "
-            "substr(data_bytes_1, 1, 4), typeof(data_bytes_1) FROM log_data ORDER BY rowid"
+            f"SELECT rowid, log_id, file_name, format, format_version, length(data_bytes_1), {head}, "
+            "typeof(data_bytes_1) FROM log_data ORDER BY rowid"
         )
         read = []
         for index, (rowid, log_id, file_name, fmt, version, stored, head, kind) in enumerate(rows):
@@ -806,7 +814,7 @@ class _Database:
                 _LogRow(
                     rowid=rowid,
                     index=index,
-                    log_id=str(log_id),
+                    log_id=None if log_id is None else str(log_id),
                     file_name=file_name if isinstance(file_name, str) else None,
                     format=fmt,
                     format_version=version,
@@ -820,7 +828,8 @@ class _Database:
     def log(self, row: _LogRow) -> tuple[bytes, Any, Any]:
         """One row's compressed log and its two sidecars."""
         sidecars = [column for column in ("data_bytes_2", "data_bytes_3") if column in self.tables["log_data"]]
-        selected = ", ".join(["data_bytes_1", *sidecars]) or "data_bytes_1"
+        # The log itself is fetched only for a row whose stored length passed `refusal`.
+        selected = ", ".join(['"data_bytes_1"', *(_fitted(column) for column in sidecars)])
         found = self.rows(f"SELECT {selected} FROM log_data WHERE rowid = ?", (row.rowid,))[0]
         values = dict(zip(["data_bytes_1", *sidecars], found))
         return values["data_bytes_1"], _json(values.get("data_bytes_2")), _json(values.get("data_bytes_3"))
@@ -844,8 +853,15 @@ class _Database:
         return str(value) if isinstance(value, int) else None
 
 
+def _fitted(column: str) -> str:
+    """A sidecar read as nothing where it is longer than a page, which no sidecar comes near."""
+    return f"CASE WHEN length({column}) <= {MAX_PAGE_SIZE} THEN {column} END"
+
+
 def _malformed(error: sqlite3.Error) -> MalformedShearwaterDbError:
-    return MalformedShearwaterDbError(f"the file begins as a SQLite database does and cannot be read as one — {error}")
+    return MalformedShearwaterDbError(
+        f"the file begins as a SQLite database does and cannot be read as one — {error}"
+    )
 
 
 def _json(value: Any) -> Any:

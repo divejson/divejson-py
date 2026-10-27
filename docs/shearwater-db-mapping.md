@@ -82,7 +82,10 @@ database:
   the package's floor allows in place of switching views and triggers off outright, which
   `Connection.setconfig` does from Python 3.12.
 - **No value may be longer than one log's ceiling plus a page** — 4 MiB plus 64 KiB — through
-  `Connection.setlimit(SQLITE_LIMIT_LENGTH, …)`.
+  `Connection.setlimit(SQLITE_LIMIT_LENGTH, …)`. A log stored longer than that is measured,
+  not read, and reported like any other log past the ceiling; a sidecar longer than a page is
+  read as no sidecar. Every other column the reader reads holds a short string, and one past
+  the cap is a file SQLite refuses to hand over, refused as a sentence.
 - **A statement is stopped when it runs long.** A progress handler is called every 1 000
   virtual-machine instructions and stops a statement after 10 000 calls, or one per hundred
   bytes of the file if that is more. The heaviest statement the reader runs takes under two
