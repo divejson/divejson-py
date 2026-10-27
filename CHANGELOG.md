@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.33.0
+
 - **Shearwater Cloud's database and XML exports are read.** `shearwater_db` reads the SQLite
   file Shearwater Cloud Desktop's *Export Whole Database* writes — every dive of the account,
   each decoded from the dive computer's own compressed log, since the file's decoded tables
