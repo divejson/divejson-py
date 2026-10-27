@@ -763,7 +763,7 @@ def device(
     """§6.4b's Device from whatever one reader read about the hardware, or nothing at all.
 
     Every adapter reaches this section from a different set of fields and all of them meet
-    the same three rules, so the rules live here rather than five times over: **strings are
+    the same three rules, so the rules live here rather than once per reader: **strings are
     trimmed and an empty one is absence** (§5.4 — a device that records nothing about
     itself is not written at all, rather than written as an object with no members),
     every string is capped at §6.4b's own length, and `dive_number` floors at 0.
