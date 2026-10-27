@@ -7,6 +7,22 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Shearwater Cloud's database and XML exports are read.** `shearwater_db` reads the SQLite
+  file Shearwater Cloud Desktop's *Export Whole Database* writes — every dive of the account,
+  each decoded from the dive computer's own compressed log, since the file's decoded tables
+  are empty — and `shearwater_xml` the one-dive XML export, Shearwater's own decoding of the
+  same log, read through the same column rules and used by the tests as the database
+  decoder's oracle. Both write the brand Shearwater's UDDF export writes, so one computer read
+  from any of the three is one device. Their mapping documents are
+  `docs/shearwater-db-mapping.md` and `docs/shearwater-xml-mapping.md`, with a pair each.
+- **`convert` takes a `max_inflated_size`**, the caller's cap on what a source may unpack to
+  beyond its own bytes, carried to every adapter as the scope's `InflationBudget` and shared
+  by an archive's members. `divejson.shearwater_db_declared_size` reads what a database's logs
+  declare without unpacking any, for a caller budgeting a batch.
+- **The package needs Python 3.11 or newer.** The database reader opens SQLite from bytes with
+  `sqlite3.Connection.deserialize` and caps it with `Connection.setlimit`, both new in 3.11;
+  Python 3.10 reached its end of life on 2026-10-01.
+
 ## 0.32.0
 
 - **A contact carries its position.** §6.18 of

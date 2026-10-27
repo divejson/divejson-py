@@ -6,7 +6,7 @@ renamed or removed only as a breaking change, and a new habit gets a new one.
 
 One code names one habit of a file, whatever the figures in the sentence and whichever
 reader raised it: "the end pressure is above the start pressure" is
-`end_pressure_above_start` from all five. A writer's notes carry no code — they are about
+`end_pressure_above_start` from every reader that meets it. A writer's notes carry no code — they are about
 the document handed to it, and their `where` already names the member.
 """
 
@@ -31,6 +31,10 @@ NOTE_CODES: dict[str, str] = {
     "gear_unnamed": "a piece of gear has no name; it is left out",
     "insurance_unnamed": "an insurance names no insurer; it is left out",
     "placeholder_dive_base": "a dive base records nothing but a name and nothing links it; it is not kept",
+    "dive_log_unreadable": "a dive computer's log in the file cannot be read; that dive is left out",
+    "dive_log_deleted": "the file marks a dive computer's log as deleted; that dive is left out",
+    "dive_without_log": "the file lists a dive with no dive computer log beside it; it is left out",
+    "summary_disagrees": "an application's own summary of a dive disagrees with the dive computer's log",
     # -- links between records --------------------------------------------------------
     "link_to_nothing": "a link names something the file does not define; it is left out",
     "link_to_record_not_kept": "a link names a record that was not kept; it is left out",
@@ -46,6 +50,8 @@ NOTE_CODES: dict[str, str] = {
     "start_time_of_day_missing": "a dive's start records a date and no time of day",
     "start_time_zone_on_a_date": "a dive's start is a date alone with a time zone beside it; the zone is left out",
     "start_time_z_read_as_local": "the application that wrote the file marks a local time with a 'Z'; read as local",
+    "start_date_order_resolved": "a start date reading either way round is read month first",
+    "time_zone_not_read": "the dive computer records its time zone setting, which is not read yet",
     "computer_start_unreadable": "a dive computer's own start time is not a date and time; it is left out",
     # -- the dive's figures -----------------------------------------------------------
     "dive_time_missing": "the file records no dive time, and none can be worked out",
@@ -112,6 +118,10 @@ NOTE_CODES: dict[str, str] = {
     "gradient_factor_unpaired": "one gradient factor without the other is left out",
     "gradient_factors_read_as_percent": "the application that wrote the file gives gradient factors in percent",
     "second_computer_summary": "a second dive computer's depths and temperature are left out",
+    "firmware_read_as_hexadecimal": "a firmware version the file writes in hexadecimal is read as decimal",
+    "model_code_disagrees": "a dive computer's model code names another model than the name it gives",
+    "device_reading_not_kept": "a reading or record a dive computer keeps that the logbook has no place for",
+    "record_types_unknown": "records of a kind that is not read are left out",
     # -- the profile ------------------------------------------------------------------
     "sample_time_missing": "a sample with no time is left out of the profile",
     "sample_before_start": "a sample before the dive began is left out of the profile",
@@ -121,6 +131,7 @@ NOTE_CODES: dict[str, str] = {
     "tank_pressure_readings_out_of_range": "tank pressure readings outside what a cylinder can hold are left out",
     "tank_pressures_unmatched": "tank pressures the file does not tie to a cylinder are left out",
     "tank_pressure_unassigned": "a tank pressure reading that names no cylinder of the dive is left out",
+    "tank_pressure_not_recorded": "a tank records a transmitter status rather than pressure readings",
     "ppo2_read_as_pascal": "a UDDF ppO₂ above 10 is read as Pascal",
     "profile_empty": "samples that carry a time and no reading give the dive no profile",
     "event_outside_profile": "an event at an instant the profile does not reach is left out",
@@ -151,4 +162,5 @@ NOTE_CODES: dict[str, str] = {
     "trip_part_link_not_kept": "a trip part's link, which a trip part has no place for, is left out",
     "vessel_not_kept": "a liveaboard's boat is left out, the operator being the contact",
     "purchase_not_kept": "a piece of gear's purchase is left out",
+    "logbook_detail_not_read": "a logbook field the file fills in that is not read yet is left out",
 }

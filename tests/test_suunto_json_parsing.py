@@ -142,7 +142,7 @@ def test_a_start_time_with_no_offset_travels_alone_and_says_so() -> None:
 
 
 def test_a_one_digit_fraction_survives_the_python_floor() -> None:
-    """`datetime.fromisoformat` rejects this on 3.10, which is why it is not the parser."""
+    """`datetime.fromisoformat` rejected this on Python 3.10, which is why it is not the parser."""
     assert _dive({"DateTime": "2021-04-06T11:16:42.6+02:00"})["started_at"] == "2021-04-06T11:16:42.6+02:00"
 
 

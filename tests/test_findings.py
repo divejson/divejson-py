@@ -39,6 +39,8 @@ CONVERSION_PATH = [
         "registry.py",
         "xmlsource.py",
         "fit.py",
+        "shearwater_db.py",
+        "shearwater_xml.py",
         "ssrf.py",
         "suunto_json.py",
         "suunto_xml.py",
@@ -50,6 +52,8 @@ READER_INPUTS = sorted(
     path
     for format_id, pattern in (
         ("fit", "*.fit"),
+        ("shearwater_db", "*.db"),
+        ("shearwater_xml", "*.xml"),
         ("ssrf", "*.ssrf"),
         ("suunto_json", "*.json"),
         ("suunto_xml", "*.xml"),

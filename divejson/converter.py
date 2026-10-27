@@ -105,6 +105,7 @@ __all__ = [
     "Fix",
     "Identities",
     "InWater",
+    "InflationBudget",
     "MalformedArchiveError",
     "NonConformingOutputError",
     "Note",
@@ -369,6 +370,42 @@ def carried(document: dict[str, Any]) -> Iterator[str]:
             yield row["uuid"]
 
 
+class InflationBudget:
+    """How many bytes the readers of one upload may still unpack out of what it carries.
+
+    The caller's figure, the way an archive's member caps are: a byte cap on a file bounds
+    the file, and a source that carries compressed content inside it — a database of
+    gzip-compressed dive logs — unpacks to more than the file is. A reader that unpacks
+    asks this before it does, with the total the source declares, and a total past what is
+    left refuses the source whole. `None` is no cap, which is right for a command line
+    reading a file the person running it chose.
+
+    One budget per upload rather than per file, which is why it is an object an archive's
+    members share the way they share `claimed`: what one member spends, the next has not got.
+    """
+
+    __slots__ = ("remaining",)
+
+    def __init__(self, limit: int | None = None) -> None:
+        if limit is not None and limit < 0:
+            raise ValueError(f"an inflation budget cannot be below zero, and {limit} is")
+        self.remaining = limit
+
+    def spend(self, size: int, *, what: str) -> None:
+        """Take `size` bytes out of the budget, or refuse the source that declared them.
+
+        `what` names what is being unpacked as a diver reads it — "the file's dive logs" —
+        for the refusal's sentence.
+        """
+        if self.remaining is None:
+            return
+        if size > self.remaining:
+            raise SourceTooLargeError(
+                f"{what} unpack to {size} bytes, and at most {self.remaining} more are read"
+            )
+        self.remaining -= size
+
+
 @dataclass(frozen=True, slots=True)
 class Scope:
     """Where one conversion sits inside the upload that produced it.
@@ -378,10 +415,14 @@ class Scope:
     and its **positional** identities with its own name, so two members whose records carry
     no ids do not collide. A record the source *did* give an id is deliberately not
     prefixed — two members naming one id are naming one record, and that is the point.
+
+    `inflation` is the upload's `InflationBudget`, shared between an archive's members the
+    same way, and spent only by a reader whose source unpacks to more than its own bytes.
     """
 
     member: str | None = None
     claimed: Claimed = field(default_factory=dict)
+    inflation: InflationBudget = field(default_factory=InflationBudget)
 
     def where(self, path: str) -> str:
         return path if self.member is None else f"{self.member}/{path}"
@@ -792,13 +833,13 @@ def deco_model(
 ) -> dict[str, Any] | None:
     """§6.4c's Deco Model from what a reader read about the algorithm, or nothing at all.
 
-    Four sources reach this section from four different subsets — UDDF's
-    `<decomodel><buehlmann>`, FIT's `dive_settings`, the Suunto app's `Header.Diving` and
-    the DM5 XML's `<PersonalMode>` — so the rules that hold across all four are here rather
-    than four times over: §6.4c's member order, the name trimmed and capped with an empty
-    one read as absence (§5.4), the schema's range on a gradient factor, **both or neither**
-    on the pair, **§3 rule 6's ordering**, and §6.4b's rule that an object with no members is
-    not written at all.
+    Every reader reaches this section from a different subset — UDDF's
+    `<decomodel><buehlmann>`, FIT's `dive_settings`, the Suunto app's `Header.Diving`, the
+    DM5 XML's `<PersonalMode>` and the deco model a Shearwater log's header states — so the
+    rules that hold across all of them are here rather than once per reader: §6.4c's member
+    order, the name trimmed and capped with an empty one read as absence (§5.4), the schema's
+    range on a gradient factor, **both or neither** on the pair, **§3 rule 6's ordering**, and
+    §6.4b's rule that an object with no members is not written at all.
 
     Every one of those is the same argument: a reading the format cannot hold resolves to an
     omission and a note here, because the alternative is `validate_document` refusing this

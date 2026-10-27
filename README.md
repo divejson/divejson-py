@@ -20,7 +20,7 @@ sentence.
 pip install divejson
 ```
 
-Python 3.10 or newer.
+Python 3.11 or newer.
 
 ## Validate a document
 
@@ -88,9 +88,11 @@ is deliberately left unmapped — is in
 [`docs/uddf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/uddf-mapping.md),
 [`docs/ssrf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/ssrf-mapping.md),
 [`docs/fit-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/fit-mapping.md),
-[`docs/suunto-json-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/suunto-json-mapping.md)
+[`docs/suunto-json-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/suunto-json-mapping.md),
+[`docs/suunto-xml-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/suunto-xml-mapping.md),
+[`docs/shearwater-db-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/shearwater-db-mapping.md)
 and
-[`docs/suunto-xml-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/suunto-xml-mapping.md).
+[`docs/shearwater-xml-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/shearwater-xml-mapping.md).
 
 From Python, the same two steps an application takes:
 
@@ -206,6 +208,8 @@ release would break every corpus that carries one.
 | FIT | `fit` | reads into DiveJSON | protocol 2.0 |
 | Suunto app JSON | `suunto_json` | reads into DiveJSON | D5-era and 2026 Suunto Ocean exports |
 | Suunto DM5 XML | `suunto_xml` | reads into DiveJSON | the desktop application's one-dive `<Dive>` exports |
+| Shearwater Cloud database | `shearwater_db` | reads into DiveJSON | Shearwater Cloud Desktop's whole-database export, `sw-pnf` logs |
+| Shearwater Cloud XML | `shearwater_xml` | reads into DiveJSON | Shearwater Cloud Desktop's one-dive `<dive version="3">` export |
 
 The **id** is the whole coupling between this package and everything around it: it is what
 `sniff` returns, what `--from` and `--to` take, and what a conformance corpus names a
@@ -228,7 +232,7 @@ the export writes no equipment element for it at all.
 [`docs/ssrf-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/ssrf-mapping.md)
 lists them.
 
-FIT is the binary one, and the only format here that is genuinely shared: a Garmin Descent
+FIT is the binary format here that is genuinely shared: a Garmin Descent
 and a Suunto Ocean write the same message numbers with the same units, because the units
 come from the global FIT profile rather than from the vendor. `fitdecode` is a **core**
 dependency and not an extra, so `pip install divejson` reads FIT with nothing else asked
@@ -244,9 +248,9 @@ in this project's hand carries a `float32` `max_depth` of 45.90999984741211 besi
 native `uint32`'s exact 45.91, and a reader that takes the last match by name produces a
 document that validates perfectly and is wrong by a rounding error.
 
-The Suunto app's JSON is what a Suunto owner arrives with, and it is one of the two formats
-here written by an *application* about a device rather than by the device itself — the DM5
-XML in the paragraph below is the other, from the same vendor's desktop side. Its units are
+The Suunto app's JSON is what a Suunto owner arrives with, and it is written by an
+*application* about a device rather than by the device itself — as the DM5 XML in the
+paragraph below is, from the same vendor's desktop side. Its units are
 SI throughout — Pascal, cubic metres, Kelvin, a 0-1 gas fraction — where §6 holds none of
 them; its newest generation moved a dive's cylinders out of the header and into the sample
 stream, where they have to be rebuilt from the diver's **gas switches** rather than from
@@ -268,10 +272,24 @@ recording says `freedive` and the dive is carried like any other. It was skipped
 reported until that member existed, which is why an archive of the reference export
 directory now yields 384 dives where it used to yield 342.
 
+**Shearwater Cloud's whole-database export is the dive computer's own log**, one 32-byte
+record per sample, gzip-compressed inside a SQLite file: the decoded tables a reader would
+reach for first are empty in every export examined, and the log carries the whole sample —
+depth, temperature, no-decompression time, time to surface, ppO₂, CNS, ceiling and gradient
+factor — where Shearwater's own UDDF export keeps a fraction of it. The reader decodes the
+records from the layout
+[`docs/shearwater-db-mapping.md`](https://github.com/divejson/divejson-py/blob/main/docs/shearwater-db-mapping.md)
+states, and is checked against Shearwater's own decoding of the same bytes, the XML export
+of a dive, which the package reads too. A SQLite file is a container whose contents unpack
+past its own size, so `convert` takes a `max_inflated_size` beside the archive caps, and
+`shearwater_db_declared_size` reads what a database's logs declare without unpacking any.
+
 **What a recording carries beyond its samples.** Every reader fills §6.4a's `mode` and
 §6.4c's `deco_model` where its files state them — UDDF from `<divemode>` and the
 `<decomodel>` a dive links, FIT from `dive_settings`, the Suunto app's JSON from
-`Header.Diving`, the DM5 XML from `<Mode>` and `<PersonalMode>` — and §6.4a's readouts, the
+`Header.Diving`, the DM5 XML from `<Mode>` and `<PersonalMode>`, the Shearwater Cloud
+database from the dive computer's own log header and its XML export from the
+`<decoModel>` beside it — and §6.4a's readouts, the
 surface pressure and the two ends of the oxygen clocks the computer used, on the recording
 beside them rather than on the dive. A format that states a readout once for the whole dive
 — UDDF's `<surfacepressure>`, Subsurface's `@cns` and `@otu` — gives it to the primary

@@ -385,9 +385,9 @@ def _moment(value: Any) -> _Moment | None:
     the source recorded it, nothing in the format asks for it to be dropped, and §5.2 makes
     it OPTIONAL rather than forbidden, so truncating would discard a value the file states.
 
-    `datetime.fromisoformat` is deliberately not the parser. On the Python floor this
-    package supports it accepts only a two- or six-digit fraction and rejects `.5`, which is
-    a property of one interpreter version rather than of the data.
+    `datetime.fromisoformat` is deliberately not the parser. Which fractions it accepts has
+    changed between interpreter versions — Python 3.10's took only three or six digits and
+    rejected `.5` — which is a property of the interpreter rather than of the data.
     """
     if not isinstance(value, str):
         return None
@@ -743,8 +743,8 @@ class _Converter:
         fractional value the header states. §6.2 makes `submerged_time` a positive integer, so a
         `DiveTime` of 0.4 s is above the schema's floor and the number written from it —
         zero — is not; checking before rounding lets that one through and fails the
-        converter's own validation. The other three readers in this package round first for
-        the same reason.
+        converter's own validation. The other readers in this package round first for the
+        same reason.
         """
         for source in ("DiveTime", "Duration"):
             value = _number(self.head.get(source))
