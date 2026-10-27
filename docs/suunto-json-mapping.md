@@ -14,9 +14,9 @@ rule rests on something none of those exercises, it says so in place.
 ## Why this format, and what makes it different
 
 This is the file the Suunto app hands a diver who asks for their data, so it is what a
-Suunto owner arrives with. It is also the only format in this corpus written by an
-*application* about a device rather than by the device itself, which shows: the same reading
-appears in different units in different generations of it, the header is a superset of every
+Suunto owner arrives with. It is also written by an *application* about a device rather than
+by the device itself, as the DM5 XML and Shearwater Cloud's XML are, which shows: the same
+reading appears in different units in different generations of it, the header is a superset of every
 activity type the watch records, and the newest generation moved gas out of the header
 altogether and never announced it.
 

@@ -289,6 +289,8 @@ which is an absence rather than a gap to fill (§5.4).
 | `fit` | `file_id.manufacturer` | `file_id.product_name` | the `device_info` at `device_index` 0's `serial_number`, else `file_id.serial_number` | that `device_info`'s `software_version` | | `session.dive_number` |
 | `suunto_json` | the literal `Suunto` | | `Header.Device.SerialNumber` | `Header.Device.Info.SW` | `Header.Device.Name` | `Header.Diving.NumberInSeries` |
 | `suunto_xml` | the literal `Suunto` | `<Source>` | `<SerialNumber>` | `<Software>` | | `<DiveNumberInSerie>` |
+| `shearwater_db` | the literal `Shearwater Research, Inc` | `log_data.file_name`, before its `[` | the final record's bytes 2–5 | the final record's byte 10, binary-coded decimal | | opening 0's bytes 2–3 |
+| `shearwater_xml` | the literal `Shearwater Research, Inc` | | `<computerSerial>` | `<computerFirmware>`, read as hexadecimal | | `<number>` |
 
 Four things the table does not say on its own.
 
@@ -298,8 +300,9 @@ names **that yields either a device or a profile**, so a dive that links none ha
 and where it links two, the dive's single `<samples>` and `<internaldivenumber>` go to the
 first, those being the dive's rather than any computer's; `.ssrf` gives a recording to every
 `<divecomputer>` on a dive **that yields either a device or a profile**, and none to one that
-yields neither, §6.4a forbidding a recording carrying nothing; the three one-dive-per-file
-formats have exactly one.
+yields neither, §6.4a forbidding a recording carrying nothing; the four one-dive-per-file
+formats have exactly one, and so does a Shearwater Cloud database's dive, each of its dives
+being one computer's log.
 
 **A model comes from a name the source wrote, never from a code a decoder resolved.** §6.4b
 defines `model` as the product string as the source names it, so a numeric vendor id is not
@@ -309,19 +312,19 @@ format states no product name, the device carries **no model**, which is the ord
 absence (§5.4) rather than a gap to fill from the brand: `brand` is a member of its own and
 copying it into `model` would say the maker's name is the product's.
 
-**The two literal `Suunto`s are not fabrications.** §5.4 forbids inventing a value the
+**The literal brands — two `Suunto`s, two `Shearwater Research, Inc`s — are not
+fabrications.** §5.4 forbids inventing a value the
 source did not record, and a vendor-proprietary export format *is* the vendor saying so —
 the same reading that already lets `source_generator` name the device rather than the
 application. A format shared by several manufacturers gets no such row, which is why the
 FIT line reads a field instead.
 
-**A device counter is not the diver's dive number**, and this is where the three formats
-that carry one stop being refusals. `session.dive_number`, `<DiveNumberInSerie>` and
-`Header.Diving.NumberInSeries` were each read and dropped with a finding, because a dive's
-`number` is the diver's own numbering and a counter that restarts on a new device is not
-it. The device's `dive_number` is that counter, in as many words, so each now lands there
-and the finding goes with it. UDDF's `<internaldivenumber>` is the same member and had no
-reader at all.
+**A device counter is not the diver's dive number.** A dive's `number` is the diver's own
+numbering, and a counter that restarts on a new device is not it. The device's `dive_number`
+is that counter, in as many words, so the five formats that carry one put it there —
+`session.dive_number`, `<DiveNumberInSerie>`, `Header.Diving.NumberInSeries`, the Shearwater
+log's own counter and the Shearwater XML's `<number>` — and never in the dive's `number`.
+UDDF's `<internaldivenumber>` is the same member.
 
 ## Profiles
 

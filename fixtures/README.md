@@ -7,7 +7,8 @@ conforms shows up here as a failing fixture — update the three together
 
 Beside those two sit the **pair** corpora, which are for *converters* rather than
 validators: each input is paired with the document a correct reader produces from it.
-`uddf/` was the first; `ssrf/`, `fit/`, `suunto_json/` and `suunto_xml/` sit beside it. The
+`uddf/` was the first; `ssrf/`, `fit/`, `suunto_json/`, `suunto_xml/`, `shearwater_db/` and
+`shearwater_xml/` sit beside it. The
 pairs under `write/` run the other way — a document, and the file a correct writer produces
 from it — and `write/uddf/` is the first of those.
 
@@ -194,8 +195,11 @@ unaltered, so its answers are the answers the whole file gives.
 **A binary format is the exception**, and it has to be: a `.fit` file cannot be reduced by
 hand, and a hand-built one would prove that an encoder and a decoder agree rather than that
 a device's file reads. Such an input is committed **as recorded**, whole, from a dive whose
-position the recorder is content to publish. `fit/` is the only directory this applies to
-today.
+position the recorder is content to publish. A container built around whole device logs is
+the same case one level down: its rows can be deleted, but each log inside it is a device's
+compressed recording, which cannot be reduced by hand any more than a `.fit` can. So the
+container is reduced around the logs it keeps, and each kept log is committed whole, as
+recorded. `fit/` and `shearwater_db/` are the only directories this applies to today.
 
 **A writer pair is the same unit with its halves swapped**, and the two rules above are
 where it differs. `<name>.divejson` is the input and `<name>.<ext>` is what a correct writer
@@ -313,6 +317,29 @@ implementation.
 | `freedive.xml` | Suunto D5, 2023 | `<Mode>3</Mode>`: a **freedive**, and a dive. It converted to a conforming logbook with no dives at all until §6.4a gained `mode`; it now produces one dive whose recording says `freedive`, with no cylinder, no gas and no `deco_model` — a computer in freedive mode runs no decompression model, so its `<PersonalMode>` is the watch's setting rather than this dive's and is not carried. This is also the only pair where the sample-time collision fires on a real file: five samples, three sample times, the reduction repeating a whole-number `<Time>` of `1` that collides at any grain — one of the corpus's 37 on a whole-second axis, and unreachable while the reader stopped at `<Mode>` before it read a sample. |
 | `refusals.xml` | constructed | Everything this format's reader refuses that fits on one dive: a `<StartTime>` with no seconds, an average depth deeper than the maximum, a millibar surface pressure, a ppO₂ limit of 3.2 bar, a mix summing to 110 %, a gas change at -30 s, text in a `<Depth>`, a sample with a nil `<Time>`, two samples on one second, a tank reading past 350 bar, the dive-conditions block, and **two** cylinders claiming the transmitter. |
 | `unlabelled-pressure.xml` | constructed | Tank readings no cylinder claims, arriving as a cylinder of their own with nothing but the channel; beside them a zero `<MaxDepth>`, `<AvgDepth>` and `<Duration>`, a nil `<Mode>`, and a `<Note>` with whitespace around it. |
+
+## shearwater_db/
+
+[`docs/shearwater-db-mapping.md`](../docs/shearwater-db-mapping.md). The binary exception
+above, at the container's level: the database is reduced — the other dives' `log_data` and
+`dive_details` rows deleted, every per-computer and sync row deleted, every table and index
+kept, and `VACUUM` run — and the two logs it keeps are committed whole, exactly as the
+computer recorded them.
+
+| file | recorded on | what it covers |
+| --- | --- | --- |
+| `perdix3-dives-1-and-8.db` | Perdix 3, exported by Shearwater Cloud Desktop 2.12.10 | **Two logs committed whole** inside a reduced whole-database export, read from the compressed device log in `log_data` while the decoded tables beside it stay empty. Dive 1 is the shortest in the export — 23 samples, one 33 % gas, 4.0 m — and dive 8 is the one `shearwater_xml/perdix3-dive-8.xml` is the XML export of. Dive 8's log runs to 4 010 s past a 3 718 s dive time, and every one of its 402 samples is kept, so the profile's `duration` is the log's rather than the dive time. Each dive carries `number` from `dive_details` and the device's own counter as the device's `dive_number`, a device whose `brand` is the literal `Shearwater Research, Inc` and whose `model` `Perdix 3` comes from the log's file name rather than the product code, a serial and a binary-coded-decimal firmware off the final record, a Bühlmann 50/85 `deco_model`, `salt` water, the surface pressure and the two ends of the CNS clock on the recording, and the depth, temperature, no-decompression time, time to surface, ppO₂, CNS and gradient-factor channels. The surface sample's no-decompression time of `0` with no stop is an absence, which is why each `ndl` channel is one sample shorter than its depth. The `started_at` carries no offset, the time zone the log states being decoded and not applied. No ceiling, no tank pressure and no gas switch: these are open-circuit, no-decompression dives with no transmitter. |
+
+## shearwater_xml/
+
+[`docs/shearwater-xml-mapping.md`](../docs/shearwater-xml-mapping.md). One dive per document.
+The reduction keeps the header whole and twelve of the export's 402 `<diveLogRecord>`
+elements, each with its recorded values unaltered, and leaves the declaration as the
+application wrote it.
+
+| file | modelled on | what it covers |
+| --- | --- | --- |
+| `perdix3-dive-8.xml` | Shearwater Cloud Desktop 2.12.10, Perdix 3 | **The same dive as `shearwater_db/perdix3-dives-1-and-8.db`'s dive 8**, Shearwater's own decoding of the log that file commits whole, so the two read against each other: on every record this reduction keeps, each channel it carries equals the database's at the same time. The records kept are the surface record with its no-decompression time of `0`, the first `99`, the temperature changes, the time to surface at its maximum of six minutes, the deepest record, the dive's end and the last record, at 4 010 s. Also the declaration that says `utf-16` over ASCII bytes, the en-US `startDate`, a `<maxDepth>` of `21.8000011` carried as the file states it, a `<computerFirmware>` of `27` read as hexadecimal into firmware `39` and reported `resolved`, and the device counter `<number>` as the device's `dive_number`. Where the database pair has more, this one has less: no `model`, the export naming the product only by code; no `mode` and no `salinity`, its header stating neither; no dive `number`, and a positional identity, the export recording no id for its dive; and no CNS, gradient-factor or ceiling channel. |
 
 ## write/uddf/
 
