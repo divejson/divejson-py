@@ -717,20 +717,23 @@ class _Database:
         self.connection = sqlite3.connect(":memory:")
         self._steps = 0
         self._budget = max(MIN_CALLS, len(data) // BYTES_PER_CALL)
+        # Closed on every refusal below, not left to the collector: a connection that is
+        # garbage-collected open is a `ResourceWarning` on Python 3.13 and later.
         try:
-            self.connection.setlimit(sqlite3.SQLITE_LIMIT_LENGTH, MAX_LOG_SIZE + MAX_PAGE_SIZE)
-            self.connection.set_progress_handler(self._progress, PROGRESS_STEP)
-            self.connection.deserialize(data)
-            for pragma in ("trusted_schema=OFF", "query_only=ON", "cell_size_check=ON", "mmap_size=0"):
-                self.connection.execute(f"PRAGMA {pragma}")
-            checked = self.rows("PRAGMA quick_check")
-        except sqlite3.Error as error:
+            try:
+                self.connection.setlimit(sqlite3.SQLITE_LIMIT_LENGTH, MAX_LOG_SIZE + MAX_PAGE_SIZE)
+                self.connection.set_progress_handler(self._progress, PROGRESS_STEP)
+                self.connection.deserialize(data)
+                for pragma in ("trusted_schema=OFF", "query_only=ON", "cell_size_check=ON", "mmap_size=0"):
+                    self.connection.execute(f"PRAGMA {pragma}")
+            except sqlite3.Error as error:
+                raise _malformed(error) from error
+            if self.rows("PRAGMA quick_check") != [("ok",)]:
+                raise MalformedShearwaterDbError("the file is a damaged SQLite database, and is not read")
+            self.tables = self._tables()
+        except BaseException:
             self.connection.close()
-            raise _malformed(error) from error
-        if checked != [("ok",)]:
-            self.connection.close()
-            raise MalformedShearwaterDbError("the file is a damaged SQLite database, and is not read")
-        self.tables = self._tables()
+            raise
 
     def __enter__(self) -> _Database:
         return self
