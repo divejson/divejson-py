@@ -22,6 +22,9 @@ this file is about the package, whose version moves independently.
 - **The package needs Python 3.11 or newer.** The database reader opens SQLite from bytes with
   `sqlite3.Connection.deserialize` and caps it with `Connection.setlimit`, both new in 3.11;
   Python 3.10 reached its end of life on 2026-10-01.
+- **A number past the interpreter's digit limit is no number in every reader**, on a Python
+  built with only the pure-Python `decimal`, where it used to raise a `ValueError` past the
+  converter's own errors.
 
 ## 0.32.0
 

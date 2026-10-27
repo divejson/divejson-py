@@ -651,7 +651,9 @@ def decimal_of(text: str | None) -> Decimal | None:
         return None
     try:
         value = Decimal(text)
-    except InvalidOperation:
+    except (InvalidOperation, ValueError):
+        # `ValueError` is the pure-Python `decimal`'s, which some builds ship in place of the C
+        # one: it parses through `int` and refuses past the interpreter's digit limit.
         return None
     # `copy_abs`, not `abs`: the builtin is a context operation and raises `Overflow` on
     # exactly the values this line exists to reject, so the guard would be the thing that
