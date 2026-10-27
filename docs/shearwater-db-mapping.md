@@ -76,7 +76,9 @@ database:
 - **Every table the reader queries is checked to be a plain table** — `log_data`,
   `dive_details`, `DeletedLogs`, `SWC_TableVersion`: its `sqlite_master` row has `type`
   `table` and a non-zero `rootpage`, its declaration does not begin `CREATE VIRTUAL TABLE`,
-  and `PRAGMA table_xinfo` shows no generated column (`hidden` 2 or 3). A view, a virtual
+  and `PRAGMA table_xinfo` shows no generated column (`hidden` 2 or 3) and no column named
+  `rowid`, `_rowid_` or `oid`, which would hide the row id the reader addresses rows by. The
+  column names the file declares are quoted as identifiers wherever a statement lists them. A view, a virtual
   table or a generated column would run the file's own code inside the reader's `SELECT`, and
   a database declaring one where a Cloud export has a table is refused. This check is what
   the package's floor allows in place of switching views and triggers off outright, which

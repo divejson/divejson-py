@@ -703,6 +703,9 @@ class _LogRow:
         return None
 
 
+# The names SQLite gives a table's row id, which a declared column of the same name hides.
+ROWID_NAMES = frozenset({"rowid", "_rowid_", "oid"})
+
 # The tables this reader queries, and the columns each must have to be one it can read.
 LOG_COLUMNS = ("log_id", "file_name", "format", "format_version", "data_bytes_1")
 
@@ -785,8 +788,14 @@ class _Database:
                 and rootpage > 0
                 and not str(sql or "").lstrip().upper().startswith("CREATE VIRTUAL")
             )
-            columns = self.rows(f'PRAGMA table_xinfo("{name}")') if plain else []
-            if not plain or any(column[6] in (2, 3) for column in columns):
+            columns = self.rows(f"PRAGMA table_xinfo({_quoted(name)})") if plain else []
+            # A column named for the row id takes that name over, and the reader addresses rows
+            # by it; a Cloud export declares none.
+            if (
+                not plain
+                or any(column[6] in (2, 3) for column in columns)
+                or any(str(column[1]).lower() in ROWID_NAMES for column in columns)
+            ):
                 raise ShearwaterDbError(
                     "the file is a SQLite database whose dive tables are not plain tables, so it is not read"
                 )
@@ -830,7 +839,10 @@ class _Database:
         sidecars = [column for column in ("data_bytes_2", "data_bytes_3") if column in self.tables["log_data"]]
         # The log itself is fetched only for a row whose stored length passed `refusal`.
         selected = ", ".join(['"data_bytes_1"', *(_fitted(column) for column in sidecars)])
-        found = self.rows(f"SELECT {selected} FROM log_data WHERE rowid = ?", (row.rowid,))[0]
+        fetched = self.rows(f"SELECT {selected} FROM log_data WHERE rowid = ?", (row.rowid,))
+        if not fetched:
+            raise _Unreadable("could not be read back out of the file")
+        found = fetched[0]
         values = dict(zip(["data_bytes_1", *sidecars], found))
         return values["data_bytes_1"], _json(values.get("data_bytes_2")), _json(values.get("data_bytes_3"))
 
@@ -838,7 +850,7 @@ class _Database:
         if "dive_details" not in self.tables:
             return []
         columns = self.tables["dive_details"]
-        listed = ", ".join(f'"{column}"' for column in columns)
+        listed = ", ".join(_quoted(column) for column in columns)
         return [dict(zip(columns, row)) for row in self.rows(f"SELECT {listed} FROM dive_details ORDER BY rowid")]
 
     def deleted(self) -> set[str]:
@@ -851,6 +863,11 @@ class _Database:
             return None
         (value,) = self.rows('SELECT max("DbVersion") FROM "SWC_TableVersion"')[0]
         return str(value) if isinstance(value, int) else None
+
+
+def _quoted(name: str) -> str:
+    """An identifier the file declared, quoted for SQL: it is the file's text, not the reader's."""
+    return '"' + name.replace('"', '""') + '"'
 
 
 def _fitted(column: str) -> str:

@@ -158,6 +158,27 @@ def test_a_table_that_would_run_the_files_own_code_is_refused(statement) -> None
         _conversion(data)
 
 
+def test_a_column_name_cannot_reach_the_readers_own_statement() -> None:
+    """Unquoted, this name would add `42 AS "y"` to the reader's SELECT and shift every later
+    column's value one place, giving the dive the number 42."""
+    hostile = 'CREATE TABLE "dive_details"("DiveId" varchar, "x"", 42 AS ""y" varchar, "DiveNumber" varchar)'
+    connection = sqlite3.connect(":memory:")
+    connection.deserialize(sw.database([sw.row(sw.log([sw.sample()]))], tables=[sw.LOG_DATA, hostile], version=None))
+    connection.execute("INSERT INTO dive_details VALUES ('1588035071789987697', NULL, '7')")
+    connection.commit()
+    data = connection.serialize()
+    connection.close()
+    [dive] = _dives(data)
+    assert dive["number"] == 7
+
+
+def test_a_column_that_hides_the_row_id_is_refused() -> None:
+    table = sw.LOG_DATA.replace('"log_id" varchar', '"rowid" integer, "log_id" varchar')
+    data = sw.database([sw.row(sw.log([sw.sample()]))], tables=[table], version=None)
+    with pytest.raises(ShearwaterDbError, match="not plain tables"):
+        _conversion(data)
+
+
 def test_a_virtual_table_is_refused() -> None:
     try:
         data = sw.database(
