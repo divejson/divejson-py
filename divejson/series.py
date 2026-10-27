@@ -5,11 +5,12 @@ reading taken at one instant inside one `<waypoint>`; Subsurface's `.ssrf` write
 `<sample>` with the attributes it has; FIT writes a `record` message per second with
 invalid-value sentinels for the channels a device did not carry; the Suunto app's JSON
 writes an array of objects with their own timestamps; Suunto's DM5 XML writes a
-`<Dive.Sample>` carrying every channel, `i:nil` where the sensor had nothing. What §6.5
-wants out of all five is the same: channels sampled on their own axes, with strictly
-increasing integer times in milliseconds (§5.1). Every source states its times in seconds,
-whole or fractional, and an adapter hands this module `converter.milliseconds` of them, so
-a fraction the source states keeps its place on the axis.
+`<Dive.Sample>` carrying every channel, `i:nil` where the sensor had nothing; a Shearwater
+log writes one 32-byte record per sample at a fixed interval. What §6.5 wants out of every
+one of them is the same: channels sampled on their own axes, with strictly increasing
+integer times in milliseconds (§5.1). An adapter hands this module each sample's
+millisecond — `converter.milliseconds` of the seconds most sources state — so a fraction
+the source states keeps its place on the axis.
 
 The rules that survive that translation are the ones in here, and no adapter re-derives
 them:
@@ -34,7 +35,8 @@ them:
   quantities has a negative value — so a source that writes one is spelling *no figure* in
   the only space it had, and every format does it: a Suunto Ocean writes `gf99: -100` where
   no tissue leads and `NoDecTime: -1` where it has no clock to show. The floor comes off the
-  schema rather than out of an adapter, which is what keeps it one rule instead of five.
+  schema rather than out of an adapter, which is what keeps it one rule instead of one per
+  reader.
 
 `noun` and `time_member` exist so the report keeps speaking the source's language — a UDDF
 report says "the waypoint records no `<divetime>`" where a FIT report says "the record

@@ -31,6 +31,12 @@ person running it chose; a server passes its own. The declared size in the archi
 directory is consulted first, so an oversized member is refused without being opened; the
 read is then bounded as well, so the cap bounds what this process allocates rather than
 only what the archive claims about itself.
+
+**So is what a source unpacks to.** A byte cap bounds a file and not what is compressed
+inside it, and a Shearwater Cloud database is a container of gzip-compressed logs. The
+caller's `max_inflated_size` reaches every adapter as the `Scope`'s `InflationBudget`, one
+for the whole upload, and a reader that unpacks spends it before it does; the others never
+touch it.
 """
 
 from __future__ import annotations
@@ -48,6 +54,7 @@ from .converter import (
     PRODUCER_KEY,
     Claimed,
     Conversion,
+    InflationBudget,
     MalformedArchiveError,
     NonConformingOutputError,
     Note,
@@ -59,6 +66,8 @@ from .converter import (
     header,
 )
 from .fit import FIT
+from .shearwater_db import SHEARWATER_DB
+from .shearwater_xml import SHEARWATER_XML
 from .ssrf import SSRF
 from .suunto_json import SUUNTO_JSON
 from .suunto_xml import SUUNTO_XML
@@ -123,16 +132,20 @@ class Adapter(Protocol):
 # Every reader this build carries, in the order `sniff` asks them. A list rather than a
 # dict so the order is a property of the file rather than of insertion history. The order
 # is free, because each reader claims a syntax the others cannot be written in: the XML
-# readers each claim a root element nothing else claims — and Suunto's DM5 export, whose
-# `<Dive>` is a name another XML format could reach for, claims its datacontract namespace
-# alongside it — FIT claims a binary magic no XML document can carry, and the Suunto app's
-# JSON claims an object opening on a member name no XML or FIT file has anywhere. So no two
-# of them can answer for one file and `sniff` reaches the same verdict whichever it asks
-# first. The suffixes decide nothing at all — nothing here sniffs on one — which is just as
-# well: `.json` is also what a DiveJSON document is called, and `.xml` is what half the
-# dive-log formats in existence are called, this build's own UDDF reader included where a
-# writer chose that extension over `.uddf`.
-ADAPTERS: tuple[Adapter, ...] = (UDDF, SSRF, FIT, SUUNTO_JSON, SUUNTO_XML)
+# readers each claim a root element nothing else claims, except the two that share `<dive>` —
+# Suunto's DM5 export claims it in its datacontract namespace, Shearwater Cloud's export in no
+# namespace with a `version` and a `<diveLog>`, so neither answers for the other's file — FIT
+# claims a binary magic no XML document can carry, the Suunto app's JSON claims an object
+# opening on a member name no XML or FIT file has anywhere, and the Shearwater Cloud
+# database claims SQLite's own header, a container rather than a format, the way `zip` is
+# claimed by its magic: no other reader's syntax begins with it, and the reader refuses a
+# database that is not a Cloud export. So no two of them can answer for one file and `sniff`
+# reaches the same verdict whichever it asks first. The suffixes decide nothing at all —
+# nothing here sniffs on one — which is just as well: `.json` is also what a DiveJSON
+# document is called, and `.xml` is what half the dive-log formats in existence are called,
+# the DM5 and Shearwater Cloud exports this build reads among them, and its UDDF reader's
+# files too where a writer chose that extension over `.uddf`.
+ADAPTERS: tuple[Adapter, ...] = (UDDF, SSRF, FIT, SUUNTO_JSON, SUUNTO_XML, SHEARWATER_DB, SHEARWATER_XML)
 
 
 class Writer(Protocol):
@@ -226,6 +239,7 @@ def convert(
     exported_at: datetime | None = None,
     max_members: int | None = None,
     max_member_size: int | None = None,
+    max_inflated_size: int | None = None,
 ) -> Conversion:
     """Convert one source — a document or an archive of them — into DiveJSON.
 
@@ -244,14 +258,20 @@ def convert(
     is the other — so a caller producing documents in a fixed context, a test or a batch
     import, should pass its own.
 
+    `max_inflated_size` caps what the readers may unpack out of the whole upload, an
+    archive's members together, beyond the bytes it arrived as — today the dive logs a
+    Shearwater Cloud database carries compressed. `None` is no cap; a source declaring more
+    than the cap is a `SourceTooLargeError` before anything is unpacked.
+
     Every failure is a `ConverterError`.
     """
     stream: BinaryIO = BytesIO(source) if isinstance(source, (bytes, bytearray)) else source
     moment = exported_at or datetime.now().astimezone()
+    budget = InflationBudget(max_inflated_size)
 
     if format is not None:
         reader = adapter_for(format)
-        return reader.convert(stream.read(), exported_at=moment, scope=Scope())
+        return reader.convert(stream.read(), exported_at=moment, scope=Scope(inflation=budget))
 
     head = stream.read(SNIFF_BYTES)
     stream.seek(0)
@@ -259,8 +279,10 @@ def convert(
     if claimed is None:
         raise UnsupportedSourceError(f"nothing here reads these bytes ({_reads()})")
     if claimed == ZIP:
-        return _archive(stream, exported_at=moment, max_members=max_members, max_member_size=max_member_size)
-    return adapter_for(claimed).convert(stream.read(), exported_at=moment, scope=Scope())
+        return _archive(
+            stream, exported_at=moment, max_members=max_members, max_member_size=max_member_size, budget=budget
+        )
+    return adapter_for(claimed).convert(stream.read(), exported_at=moment, scope=Scope(inflation=budget))
 
 
 def _reads() -> str:
@@ -287,6 +309,7 @@ def _archive(
     exported_at: datetime,
     max_members: int | None,
     max_member_size: int | None,
+    budget: InflationBudget,
 ) -> Conversion:
     try:
         archive = zipfile.ZipFile(stream)
@@ -321,7 +344,12 @@ def _archive(
     for name in names:
         data = _member_bytes(archive, name, max_member_size)
         converted.append(
-            (name, reader.convert(data, exported_at=exported_at, scope=Scope(member=name, claimed=shared)))
+            (
+                name,
+                reader.convert(
+                    data, exported_at=exported_at, scope=Scope(member=name, claimed=shared, inflation=budget)
+                ),
+            )
         )
     return _merged(converted, exported_at=exported_at)
 
@@ -493,4 +521,6 @@ _PROVENANCE_LABELS: dict[str, str] = {
     "ssrf_version": "the Subsurface file version they are written in",
     "uddf_version": "the UDDF version they are written in",
     "fit_protocol_version": "the FIT version they are written in",
+    "shearwater_db_version": "the Shearwater Cloud database version they are written in",
+    "shearwater_xml_version": "the Shearwater Cloud XML version they are written in",
 }

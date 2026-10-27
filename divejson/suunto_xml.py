@@ -449,10 +449,10 @@ class _Converter:
         if cylinders:
             dive["cylinders"] = [cylinder.member for cylinder in cylinders]
         # One document is one dive written by one computer, so a converted document has
-        # exactly one recording (§6.4a) — **exactly**, not at most, and this is the one
-        # reader of the five where that is true: the brand is the format's rather than the
-        # file's, so `read_device` always has a member to write and §6.4a's "carries at
-        # least one" is met before a sample is read. The guard stays because `recording`'s
+        # exactly one recording (§6.4a) — **exactly**, not at most, which holds of every
+        # reader here whose brand is the format's rather than the file's: `read_device`
+        # always has a member to write, so §6.4a's "carries at least one" is met before a
+        # sample is read. The guard stays because `recording`'s
         # contract is the shared one and a reader that lost that constant would need it.
         mode = self.read_mode(where)
         built = recording(
@@ -1139,10 +1139,11 @@ def _date_time(raw: str) -> tuple[str, bool] | None:
     grammar carries — §5.2 requires the seconds and a stored value missing them would cost
     the whole dive — without asking the caller to re-parse the text to find out.
 
-    `datetime.fromisoformat` is deliberately not the parser. On the Python floor this
-    package supports, it accepts only a two- or six-digit fraction and rejects `.6` — which
-    is a property of one interpreter version rather than of the data, and `.6` is exactly
-    what this format writes. It is still used for the calendar check no pattern can make.
+    `datetime.fromisoformat` is deliberately not the parser. Which fractions it accepts has
+    changed between interpreter versions — Python 3.10's took only three or six digits and
+    rejected `.6`, which is exactly what this format writes — and that is a property of the
+    interpreter rather than of the data. It is still used for the calendar check no pattern
+    can make.
     """
     match = _TIMESTAMP.match(raw)
     if match is None:

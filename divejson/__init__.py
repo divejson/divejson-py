@@ -10,7 +10,8 @@ functions; ``cli`` is a thin wrapper over them.
 
 An application reads a source in two calls. ``sniff(head)`` takes a bounded head of bytes
 — ``SNIFF_BYTES`` of them — and answers a format id, ``"zip"``, or ``None`` for bytes
-nothing here claims; ``convert(source)`` takes the whole thing and returns a
+nothing here claims; ``convert(source)`` takes the whole thing — with the caller's caps on an
+archive's members and on what a source may unpack to — and returns a
 ``Conversion``: the document, the notes that are the other half of the output, and the
 source path each record the document carries was read from. Each note names its habit by a
 code, one of ``NOTE_CODES``, and the document member it is about.
@@ -39,6 +40,7 @@ from .converter import (  # noqa: E402
     Conversion,
     ConverterError,
     DoctypeRefusedError,
+    InflationBudget,
     InWater,
     MalformedArchiveError,
     NonConformingOutputError,
@@ -58,6 +60,17 @@ from .registry import (  # noqa: E402
     read_formats,
     sniff,
     write_formats,
+)
+from .shearwater_db import (  # noqa: E402
+    SHEARWATER_DB_ID_NAMESPACE,
+    MalformedShearwaterDbError,
+    ShearwaterDbError,
+)
+from .shearwater_db import declared_size as shearwater_db_declared_size  # noqa: E402
+from .shearwater_xml import (  # noqa: E402
+    SHEARWATER_XML_ID_NAMESPACE,
+    MalformedShearwaterXmlError,
+    ShearwaterXmlError,
 )
 from .ssrf import SSRF_ID_NAMESPACE, MalformedSsrfError, SsrfError  # noqa: E402
 from .suunto_json import (  # noqa: E402
@@ -89,6 +102,8 @@ __all__ = [
     "WRITTEN",
     "PRODUCER_KEY",
     "FIT_ID_NAMESPACE",
+    "SHEARWATER_DB_ID_NAMESPACE",
+    "SHEARWATER_XML_ID_NAMESPACE",
     "SSRF_ID_NAMESPACE",
     "SUUNTO_JSON_ID_NAMESPACE",
     "SUUNTO_XML_ID_NAMESPACE",
@@ -98,10 +113,13 @@ __all__ = [
     "DoctypeRefusedError",
     "DuplicateMemberError",
     "FitError",
+    "InflationBudget",
     "InWater",
     "Issue",
     "MalformedArchiveError",
     "MalformedFitError",
+    "MalformedShearwaterDbError",
+    "MalformedShearwaterXmlError",
     "MalformedSsrfError",
     "MalformedSuuntoJsonError",
     "MalformedSuuntoXmlError",
@@ -110,6 +128,8 @@ __all__ = [
     "Note",
     "NoteGroup",
     "NoteKind",
+    "ShearwaterDbError",
+    "ShearwaterXmlError",
     "SourceTooLargeError",
     "SsrfError",
     "SuuntoJsonError",
@@ -125,6 +145,7 @@ __all__ = [
     "load_schema",
     "parse_document",
     "read_formats",
+    "shearwater_db_declared_size",
     "sniff",
     "validate_document",
     "write_formats",

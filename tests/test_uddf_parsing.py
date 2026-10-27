@@ -87,7 +87,7 @@ def test_a_doctype_is_refused() -> None:
 
     `ElementTree` blocks external entities on its own, but entity *amplification* is capped
     only by recent libexpat, which is a library-version property rather than one this
-    package's `>=3.10` floor can promise. Refusing the declaration is the promise.
+    package's `>=3.11` floor can promise. Refusing the declaration is the promise.
     """
     data = b'<!DOCTYPE uddf [<!ENTITY a "b">]><uddf version="3.2.2"/>'
     with pytest.raises(DoctypeRefusedError, match="DOCTYPE"):

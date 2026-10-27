@@ -36,6 +36,8 @@ PAIRS = {
     "fit": "suunto-d5",
     "suunto_json": "header-only",
     "suunto_xml": "freedive",
+    "shearwater_db": "perdix3-dives-1-and-8",
+    "shearwater_xml": "perdix3-dive-8",
 }
 
 # The same, for the formats this implementation *writes*: `--strict` wants a `write/<id>/`

@@ -650,9 +650,9 @@ def _check_datetime(
         issues.append(Issue(where, f"{value!r} is not a DiveJSON {kind}"))
         return
     base, fraction, offset = match.groups()
-    # Normalize before the calendar check: fromisoformat is case-sensitive about Z
-    # and, on Python 3.10, insists on exactly 3 or 6 fractional digits — both stricter
-    # than the format's grammar.
+    # Normalize before the calendar check: fromisoformat is case-sensitive about Z, and
+    # the fraction lengths it accepts have differed between interpreter versions — both
+    # stricter than the format's grammar.
     normalized = base
     if fraction:
         normalized += "." + (fraction[1:] + "000000")[:6]

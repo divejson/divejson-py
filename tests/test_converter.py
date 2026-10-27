@@ -651,3 +651,14 @@ def test_the_derivation_is_exported_from_the_package_root() -> None:
     assert divejson.in_water is in_water
     assert divejson.IN_WATER_DEPTH == IN_WATER_DEPTH
     assert {"in_water", "InWater", "IN_WATER_DEPTH"} <= set(divejson.__all__)
+
+
+def test_a_number_past_the_digit_limit_is_no_number_under_the_pure_python_decimal(monkeypatch) -> None:
+    """Some interpreter builds ship only `_pydecimal`, which parses digits through `int` and
+    raises `ValueError` past the interpreter's limit rather than `InvalidOperation`."""
+    import _pydecimal
+
+    from divejson import converter
+
+    monkeypatch.setattr(converter, "Decimal", _pydecimal.Decimal)
+    assert converter.decimal_of("9" * 5000) is None

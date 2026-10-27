@@ -3,7 +3,7 @@ name = "divejson"
 description = "Validator, converters and conformance runner for DiveJSON, an open dive-log interchange format"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 # `fitdecode` is here before anything imports it, and deliberately not behind an extra:
 # `pip install divejson==<release>` has to be the whole install everywhere — the
 # specification repository's CI, an application, a diver's machine — and a format left

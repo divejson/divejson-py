@@ -1,15 +1,15 @@
 """Reading an XML source safely, once for every XML format.
 
-Three of the dive-log formats worth reading are XML — UDDF, Subsurface's `.ssrf`, Suunto's
-DM5 export — and every one of them meets the same two hazards, so both answers live here
-and are inherited rather than re-implemented per adapter.
+Four of the dive-log formats worth reading are XML — UDDF, Subsurface's `.ssrf`, Suunto's
+DM5 export, Shearwater Cloud's XML export — and every one of them meets the same two
+hazards, so both answers live here and are inherited rather than re-implemented per adapter.
 
 **A `<!DOCTYPE>` is refused outright.** Spec §9 requires a reader not to execute or
 dereference anything it finds in a document, and no dive log has a legitimate use for a
 document type declaration. `ElementTree` blocks external entities on its own but caps
 entity *amplification* only in recent libexpat — a several hundredfold blowup still parses
 on older ones, and that is a library-version property rather than a guarantee this
-package's `>=3.10` floor can make. Refusing the declaration is the guarantee, and it costs
+package's `>=3.11` floor can make. Refusing the declaration is the guarantee, and it costs
 nothing real. Raising from the target's `doctype` hook aborts before expat has expanded a
 single entity reference in the content, which is what makes this a bound on amplification
 rather than a check performed after the damage.
@@ -52,7 +52,7 @@ class DoctypeRefusingTarget(ET.TreeBuilder):
 
     The hook is on the *target* rather than on the parser: `XMLParser.parser`, which the
     equivalent expat handler would need, no longer exists on Python 3.14, while this one
-    behaves identically from 3.10 through 3.14.
+    behaves identically on every interpreter from the package's floor through 3.14.
     """
 
     def doctype(self, name: str, pubid: str | None, system: str | None) -> None:

@@ -236,7 +236,7 @@ def test_events_alone_are_a_profile_and_are_ordered_by_time() -> None:
 
 def test_a_reading_below_the_channels_floor_is_refused_and_counted() -> None:
     """§6.4 floors the decompression readouts at zero, and the floor comes off the schema
-    rather than out of an adapter — which is what keeps it one rule instead of five."""
+    rather than out of an adapter — which is what keeps it one rule instead of one per reader."""
     channel = Channel("ndl")
     assert channel.record(0, -1) is False
     assert channel.record(10, 0) is True
