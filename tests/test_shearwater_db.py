@@ -10,6 +10,7 @@ from __future__ import annotations
 import io
 import json
 import sqlite3
+import uuid
 import zipfile
 
 import pytest
@@ -29,12 +30,14 @@ from divejson.converter import InflationBudget, Scope
 from divejson.shearwater_db import (
     MAX_LOG_SIZE,
     SHEARWATER_DB,
+    SHEARWATER_DB_ID_NAMESPACE,
     Tank,
     decoded_sample,
 )
 from divejson.validate import validate_document
 
 PAIR = FIXTURES / "shearwater_db" / "perdix3-dives-1-and-8.db"
+DECO_PAIR = FIXTURES / "shearwater_db" / "perdix3-deco-dive-11.db"
 NOT_A_CLOUD_EXPORT = "not a Shearwater Cloud export"
 
 
@@ -65,15 +68,17 @@ def _edited(statements: list[str]) -> bytes:
 # -- the pair ---------------------------------------------------------------------------
 
 
-def test_the_pair_converts_to_its_expected_document() -> None:
-    expected = json.loads(PAIR.with_suffix(".divejson").read_text(encoding="utf-8"))
-    assert compared(_conversion(PAIR.read_bytes()).document) == compared(expected)
+@pytest.mark.parametrize("pair", [PAIR, DECO_PAIR], ids=lambda path: path.stem)
+def test_the_pair_converts_to_its_expected_document(pair) -> None:
+    expected = json.loads(pair.with_suffix(".divejson").read_text(encoding="utf-8"))
+    assert compared(_conversion(pair.read_bytes()).document) == compared(expected)
     assert validate_document(expected) == []
 
 
-def test_the_summaries_beside_each_log_agree_with_it() -> None:
+@pytest.mark.parametrize("pair", [PAIR, DECO_PAIR], ids=lambda path: path.stem)
+def test_the_summaries_beside_each_log_agree_with_it(pair) -> None:
     """The sidecars are never read into the document; they earn their keep as cross-checks."""
-    assert "summary_disagrees" not in _codes(_conversion(PAIR.read_bytes()))
+    assert "summary_disagrees" not in _codes(_conversion(pair.read_bytes()))
 
 
 def test_a_summary_that_disagrees_is_reported_and_the_log_is_kept() -> None:
@@ -293,14 +298,200 @@ def test_the_logbooks_number_is_the_diver_and_the_counter_is_the_devices() -> No
     assert dive["number"] == 112 and device_of(dive)["dive_number"] == 3
 
 
-def test_a_filled_logbook_column_waits_for_a_file_and_says_so() -> None:
-    data = sw.database(
-        [sw.row(sw.log([sw.sample()]))],
-        details=[{"DiveId": "1588035071789987697", "Location": "Dahab", "Buddy": "", "Notes": None}],
+# -- the deco dive ------------------------------------------------------------------------
+
+
+def test_the_deco_dive_carries_its_ceiling_from_the_first_sample_one_is_recorded() -> None:
+    """The first stop is recorded at 610 s with the ceiling byte still 0, which is no ceiling."""
+    profile = profile_of(_dives(DECO_PAIR.read_bytes())[0])
+    ceiling = profile["ceiling"]
+    assert (len(ceiling["times"]), ceiling["times"][0], ceiling["times"][-1]) == (358, 630_000, 4_200_000)
+    assert (min(ceiling["values"]), max(ceiling["values"])) == (100, 1400)
+    assert ceiling["times"] == list(range(630_000, 4_210_000, 10_000))
+    assert 610_000 in profile["tts"]["times"]
+
+
+def test_the_deco_dives_no_decompression_time_counts_to_zero_and_stops_at_the_stop() -> None:
+    ndl = profile_of(_dives(DECO_PAIR.read_bytes())[0])["ndl"]
+    read = dict(zip(ndl["times"], ndl["values"]))
+    assert 0 not in read
+    assert [read[at] for at in range(530_000, 610_000, 10_000)] == [0] * 8
+    assert not any(610_000 <= at <= 4_200_000 for at in read)
+    assert read[4_210_000] == 5940
+
+
+def test_the_deco_dive_switches_gas_and_back() -> None:
+    dive = _dives(DECO_PAIR.read_bytes())[0]
+    assert profile_of(dive)["events"] == [
+        {"time": 2_030_000, "type": "gas_switch", "gas_number": 0},
+        {"time": 4_430_000, "type": "gas_switch", "gas_number": 1},
+    ]
+
+
+def test_the_deco_dives_logbook_lands_on_the_dive() -> None:
+    conversion = _conversion(DECO_PAIR.read_bytes())
+    document = conversion.document
+    [dive] = document["dives"]
+    [site] = document["sites"]
+    [person] = document["people"]
+    assert site == {
+        "uuid": str(uuid.uuid5(SHEARWATER_DB_ID_NAMESPACE, 'site:["Lighthouse","Dahab, Egypt"]')),
+        "name": "Lighthouse",
+        "location": {"name": "Dahab, Egypt"},
+    }
+    assert person == {"uuid": str(uuid.uuid5(SHEARWATER_DB_ID_NAMESPACE, "person:john doe")), "name": "John Doe"}
+    assert dive["site_uuids"] == [site["uuid"]]
+    assert dive["people"] == [{"person_uuid": person["uuid"], "role": "buddy"}]
+    assert dive["notes"] == (
+        "Summary: Dive notes here\n\nEnvironment: Environment notes here\n\nGas: Gas notes here\n\n"
+        "Gear: Gear notes here\n\nIssues: No problems at all"
     )
-    conversion = _conversion(data)
-    [note] = [note for note in conversion.notes if note.code == "logbook_detail_not_read"]
-    assert "Location" in note.message
+    assert (dive["visibility"], dive["air_temperature"], dive["weather"], dive["entry_type"]) == (
+        20.0,
+        29.0,
+        "clear",
+        "shore",
+    )
+    assert _codes(conversion, "resolved") == ["sunny_read_as_clear"]
+    assert "logbook_detail_not_read" not in _codes(conversion)
+    reported = [note for note in conversion.notes if note.code in REPORTED_LOGBOOK]
+    assert sorted((note.code, note.message.split("'s ")[1].split(" field")[0]) for note in reported) == sorted(
+        [
+            ("unit_not_stated", "Weight"),
+            *(("tank_pressures_unmatched", f"Tank{n}Pressure{end}") for n in (1, 2) for end in ("Start", "End")),
+            *(
+                ("detail_not_kept", column)
+                for column in (
+                    "TankSize",
+                    "Environment",
+                    "Conditions",
+                    "Dress",
+                    "Apparatus",
+                    "ThermalComfort",
+                    "Workload",
+                    "Problems",
+                    "Malfunctions",
+                    "Symptoms",
+                    "ExposureToAltitude",
+                )
+            ),
+        ]
+    )
+    assert "'Dry Suit'" in " ".join(note.message for note in reported)
+
+
+# -- the logbook --------------------------------------------------------------------------
+
+REPORTED_LOGBOOK = ("unit_not_stated", "tank_pressures_unmatched", "detail_not_kept")
+LOGBOOK_COLUMNS = (
+    "Site", "Location", "Buddy", "Notes", "EnvironmentNotes", "GasNotes", "GearNotes", "IssueNotes", "Visibility",
+    "AirTemperature", "Weather", "Platform", "Weight", "Environment", "TankSize", "Tank1PressureStart",
+    "GnssEntryLocation", "Other1",
+)
+
+
+def _logbook(*details: dict, log_ids: tuple[str, ...] = ("1588035071789987697",)) -> bytes:
+    """A database of one log per id, each joined to the logbook columns given for it."""
+    table = 'CREATE TABLE "dive_details"("DiveId" varchar primary key not null, ' + ", ".join(
+        f'"{column}" varchar' for column in LOGBOOK_COLUMNS
+    ) + ")"
+    rows = [sw.row(sw.log([sw.sample()], number=index + 1), log_id=log_id) for index, log_id in enumerate(log_ids)]
+    return sw.database(
+        rows,
+        details=[{"DiveId": log_id, **columns} for log_id, columns in zip(log_ids, details)],
+        tables=(sw.LOG_DATA, table, sw.DELETED_LOGS, sw.TABLE_VERSION),
+    )
+
+
+def test_a_site_per_pair_and_a_person_per_name_across_the_file() -> None:
+    data = _logbook(
+        {"Site": " Lighthouse ", "Location": "Dahab", "Buddy": "John Doe"},
+        {"Site": "Lighthouse", "Location": "Dahab", "Buddy": "  john DOE"},
+        {"Site": "Lighthouse", "Buddy": "Jane Roe, John Doe"},
+        log_ids=("1", "2", "3"),
+    )
+    document = _conversion(data).document
+    assert [(site["name"], site.get("location")) for site in document["sites"]] == [
+        ("Lighthouse", {"name": "Dahab"}),
+        ("Lighthouse", None),
+    ]
+    assert document["sites"][1]["uuid"] == str(uuid.uuid5(SHEARWATER_DB_ID_NAMESPACE, 'site:["Lighthouse",""]'))
+    assert [person["name"] for person in document["people"]] == ["John Doe", "Jane Roe, John Doe"]
+    first, second, third = document["dives"]
+    assert first["site_uuids"] == second["site_uuids"] != third["site_uuids"]
+    assert first["people"] == second["people"] != third["people"]
+
+
+def test_a_site_key_keeps_its_characters_as_they_are() -> None:
+    document = _conversion(_logbook({"Site": "Ras Muhammad — Shark Reef", "Location": "Sharm"})).document
+    key = json.dumps(["Ras Muhammad — Shark Reef", "Sharm"], ensure_ascii=False, separators=(",", ":"))
+    assert document["sites"][0]["uuid"] == str(uuid.uuid5(SHEARWATER_DB_ID_NAMESPACE, f"site:{key}"))
+
+
+def test_a_location_with_no_site_makes_no_site() -> None:
+    conversion = _conversion(_logbook({"Location": "Dahab"}))
+    assert "sites" not in conversion.document and "site_uuids" not in conversion.document["dives"][0]
+    assert "site_unnamed" in _codes(conversion, "dropped")
+
+
+def test_a_name_past_the_logbooks_length_is_cut_and_said() -> None:
+    conversion = _conversion(_logbook({"Site": "S" * 300, "Location": "L" * 300, "Buddy": "B" * 300}))
+    document = conversion.document
+    assert len(document["sites"][0]["name"]) == 255 and len(document["sites"][0]["location"]["name"]) == 255
+    assert len(document["people"][0]["name"]) == 255
+    assert _codes(conversion).count("text_shortened") == 3
+
+
+def test_only_the_notes_columns_filled_become_paragraphs() -> None:
+    [dive] = _dives(_logbook({"GasNotes": " 32 % ", "IssueNotes": "Free flow"}))
+    assert dive["notes"] == "Gas: 32 %\n\nIssues: Free flow"
+
+
+@pytest.mark.parametrize(
+    ("column", "typed", "code"),
+    [
+        ("Visibility", "20 ft", "unit_unexpected"),
+        ("Visibility", "good", "not_a_number"),
+        ("Visibility", "-1", "visibility_negative"),
+        ("AirTemperature", "29", "unit_not_stated"),
+        ("AirTemperature", "84F", "unit_unexpected"),
+        ("AirTemperature", "warm", "not_a_number"),
+        ("Weather", "Rain", "value_unknown"),
+        ("Platform", "Boat", "value_unknown"),
+    ],
+)
+def test_a_value_the_file_does_not_state_the_meaning_of_is_reported_quoted(column, typed, code) -> None:
+    conversion = _conversion(_logbook({column: typed}))
+    member = {"Visibility": "visibility", "AirTemperature": "air_temperature", "Weather": "weather"}.get(
+        column, "entry_type"
+    )
+    assert member not in conversion.document["dives"][0]
+    [note] = [note for note in conversion.notes if note.code == code]
+    assert note.kind == "dropped" and repr(typed) in note.message and note.member == f"dives/0/{member}"
+
+
+def test_a_figure_with_its_unit_reads() -> None:
+    [dive] = _dives(_logbook({"Visibility": "12.5", "AirTemperature": "-3.5C"}))
+    assert (dive["visibility"], dive["air_temperature"]) == (12.5, -3.5)
+
+
+def test_a_column_no_file_has_filled_waits_and_says_so_by_name() -> None:
+    conversion = _conversion(_logbook({"GnssEntryLocation": "27.9, 34.3", "Other1": "x", "Buddy": ""}))
+    notes = [note for note in conversion.notes if note.code == "logbook_detail_not_read"]
+    assert sorted(note.message.split("'s ")[1].split(" field")[0] for note in notes) == ["GnssEntryLocation", "Other1"]
+    assert "people" not in conversion.document
+
+
+def test_an_archives_databases_name_one_site_once() -> None:
+    first = _logbook({"Site": "Lighthouse", "Buddy": "John Doe"}, log_ids=("1",))
+    second = _logbook({"Site": "Lighthouse", "Buddy": "John Doe"}, log_ids=("2",))
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("a.db", first)
+        archive.writestr("b.db", second)
+    document = _conversion(buffer.getvalue()).document
+    assert len(document["sites"]) == 1 and len(document["people"]) == 1
+    assert document["dives"][0]["site_uuids"] == document["dives"][1]["site_uuids"]
 
 
 # -- the budget ---------------------------------------------------------------------------
@@ -341,28 +532,36 @@ def test_the_adapter_spends_the_scopes_budget() -> None:
 
 
 def test_the_sentinels_read_as_absence() -> None:
-    read = decoded_sample(sw.sample(ndl=0, ppo2=0, gf99=0xFF, ceiling=0, gas_time=0xF9, sac=0xFFFA), cell_mask=0)
+    read = decoded_sample(
+        sw.sample(ndl=0, ppo2=0, gf99=0xFF, ceiling=0, gas_time=0xF9, sac=0xFFFA), cell_mask=0, first=True
+    )
     assert (read.ndl, read.ppo2, read.gradient_factor, read.ceiling, read.gas_time, read.sac) == (None,) * 6
     assert read.cells == (None, None, None) and read.tanks == (Tank(status="the air integration is off"),) * 2
 
 
+def test_a_zero_no_decompression_time_with_no_stop_is_a_reading_past_the_first_sample() -> None:
+    """The device counting down to its last minute at depth before a stop; a ceiling of 0 stays none."""
+    assert decoded_sample(sw.sample(depth=460, ndl=0), cell_mask=0, first=False).ndl == 0
+    assert decoded_sample(sw.sample(depth=460, ndl=0, ceiling=0), cell_mask=0, first=False).ceiling is None
+
+
 def test_a_stop_turns_the_no_decompression_byte_into_the_stops_time() -> None:
-    read = decoded_sample(sw.sample(stop_depth=6, ndl=3, ceiling=5), cell_mask=0)
+    read = decoded_sample(sw.sample(stop_depth=6, ndl=3, ceiling=5), cell_mask=0, first=False)
     assert (read.stop_depth, read.stop_time, read.ndl, read.ceiling) == (6, 3, None, 5)
 
 
 def test_a_tank_word_below_the_status_range_is_twelve_bits_of_two_psi() -> None:
-    read = decoded_sample(sw.sample(tank0=0x13C4, tank1=0xFFFC), cell_mask=0)
+    read = decoded_sample(sw.sample(tank0=0x13C4, tank1=0xFFFC), cell_mask=0, first=False)
     assert read.tanks == (Tank(psi=0x3C4 * 2), Tank(status="no transmitter is paired"))
 
 
 def test_a_below_zero_temperature_wraps_as_the_layout_says() -> None:
-    assert decoded_sample(sw.sample(temperature=-2), cell_mask=0).temperature == 0
-    assert decoded_sample(sw.sample(temperature=-110), cell_mask=0).temperature == -8
+    assert decoded_sample(sw.sample(temperature=-2), cell_mask=0, first=False).temperature == 0
+    assert decoded_sample(sw.sample(temperature=-110), cell_mask=0, first=False).temperature == -8
 
 
 def test_the_ppo2_byte_averaging_the_cells_is_not_the_computers_ppo2() -> None:
-    read = decoded_sample(sw.sample(ppo2=120, status=0x02, cells=(50, 51, 52)), cell_mask=0b111)
+    read = decoded_sample(sw.sample(ppo2=120, status=0x02, cells=(50, 51, 52)), cell_mask=0b111, first=False)
     assert read.ppo2 is None and read.cell_ppo2 and read.cells == (50, 51, 52)
 
 

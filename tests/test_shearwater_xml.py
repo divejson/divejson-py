@@ -25,6 +25,14 @@ from divejson.validate import validate_document
 
 PAIR = FIXTURES / "shearwater_xml" / "perdix3-dive-8.xml"
 DATABASE = FIXTURES / "shearwater_db" / "perdix3-dives-1-and-8.db"
+DECO_PAIR = FIXTURES / "shearwater_xml" / "perdix3-deco-dive-11.xml"
+DECO_DATABASE = FIXTURES / "shearwater_db" / "perdix3-deco-dive-11.db"
+
+# Each XML pair beside the database pair holding the same dive, and that dive's log's tag.
+ORACLES = [
+    pytest.param(PAIR, DATABASE, "#8 ", 12, 402, id="dive 8"),
+    pytest.param(DECO_PAIR, DECO_DATABASE, "#11 ", 14, 488, id="deco dive 11"),
+]
 
 # The columns both exports carry, which the oracle compares.
 COMPARED = (
@@ -53,29 +61,61 @@ def _codes(conversion, kind: str | None = None) -> list[str]:
 # -- the oracle ---------------------------------------------------------------------------
 
 
-def _database_samples() -> dict[int, object]:
-    """Dive 8's samples out of the database pair, by their millisecond."""
-    with _Database(DATABASE.read_bytes()) as db:
-        [row] = [row for row in db.log_rows() if row.file_name and "#8 " in row.file_name]
+def _database_samples(database, tag: str) -> dict[int, object]:
+    """One dive's samples out of a database pair, by their millisecond."""
+    with _Database(database.read_bytes()) as db:
+        [row] = [row for row in db.log_rows() if row.file_name and tag in row.file_name]
         log = _decoded(_inflated(db.log(row)[0], row.declared))
     mask = log.openings[3][6]
-    return {ordinal * 10_000: decoded_sample(record, cell_mask=mask) for ordinal, record in enumerate(log.samples)}
+    return {
+        ordinal * 10_000: decoded_sample(record, cell_mask=mask, first=not ordinal)
+        for ordinal, record in enumerate(log.samples)
+    }
 
 
-def _xml_samples() -> dict[int, object]:
-    root = ET.fromstring(PAIR.read_bytes().decode("ascii").replace('encoding="utf-16"', 'encoding="utf-8"'))
+def _xml_records(pair) -> list[ET.Element]:
+    root = ET.fromstring(pair.read_bytes().decode("ascii").replace('encoding="utf-16"', 'encoding="utf-8"'))
+    return list(root.find("diveLog").iter("diveLogRecord"))
+
+
+def _xml_samples(pair) -> dict[int, object]:
+    root = ET.fromstring(pair.read_bytes().decode("ascii").replace('encoding="utf-16"', 'encoding="utf-8"'))
     log = root.find("diveLog")
     reader = _Converter(root, log, exported_at=EXPORTED_AT, scope=Scope())
-    return {reader.time_of(record): reader.sample(record) for record in log.iter("diveLogRecord")}
+    records = list(log.iter("diveLogRecord"))
+    return {reader.time_of(record): reader.sample(record, first=not index) for index, record in enumerate(records)}
 
 
-def test_every_record_the_xml_keeps_is_the_databases_sample_at_that_time() -> None:
-    database, exported = _database_samples(), _xml_samples()
-    assert len(exported) == 12 and len(database) == 402
+def _figure(record: ET.Element, name: str) -> int:
+    return int(float(record.findtext(name)))
+
+
+@pytest.mark.parametrize(("pair", "database", "tag", "kept", "logged"), ORACLES)
+def test_every_record_the_xml_keeps_is_the_databases_sample_at_that_time(pair, database, tag, kept, logged) -> None:
+    from_database, exported = _database_samples(database, tag), _xml_samples(pair)
+    assert len(exported) == kept and len(from_database) == logged
     for at, sample in exported.items():
-        assert at in database, at
+        assert at in from_database, at
         for column in COMPARED:
-            assert getattr(database[at], column) == getattr(sample, column), (at, column)
+            assert getattr(from_database[at], column) == getattr(sample, column), (at, column)
+
+
+@pytest.mark.parametrize(("pair", "database", "tag", "kept", "logged"), ORACLES)
+def test_the_database_agrees_with_the_xml_under_the_rules_both_sides_share(pair, database, tag, kept, logged) -> None:
+    """What the shared sentinel rules would hide on both sides at once, checked against the
+    XML's own figures: the stop's time, the no-decompression time wherever no stop is
+    recorded past the first record, and a ceiling only where a stop is."""
+    from_database = _database_samples(database, tag)
+    for index, record in enumerate(_xml_records(pair)):
+        sample = from_database[_figure(record, "currentTime")]
+        stop = _figure(record, "firstStopDepth")
+        if stop:
+            assert (sample.stop_depth, sample.stop_time) == (stop, _figure(record, "firstStopTime")), index
+            assert sample.ndl is None, index
+        else:
+            assert sample.ceiling is None, index
+            if index:
+                assert sample.ndl == _figure(record, "currentNdl"), index
 
 
 def test_the_two_exports_of_dive_eight_carry_one_profile_where_both_have_it() -> None:
@@ -87,12 +127,25 @@ def test_the_two_exports_of_dive_eight_carry_one_profile_where_both_have_it() ->
     assert "cns" not in from_xml and "gradient_factor" not in from_xml
 
 
+def test_the_deco_dives_no_decompression_time_reaches_zero_before_its_first_stop() -> None:
+    ndl = profile_of(_conversion(DECO_PAIR.read_bytes()).document["dives"][0])["ndl"]
+    assert dict(zip(ndl["times"], ndl["values"])) == {
+        520_000: 60,
+        530_000: 0,
+        600_000: 0,
+        4_210_000: 5940,
+        4_430_000: 5940,
+        4_870_000: 5940,
+    }
+
+
 # -- the pair -----------------------------------------------------------------------------
 
 
-def test_the_pair_converts_to_its_expected_document() -> None:
-    expected = json.loads(PAIR.with_suffix(".divejson").read_text(encoding="utf-8"))
-    assert compared(_conversion(PAIR.read_bytes()).document) == compared(expected)
+@pytest.mark.parametrize("pair", [PAIR, DECO_PAIR], ids=lambda path: path.stem)
+def test_the_pair_converts_to_its_expected_document(pair) -> None:
+    expected = json.loads(pair.with_suffix(".divejson").read_text(encoding="utf-8"))
+    assert compared(_conversion(pair.read_bytes()).document) == compared(expected)
     assert validate_document(expected) == []
 
 

@@ -49,11 +49,13 @@ from typing import Any
 from .converter import (
     CENTIMETRES_PER_METRE,
     HUNDREDTHS_PER_DEGREE,
+    MAX_NAME,
     PRODUCER_KEY,
     TENTHS_PER_UNIT,
     Conversion,
     ConverterError,
     Identities,
+    capped,
     NonConformingOutputError,
     Note,
     NoteKind,
@@ -218,8 +220,9 @@ MAX_CYLINDER_PRESSURE = Decimal(350)
 MILLIBAR_PER_BAR = Decimal(1000)
 
 # The `dive_details` columns this reader reads or knows to pass over: the join key and the
-# housekeeping, the typed columns, and the floats Shearwater Cloud computes. Every other
-# column is something the diver typed, and waits for a file that fills one in.
+# housekeeping, the typed columns, and the floats Shearwater Cloud computes. The columns the
+# diver types are the tables below; a filled column in none of them — one no file in hand
+# fills — is reported by its name.
 DETAIL_COLUMNS_READ = frozenset({"DiveId", "DiveNumber", "SerialNumber", "TankProfileData"})
 DETAIL_COLUMNS_PASSED = frozenset(
     {
@@ -237,6 +240,67 @@ DETAIL_COLUMNS_PASSED = frozenset(
         "EndGF99",
     }
 )
+
+# The diver's logbook columns, each read only where the file states its meaning and unit —
+# in the string itself or in Shearwater's own UDDF export of the same dive.
+SITE, LOCATION, BUDDY = "Site", "Location", "Buddy"
+VISIBILITY, AIR_TEMPERATURE, WEATHER, PLATFORM, WEIGHT = (
+    "Visibility",
+    "AirTemperature",
+    "Weather",
+    "Platform",
+    "Weight",
+)
+# The note columns, in the order Shearwater's UDDF writes them, each one paragraph under the
+# label it writes it with.
+NOTE_COLUMNS = (
+    ("Notes", "Summary"),
+    ("EnvironmentNotes", "Environment"),
+    ("GasNotes", "Gas"),
+    ("GearNotes", "Gear"),
+    ("IssueNotes", "Issues"),
+)
+# The words seen in Weather and Platform, onto the logbook's. `Sunny` is clear skies with the
+# cloud cover left open, so it is read and said; `Beach/Shore` is UDDF's `beach-shore`.
+WEATHERS = {"Sunny": "clear"}
+PLATFORMS = {"Beach/Shore": "shore"}
+# Air temperature as Shearwater Cloud spells it, `29C`: the unit is in the string.
+AIR_TEMPERATURE_UNIT = "C"
+# The typed tank pressures and the tank size, which the file ties to no cylinder:
+# `TankProfileData` puts each beside a gas segment rather than a cylinder.
+TYPED_PRESSURES = tuple(f"Tank{tank}Pressure{end}" for tank in range(1, 5) for end in ("Start", "End"))
+TANK_SIZE = "TankSize"
+# Columns with no place in the logbook, each reported with what it records.
+NO_PLACE_COLUMNS = (
+    "Environment",
+    "Conditions",
+    "Dress",
+    "Apparatus",
+    "ThermalComfort",
+    "Workload",
+    "Problems",
+    "Malfunctions",
+    "Symptoms",
+    "ExposureToAltitude",
+)
+DETAIL_COLUMNS_MAPPED = frozenset(
+    {
+        SITE,
+        LOCATION,
+        BUDDY,
+        VISIBILITY,
+        AIR_TEMPERATURE,
+        WEATHER,
+        PLATFORM,
+        WEIGHT,
+        TANK_SIZE,
+        *TYPED_PRESSURES,
+        *(column for column, _ in NOTE_COLUMNS),
+        *NO_PLACE_COLUMNS,
+    }
+)
+# A figure as a diver types one: a number, and whatever follows it.
+_FIGURE = re.compile(r"\A([+-]?\d+(?:\.\d+)?)\s*(\S.*)?\Z")
 
 
 class ShearwaterDbError(ConverterError):
@@ -345,35 +409,42 @@ class Sample:
     circuit: str | None = None
 
 
-def stop_and_ndl(stop_depth: int, minutes: int) -> tuple[int | None, int | None, int | None]:
+def stop_and_ndl(stop_depth: int, minutes: int, *, first: bool) -> tuple[int | None, int | None, int | None]:
     """The next stop's depth and time and the no-decompression time, from one sample's pair.
 
     One byte serves both: the next stop's time where a stop depth is recorded, the
-    no-decompression time where it is zero. A zero then is no reading — the first sample of
-    seven of the owner's eight logs writes it at the surface, with the device's cap of 99 on
-    the next, and Shearwater's own UDDF export writes no no-decompression time there.
+    no-decompression time where it is zero. A zero with no stop is a reading — the device
+    counting down to its last minute before a stop, as a deco dive does at depth — except on
+    the log's `first` sample, where the device has not begun deciding: most logs write a zero
+    there at the surface with the cap of 99 on the next. Both readers decide it here, by the
+    sample's place in the log.
     """
     if stop_depth:
         return stop_depth, minutes, None
-    return None, None, minutes or None
+    if not minutes and first:
+        return None, None, None
+    return None, None, minutes
 
 
 def computed_ppo2(hundredths: int, *, from_cells: bool) -> tuple[int | None, bool]:
     """The ppO₂ the computer worked out, and whether the byte averaged the cells instead.
 
-    A zero is no reading: a ppO₂ the computer computed is never nothing, and the one zero in
-    the owner's eight logs sits on a surface sample whose depth and times are zero beside it.
+    A zero is no reading: a ppO₂ the computer computed is never nothing, and every zero in the
+    owner's logs sits on a log's first sample, at the surface.
     """
     if from_cells:
         return None, bool(hundredths)
     return hundredths or None, False
 
 
-def decoded_sample(record: bytes, *, cell_mask: int) -> Sample:
-    """One `0x01` record as a `Sample`. Offsets and scales are the mapping document's table."""
+def decoded_sample(record: bytes, *, cell_mask: int, first: bool) -> Sample:
+    """One `0x01` record as a `Sample`, `first` where it is the log's first sample.
+
+    Offsets and scales are the mapping document's table.
+    """
     depth, stop_depth, tts = struct.unpack_from(">HHH", record, 1)
     status = record[12]
-    stop, stop_time, ndl = stop_and_ndl(stop_depth, record[10])
+    stop, stop_time, ndl = stop_and_ndl(stop_depth, record[10], first=first)
     ppo2, cell_ppo2 = computed_ppo2(record[7], from_cells=bool(status & STATUS_EXTERNAL_PPO2))
     cells = tuple(
         value if value or cell_mask & (1 << index) else None
@@ -990,6 +1061,12 @@ class _Converter:
         self.scope = scope
         self.notes: list[Note] = []
         self.identities = Identities(SHEARWATER_DB_ID_NAMESPACE, scope, self.note)
+        # The sites and people the logbook columns name, once each across the file, by
+        # the key each is identified by.
+        self.sites: list[dict[str, Any]] = []
+        self.people: list[dict[str, Any]] = []
+        self.site_uuids: dict[str, str] = {}
+        self.person_uuids: dict[str, str] = {}
 
     def note(self, where: str, message: str, kind: NoteKind, *, code: str, member: str | None = None) -> None:
         """One line of the report, at a path into the source this conversion read."""
@@ -1024,6 +1101,10 @@ class _Converter:
         document: dict[str, Any] = header(self.exported_at)
         if dives:
             document["dives"] = dives
+        if self.sites:
+            document["sites"] = self.sites
+        if self.people:
+            document["people"] = self.people
         provenance: dict[str, Any] = {"converted_from": FORMAT}
         version = self.db.version()
         if version is not None:
@@ -1111,7 +1192,8 @@ class _Converter:
             time_member="time",
         )
         self.report_records(log, where, path)
-        self.report_logbook(details, where, path)
+        if details is not None:
+            self.read_logbook(details, dive, where, path)
         if gases:
             dive["cylinders"] = [gas.member for gas in gases]
 
@@ -1139,7 +1221,7 @@ class _Converter:
             interval = struct.unpack_from(">H", log.openings[5], 23)[0] or DEFAULT_INTERVAL
         mask = log.openings[3][6]
         for ordinal, record in enumerate(log.samples):
-            yield ordinal * interval, decoded_sample(record, cell_mask=mask)
+            yield ordinal * interval, decoded_sample(record, cell_mask=mask, first=not ordinal)
 
     def read_number(self, details: dict[str, Any] | None, where: str, path: str) -> int | None:
         """`dive_details.DiveNumber`, the logbook's number for the dive — the diver's, not the device's."""
@@ -1404,18 +1486,237 @@ class _Converter:
                     member=f"{path}/{side}_position",
                 )
 
-    def report_logbook(self, details: dict[str, Any] | None, where: str, path: str) -> None:
-        """Every filled `dive_details` column this reader does not read yet, by its own name.
+    def read_logbook(self, details: dict[str, Any], dive: dict[str, Any], where: str, path: str) -> None:
+        """The columns the diver typed into Shearwater Cloud, onto the dive or into the report.
 
-        What Shearwater Cloud puts in Location, Buddy, the GNSS fixes and the rest is unknown
-        until a file that fills them in exists, so none is mapped on a guess.
+        Each column is trimmed and an empty one is no column. What each filled one becomes is
+        `docs/shearwater-db-mapping.md`'s *The logbook columns*; a filled column that table
+        does not name is reported by its own name, waiting for a file that shows what it holds.
         """
-        if details is None:
-            return
-        for column, value in details.items():
-            if column in DETAIL_COLUMNS_READ or column in DETAIL_COLUMNS_PASSED:
-                continue
-            if value is None or (isinstance(value, str) and not value.strip()):
+        typed = {column: _typed(value) for column, value in details.items() if value is not None}
+        typed = {column: value for column, value in typed.items() if value}
+
+        site = self.read_site(typed.get(SITE, ""), typed.get(LOCATION, ""), where, path)
+        if site is not None:
+            dive["site_uuids"] = [site]
+        buddy = typed.get(BUDDY)
+        person = None if buddy is None else self.read_person(buddy, f"{where}/{BUDDY}")
+        if person is not None:
+            dive["people"] = [{"person_uuid": person, "role": "buddy"}]
+        paragraphs = [f"{label}: {typed[column]}" for column, label in NOTE_COLUMNS if column in typed]
+        if paragraphs:
+            dive["notes"] = "\n\n".join(paragraphs)
+        if VISIBILITY in typed:
+            visibility = self.read_visibility(typed[VISIBILITY], where, path)
+            if visibility is not None:
+                dive["visibility"] = visibility
+        if AIR_TEMPERATURE in typed:
+            air = self.read_air_temperature(typed[AIR_TEMPERATURE], where, path)
+            if air is not None:
+                dive["air_temperature"] = air
+        if WEATHER in typed:
+            weather = self.read_word(typed[WEATHER], WEATHER, WEATHERS, "weather", where, f"{path}/weather")
+            if weather is not None:
+                dive["weather"] = weather
+                self.note(
+                    where,
+                    f"Shearwater Cloud's {WEATHER} field records {typed[WEATHER]!r}, read as clear skies; how much "
+                    "cloud there was is not said.",
+                    "resolved",
+                    code="sunny_read_as_clear",
+                    member=f"{path}/weather",
+                )
+        if PLATFORM in typed:
+            entry = self.read_word(typed[PLATFORM], PLATFORM, PLATFORMS, "entry type", where, f"{path}/entry_type")
+            if entry is not None:
+                dive["entry_type"] = entry
+        self.report_unread_logbook(typed, where, path)
+
+    def read_site(self, name: str, locality: str, where: str, path: str) -> str | None:
+        """The site the Site and Location columns name, one per distinct pair across the file.
+
+        Identified by the pair itself, as Shearwater's own UDDF export identifies its site,
+        under the kind `site`. A Location with no Site names no site.
+        """
+        if not name:
+            if locality:
+                self.note(
+                    where,
+                    f"Shearwater Cloud's {LOCATION} field records {locality!r} with no site name, and a site cannot be "
+                    "kept without one; it is left out.",
+                    "dropped",
+                    code="site_unnamed",
+                )
+            return None
+        key = json.dumps([name, locality], ensure_ascii=False, separators=(",", ":"))
+        if key in self.site_uuids:
+            return self.site_uuids[key]
+        claimed, carried = self.identities.for_record("site", key, f"{where}/{SITE}", len(self.site_uuids))
+        if claimed is None:
+            return None
+        self.site_uuids[key] = claimed
+        if carried:
+            at = f"sites/{len(self.sites)}"
+            site: dict[str, Any] = {
+                "uuid": claimed,
+                "name": capped(name, MAX_NAME, note=self.note, where=where, label="the site name", path=f"{at}/name"),
+            }
+            if locality:
+                site["location"] = {
+                    "name": capped(
+                        locality, MAX_NAME, note=self.note, where=where, label="the site's location",
+                        path=f"{at}/location/name",
+                    )
+                }
+            self.sites.append(site)
+        return claimed
+
+    def read_person(self, name: str, where: str) -> str | None:
+        """The person a Buddy string is, the whole string one person, never split.
+
+        One person per trimmed, case-folded string across the file, identified by it under
+        the kind `person`, and spelled the way the file first spelled it.
+        """
+        key = name.casefold()
+        if key in self.person_uuids:
+            return self.person_uuids[key]
+        claimed, carried = self.identities.for_record("person", key, where, len(self.person_uuids))
+        if claimed is None:
+            return None
+        self.person_uuids[key] = claimed
+        if carried:
+            at = f"people/{len(self.people)}/name"
+            self.people.append(
+                {
+                    "uuid": claimed,
+                    "name": capped(name, MAX_NAME, note=self.note, where=where, label="the buddy's name", path=at),
+                }
+            )
+        return claimed
+
+    def read_visibility(self, typed: str, where: str, path: str) -> float | None:
+        """A plain number, read as metres: Shearwater's UDDF export writes it unchanged as metres."""
+        figure = _figure(typed)
+        member = f"{path}/visibility"
+        if figure is None:
+            self.note(
+                where, f"Shearwater Cloud's {VISIBILITY} field records {typed!r}, which is not a number; it is left out.",
+                "dropped", code="not_a_number", member=member,
+            )
+            return None
+        number, unit = figure
+        if unit:
+            self.note(
+                where,
+                f"Shearwater Cloud's {VISIBILITY} field records {typed!r}, where it writes a plain number of metres; it "
+                "is left out.",
+                "dropped",
+                code="unit_unexpected",
+                member=member,
+            )
+            return None
+        if not recorded(number, record="dive", member="visibility"):
+            self.note(
+                where, f"Shearwater Cloud's {VISIBILITY} field records {typed!r}, below zero; it is left out.",
+                "dropped", code="visibility_negative", member=member,
+            )
+            return None
+        return float(number)
+
+    def read_air_temperature(self, typed: str, where: str, path: str) -> float | None:
+        """A number followed by `C`, the unit the string states."""
+        figure = _figure(typed)
+        member = f"{path}/air_temperature"
+        if figure is None:
+            self.note(
+                where,
+                f"Shearwater Cloud's {AIR_TEMPERATURE} field records {typed!r}, which is not a number; it is left out.",
+                "dropped",
+                code="not_a_number",
+                member=member,
+            )
+            return None
+        number, unit = figure
+        if not unit:
+            self.note(
+                where,
+                f"Shearwater Cloud's {AIR_TEMPERATURE} field records {typed!r} with no unit, and nothing in the file "
+                "states one; it is left out.",
+                "dropped",
+                code="unit_not_stated",
+                member=member,
+            )
+            return None
+        if unit != AIR_TEMPERATURE_UNIT:
+            self.note(
+                where,
+                f"Shearwater Cloud's {AIR_TEMPERATURE} field records {typed!r}, in a unit other than the Celsius it "
+                "writes; it is left out.",
+                "dropped",
+                code="unit_unexpected",
+                member=member,
+            )
+            return None
+        return float(number)
+
+    def read_word(
+        self, typed: str, column: str, table: dict[str, str], label: str, where: str, member: str
+    ) -> str | None:
+        """One of the logbook's vocabularies off a column's word, through its table above."""
+        value = table.get(typed)
+        if value is None:
+            self.note(
+                where,
+                f"Shearwater Cloud's {column} field records {typed!r}, which the logbook's {label} has no value for; it "
+                "is left out.",
+                "dropped",
+                code="value_unknown",
+                member=member,
+            )
+        return value
+
+    def report_unread_logbook(self, typed: dict[str, str], where: str, path: str) -> None:
+        """The filled columns with no place in the logbook, each named with what it records."""
+        if WEIGHT in typed:
+            self.note(
+                where,
+                f"Shearwater Cloud's {WEIGHT} field records {typed[WEIGHT]!r} with no unit, and nothing in the file "
+                "states one; it is left out.",
+                "dropped",
+                code="unit_not_stated",
+                member=f"{path}/weight",
+            )
+        for column in TYPED_PRESSURES:
+            if column in typed:
+                self.note(
+                    where,
+                    f"Shearwater Cloud's {column} field records {typed[column]!r}, a typed tank pressure the file ties "
+                    "to none of the dive's cylinders; it is left out.",
+                    "dropped",
+                    code="tank_pressures_unmatched",
+                    member=f"{path}/cylinders",
+                )
+        if TANK_SIZE in typed:
+            self.note(
+                where,
+                f"Shearwater Cloud's {TANK_SIZE} field records {typed[TANK_SIZE]!r}, a tank size the file ties to none "
+                "of the dive's cylinders; it is left out.",
+                "dropped",
+                code="detail_not_kept",
+                member=path,
+            )
+        for column in NO_PLACE_COLUMNS:
+            if column in typed:
+                self.note(
+                    where,
+                    f"Shearwater Cloud's {column} field records {typed[column]!r}, which the logbook has no place for; "
+                    "it is left out.",
+                    "dropped",
+                    code="detail_not_kept",
+                    member=path,
+                )
+        for column in typed:
+            if column in DETAIL_COLUMNS_READ or column in DETAIL_COLUMNS_PASSED or column in DETAIL_COLUMNS_MAPPED:
                 continue
             self.note(
                 where,
@@ -1474,6 +1775,23 @@ class _Converter:
                 "dropped",
                 code="summary_disagrees",
             )
+
+
+def _typed(value: Any) -> str:
+    """A column's value as the trimmed text the diver typed."""
+    if isinstance(value, bytes):
+        value = value.decode("utf-8", errors="replace")
+    return str(value).strip()
+
+
+def _figure(typed: str) -> tuple[Decimal, str] | None:
+    """A typed figure as its number and whatever unit follows it, or nothing for one that is
+    not a number this package can carry."""
+    match = _FIGURE.match(typed)
+    number = None if match is None else decimal_of(match[1])
+    if match is None or number is None:
+        return None
+    return number, (match[2] or "").strip()
 
 
 def _scaled(value: Any, scale: int) -> int | None:
