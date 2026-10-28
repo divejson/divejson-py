@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.35.0
+
 - **The readers carry the diver's heart rate, and the UDDF writer sends it back as a pulse
   rate.** The profile's new `heart_rate` is whole beats per minute. The Suunto app's JSON
   reader takes `HR`, which is hertz over a whole beat, times 60; the FIT reader takes
