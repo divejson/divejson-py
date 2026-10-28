@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.34.0
+
 - **Shearwater Cloud's database reader reads the logbook the diver typed**, settled against a
   decompression dive whose dive-details form was filled before export, now a pair in each
   Shearwater directory. Site and Location become a site and Buddy one person, written as the
