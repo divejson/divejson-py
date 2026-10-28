@@ -75,6 +75,7 @@ NOTE_CODES: dict[str, str] = {
     "rating_halved": "a UDDF rating out of 10 is read onto the logbook's 1 to 5",
     "rebreather_read_as_closed_circuit": "UDDF's 'rebreather', which covers closed and semi-closed, is read as closed",
     "current_read_as_light": "UDDF's 'very-mild-current' is read as a light current",
+    "sunny_read_as_clear": "Shearwater Cloud's 'Sunny' weather is read as clear skies, the cloud cover unsaid",
     "air_consumption_not_kept": "a surface air consumption, which the logbook has no place for, is left out",
     "position_incomplete": "half a coordinate pair is left out",
     "position_zero": "coordinates of exactly 0 / 0 are read as no position",

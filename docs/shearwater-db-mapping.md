@@ -6,13 +6,15 @@ is reading are in [`converting.md`](converting.md) and are **not repeated here**
 kinds, identity, the way a zero reads, the representability bound, sample ordering, a
 container's caps. This document carries what is this format's.
 
-Every claim below is checked against **one diver's whole-account export** — eight
-open-circuit dives off a Perdix 3, written by Shearwater Cloud Desktop 2.12.10 on macOS — and
-the layout against Shearwater's own decoding of the same records, the XML export of one of
-those dives ([`shearwater-xml-mapping.md`](shearwater-xml-mapping.md)). That export is not in
-this repository; what *is* here is [`fixtures/shearwater_db/`](../fixtures/shearwater_db),
-the same file reduced to two of its dives. The closed-circuit, decompression and
-transmitter branches have **no file in hand**, and every rule that rests on one is marked
+Every claim below is checked against **two exports from one diver's account**, both written
+by Shearwater Cloud Desktop 2.12.10 on macOS off one Perdix 3: a whole-account export of eight
+open-circuit, no-decompression dives with no logbook column filled, and a later export of one
+decompression dive on two gases whose every logbook column the dive-details form offers is
+filled. The layout is checked against Shearwater's own decoding of the same records, the XML
+export of one dive of each ([`shearwater-xml-mapping.md`](shearwater-xml-mapping.md)). Neither
+export is in this repository; what *is* here is
+[`fixtures/shearwater_db/`](../fixtures/shearwater_db), the two reduced. The closed-circuit
+and transmitter branches have **no file in hand**, and every rule that rests on one is marked
 **untested** where it is stated.
 
 ## Why this format, and what makes it different
@@ -183,7 +185,7 @@ Every multi-byte field is big-endian unless a row says otherwise.
 | sample, byte 7 | `profile.ppo2.values` | hundredths of a bar, ×1 |
 | sample, byte 23 | `profile.cns.values` | whole percent **× 10** — tenths |
 | sample, byte 25 | `profile.gradient_factor.values` | whole percent, ×1 |
-| sample, byte 24 | `profile.ceiling.values` | whole metres **× 100** — centimetres; imperial, feet × 30.48 — **untested** |
+| sample, byte 24 | `profile.ceiling.values` | whole metres **× 100** — centimetres; imperial, feet × 30.48 — the imperial factor **untested** |
 | sample, bytes 28–29 and 20–21 | `profile.pressures[].values` | low twelve bits × 2 psi, × 0.0689475729 to bar, **× 10** — tenths — **untested** |
 | ordinal × interval | sample times | milliseconds, ×1 |
 
@@ -200,6 +202,19 @@ database.
 A dive's source id is **`log_data.log_id`**, which equals `dive_details.DiveId`, the id the
 file itself carries for the dive. Not the dive number, which is the computer's counter and
 restarts on a new computer, and not `file_name`, which a later export can spell differently.
+
+The logbook's sites and people carry no id in the file, so each takes `converting.md`'s rule 2
+with a key standing in for one, under the same namespace:
+
+- **A site** is keyed by its Site and Location columns, each trimmed, as the JSON array
+  `[Site, Location]` — Location `""` where the column is empty — serialised with no
+  whitespace and non-ASCII characters kept as they are (in Python,
+  `json.dumps([site, location], ensure_ascii=False, separators=(',', ':'))`), under the kind
+  `site`. Shearwater's own UDDF export keys its site on the same pair.
+- **A person** is keyed by the Buddy column trimmed and case-folded, under the kind `person`,
+  as `ssrf-mapping.md` keys a buddy by name.
+
+The same pair, or the same name, on two dives of one database is one site, or one person.
 
 ## The member map
 
@@ -247,15 +262,16 @@ one serial; the final record's is the one read.
 
 **The start is the wall clock the diver read off the wrist.** A log of version 9 or later
 also carries the time zone the computer was set to, opening 5's bytes 26–29 (minutes, signed)
-with a daylight-saving flag at byte 30. It is **decoded and not applied**: the files in hand
-write it two ways for one place — 180 minutes with the flag clear on two dives, 120 with it
-set on six — and what the flag adds is settled by no file in hand, so the start keeps its
+with a daylight-saving flag at byte 30. It is **decoded and not applied**: the open-circuit
+export writes it two ways for one place — 180 minutes with the flag clear on two dives, 120
+with it set on six, as the decompression dive's log does too — and what the flag adds is settled by no file in hand, so the start keeps its
 wall clock and the report says the zone was there and was not read. Where the zone is zero or
 the log too old to carry it, the report says the file gives no zone.
 
 `dive_details.DiveDate`, `Depth` and `DiveLengthTime` restate the log and are not consulted.
 The dive's `avg_depth` is not stated by the log and is not derived: `converting.md` leaves it
-absent until a file in hand needs the derivation.
+absent until a file in hand needs the derivation. The rest of the dive's members come from
+what the diver typed, *The logbook* below.
 
 ### The recording — opening records 2, 3 and 4
 
@@ -289,7 +305,7 @@ cylinder is in the log.
 | 5–6 | time to surface, minutes | `tts` | — |
 | 7 | average ppO₂, hundredths of a bar | `ppo2` | `0`; and the whole byte where the status's external-ppO₂ bit is set |
 | 8, 9 | the breathed mix's O₂ and He percent | gas switches | both `0` |
-| 10 | no-decompression time, minutes, where bytes 3–4 are `0`; else the next stop's time | `ndl`; the stop time has no member | `0` with no stop |
+| 10 | no-decompression time, minutes, where bytes 3–4 are `0`; else the next stop's time | `ndl`; the stop time has no member | `0` with no stop on the log's first sample; the whole byte while a stop is recorded |
 | 11 | battery percent | no member | — |
 | 12 | status: `0x10` open circuit, `0x02` external ppO₂, `0x01` gas switch needed | read for the ppO₂ and the mix | — |
 | 13, 15, 16 | O₂ cells 1 to 3, millivolts | no member | `0` with the cell's bit clear in opening 3's byte 6 |
@@ -309,12 +325,20 @@ cylinder is in the log.
 references give: 102 is added, and a result above zero is zero — **untested**, no file in hand
 is that cold. An imperial log's temperature is Fahrenheit, converted to Celsius.
 
-**The ceiling and the gradient factor are mapped untested by a pair**: no file in hand dives
-into decompression. The ceiling's `0` is absence, the channel being present only while a
-ceiling existed (§6.5), and GF99's `0xFF` is the device saying it has no figure while it
-on-gasses, where its `0` is a reading. Under the DCIEM model the two bytes are a safe-ascent
-depth rather than a ceiling and a gradient factor, so a DCIEM dive's are reported and not
-carried.
+**The ceiling and the no-decompression time are settled by the decompression pair.** The
+ceiling's `0` is absence, the channel being present only while a ceiling existed (§6.5) and
+`converting.md`'s *A ceiling of zero is not a ceiling* holding here as for every format —
+including beside a recorded stop: the dive's first stop, 3 m, is recorded at 610 and 620 s
+with the ceiling byte still `0`, so the ceiling starts at 630 s, 1 m, and is carried on
+every sample from there to 4 200 s, up to 14 m, while the time to surface carries the
+obligation from the stop's first sample. The no-decompression byte counts down to `0` at
+530 s, 44 m, and stays there until the stop appears at 610 s; those are readings of 0 s — the
+moment the dive became a decompression dive, which is the reading `converting.md` names — and
+from 610 s the byte is the stop's time and the `ndl` channel has a gap until the stop clears
+at 4 210 s and the byte reads `99` again. GF99's `0xFF` is the device saying it has no figure
+while it on-gasses, where its `0` is a reading. Under the DCIEM model the two bytes are a
+safe-ascent depth rather than a ceiling and a gradient factor, so a DCIEM dive's are reported
+and not carried.
 
 **A tank word** at or above `0xFFF0` is the transmitter's status — `0xFFFF` air integration
 off, `0xFFFE` and `0xFFFD` no communication, `0xFFFC` not paired — reported once per tank and
@@ -335,27 +359,76 @@ holds is a switch naming no cylinder, reported.
 from pressures: §6.4's computed readouts are the computer's, and the reader writes only what
 the computer wrote.
 
+### The logbook — what the diver typed into `dive_details`
+
+Beside the columns that restate the log, `dive_details` holds what the diver typed into
+Shearwater Cloud's dive-details form. **A column maps only where the file states what it
+means and in what unit** — in the string itself, or in Shearwater's own UDDF export of the same
+dive, which writes each column it exports under an element that says what it is. A value no
+file has shown, or a bare number nothing gives a unit to, is reported and quoted, never mapped
+on a guess.
+
+Every column is trimmed, and an empty one is absent and says nothing. A value longer than the
+member allows is cut to its `maxLength` and reported, as `uddf-mapping.md` cuts a name.
+
+| column | into | rule |
+| --- | --- | --- |
+| `Site`, `Location` | `sites[]` — `name` from Site, `location.name` from Location — and the dive's `site_uuids` | one site per distinct pair in the database, keyed as *Identity* says. Location with no Site makes no site and is reported, as `uddf-mapping.md` treats a nameless site. |
+| `Buddy` | `people[]` and the dive's `people`, role `buddy` | the whole string is **one person**, never split on a comma or an `and` — Shearwater's UDDF writes it as one buddy. One person per distinct name, keyed as *Identity* says. |
+| `Notes`, `EnvironmentNotes`, `GasNotes`, `GearNotes`, `IssueNotes` | the dive's `notes` | each column that is filled is one paragraph, in that order, labelled `Summary: `, `Environment: `, `Gas: `, `Gear: ` and `Issues: ` — the labels Shearwater's UDDF writes them under — and the paragraphs are joined by a blank line |
+| `Visibility` | `visibility` | a plain decimal, read as metres: Shearwater's UDDF of the same dive writes it unchanged as `<visibility>`, which UDDF defines in metres. Anything else is reported, quoted. |
+| `AirTemperature` | `air_temperature` | a decimal followed by `C`, the unit the string states — `29C` is 29 °C. Any other spelling is reported, quoted. |
+| `Weather` | `weather` | `Sunny` → `clear`, reported `resolved`: sunshine says nothing of cloud cover, and `clear` is the nearest word the vocabulary has. Any other value is reported, quoted. |
+| `Platform` | `entry_type` | `Beach/Shore` → `shore`, silently — the fold `uddf-mapping.md` makes of UDDF's `beach-shore`. Any other value is reported, quoted. |
+| `Weight` | — | reported, quoted: the figure carries no unit and Shearwater's UDDF writes none, as `suunto-xml-mapping.md` refuses `<Weight>`. |
+| `Environment` | — | reported, quoted: `Ocean/Sea` names a kind of place rather than the water, and the device's own density setting is already the recording's `salinity`. |
+| `Conditions` | — | reported, quoted: `Surge` is neither a current nor waves, as `ssrf-mapping.md` leaves `@surge`. |
+| `Dress`, `Apparatus`, `ThermalComfort`, `Workload`, `Problems`, `Malfunctions`, `Symptoms`, `ExposureToAltitude` | — | reported by name, the value quoted; Dress makes no gear item. |
+| `Tank1PressureStart` to `Tank4PressureEnd`, `TankSize` | — | reported, quoted, tied to no cylinder: *The typed tank pressures*, below. |
+| `GnssEntryLocation`, `GnssExitLocation`, `GnssCustomWaypoints`, `DateAndTime`, `AverageSAC`, `AveloNotes`, `Other1` to `Other3` | — | empty in every file in hand; filled, each is reported as a column not read yet. *What waits for a file*. |
+| `DiveNumber` | the dive's `number` | *The dive*, above. |
+
+**The typed tank pressures are reported, not mapped.** The four tanks' typed start and end
+pressures are pounds per square inch — the key names of `TankProfileData`'s own copy of them,
+`StartPressurePSI` and `EndPressurePSI`, say so — and Tank N's pair is the one
+`TankProfileData.TankData[N−1]` restates. What they cannot say is which cylinder they belong
+to. Each `TankData` entry carries a `GasProfile`, but that is the dive's gas segment of the
+same index, falling back to the first segment past the last one, not a link to a cylinder: on
+the decompression dive, which breathes 21 %, then 51 %, then 21 % again, `TankData[2]` is the
+return to 21 % and `TankData[3]` to `[5]` all read the first segment. Shearwater's own UDDF
+export writes these pressures under `<tankdata>` with no link to a mix either. So each filled
+figure, and `TankSize`, is reported naming it, and none reaches a cylinder.
+**Untested**: which cylinder a typed pressure belongs to waits for a file with a paired
+transmitter, beside the transmitter series' own rule above.
+
 ## Sentinels and caps
 
 What this device writes for "no figure", per quantity, each settled against the files in hand
 unless marked:
 
-- **No-decompression time `0` with a stop depth of `0`** — absence. The first sample of seven
-  of the eight logs carries it, at the surface between 0 and 1.5 m, with `99` on the next
-  sample; Shearwater's own UDDF export of the same dive writes no `<nodecotime>` on that
-  waypoint, and a no-decompression time of nothing at the surface is no reading.
+- **No-decompression time `0` with a stop depth of `0`** — absence on the log's first sample
+  and a reading of 0 s on every other. The first sample of seven of the eight open-circuit
+  logs carries it, at the surface between 0 and 1.5 m, with `99` on the next sample: the
+  device was not yet deciding, and a no-decompression time of nothing at the surface is no
+  reading. The decompression log carries it on its first sample too, and again from 530 to
+  600 s at 44 to 47 m, counting down from `1` before its first stop, where the device was
+  deciding and showed 0. Shearwater's own UDDF export writes no `<nodecotime>` on either
+  stretch, but it writes no zero no-decompression time anywhere, so its writer settles
+  nothing either way.
+- **No-decompression byte while a stop depth is recorded** — the stop's time, not a
+  no-decompression time; the `ndl` channel has a gap there.
 - **No-decompression time `99`** — a reading at the display cap, `5940` s, as
   `uddf-mapping.md` already rules for this device.
-- **ppO₂ `0`** — absence. It occurs once in the eight logs, on one dive's first sample at the
-  surface, with depth, time to surface and no-decompression time also `0`; a ppO₂ the computer
-  computed is never nothing.
+- **ppO₂ `0`** — absence. It occurs on the first sample of one of the eight open-circuit logs
+  and of the decompression log, at the surface, with depth, time to surface and
+  no-decompression time also `0`; a ppO₂ the computer computed is never nothing.
 - **GF99 `0xFF`** — absence; `0` is a reading.
-- **A ceiling of `0`** — absence — **untested** by a pair.
+- **A ceiling of `0`** — absence, beside a recorded stop as anywhere else.
 - **A stop depth of `0`** — the dive is not in deco at that sample.
 - **A tank word at or above `0xFFF0`** — absence, the status named once per tank. Every tank
   word in hand is `0xFFFF`.
 - **The gas-time byte at or above `0xF0`** — absence; a status, as the tank words are.
-- **The SAC word at or above `0xFFF0`** — absence. The eight logs carry only `0xFFF9` and
+- **The SAC word at or above `0xFFF0`** — absence. Every log in hand carries only `0xFFF9` and
   `0xFFFA`; a SAC has no member either way.
 - **Cells `0` with the calibration mask `0`** — no cells. Every cell in hand is `0`.
 - **`-1`, `2147483647` and `-2147483648` in `calculated_values_from_samples`** — that summary's
@@ -374,11 +447,12 @@ record's, and the first `TankProfileData.TankData` entry's `SurfacePressureMBar`
 with opening 1's pressure and opening 3's density — and a disagreement is reported, the log's
 figure kept.
 
-## This format settles no ambiguity
+## This format settles one ambiguity
 
 Every field of the log has one unit, stated by the log's own units byte (opening 0, byte 8:
-`0` metric, `1` imperial; anything else and the log is reported and left out). The reader emits
-no `resolved` finding.
+`0` metric, `1` imperial; anything else and the log is reported and left out), so the log
+itself settles nothing. The logbook settles one thing: **`Weather`'s `Sunny`** is read as
+`clear` and reported `resolved`, sunshine saying nothing of cloud cover.
 
 ## The kinds this reader's report emits
 
@@ -391,10 +465,13 @@ no `resolved` finding.
   surface pressure out of range; a switched-off gas; a firmware byte that is not decimal; a
   model code that disagrees with the name; a summary that disagrees with the log; every field
   and record of *What waits for a file*; records of an unknown kind; a gas switch to no slot;
-  a tank pressure past 350 bar; and the profile rules every reader shares.
+  a tank pressure past 350 bar; a logbook column *The logbook* gives no member, a value its
+  member's vocabulary has not got, a figure in a unit nothing states, a typed tank pressure or
+  tank size tied to no cylinder, a site with no name and a text cut to its member's length;
+  and the profile rules every reader shares.
 - **`inferred`** — never. The reader computes nothing, and `extensions.divejson.inferred` is
   never written.
-- **`resolved`** — never, as above.
+- **`resolved`** — `Weather`, as above.
 
 ## Personal data
 
@@ -404,18 +481,21 @@ the log's final record, and `StoredDiveComputer`'s decimal form of it), the dive
 for the computer (`CustomDiveComputer.JsonData`'s `CustomerComputerName`), the exporting
 installation's device identifiers (`IdToDiveComputer`), and the sync metadata naming which
 device created and last changed each dive (the `SyncV3Metadata*` tables). §9 calls a document
-a personal dossier and the serial a stable hardware identifier.
+a personal dossier and the serial a stable hardware identifier. What the diver typed into the
+dive-details form — where they dived, with whom, what they noted — is the logbook, read by
+*The logbook*'s rules like any other logbook's.
 
 The reader carries **the serial**, as §6.4b's `serial` — as the UDDF and FIT readers carry
-it — and **none of the rest**: it reads no per-computer or sync table at all. The fixture is
-reduced on the same line: it keeps the serial, already published in the UDDF pairs, and drops
-every `StoredDiveComputer`, `CustomDiveComputer`, `IdToDiveComputer` and `SyncV3Metadata*` row.
+it — and **none of the rest**: it reads no per-computer or sync table at all. The fixtures are
+reduced on the same line: they keep the serial, already published in the UDDF pairs, and drop
+every `StoredDiveComputer`, `CustomDiveComputer`, `IdToDiveComputer` and `SyncV3Metadata*` row;
+the decompression pair's buddy is a placeholder name typed for the export.
 
 ## What waits for a file
 
-A member lands only where a real file carries it. In the files in hand every logbook column
-of `dive_details` is empty, every tank word is a status, every stop depth and ceiling is zero
-and every cell is zero, so the reader decodes all of it and does this with each.
+A member lands only where a real file carries it. In the files in hand every tank word is a
+status and every cell is zero, and some logbook columns are empty in every one, so the reader
+decodes all of it and does this with each.
 
 **No member yet** — reported `dropped` under the field's own name, once per dive that carries
 a reading, and never mapped. This is the set a follow-on version of the format would add
@@ -424,24 +504,22 @@ battery voltage and percent; the gas-time and SAC words; the time to surface in 
 the tissue snapshots; the info events; and a closed-circuit Petrel 3's validity maps and
 periodic records. So are the freedive and Avelo samples, which have no file in hand.
 
-**A member, no file** — `profile.ceiling` and `profile.pressures` are mapped by the rules
-above, marked **untested by a pair**. The `dive_details` columns are not mapped at all: each
-one that is filled in is reported `dropped` by its own name until a file shows what Shearwater
-Cloud puts in it, and is then mapped or listed below with its reason. The shape of each is
-unknown until then — whether Buddy is one name or several, how a GNSS fix is spelled, what
-unit a typed pressure carries — which is why none is mapped on a guess. The list is
-`PRAGMA table_info(dive_details)` read against the schema's dive and cylinder properties:
+**A member, no file** — `profile.pressures` is mapped by the rule above, marked **untested by
+a pair**, and the typed tank pressures beside it are reported until a file with a paired
+transmitter says which cylinder each belongs to.
 
-- Site and Location → the dive site and its locality; Buddy → a person; Notes → `notes`;
-  GnssEntryLocation and GnssExitLocation → the dive's positions; Tank1PressureStart and
-  Tank1PressureEnd → the cylinder's pressures; TankSize → a cylinder's `volume`;
-  AirTemperature → `air_temperature`; Platform → `entry_type`; Weather → `weather`;
-  Visibility → `visibility`; Weight → `weight`; Environment → `water_type`, where its
-  vocabulary turns out to be one.
-- Conditions, EnvironmentNotes, GasNotes, GearNotes, Dress, Apparatus, ThermalComfort,
-  Workload, Problems, Malfunctions, Symptoms, ExposureToAltitude, IssueNotes, AveloNotes,
-  Other1 to Other3, DateAndTime, GnssCustomWaypoints, AverageSAC and the Tank2 to Tank4
-  pressures → nothing yet; each is mapped or refused against the file that fills it.
+**Logbook columns no file has filled** — `GnssEntryLocation`, `GnssExitLocation`,
+`GnssCustomWaypoints`, `DateAndTime`, `AverageSAC`, `AveloNotes` and `Other1` to `Other3`
+are empty in every file in hand. A filled one is reported as a column not read yet, naming
+it, until a file shows what Shearwater Cloud puts in it; how a GNSS fix is spelled is unknown
+until then, which is why none is mapped on a guess.
+
+**The `dive_site` table** — present in the later export and absent from the earlier one, with
+the columns `Guid`, `GeoHash`, `Name`, `Location`, `Region`, `Country`, `CountryCode`,
+`Latitude`, `Longitude`, `timestamps`, `model_version`, `created_at` and `modified_at`. It is
+empty in the file in hand, and no column of `dive_details` names one of its rows, so how a
+dive points at a site there is unknown. The reader does not read it; the dive's site comes
+from `Site` and `Location`.
 
 So does the **entry and exit position** a log of version 17 or later can carry in opening and
 closing record 9 — a fix type at byte 16 (2 or 3 for a fix), latitude at bytes 21–24 and
@@ -457,8 +535,9 @@ reported and not read.
 - **`dive_details`' housekeeping** — `DataVersion`, `FileName`, `LastModified`,
   `MainTimestampReliable` — and **the five floats Shearwater Cloud computes**, `AverageDepth`,
   `AverageTemp`, `MinTemp`, `MaxTemp` and `EndGF99`, each `0.0` on every row in hand.
-- **`TankProfileData`** — a JSON gas list with each gas's span and six transmitter entries; the
-  log's own gas list is what is read, and two of its figures are cross-checks.
+- **`TankProfileData`** — a JSON gas list with each gas's span and six tank entries; the
+  log's own gas list is what is read, two of its figures are cross-checks, and its typed
+  pressures are *The typed tank pressures*' above.
 - **The status byte's other bits** — the gas-switch-needed flag and a setpoint type: the
   first is a prompt the computer showed, the second describes the setpoint, which has no
   member.
@@ -479,11 +558,20 @@ an application that wants the database reads the archive member by member.
 
 [`fixtures/shearwater_db/`](../fixtures/shearwater_db) holds the conformance pairs for this
 format — an input, and the document a correct reader produces from it. Their writer is
-Shearwater Cloud Desktop 2.12.10. `perdix3-dives-1-and-8.db` is that export reduced to
-two dives: dive 1, the shortest (23 samples, 33 % nitrox, 4.0 m), and dive 8, the one
-[`fixtures/shearwater_xml/`](../fixtures/shearwater_xml) holds the XML export of. A log cannot
-be reduced by hand, so the two are committed whole, as recorded; the reduction is the
-database's — the other six `log_data` and `dive_details` rows deleted, every per-computer and
-sync row deleted, every table and index kept, and `VACUUM` run. What each pair covers, and how
-it was built, is one row per pair in [`fixtures/README.md`](../fixtures/README.md); the rules
-those expectations follow are this document and [`converting.md`](converting.md).
+Shearwater Cloud Desktop 2.12.10. A log cannot be reduced by hand, so each kept log is
+committed whole, as recorded; the reduction is the database's — every per-computer and sync
+row deleted, every table and index kept, and `VACUUM` run so that no deleted row survives in a
+free page.
+
+- `perdix3-dives-1-and-8.db` is the open-circuit export reduced to two dives — its other six
+  `log_data` and `dive_details` rows deleted: dive 1, the shortest (23 samples, 33 % nitrox,
+  4.0 m), and dive 8, the one [`fixtures/shearwater_xml/`](../fixtures/shearwater_xml) holds
+  the XML export of.
+- `perdix3-deco-dive-11.db` is the later export, one dive and nothing to delete but the
+  per-computer and sync rows: a decompression dive to 47.7 m on 21 % and 51 %, with every
+  logbook column the dive-details form offers filled. The XML directory holds this dive's
+  export too.
+
+What each pair covers, and how it was built, is one row per pair in
+[`fixtures/README.md`](../fixtures/README.md); the rules those expectations follow are this
+document and [`converting.md`](converting.md).

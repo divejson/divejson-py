@@ -7,6 +7,20 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Shearwater Cloud's database reader reads the logbook the diver typed**, settled against a
+  decompression dive whose dive-details form was filled before export, now a pair in each
+  Shearwater directory. Site and Location become a site and Buddy one person, written as the
+  document's `sites` and `people` for the first time and identified by the pair and the
+  case-folded name; the five notes columns become labelled paragraphs; Visibility,
+  AirTemperature, Weather and Platform are read where the file states their meaning and unit,
+  `Sunny` as clear skies and reported `resolved` under the new code `sunny_read_as_clear`.
+  Every other filled column is reported with what it records — the typed tank pressures and
+  tank size tied to no cylinder, the weight with no unit, the rest with no place in the
+  logbook. **Both Shearwater readers keep a no-decompression time of 0 with no stop** as a
+  reading on every sample but the log's first, where the device counts down before a stop;
+  `stop_and_ndl` and `decoded_sample` take the sample's place as `first`. A ceiling of 0 stays
+  no ceiling, beside a recorded stop too.
+
 ## 0.33.0
 
 - **Shearwater Cloud's database and XML exports are read.** `shearwater_db` reads the SQLite

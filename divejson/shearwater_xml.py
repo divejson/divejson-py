@@ -16,7 +16,7 @@ the declaration rewritten to say so, and the result still goes through `xmlsourc
 the package's one XML entry point, which refuses a `<!DOCTYPE>` before anything expands.
 
 **Its dates are culture-formatted.** `startDate` is written the way the exporting machine
-writes dates — `9/21/2026 10:48:17 AM` on the file in hand — with no epoch beside it. A date
+writes dates — `9/21/2026 10:48:17 AM` on the files in hand — with no epoch beside it. A date
 whose fields are both 12 or below reads either way round; it is read month first and the
 report names the other reading, so a diver on a day-first machine can catch the swap.
 
@@ -172,7 +172,7 @@ def _as_utf8(data: bytes) -> bytes:
 
     A file that opens on a UTF-16 byte-order mark is UTF-16 and its declaration is true, so
     it goes to the parser as it is. Anything else is decoded as UTF-8, a byte-order mark
-    allowed — the file in hand is ASCII under a declaration naming UTF-16.
+    allowed — the files in hand are ASCII under a declaration naming UTF-16.
     """
     if data[:2] in (b"\xff\xfe", b"\xfe\xff"):
         return data
@@ -259,7 +259,7 @@ class _Converter:
             )
 
         records = children(_child(self.log, "diveLogRecords"), "divelogrecord")
-        samples = [(self.time_of(record), self.sample(record)) for record in records]
+        samples = [(self.time_of(record), self.sample(record, first=not index)) for index, record in enumerate(records)]
         gases = self.read_gases([sample for _, sample in samples])
         model_code = _whole(self.log, "decoModel")
         profile = build_profile(
@@ -323,10 +323,11 @@ class _Converter:
         """`<currentTime>`, already milliseconds."""
         return _whole(record, "currentTime")
 
-    def sample(self, record: ET.Element) -> Sample:
-        """One `<diveLogRecord>` as the database's `Sample`, in the log's own units."""
+    def sample(self, record: ET.Element, *, first: bool) -> Sample:
+        """One `<diveLogRecord>` as the database's `Sample`, in the log's own units, `first`
+        where it is the export's first record."""
         stop_depth = _whole(record, "firstStopDepth") or 0
-        stop, stop_time, ndl = stop_and_ndl(stop_depth, _whole(record, "currentNdl") or 0)
+        stop, stop_time, ndl = stop_and_ndl(stop_depth, _whole(record, "currentNdl"), first=first)
         if stop is not None:
             stop_time = _whole(record, "firstStopTime")
         external = (_text(record, "externalPPO2") or "0").lower() not in ("0", "false")
@@ -478,7 +479,7 @@ def _wall_clock(match: re.Match[str]) -> tuple[str, str | None] | None:
     """A matched `startDate` as an ISO wall clock, and the day-first date where both read.
 
     A field above 12 settles which is the day. Where both are 12 or below the date is read
-    month first, the shape of the file in hand, and the day-first reading is returned beside
+    month first, the shape of the files in hand, and the day-first reading is returned beside
     it — unless the two fields are equal, when both readings are one date.
     """
     first, second, year = int(match["first"]), int(match["second"]), int(match["year"])
