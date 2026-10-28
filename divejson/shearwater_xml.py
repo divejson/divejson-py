@@ -327,7 +327,7 @@ class _Converter:
         """One `<diveLogRecord>` as the database's `Sample`, in the log's own units, `first`
         where it is the export's first record."""
         stop_depth = _whole(record, "firstStopDepth") or 0
-        stop, stop_time, ndl = stop_and_ndl(stop_depth, _whole(record, "currentNdl") or 0, first=first)
+        stop, stop_time, ndl = stop_and_ndl(stop_depth, _whole(record, "currentNdl"), first=first)
         if stop is not None:
             stop_time = _whole(record, "firstStopTime")
         external = (_text(record, "externalPPO2") or "0").lower() not in ("0", "false")

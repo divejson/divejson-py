@@ -269,6 +269,16 @@ def test_a_tank_pressure_that_is_a_number_is_a_reading() -> None:
     assert profile_of(dive)["pressures"] == [{"times": [0, 10000], "values": [2068, 1999], "gas_number": 0}]
 
 
+def test_a_record_with_no_no_decompression_time_states_none() -> None:
+    records = [
+        sw.xml_record(currentTime="0"),
+        sw.xml_record(currentTime="10000", currentNdl="N/A"),
+        sw.xml_record(currentTime="20000", currentNdl="0"),
+    ]
+    dive = _conversion(sw.xml(records)).document["dives"][0]
+    assert profile_of(dive)["ndl"] == {"times": [0, 20000], "values": [5940, 0]}
+
+
 def test_the_words_in_a_numeric_column_are_no_reading() -> None:
     conversion = _conversion(sw.xml([sw.xml_record(gasTime="N/A", sac="Waiting for initial data")]))
     assert "air_consumption_not_kept" not in _codes(conversion)

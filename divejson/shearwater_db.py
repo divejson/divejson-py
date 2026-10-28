@@ -409,7 +409,9 @@ class Sample:
     circuit: str | None = None
 
 
-def stop_and_ndl(stop_depth: int, minutes: int, *, first: bool) -> tuple[int | None, int | None, int | None]:
+def stop_and_ndl(
+    stop_depth: int, minutes: int | None, *, first: bool
+) -> tuple[int | None, int | None, int | None]:
     """The next stop's depth and time and the no-decompression time, from one sample's pair.
 
     One byte serves both: the next stop's time where a stop depth is recorded, the
@@ -417,11 +419,11 @@ def stop_and_ndl(stop_depth: int, minutes: int, *, first: bool) -> tuple[int | N
     counting down to its last minute before a stop, as a deco dive does at depth — except on
     the log's `first` sample, where the device has not begun deciding: most logs write a zero
     there at the surface with the cap of 99 on the next. Both readers decide it here, by the
-    sample's place in the log.
+    sample's place in the log. `minutes` is `None` where the source states no figure at all.
     """
     if stop_depth:
         return stop_depth, minutes, None
-    if not minutes and first:
+    if minutes == 0 and first:
         return None, None, None
     return None, None, minutes
 
@@ -1490,7 +1492,7 @@ class _Converter:
         """The columns the diver typed into Shearwater Cloud, onto the dive or into the report.
 
         Each column is trimmed and an empty one is no column. What each filled one becomes is
-        `docs/shearwater-db-mapping.md`'s *The logbook columns*; a filled column that table
+        `docs/shearwater-db-mapping.md`'s *The logbook*; a filled column that table
         does not name is reported by its own name, waiting for a file that shows what it holds.
         """
         typed = {column: _typed(value) for column, value in details.items() if value is not None}
