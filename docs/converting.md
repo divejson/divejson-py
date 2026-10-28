@@ -364,6 +364,12 @@ readings beside 29 temperatures keeps both, rather than gaining 402 invented one
   the drop is reported, exactly as a zero ceiling is; carrying it would produce a document
   its own schema rejects. The rule is one place in a converter, not one per format: the
   floor belongs to the channel, and every reader applies it to every sample it offers.
+- **A heart rate of zero is the sensor's absent-marker**, settled the same way by a floor
+  of 1 rather than 0. §6.4's `heart_rate` is a measurement, and no diver's heart beats zero
+  times a minute, so a source that writes `0` — libdivecomputer passes one through from some
+  computers, and Subsurface treats the value as no reading — is saying the sensor had no
+  figure. The sample is dropped from the channel and the drop reported, by the same one
+  place in a converter that drops a negative readout.
 - **A value at a device's display cap is a reading, not a ceiling on the truth.** A
   Shearwater writes `<nodecotime>5940</nodecotime>` — 99 minutes, its display maximum — on
   most samples of a shallow dive, and a Suunto Ocean writes `NoDecTime: 6000`. Both mean

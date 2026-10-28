@@ -39,6 +39,7 @@ PURGED = FIXTURES / "suunto_json" / "purged-regulator.json"
 D5 = FIXTURES / "suunto_json" / "suunto-d5.json"
 HEADER_ONLY = FIXTURES / "suunto_json" / "header-only.json"
 NOT_A_DIVE = FIXTURES / "suunto_json" / "not-a-dive.json"
+HEART_RATE = FIXTURES / "suunto_json" / "ocean-heart-rate.json"
 
 
 def _dive(source) -> dict:
@@ -190,6 +191,27 @@ def test_the_ocean_profile_takes_each_channel_only_where_it_was_recorded() -> No
     # 295.5 K is 22.35 °C, its hundredth kept.
     assert profile["temperature"] == {"times": [60_000], "values": [2235]}
     assert profile["ceiling"] == {"times": [1_200_000], "values": [300]}
+
+
+def test_the_heart_rate_keeps_the_first_of_one_millisecond_and_both_of_ten() -> None:
+    """The export stamps two consecutive seconds once, beside a two-second gap, and those are
+    one instant: the first is kept and the report says so once. A pair stamped 10 ms apart is
+    the same artefact landing on two instants, and the millisecond axis keeps both."""
+    raw = json.loads(HEART_RATE.read_text(encoding="utf-8"))["DeviceLog"]["Samples"]
+    stamps = [sample["TimeISO8601"] for sample in raw if "HR" in sample]
+    repeated = len(stamps) - len(set(stamps))
+
+    conversion = convert(HEART_RATE.read_bytes(), exported_at=EXPORTED_AT)
+    times = profile_of(conversion.document["dives"][0])["heart_rate"]["times"]
+    assert len(times) == len(set(stamps))
+    assert any(later - earlier == 10 for earlier, later in zip(times, times[1:]))
+    [note] = [note for note in conversion.notes if note.code == "readings_at_one_instant"]
+    assert note.message.startswith(f"{repeated} heart rate readings land on a millisecond")
+
+
+def test_the_heart_rate_outlives_the_last_depth_and_sets_the_duration() -> None:
+    profile = profile_of(_dive(HEART_RATE))
+    assert profile["duration"] == profile["heart_rate"]["times"][-1] > profile["depth"]["times"][-1]
 
 
 def test_a_ceiling_of_zero_is_not_a_ceiling() -> None:

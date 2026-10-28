@@ -36,6 +36,7 @@ FIT_FIXTURES = sorted((FIXTURES / "fit").glob("*.fit"))
 OCEAN = FIXTURES / "fit" / "suunto-ocean.fit"
 D5 = FIXTURES / "fit" / "suunto-d5.fit"
 POOR_FIRST_FIX = FIXTURES / "fit" / "ocean-poor-first-fix.fit"
+HEART_RATE = FIXTURES / "fit" / "ocean-heart-rate.fit"
 
 
 @pytest.mark.parametrize("source", FIT_FIXTURES, ids=lambda path: path.stem)
@@ -154,6 +155,14 @@ def test_the_ocean_profile_takes_each_channel_only_where_it_was_recorded() -> No
     # the summary is the device's reading rather than a maximum over the samples, which is
     # exactly why it is preferred and why taking it from the samples would be `inferred`.
     assert max(profile["depth"]["values"]) == 4582
+
+
+def test_the_heart_rate_is_read_where_a_record_carries_one() -> None:
+    """4,401 of the dive's 4,960 records carry a heart rate, in the channel's own beats per
+    minute, between the 57 and 107 the same dive's JSON export gives."""
+    profile = profile_of(convert(HEART_RATE.read_bytes(), exported_at=EXPORTED_AT).document["dives"][0])
+    values = profile["heart_rate"]["values"]
+    assert (len(values), min(values), max(values)) == (4401, 57, 107)
 
 
 def test_the_d5_reads_the_same_way_from_a_different_device() -> None:

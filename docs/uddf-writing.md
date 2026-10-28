@@ -754,10 +754,11 @@ data loss and a moved timestamp is a reading presented as measured where it was 
 *Known consumer artefacts* below.
 
 `waypointType` is an `xs:sequence`, and the children written go in this order: `<cns>`,
-`<calculatedpo2>`, `<depth>`, `<divetime>`, `<setmarker>`, `<switchmix>`, `<tankpressure>`
-(repeatable), `<temperature>`, `<divemode>`, `<gradientfactor>`, `<nodecotime>`. That is the
-XSD's own order and not a preference — `<cns>` comes third in the type and therefore first
-in a waypoint that carries no alarm or battery reading, while `<nodecotime>` is last of all.
+`<calculatedpo2>`, `<depth>`, `<divetime>`, `<pulserate>`, `<setmarker>`, `<switchmix>`,
+`<tankpressure>` (repeatable), `<temperature>`, `<divemode>`, `<gradientfactor>`,
+`<nodecotime>`. That is the XSD's own order and not a preference — `<cns>` comes third in
+the type and therefore first in a waypoint that carries no alarm or battery reading, while
+`<nodecotime>` is last of all.
 
 **`<divetime>` is `xs:float` seconds** and the axis is milliseconds, so a time is divided by
 a thousand in decimal: a whole second is written as the integer it is, and a millisecond
@@ -768,8 +769,17 @@ samples all fall on whole seconds writes no fraction at all.
 Channel units: depth centimetres → metres, temperature hundredths of °C → Kelvin, pressures
 tenths of a bar → Pascal, ppO₂ hundredths of a bar → bar, CNS tenths of a percent →
 percent, `ndl` seconds → seconds, `gradient_factor` whole percent → the documented fraction,
-÷ 100. Each is a decimal factor, and doing the arithmetic in decimal is what makes a round
-trip through Kelvin land back on the number it started from.
+÷ 100, `heart_rate` whole beats per minute → beats per second, ÷ 60. Each but the last is a
+decimal factor, and doing the arithmetic in decimal is what makes a round trip through Kelvin
+land back on the number it started from.
+
+**`<pulserate>` is the one channel whose factor does not terminate.** A whole beat over 60 is
+no decimal UDDF can state exactly, so a heart rate of `83` goes out as `1.3833…` at the
+precision the writer gives every other float, and a reader multiplying back by 60 and
+rounding to the beat — the only grain §5.1 gives the channel — lands on `83` again. UDDF
+3.2.3 adds `<heartrate>` for the same quantity in the same unit; this writer declares 3.2.2,
+whose waypoint has `<pulserate>` and nothing else for it, and `uddf-mapping.md` says why the
+newer element is not one a writer should rely on being read back.
 
 **The per-waypoint `<gradientfactor>` goes out as the documented fraction**: §6.4's whole
 percent divided by 100, so a `gradient_factor` of `67` is

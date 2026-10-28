@@ -109,6 +109,7 @@ validates perfectly and describes a dive nobody took.
 | `Samples[].TimeISO8601` | an ISO 8601 instant, fractional | **milliseconds** on a §6.5 axis, elapsed from `Header.DateTime` | the difference × 1 000, halves away from zero |
 | `NoDecTime`, `TimeToSurface` | seconds | **seconds** on a §6.5 channel | — |
 | `RtGradientFactors.gf99`, `.gfSurface` | whole percent | **whole percent** on a §6.5 channel | — |
+| `HR` | **hertz**, to two decimals | **whole beats per minute** on a §6.5 channel | × 60, to the nearest beat |
 
 **The channel conversions carry a scale the scalar ones do not**, and the three rows that
 say so are the most-executed arithmetic in this reader.
@@ -395,6 +396,7 @@ switch that happened, and saying so is honest where guessing a position would no
 | `Ceiling` | | the `ceiling` channel, centimetres, **where it is above zero** |
 | `Temperature` | | the `temperature` channel, hundredths of a degree Celsius |
 | `Cylinders[].Pressure` | | a `pressures` channel, tenths of a bar, per cylinder |
+| `HR` | | the `heart_rate` channel, whole beats per minute |
 | `NoDecTime` | | the `ndl` channel, seconds |
 | `TimeToSurface` | | the `tts` channel, seconds, **where it is above zero** |
 | `RtGradientFactors.gf99` | | the `gradient_factor` channel, whole percent |
@@ -414,6 +416,23 @@ instant and keeps the sub-second offsets the export writes: `suunto-ocean.json`'
 depths sit at 160, 1 200 000 and 4 000 020 ms. The per-channel rule is what still decides two
 entries of different channels stamped the same millisecond.
 
+**Heart rate is a stream of its own, in hertz.** Where the diver turned the measurement on —
+`Header.Settings.HrUsed` is `true` — the export writes `HR` on sample objects that carry
+nothing else, one a second against a depth every ten. The value is beats per second to two
+decimals, and every one is a whole number of beats per minute divided by 60 and rounded:
+the 51 distinct values on the dive `ocean-heart-rate.json` is reduced from are 0.95 to 1.78,
+and × 60 recovers 57 to 107 with none further than 0.3 from a whole beat, so the reader
+rounds to the beat and `1.38` reads as 83. Two artefacts of the stream are the export's
+rather than the sensor's. **362 pairs of `HR` objects share one millisecond**, each beside a
+two-second gap: two consecutive seconds the export stamped once rather than one reading
+written twice, so the per-channel collision rule keeps the first and reports the second, as
+it does any channel's. **178 more pairs are stamped 10 ms apart**, each beside the same
+two-second gap; those are two instants on a millisecond axis, and both are kept with no
+report. The readings start after the first depth — 21 s after it on that dive — and outrun
+the last, by 6 s, so a heart rate can be the reading that sets the profile's `duration`.
+Suunto itself says its optical sensor may not read accurately while diving; the reader carries
+what the watch recorded, and judging it is not a reader's business (§6.4).
+
 **Samples are ordered by their own recorded time.** The union of an Ocean export's sample
 timestamps is not monotonic: adjacent entries go backwards by up to a second — 1.05 s is
 the worst step across these 35 files — because the separate sensor streams are appended out
@@ -426,6 +445,15 @@ export writes `{gf99, gfLeadingTissue, gfSurface}`. The `gt` is a vendor typo fi
 firmware update, and both files are real, so both spellings read into
 `surface_gradient_factor`. `gfLeadingTissue` is the compartment's *number* rather than a
 loading and stays unmapped.
+
+2.51.28 also changed what `gf99` does on a decompression ascent, without curing it. On the
+48.15 m dive `ocean-heart-rate.json` is reduced from, with a 14.54 m ceiling, no `gf99` is
+above 98 and none above the `gfSurface` beside it — yet the series keeps the artefact the
+paragraph below describes in a smaller form: a spike on each step of `gfLeadingTissue`, then
+minutes of decay, reading 97 or 98 while the diver is below the device's own ceiling, where
+its gradient-factor high of 70 bounds every compartment. So on this firmware a clean
+`gf99 ≤ gfSurface` is no longer evidence the channel is sound. The number is carried as
+written either way.
 
 **Three zeros and two negatives, each decided against the file** — `converting.md` says the
 decision is per quantity, per format, and this format needs all five:
@@ -732,7 +760,9 @@ Read as a list of what was considered, not of what was missed.
   charts; empty on all 16 D5 files. On every Ocean export in hand it repeats the header's
   `Duration` and `DiveTime`, and its depth block is an array whose average is the mean over
   the whole recording rather than the header's `DepthAverage`, so it says nothing about the
-  dive the header does not say better.
+  dive the header does not say better. Its `HR` block is the device's own average, maximum
+  and minimum heart rate over the activity, in hertz; no member holds a heart-rate summary,
+  and the channel carries every reading they summarise.
 - **The filename** — above, under *Identity*.
 
 ## The pairs
