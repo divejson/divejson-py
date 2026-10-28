@@ -34,7 +34,8 @@ them:
   floors `ndl`, `tts`, `ppo2`, `cns` and the two gradient factors at zero — none of those
   quantities has a negative value — so a source that writes one is spelling *no figure* in
   the only space it had, and every format does it: a Suunto Ocean writes `gf99: -100` where
-  no tissue leads and `NoDecTime: -1` where it has no clock to show. The floor comes off the
+  no tissue leads and `NoDecTime: -1` where it has no clock to show. It floors `heart_rate`
+  at 1, a zero being how a sensor writes a beat it did not catch. The floor comes off the
   schema rather than out of an adapter, which is what keeps it one rule instead of one per
   reader.
 
@@ -59,6 +60,7 @@ CHANNEL_LABELS: dict[str, str] = {
     "ceiling": "decompression ceiling",
     "temperature": "water temperature",
     "pressures": "tank pressure",
+    "heart_rate": "heart rate",
     "ndl": "no-decompression time",
     "tts": "time to surface",
     "ppo2": "ppO₂",
@@ -80,7 +82,7 @@ class Channel:
     the rule, and cannot get it differently from the next adapter.
     """
 
-    __slots__ = ("name", "times", "values", "refused", "_floor")
+    __slots__ = ("name", "times", "values", "refused", "floor")
 
     def __init__(self, name: str) -> None:
         self.name = name
@@ -90,7 +92,7 @@ class Channel:
         # absent-marker for a run of samples — 5 531 of one export's 7 194 `gf99` readings —
         # and a line apiece would bury every other finding in the report.
         self.refused = 0
-        self._floor = channel_floor(name)
+        self.floor = channel_floor(name)
 
     def record(self, at: int, value: int) -> bool:
         """Take one reading at a millisecond, unless the floor refuses it or one is there.
@@ -106,7 +108,7 @@ class Channel:
         A caller that reports its own `False` therefore has to be sure which refusal it
         saw; `taken` is how it asks, and the one such caller uses it.
         """
-        if self._floor is not None and value < self._floor:
+        if self.floor is not None and value < self.floor:
             self.refused += 1
             return False
         if self.taken(at):
@@ -232,13 +234,17 @@ class SampleAxis:
         for channel in (*channels.values(), *(channel for _, channel in pressures)):
             if channel.refused:
                 one = channel.refused == 1
+                # A floor above zero refuses the zero itself, and "below zero" would be
+                # false of it: that is a habit of its own, under a code of its own.
+                positive = channel.floor is not None and channel.floor > 0
                 self._note(
                     self._where,
                     f"{channel.refused} of the dive's {CHANNEL_LABELS.get(channel.name, channel.name)} readings "
-                    f"{'is' if one else 'are'} below zero, which is how a device writes a reading it does not "
-                    f"have; {'that reading is' if one else 'those readings are'} left out.",
+                    f"{'is' if one else 'are'} {'zero or less' if positive else 'below zero'}, which is how a "
+                    f"device writes a reading it does not have; {'that reading is' if one else 'those readings are'} "
+                    "left out.",
                     "dropped",
-                    code="negative_readings",
+                    code="zero_readings" if positive else "negative_readings",
                     member=None if self._path is None else f"{self._path}/{channel.name}",
                 )
         filled: list[tuple[str, Channel]] = [(name, channel) for name, channel in channels.items() if len(channel)]

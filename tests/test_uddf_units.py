@@ -66,6 +66,32 @@ def test_temperature_samples_are_hundredths_of_a_degree(kelvin: str, hundredths:
     assert profile(samples)["temperature"]["values"] == [hundredths]
 
 
+@pytest.mark.parametrize(
+    ("per_second", "per_minute"),
+    [
+        ("1.383333333333333333333333333", 83),  # what this package's writer puts down for 83
+        ("1.38", 83),  # 82.8, rounded to the whole beat
+        ("0.8", 48),  # UDDF's own example
+    ],
+)
+def test_a_pulse_rate_is_beats_per_second_and_the_channel_is_per_minute(per_second: str, per_minute: int) -> None:
+    samples = f"<waypoint><depth>1</depth><divetime>0</divetime><pulserate>{per_second}</pulserate></waypoint>"
+    assert profile(samples)["heart_rate"]["values"] == [per_minute]
+
+
+def test_a_pulse_rate_of_zero_is_no_reading() -> None:
+    conversion = convert(
+        one_dive(
+            f"{STARTED_AT}<samples>"
+            "<waypoint><depth>1</depth><divetime>0</divetime><pulserate>0</pulserate></waypoint>"
+            "<waypoint><depth>2</depth><divetime>10</divetime><pulserate>1.5</pulserate></waypoint>"
+            "</samples>"
+        )
+    )
+    assert profile_of(conversion.document["dives"][0])["heart_rate"] == {"times": [10_000], "values": [90]}
+    assert "zero_readings" in [note.code for note in conversion.notes]
+
+
 def test_bottom_temperature_is_plain_celsius() -> None:
     """The scalar member takes no channel scale, which is the pair this file exists to keep apart."""
     document = convert(

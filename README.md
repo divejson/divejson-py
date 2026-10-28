@@ -294,8 +294,9 @@ surface pressure and the two ends of the oxygen clocks the computer used, on the
 beside them rather than on the dive. A format that states a readout once for the whole dive
 — UDDF's `<surfacepressure>`, Subsurface's `@cns` and `@otu` — gives it to the primary
 recording, and reports that reading where the dive has more than one. The profile carries
-the figures the computer *computed* sample by sample, as distinct from what it measured, on
-an axis in milliseconds that keeps every sub-second offset a source states. Which channels
+what the computer measured sample by sample — the diver's heart rate among it, where a
+sensor counted one — and what it computed, on an axis in milliseconds that keeps every
+sub-second offset a source states. Which channels
 those are, and in what units, is
 [§6.4 of the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md);
 which of them a given format states, and what it does with a device's absent-markers and

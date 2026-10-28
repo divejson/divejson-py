@@ -888,6 +888,13 @@ def test_two_readings_of_one_channel_at_one_instant_report_the_collision() -> No
     assert "readings_at_one_instant" in _codes(conversion, "dropped")
 
 
+def test_two_heart_rates_at_one_instant_name_the_reading_as_a_diver_does() -> None:
+    data = dive_file(_at(0, depth=5.0, heart_rate=80), _at(0, heart_rate=81), session={"total_elapsed_time": 60.0})
+    conversion = _run(data)
+    assert profile_of(conversion.document["dives"][0])["heart_rate"]["values"] == [80]
+    assert any("Two records give a heart rate at one instant" in text for text in _messages(conversion, "dropped"))
+
+
 def test_a_record_before_the_session_started_is_dropped() -> None:
     """The origin is the session's own start time, so the profile's seconds are elapsed time
     from the moment the dive began — the same instant `started_at` names."""
@@ -899,7 +906,7 @@ def test_a_record_before_the_session_started_is_dropped() -> None:
 
 def test_samples_carrying_a_time_and_no_reading_produce_no_profile_at_all() -> None:
     """Rather than one with a bare `duration: 0`, which is a claim the source did not make."""
-    data = dive_file(_at(0, heart_rate=70), _at(30, heart_rate=72), session={"total_elapsed_time": 60.0})
+    data = dive_file(_at(0, cadence=70), _at(30, cadence=72), session={"total_elapsed_time": 60.0})
     conversion = _run(data)
     assert profile_of(conversion.document["dives"][0]) is None
     assert "profile_empty" in _codes(conversion, "dropped")

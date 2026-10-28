@@ -7,6 +7,16 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **The readers carry the diver's heart rate, and the UDDF writer sends it back as a pulse
+  rate.** The profile's new `heart_rate` is whole beats per minute. The Suunto app's JSON
+  reader takes `HR`, which is hertz over a whole beat, times 60; the FIT reader takes
+  `record.heart_rate` as it stands; the UDDF writer emits `<pulserate>` in beats per second
+  and the UDDF reader takes it back. Settled against a Suunto Ocean dive recorded with its
+  wrist sensor on, now a pair in the Suunto JSON and FIT directories. A heart rate of zero is
+  a sensor that caught no beat: it is left out and reported, in words that say zero, under the
+  new code `zero_readings`. Subsurface's `heartbeat` and UDDF 3.2.3's `<heartrate>` are not
+  read yet, no file in hand carrying either.
+
 ## 0.34.0
 
 - **Shearwater Cloud's database reader reads the logbook the diver typed**, settled against a

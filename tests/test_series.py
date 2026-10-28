@@ -277,6 +277,29 @@ def test_the_refusals_are_reported_once_per_channel_rather_than_once_per_sample(
     assert report.codes == [("negative_readings", f"{PROFILE}/gradient_factor")]
 
 
+def test_a_heart_rate_of_zero_is_refused_and_reported_as_zero_under_its_own_code() -> None:
+    """The heart rate floors at 1, so its refusal is the zero itself, which "below zero" would
+    misdescribe: one note under `zero_readings`, and none under `negative_readings`."""
+    channel = Channel("heart_rate")
+    assert channel.record(0, 0) is False
+    assert channel.record(10, 1) is True
+    report = Reported()
+    axis = _axis(report)
+    for second in (0, 10):
+        axis.offer(second, second)
+    axis.ordered()
+    axis.profile({"heart_rate": channel})
+    assert [note for note in report.notes if "heart rate" in note[1]] == [
+        (
+            "dive/0",
+            "1 of the dive's heart rate readings is zero or less, which is how a device writes a reading it does "
+            "not have; that reading is left out.",
+            "dropped",
+        )
+    ]
+    assert report.codes == [("zero_readings", f"{PROFILE}/heart_rate")]
+
+
 def test_one_refusal_is_reported_in_the_singular() -> None:
     report = Reported()
     axis = _axis(report)

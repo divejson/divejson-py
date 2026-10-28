@@ -77,6 +77,7 @@ from decimal import Decimal
 from typing import Any
 
 from .converter import (
+    BEATS_PER_MINUTE_PER_HERTZ,
     CENTIMETRES_PER_METRE,
     HUNDREDTHS_PER_DEGREE,
     MAX_NAME,
@@ -2835,6 +2836,7 @@ class _Converter:
 
         depth = Channel("depth")
         temperature = Channel("temperature")
+        heart_rate = Channel("heart_rate")
         ndl = Channel("ndl")
         ppo2 = Channel("ppo2")
         cns = Channel("cns")
@@ -2853,6 +2855,12 @@ class _Converter:
             kelvin = decimal_of(_text_of(waypoint, "temperature"))
             if kelvin is not None:
                 temperature.record(at, rounded((kelvin - KELVIN_OFFSET) * HUNDREDTHS_PER_DEGREE))
+
+            # Beats per second. UDDF holds a `<pulserate>` until the next one, as it does a
+            # `<temperature>`, and like that one it is read as a reading at its own waypoint.
+            beats = decimal_of(_text_of(waypoint, "pulserate"))
+            if beats is not None:
+                heart_rate.record(at, rounded(beats * BEATS_PER_MINUTE_PER_HERTZ))
 
             # Seconds already, which is §6.4's unit for the reading — the axis it sits on
             # is milliseconds, the value is not. A value at the device's display cap —
@@ -2940,6 +2948,7 @@ class _Converter:
             {
                 "depth": depth,
                 "temperature": temperature,
+                "heart_rate": heart_rate,
                 "ndl": ndl,
                 "ppo2": ppo2,
                 "cns": cns,

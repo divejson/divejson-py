@@ -705,8 +705,12 @@ def test_the_readout_channels_go_out_at_uddfs_scales_and_come_back_at_the_format
     `0.67` rather than `67` for the gradient factor because this writer is **not** a
     generator `uddf-mapping.md`'s table names — it stamps `divejson convert` — so a file it
     produces is read back by the fraction branch of that rule.
+
+    The heart rate is the one whose UDDF figure is no exact decimal: 83 beats a minute is
+    1.3833… a second, and it comes back as 83 only because the reader rounds.
     """
     channels = {
+        "heart_rate": {"times": [0], "values": [83]},
         "ndl": {"times": [0], "values": [5940]},
         "ppo2": {"times": [0], "values": [128]},
         "cns": {"times": [0], "values": [45]},
@@ -714,6 +718,7 @@ def test_the_readout_channels_go_out_at_uddfs_scales_and_come_back_at_the_format
     }
     source = one_dive(profile=_with_readouts(**channels))
     text = written(source, schema)
+    assert "<pulserate>1.383333333333333333333333333</pulserate>" in text
     assert "<nodecotime>5940</nodecotime>" in text
     assert "<calculatedpo2>1.28</calculatedpo2>" in text
     assert "<cns>4.5</cns>" in text
@@ -772,6 +777,22 @@ def test_a_millisecond_that_is_not_a_whole_second_goes_out_as_a_fraction(schema)
     assert "<divetime>0.16</divetime>" in text
     assert "<divetime>60</divetime>" in text
     assert "<divetime>1200.02</divetime>" in text
+    assert recorded(read_back(source))["profile"] == source["dives"][0]["recordings"][0]["profile"]
+
+
+def test_a_heart_rate_outrunning_the_depths_sets_the_span_and_is_written(schema) -> None:
+    """A wrist sensor keeps counting after the last depth, and the span a reader recomputes
+    takes in the reading that outran it — so the duration that reading set is no loss."""
+    source = one_dive(
+        profile={
+            "duration": 66_000,
+            "depth": {"times": [0, 60_000], "values": [0, 500]},
+            "heart_rate": {"times": [21_000, 66_000], "values": [57, 107]},
+        }
+    )
+    text = written(source, schema)
+    assert text.index("<divetime>66</divetime>") < text.index("<pulserate>1.783333333333333333333333333</pulserate>")
+    assert messages(source, "dives/0/recordings/0/profile") == []
     assert recorded(read_back(source))["profile"] == source["dives"][0]["recordings"][0]["profile"]
 
 

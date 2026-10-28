@@ -165,6 +165,27 @@ def test_a_ceiling_of_zero_is_not_a_ceiling() -> None:
     assert len(profile["depth"]["times"]) == 3
 
 
+def test_heart_rate_samples_are_beats_per_minute_unscaled() -> None:
+    """FIT's `record.heart_rate` is a `uint8` in the channel's own unit, so the failure on offer
+    is applying a factor out of habit. A record with none — `0xFF`, FIT's invalid `uint8` — is
+    a gap rather than a reading."""
+    data = dive_file(
+        *_records((0, {"depth": 5.0, "heart_rate": 83}), (1, {"depth": 6.0, "heart_rate": 0xFF}), (2, {"heart_rate": 107})),
+        session={"total_elapsed_time": 60.0},
+    )
+    assert profile_of(_dive(data))["heart_rate"] == {"times": [0, 2000], "values": [83, 107]}
+
+
+def test_a_heart_rate_of_zero_is_refused_by_the_floor() -> None:
+    data = dive_file(
+        *_records((0, {"depth": 5.0, "heart_rate": 0}), (1, {"depth": 6.0, "heart_rate": 80})),
+        session={"total_elapsed_time": 60.0},
+    )
+    conversion = _conversion(data)
+    assert profile_of(conversion.document["dives"][0])["heart_rate"] == {"times": [1000], "values": [80]}
+    assert [note.code for note in conversion.notes if note.code.endswith("_readings")] == ["zero_readings"]
+
+
 # -- semicircles ----------------------------------------------------------------------
 
 

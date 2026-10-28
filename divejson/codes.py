@@ -128,6 +128,7 @@ NOTE_CODES: dict[str, str] = {
     "sample_before_start": "a sample before the dive began is left out of the profile",
     "readings_at_one_instant": "two readings at one instant; the later is left out",
     "negative_readings": "readings below zero, which is how a device writes no reading, are left out",
+    "zero_readings": "readings of zero of a quantity that has none, which is how a sensor writes no reading, are left out",
     "time_to_surface_zero": "time-to-surface readings of zero, which the Suunto app writes for none, are left out",
     "tank_pressure_readings_out_of_range": "tank pressure readings outside what a cylinder can hold are left out",
     "tank_pressures_unmatched": "tank pressures the file does not tie to a cylinder are left out",

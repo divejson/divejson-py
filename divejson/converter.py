@@ -83,6 +83,7 @@ from . import SPEC_VERSION, __version__
 from .validate import READOUTS, Issue, load_schema
 
 __all__ = [
+    "BEATS_PER_MINUTE_PER_HERTZ",
     "CENTIMETRES_PER_METRE",
     "DEVICE_CAPS",
     "FIX_ERROR_BOUND",
@@ -543,8 +544,9 @@ def channel_floor(member: str) -> int | None:
     resolves the reference instead: the six decompression readouts share a definition whose
     `values` floor at zero, because no-decompression time, time to surface,
     ppO₂, CNS and a gradient factor have no negative reading and a source that writes one is
-    spelling absence in the only space it had. Depth, ceiling and temperature share the
-    signed definition and floor at nothing.
+    spelling absence in the only space it had. The heart rate has a definition of its own
+    flooring at 1, no living diver reading 0 beats, so a zero there is a sensor's
+    absent-marker. Depth, ceiling and temperature share a definition with no floor.
 
     `series.Channel` asks this once per channel, which is what keeps the rule one place in
     this package rather than one per format.
@@ -603,6 +605,9 @@ def recorded(value: Decimal | int | None, *, record: str, member: str) -> bool:
 CENTIMETRES_PER_METRE = Decimal(100)
 TENTHS_PER_UNIT = Decimal(10)
 HUNDREDTHS_PER_DEGREE = Decimal(100)
+# A heart rate stated per second — the Suunto app's hertz, UDDF's beats per second — onto
+# the channel's beats per minute.
+BEATS_PER_MINUTE_PER_HERTZ = Decimal(60)
 
 # The largest magnitude a source number may have. Not a physical bound — this format sets
 # none on a depth or a temperature, and inventing one here would be a converter deciding

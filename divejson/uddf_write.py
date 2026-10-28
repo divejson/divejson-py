@@ -82,6 +82,7 @@ from typing import Any
 
 from . import __version__
 from .converter import (
+    BEATS_PER_MINUTE_PER_HERTZ,
     CENTIMETRES_PER_METRE,
     GENERATOR_NAME,
     HUNDREDTHS_PER_DEGREE,
@@ -2098,6 +2099,7 @@ class _Writer:
                     "depth",
                     "temperature",
                     "pressures",
+                    "heart_rate",
                     "ndl",
                     "ppo2",
                     "cns",
@@ -2116,6 +2118,10 @@ class _Writer:
             at(instant)["depth"] = _decimal(centimetres) / CENTIMETRES_PER_METRE
         for instant, hundredths in _series(profile.get("temperature")):
             at(instant)["temperature"] = _decimal(hundredths) / HUNDREDTHS_PER_DEGREE + KELVIN_OFFSET
+        # Beats per second, UDDF's unit: `83` is written `1.383…`, which the reader's `× 60`
+        # rounds back to 83.
+        for instant, beats in _series(profile.get("heart_rate")):
+            at(instant)["pulserate"] = _decimal(beats) / BEATS_PER_MINUTE_PER_HERTZ
         for instant, seconds in _series(profile.get("ndl")):
             at(instant)["nodecotime"] = _decimal(seconds)
         for instant, hundredths in _series(profile.get("ppo2")):
@@ -2166,6 +2172,8 @@ class _Writer:
             if "depth" in reading:
                 _sub(waypoint, "depth", _num(reading["depth"]))
             _sub(waypoint, "divetime", _num(_decimal(instant) / MILLISECONDS_PER_SECOND))
+            if "pulserate" in reading:
+                _sub(waypoint, "pulserate", _num(reading["pulserate"]))
             if "setmarker" in reading:
                 _sub(waypoint, "setmarker", reading["setmarker"])
             if "switchmix" in reading:
@@ -2190,6 +2198,7 @@ class _Writer:
                 for channel in (
                     profile.get("depth"),
                     profile.get("temperature"),
+                    profile.get("heart_rate"),
                     profile.get("ndl"),
                     profile.get("ppo2"),
                     profile.get("cns"),
