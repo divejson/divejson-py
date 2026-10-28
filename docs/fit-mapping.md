@@ -134,6 +134,7 @@ value.
 | depth, ceiling | `uint32` metres scaled by 1000 | metres; centimetres on a §6.5 channel |
 | sample temperature | `sint8` whole degrees Celsius | hundredths of a degree on a §6.5 channel |
 | tank pressure | `uint16` bar scaled by 100 | bar; tenths of a bar on a §6.5 channel |
+| heart rate | `uint8` beats per minute | whole beats per minute on a §6.5 channel |
 | elapsed and timer time | `uint32` seconds scaled by 1000 | whole seconds, halves away from zero |
 | a sample's place on the axis | `uint32` whole seconds, a `record`'s `timestamp` | milliseconds on a §6.5 axis, × 1000 |
 | CNS | `uint8` percent | percent |
@@ -212,8 +213,8 @@ transmitter, a heart-rate strap — and only index 0 is the computer. libdivecom
 `garmin_parser.c` copies a serial, a product and a firmware from that message and no other,
 and reading a transmitter's serial as the computer's would pair two dives that were never on
 one wrist. `file_id.serial_number` is the fallback, being the file's own claim about what
-wrote it. No fixture here carries a `device_index` at all — each Ocean writes two
-`device_info` messages with no index and no serial, the D5 writes none — so both rows above
+wrote it. No fixture here carries a `device_index` at all — each Ocean writes two or
+three `device_info` messages with no index and no serial, the D5 writes none — so both rows above
 wait on a file that has one, exactly as the tank-telemetry rows do.
 
 **`product` (2) is not a model, and there is no fall-through to it.** It is a numeric vendor
@@ -319,7 +320,7 @@ nothing is scaled. They are written **both or neither** (§6.4c), so a file stat
 yields neither and a note.
 
 **`model` is read only where it states a value.** `tissue_model_type` has exactly one member
-in the FIT profile, `zhl_16c`. Three of the four recordings in `fixtures/fit/` carry a
+in the FIT profile, `zhl_16c`. Four of the five recordings in `fixtures/fit/` carry a
 `dive_settings` at all, and each of those states a gradient-factor pair with no `model`
 beside it — so each produces a `deco_model` of a pair and no family, which is the honest
 shape, while `suunto-d5.fit` writes no `dive_settings` and gets no `deco_model`. Reading
@@ -471,6 +472,7 @@ source defect rather than a scale to reinterpret: the profile states the unit ou
 | `depth` (92) | | the `depth` channel, centimetres |
 | `next_stop_depth` (93) | | the `ceiling` channel, centimetres |
 | `temperature` (13) | | the `temperature` channel, hundredths of a degree |
+| `heart_rate` (3) | | the `heart_rate` channel, whole beats per minute |
 | `position_lat` (0) / `position_long` (1) | | `entry_position` / `exit_position` |
 | `gps_accuracy` (31) | | which fix is the entry or the exit, under *Positions*; never written. **untested** |
 
@@ -486,7 +488,9 @@ is `converting.md`'s and shared with every other format.
 other's length would invent nearly four thousand depths the dive never reached. A `record`
 and a `tank_update` on one timestamp are one sample rather than two, by `converting.md`'s
 per-channel collision rule — the two carry different channels and were never in
-competition.
+competition. Heart rate is the same case a third time: `ocean-heart-rate.fit`'s 4,960
+`record`s carry 4,401 heart rates beside its 522 depths, the gaps being seconds the sensor
+reported nothing for, and FIT's unit is the format's, so the reading goes in as written.
 
 `next_stop_depth` is FIT's deco ceiling — the depth of the next required stop, in metres,
 scaled like `depth` beside it. **Not** `next_stop_time` (94), `time_to_surface` (95) or
@@ -505,7 +509,7 @@ is stated in.
 
 **`gps_accuracy` (31) is a fix's stated error**, a `uint8` in metres that the profile defines
 on `record`, and the reader reads it off a `record` that carries a fix. It is **untested**:
-no file in hand writes it — not one of the four recordings in `fixtures/fit/`, and not one of
+no file in hand writes it — not one of the five recordings in `fixtures/fit/`, and not one of
 the 792 fix records across a personal set of 25 Suunto Ocean exports this repository does
 not carry — and whether a Garmin Descent writes it on a dive is unverified. Messages built
 with an encoder stand in for a device, as they do for the other untested rows.
@@ -582,6 +586,9 @@ which the `extensions.divejson.inferred` list is ever written.
   `training_stress_score`, `total_training_effect`, `enhanced_min_altitude` /
   `max_altitude`** — an activity tracker's members, not a dive log's. §6.2's `altitude` is the
   altitude of the *water the dive was made in*, which none of these is.
+- **`session.avg_heart_rate` / `max_heart_rate`** — the device's own summary of the
+  heart-rate channel, 77 and 107 on `ocean-heart-rate.fit`. No member holds a summary of a
+  channel, and the channel carries every reading they summarise.
 - **`session.surface_interval`** — the gap before the dive, derivable from two dives' start
   times and a property of a pair rather than of one file. `session.dive_number` was refused
   beside it until §6.4b gave a device's counter a home; it is carried now, under *Device*
@@ -596,7 +603,7 @@ which the `extensions.divejson.inferred` list is ever written.
 - **`record.ndl_time`, `time_to_surface`, `cns_load`, `po2` and `next_stop_time`, and
   `session.sub_sport`** — §6.4 now has a channel for the first four and §6.4a a `mode` the
   last would fill, and all six stay unmapped for a different reason: **no file in hand writes
-  any of them.** All four FIT recordings in `fixtures/fit/` carry `record` messages with
+  any of them.** Every FIT recording in `fixtures/fit/` carries `record` messages with
   every one of these fields empty, and a mapping written against a profile listing rather than
   a dive is the speculation this format's core rule exists to keep out. Each lands the day a
   file arrives that has it. `gps_accuracy` is read under *Positions* although no file writes

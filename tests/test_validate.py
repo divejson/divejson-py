@@ -83,11 +83,14 @@ def test_the_validators_channel_list_is_the_schemas() -> None:
     """
     from divejson.validate import load_schema
 
-    properties = load_schema()["$defs"]["profile"]["properties"]
+    schema = load_schema()
+    properties = schema["$defs"]["profile"]["properties"]
+    # Every member whose definition is a Series — times beside values — whatever that
+    # definition is called, so a channel arriving under a definition of its own is found.
     series = {
         name
         for name, definition in properties.items()
-        if str(definition.get("$ref", "")).endswith(("/series", "/unsigned_series"))
+        if "times" in schema["$defs"].get(str(definition.get("$ref", "")).rsplit("/", 1)[-1], {}).get("properties", {})
     }
     assert set(CHANNELS) == series
 

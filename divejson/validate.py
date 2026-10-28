@@ -150,6 +150,7 @@ CHANNELS = (
     "depth",
     "ceiling",
     "temperature",
+    "heart_rate",
     "ndl",
     "tts",
     "ppo2",

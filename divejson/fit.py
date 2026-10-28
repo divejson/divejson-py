@@ -109,6 +109,7 @@ RECORDING = f"{DIVE}/recordings/0"
 _READING_LABELS: dict[str, str] = {
     "ceiling": "decompression ceiling",
     "temperature": "water temperature",
+    "heart_rate": "heart rate",
 }
 
 # uuid5(NAMESPACE_URL, "https://divejson.org/ns/fit"). Fixed forever: changing it would
@@ -337,6 +338,7 @@ class _Point:
     depth: Decimal | None = None
     ceiling: Decimal | None = None
     temperature: Decimal | None = None
+    heart_rate: Decimal | None = None
     latitude: Decimal | None = None
     longitude: Decimal | None = None
     # `gps_accuracy`, the receiver's stated horizontal error in metres, off the `record`
@@ -485,7 +487,7 @@ def _set(scan: _Scan, point: _Point, name: str, value: Decimal | None) -> None:
 
 
 def _collect_record(scan: _Scan, frame: fitdecode.FitDataMessage) -> None:
-    """Depth, deco ceiling, temperature and any satellite fix off one `record`.
+    """Depth, deco ceiling, temperature, heart rate and any satellite fix off one `record`.
 
     `next_stop_depth` is FIT's deco ceiling — the depth of the next required stop, in
     metres, scaled like `depth` beside it. **Not** `next_stop_time`, `time_to_surface` or
@@ -502,6 +504,8 @@ def _collect_record(scan: _Scan, frame: fitdecode.FitDataMessage) -> None:
     _set(scan, point, "depth", _number(_native(frame, "depth")))
     _set(scan, point, "ceiling", _number(_native(frame, "next_stop_depth")))
     _set(scan, point, "temperature", _number(_native(frame, "temperature")))
+    # Beats per minute already, which is the channel's unit.
+    _set(scan, point, "heart_rate", _number(_native(frame, "heart_rate")))
     unfixed = point.latitude is None
     _set(scan, point, "latitude", _degrees(_native(frame, "position_lat")))
     _set(scan, point, "longitude", _degrees(_native(frame, "position_long")))
@@ -1501,6 +1505,7 @@ class _Converter:
         depth = Channel("depth")
         ceiling = Channel("ceiling")
         temperature = Channel("temperature")
+        heart_rate = Channel("heart_rate")
         pressures = {sensor: Channel("pressures") for sensor in sensors}
         for at, point in samples.ordered():
             if point.depth is not None:
@@ -1509,6 +1514,8 @@ class _Converter:
                 ceiling.record(at, rounded(point.ceiling * CENTIMETRES_PER_METRE))
             if point.temperature is not None:
                 temperature.record(at, rounded(point.temperature * HUNDREDTHS_PER_DEGREE))
+            if point.heart_rate is not None:
+                heart_rate.record(at, rounded(point.heart_rate))
             for sensor, bar in point.pressures.items():
                 if sensor in pressures and 0 <= bar <= MAX_CYLINDER_PRESSURE:
                     pressures[sensor].record(at, rounded(bar * TENTHS_PER_UNIT))
@@ -1516,7 +1523,7 @@ class _Converter:
         events = self.read_events(samples, where)
         numbered = [(number, pressures[sensor]) for number, sensor in enumerate(sensors) if sensor in pressures]
         profile = samples.profile(
-            {"depth": depth, "ceiling": ceiling, "temperature": temperature},
+            {"depth": depth, "ceiling": ceiling, "temperature": temperature, "heart_rate": heart_rate},
             pressures=numbered,
             events=events,
         )

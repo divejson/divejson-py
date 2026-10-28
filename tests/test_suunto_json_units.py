@@ -250,6 +250,74 @@ def test_the_elapsed_time_is_exact_rather_than_a_binary_fraction() -> None:
     assert profile_of(dive)["depth"]["times"] == [0, 4_000_020]
 
 
+# -- heart rate -----------------------------------------------------------------------
+
+
+def test_a_heart_rate_is_hertz_and_the_channel_is_whole_beats_per_minute() -> None:
+    """`1.38` Hz is 82.8 beats a minute and the device held 83; `0.97` is 58.2 and it held 58.
+
+    The export writes whole beats divided by 60 to two decimals, so the product never lands
+    on a half and rounding gives back the integer. Carrying the hertz would chart a heart
+    beating once a minute.
+    """
+    dive = _dive(
+        {},
+        [
+            suunto_sample(0, Depth=5.0),
+            suunto_sample(1, HR=1.38),
+            suunto_sample(2, HR=0.97),
+        ],
+    )
+    assert profile_of(dive)["heart_rate"] == {"times": [1000, 2000], "values": [83, 58]}
+
+
+def test_a_heart_rate_on_a_depths_millisecond_shares_its_sample() -> None:
+    """Two entries of different streams at one millisecond were never in competition."""
+    dive = _dive({}, [suunto_sample(0, Depth=5.0), suunto_sample(0, HR=1.5)])
+    profile = profile_of(dive)
+    assert profile["depth"]["times"] == profile["heart_rate"]["times"] == [0]
+
+
+def test_heart_rates_outrunning_the_depths_set_the_duration() -> None:
+    """The wrist keeps counting after the last depth, and §6.4's duration is the span of every
+    channel."""
+    dive = _dive({}, [suunto_sample(0, Depth=5.0), suunto_sample(10, Depth=0.5), suunto_sample(16, HR=1.2)])
+    assert profile_of(dive)["duration"] == 16_000
+
+
+def test_a_heart_rate_of_zero_is_no_reading_and_says_zero() -> None:
+    """A zero beat is a sensor that caught none: refused by the channel's floor, written as a
+    gap, and reported in words that say zero rather than "below zero", under a code of its
+    own."""
+    conversion = convert(
+        suunto_json({}, [suunto_sample(0, Depth=5.0), suunto_sample(1, HR=0), suunto_sample(2, HR=1.2)]),
+        exported_at=EXPORTED_AT,
+    )
+    assert profile_of(conversion.document["dives"][0])["heart_rate"] == {"times": [2000], "values": [72]}
+    refused = [note for note in conversion.notes if note.code in ("zero_readings", "negative_readings")]
+    assert [(note.code, note.member) for note in refused] == [
+        ("zero_readings", "dives/0/recordings/0/profile/heart_rate")
+    ]
+    assert "1 of the dive's heart rate readings is zero or less" in refused[0].message
+
+
+def test_two_heart_rates_on_one_millisecond_keep_the_first_and_say_so_once() -> None:
+    """The export stamps two consecutive seconds once, beside a two-second gap."""
+    conversion = convert(
+        suunto_json(
+            {},
+            [
+                suunto_sample(0, Depth=5.0),
+                *(suunto_sample(second, HR=hertz) for second, hertz in ((1, 1.2), (1, 1.22), (3, 1.25), (3, 1.27))),
+            ],
+        ),
+        exported_at=EXPORTED_AT,
+    )
+    assert profile_of(conversion.document["dives"][0])["heart_rate"]["values"] == [72, 75]
+    [note] = [note for note in conversion.notes if note.code == "readings_at_one_instant"]
+    assert note.message.startswith("2 heart rate readings land on a millisecond")
+
+
 # -- the decompression readouts -------------------------------------------------------
 
 

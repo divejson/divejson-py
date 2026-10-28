@@ -267,6 +267,7 @@
         "ceiling": { "$ref": "#/$defs/series" },
         "temperature": { "$ref": "#/$defs/series" },
         "pressures": { "type": "array", "items": { "$ref": "#/$defs/pressure_series" } },
+        "heart_rate": { "$ref": "#/$defs/positive_series" },
         "ndl": { "$ref": "#/$defs/unsigned_series" },
         "tts": { "$ref": "#/$defs/unsigned_series" },
         "ppo2": { "$ref": "#/$defs/unsigned_series" },
@@ -295,6 +296,17 @@
       "properties": {
         "times": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
         "values": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      },
+      "required": ["times", "values"],
+      "additionalProperties": false
+    },
+    "positive_series": {
+      "description": "A Series whose quantity has no zero reading: the heart rate. A zero here is a sensor's absent-marker, which §5.4 spells as absence.",
+      "type": "object",
+      "properties": {
+        "times": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+        "values": { "type": "array", "items": { "type": "integer", "minimum": 1 } },
         "extensions": { "$ref": "#/$defs/extensions" }
       },
       "required": ["times", "values"],

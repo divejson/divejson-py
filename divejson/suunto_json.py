@@ -69,6 +69,7 @@ from decimal import Decimal
 from typing import Any
 
 from .converter import (
+    BEATS_PER_MINUTE_PER_HERTZ,
     CENTIMETRES_PER_METRE,
     HUNDREDTHS_PER_DEGREE,
     PRODUCER_KEY,
@@ -463,6 +464,8 @@ class _Sample:
     depth: Decimal | None = None
     ceiling: Decimal | None = None
     kelvin: Decimal | None = None
+    # `HR`, in hertz: beats per second.
+    hertz: Decimal | None = None
     ndl: Decimal | None = None
     tts: Decimal | None = None
     gradient_factor: Decimal | None = None
@@ -1285,6 +1288,7 @@ class _Converter:
             depth=_number(raw.get("Depth")),
             ceiling=_number(raw.get("Ceiling")),
             kelvin=_number(raw.get("Temperature")),
+            hertz=_number(raw.get("HR")),
             ndl=_number(raw.get("NoDecTime")),
             tts=_number(raw.get("TimeToSurface")),
             gradient_factor=_number(factors.get("gf99")),
@@ -1354,10 +1358,15 @@ class _Converter:
         from a sample at 14.63 m that says `88`. The negatives beside them — `NoDecTime: -1`,
         `gf99: -100` — are the channel's own floor and are dropped by `Channel`, once for
         every format.
+
+        **`HR` is hertz over a whole number of beats per minute.** The Ocean writes it once a
+        second on entries of its own, to two decimals — `1.38` for 83 — so `× 60` lands within
+        a third of a beat of the integer the device held, and rounding gives that integer back.
         """
         depth = Channel("depth")
         ceiling = Channel("ceiling")
         temperature = Channel("temperature")
+        heart_rate = Channel("heart_rate")
         ndl = Channel("ndl")
         tts = Channel("tts")
         gradient_factor = Channel("gradient_factor")
@@ -1373,6 +1382,8 @@ class _Converter:
                 ceiling.record(at, rounded(sample.ceiling * CENTIMETRES_PER_METRE))
             if sample.kelvin is not None:
                 temperature.record(at, rounded((sample.kelvin - KELVIN_OFFSET) * HUNDREDTHS_PER_DEGREE))
+            if sample.hertz is not None:
+                heart_rate.record(at, rounded(sample.hertz * BEATS_PER_MINUTE_PER_HERTZ))
             if sample.ndl is not None:
                 ndl.record(at, rounded(sample.ndl))
             if sample.tts is not None:
@@ -1413,6 +1424,7 @@ class _Converter:
                 "depth": depth,
                 "ceiling": ceiling,
                 "temperature": temperature,
+                "heart_rate": heart_rate,
                 "ndl": ndl,
                 "tts": tts,
                 "gradient_factor": gradient_factor,
@@ -1520,6 +1532,7 @@ def _merge(standing: _Sample, arriving: _Sample, collisions: dict[str, int]) -> 
         ("depth", "depth"),
         ("ceiling", "ceiling"),
         ("kelvin", "temperature"),
+        ("hertz", "heart_rate"),
         ("ndl", "ndl"),
         ("tts", "tts"),
         ("gradient_factor", "gradient_factor"),

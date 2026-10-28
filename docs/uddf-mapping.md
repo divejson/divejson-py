@@ -82,6 +82,7 @@ in a converter, are in `converting.md`.
 | `profile.depth` values | centimetres | `<waypoint><depth>` | metres | × 100 |
 | `profile.temperature` values | hundredths of a °C | `<waypoint><temperature>` | Kelvin | (K − 273.15) × 100 |
 | `profile.pressures[]` values | tenths of a bar | `<waypoint><tankpressure>` | Pascal | ÷ 100 000 × 10 |
+| `profile.heart_rate` values | whole beats per minute | `<waypoint><pulserate>` | beats per second, `xs:float` | × 60, to the nearest beat |
 | `profile.duration`, `times` | milliseconds | `<waypoint><divetime>` | seconds, `xs:float` | × 1 000, to a whole millisecond |
 | `profile.ndl` values | seconds | `<waypoint><nodecotime>` | seconds | — |
 | `profile.ppo2` values | hundredths of a bar | `<waypoint><calculatedpo2>` | bar or Pascal, and see below | × 100, or ÷ 1000 |
@@ -758,6 +759,7 @@ inventing 402 readings.
 | `depth` | `profile.depth` |
 | `temperature` | `profile.temperature` |
 | `tankpressure` (`@ref` → a mix → a cylinder) | `profile.pressures[]` |
+| `pulserate` | `profile.heart_rate` |
 | `setmarker` | an event |
 | `switchmix` (`@ref` → a mix → a cylinder) | a `gas_switch` event |
 | `nodecotime` | `profile.ndl` |
@@ -773,6 +775,13 @@ inventing 402 readings.
   that round to one millisecond are `converting.md`'s collision.
   `fixtures/uddf/legacy-writer.uddf` writes a `30.4` beside a `30`: one second, two
   milliseconds, so both readings are kept.
+- **`<pulserate>` is read because this format's writer writes it.** No UDDF file in hand
+  carries the element, so its only fixture is the writer's own output: a heart rate written
+  to `write/uddf/technical-dive.uddf` comes back to the beat it was, and the writer's
+  contract is that what it scales comes back at the format's figure
+  ([`uddf-writing.md`](uddf-writing.md)). UDDF documents the element, like `<temperature>`,
+  as holding until the next waypoint that states one; the reader takes each as a reading at
+  its own waypoint, as it takes a temperature, and pads nothing.
 - A `<setmarker>` whose text is exactly `deep_stop`, `safety_stop` or `bookmark` becomes
   that event type; anything else becomes an event with **no `type`** and the text as its
   `label`, which §6.6 makes the spelling of an unclassified event. `<setmarker>` is a bare
@@ -978,7 +987,8 @@ writes all three that way.
 | `<waypoint><decostop>` | a stop *schedule*, not a ceiling sample: `@duration` is required on it and a ceiling has none, several may appear on one waypoint, and no writer in the corpus emits any. `profile.ceiling` waits for a real file to map from. |
 | `<waypoint><otu>` | §6.4 has a `cns` channel and no OTU one, and no file in hand carries this element. Deriving a recording's `otu_start`/`otu_end` from the last sample would present a derivation as recorded data, which §5.7 forbids. |
 | `<waypoint><measuredpo2>` | per cell by construction: its `@ref` to an O₂ sensor is mandatory and the element may repeat inside one waypoint, once per sensor. §6.4's `ppo2` is the one figure the computer calculated, which is `<calculatedpo2>`; a per-cell reading has no member yet. |
-| `<waypoint><alarm>`, `<setpo2>`, `<heading>`, `<pulserate>` | no core member, and no fixture to map against. `<setpo2>` is a *maximum tolerated* ppO₂ rather than a rebreather setpoint, which is the member it would otherwise look like. |
+| `<waypoint><heartrate>` | UDDF 3.2.3's one addition: the same quantity as `<pulserate>`, documented in the same beats per second. It waits for a file. None in hand carries it, and the one writer known to emit it, Submersion, fills it with whole beats per minute, so a reader following the documentation would turn a heart rate of 80 into 4 800. Which unit a reader takes is settled against a file that carries the element, not against the documentation alone. |
+| `<waypoint><alarm>`, `<setpo2>`, `<heading>` | no core member, and no fixture to map against. `<setpo2>` is a *maximum tolerated* ppO₂ rather than a rebreather setpoint, which is the member it would otherwise look like. |
 | `<decomodel><vpm>`, `<rgbm>` | no file in hand carries either, so §6.4c's `algorithm` has no value seeded for them yet. |
 | `<calculateprofile><profile><density>` | a water density in kg/m³ — Shearwater Cloud Desktop writes `1030` — beside the recalculation's model, a route not read for the reason *The decompression model* gives. §6.4a's `salinity` is a named setting and carries no density: the two are different members, neither derivable from the other, and a density arrives in a minor version when a reader maps one. |
 | `<informationbeforedive><surfaceintervalbeforedive>`; `<informationafterdive><desaturationtime>`, `<noflighttime>` | no core member. |

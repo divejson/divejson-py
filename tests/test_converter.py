@@ -236,8 +236,8 @@ def test_the_signed_channels_floor_at_nothing(channel: str) -> None:
 
 def test_the_profile_member_order_is_the_schemas() -> None:
     """A converted profile reads down §6.4, and the order is the schema's to say — so
-    `pressures` keeps its place between `temperature` and the readouts."""
-    assert profile_members()[:6] == ("duration", "depth", "ceiling", "temperature", "pressures", "ndl")
+    `pressures` and `heart_rate` keep their places between `temperature` and the readouts."""
+    assert profile_members()[:7] == ("duration", "depth", "ceiling", "temperature", "pressures", "heart_rate", "ndl")
     assert profile_members()[-2:] == ("events", "extensions")
 
 
