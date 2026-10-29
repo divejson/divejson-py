@@ -54,7 +54,11 @@ _CHUNK = 64 * 1024
 
 
 class DoctypeRefusingTarget(ET.TreeBuilder):
-    """A parse target that stops the parse the moment a DTD is declared.
+    """A parse target that refuses a DTD the prolog scan let through.
+
+    Its error surfaces only once expat has parsed the chunk that carried the declaration,
+    entity references in it included, so it is the backstop for an encoding the scan
+    misreads and not the refusal itself.
 
     The hook is on the *target* rather than on the parser: `XMLParser.parser`, which the
     equivalent expat handler would need, no longer exists on Python 3.14, while this one
