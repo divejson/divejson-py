@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.35.1
+
 - **Reading a measurement takes linear time in every reader.** Subsurface's measured
   attributes and the figures typed into a Shearwater Cloud logbook were split with patterns
   that backtrack quadratically on a long run of letters or digits; both are now scanned
