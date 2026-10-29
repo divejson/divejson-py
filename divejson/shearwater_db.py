@@ -299,8 +299,11 @@ DETAIL_COLUMNS_MAPPED = frozenset(
         *NO_PLACE_COLUMNS,
     }
 )
-# A figure as a diver types one: a number, and whatever follows it.
-_FIGURE = re.compile(r"\A([+-]?\d+(?:\.\d+)?)\s*(\S.*)?\Z")
+# A figure as a diver types one: a number, and whatever follows it. Possessive, because
+# a number that gave digits back would be retried against the rest of the line once per
+# digit; and refused past `_FIGURE_LENGTH`, which no figure a diver types comes near.
+_FIGURE = re.compile(r"\A([+-]?\d++(?:\.\d++)?+)\s*+(.*)\Z")
+_FIGURE_LENGTH = 64
 
 
 class ShearwaterDbError(ConverterError):
@@ -1789,11 +1792,11 @@ def _typed(value: Any) -> str:
 def _figure(typed: str) -> tuple[Decimal, str] | None:
     """A typed figure as its number and whatever unit follows it, or nothing for one that is
     not a number this package can carry."""
-    match = _FIGURE.match(typed)
+    match = _FIGURE.match(typed) if len(typed) <= _FIGURE_LENGTH else None
     number = None if match is None else decimal_of(match[1])
     if match is None or number is None:
         return None
-    return number, (match[2] or "").strip()
+    return number, match[2].strip()
 
 
 def _scaled(value: Any, scale: int) -> int | None:

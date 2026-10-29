@@ -51,6 +51,7 @@ and `drop_summary` are where it is made.
 from __future__ import annotations
 
 import re
+import string
 import uuid as uuid_pkg
 import xml.etree.ElementTree as ET
 from collections.abc import Callable
@@ -114,10 +115,10 @@ MAX_CYLINDER_PRESSURE = Decimal(350)
 # guess at.
 _CLOCK = re.compile(r"\A(\d+):([0-5]\d)\Z")
 
-# A measurement splits into a number and the unit written after it. The unit is optional
-# because Subsurface writes some counts bare — `otu='31'`, `visibility='5'` — and the
-# number is whatever is left, checked by `decimal_of` rather than by this pattern.
-_MEASUREMENT = re.compile(r"\A(?P<number>\S+?)\s*(?P<unit>%|[A-Za-z][A-Za-z/]*)?\Z")
+# A measurement splits into a number and the unit written after it — see `_measurement`.
+# Nothing Subsurface writes comes near this length, and a value past it is not a number.
+_MEASUREMENT_LENGTH = 64
+_UNIT_CHARACTERS = frozenset(string.ascii_letters + "/")
 
 # A dive's `@date` and `@time`. Subsurface writes both to the digit, and the leniency here
 # is for the seconds alone: a hand-edited file missing them costs a dive otherwise, and
@@ -160,6 +161,41 @@ def _calendar_date(text: str) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _measurement(raw: str) -> tuple[str, str] | None:
+    """A measurement as its number and the unit written after it, or nothing.
+
+    The unit is optional because Subsurface writes some counts bare — `otu='31'`,
+    `visibility='5'` — so it is the longest closing `%` or run of letters and slashes that
+    opens on a letter, whitespace before it allowed. The number is everything in front: at
+    least one character and no whitespace, checked by `decimal_of` rather than here. Scanned
+    by hand because the pattern that says this backtracks quadratically on a long run of
+    letters, and refused past `_MEASUREMENT_LENGTH` so the work is bounded whatever the file.
+    """
+    if not raw or len(raw) > _MEASUREMENT_LENGTH:
+        return None
+    if raw.endswith("%"):
+        start = len(raw) - 1
+    else:
+        start = len(raw)
+        while start and raw[start - 1] in _UNIT_CHARACTERS:
+            start -= 1
+        while start < len(raw) and raw[start] == "/":
+            start += 1
+    number = raw[:start].rstrip()
+    if not number:
+        if start:
+            return None
+        # All of it reads as a unit, and the number needs a character: it takes the first,
+        # and the slashes after it, since a unit opens on a letter.
+        start = 1
+        while start < len(raw) and raw[start] == "/":
+            start += 1
+        number = raw[:start]
+    if any(character.isspace() for character in number):
+        return None
+    return number, raw[start:]
 
 
 # Every unit spelling this reader knows, against the way the number in front of it is read.
@@ -274,14 +310,14 @@ class _Converter:
         # written in one unit produces one of these per record — 431 of them for a sample
         # channel — and `Conversion.grouped()` groups on the message, so a value in the
         # text would turn one habit of the file into hundreds of separate report lines.
-        match = _MEASUREMENT.match(raw)
-        if match is None:
+        split = _measurement(raw)
+        if split is None:
             self.note(
                 where, f"{label} is not a number with a unit after it, and is left out.", "dropped",
                 code="not_a_number", member=path,
             )
             return None
-        found = match.group("unit") or ""
+        number, found = split
         if found != unit:
             self.note(
                 where,
@@ -294,7 +330,7 @@ class _Converter:
             return None
         # `UNITS[unit]` on a unit this module never registered is a `KeyError`, which is the
         # point: it is this adapter asking for a scale nothing defines, not a source defect.
-        value = UNITS[unit](match.group("number"))
+        value = UNITS[unit](number)
         if value is None:
             self.note(
                 where,
