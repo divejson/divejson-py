@@ -17,6 +17,7 @@ import pytest
 
 from divejson import ConverterError, DoctypeRefusedError, UddfError
 from divejson.uddf import MalformedUddfError
+from divejson import xmlsource
 from divejson.xmlsource import attribute, child, children, parse_xml, root_name, text
 
 # -- the parse target -----------------------------------------------------------------
@@ -39,6 +40,50 @@ def test_a_doctype_refusal_is_not_any_one_formats_error() -> None:
         parse_xml(b'<!DOCTYPE uddf><uddf/>', root="uddf", malformed=MalformedUddfError)
     assert isinstance(raised.value, ConverterError)
     assert not isinstance(raised.value, UddfError)
+
+
+HOSTILE = '<!DOCTYPE uddf [<!ENTITY a "aaaaaaaaaa">]><uddf>' + "&a;" * 100_000 + "</uddf>"
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        HOSTILE.encode(),
+        b"\xef\xbb\xbf" + HOSTILE.encode(),
+        ('<?xml version="1.0"?>\n<?generator x?><!-- a comment -->\n' + HOSTILE).encode(),
+        HOSTILE.encode("utf-16"),
+        HOSTILE.encode("utf-16-le"),  # expat reads UTF-16 with no byte-order mark too
+        HOSTILE.encode("utf-16-be"),
+    ],
+    ids=["utf-8", "byte-order mark", "after a declaration, instruction and comment", "utf-16", "utf-16le", "utf-16be"],
+)
+def test_a_doctype_is_refused_before_expat_reads_a_byte(data: bytes, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Expat raises the target's refusal only once it has parsed the buffer that carried
+    it, entity references and all — so the declaration is found before anything is fed."""
+
+    class Unfed(ET.XMLParser):
+        def feed(self, data: bytes | str) -> None:
+            raise AssertionError("expat was fed a document that declares a DOCTYPE")
+
+    monkeypatch.setattr(xmlsource.ET, "XMLParser", Unfed)
+    with pytest.raises(DoctypeRefusedError, match="<!DOCTYPE uddf>"):
+        parse_xml(data, root="uddf", malformed=MalformedUddfError)
+
+
+def test_a_document_is_fed_to_expat_in_pieces(monkeypatch: pytest.MonkeyPatch) -> None:
+    """So the target's own refusal, there for an encoding the prolog scan misreads, stops
+    the parse within a piece of the declaration."""
+    fed: list[int] = []
+
+    class Counted(ET.XMLParser):
+        def feed(self, data: bytes | str) -> None:
+            fed.append(len(data))
+            super().feed(data)
+
+    monkeypatch.setattr(xmlsource.ET, "XMLParser", Counted)
+    data = b"<uddf>" + b"<a/>" * xmlsource._CHUNK + b"</uddf>"
+    assert len(parse_xml(data, root="uddf", malformed=MalformedUddfError)) == xmlsource._CHUNK
+    assert sum(fed) == len(data) and max(fed) == xmlsource._CHUNK
 
 
 # -- the accessors --------------------------------------------------------------------
@@ -100,6 +145,8 @@ def test_a_comment_is_not_a_child_with_a_name() -> None:
         (b"<!DOCTYPE uddf [<!ENTITY a \"b\">]>\n<uddf>", "uddf"),  # skipped, not refused
         (b'<x:uddf xmlns:x="urn:x">', "uddf"),  # a prefixed root is still that root
         ('<uddf/>'.encode("utf-16"), "uddf"),
+        ('<uddf/>'.encode("utf-16-le"), "uddf"),
+        ('<uddf/>'.encode("utf-16-be"), "uddf"),
         (b"", None),
         (b"{}", None),
         (b"this is not XML at all", None),

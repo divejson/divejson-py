@@ -21,10 +21,13 @@ metric scale, which is what the last group below is about.
 
 from __future__ import annotations
 
+import time
+
 import pytest
 from helpers import FIXTURES, one_ssrf_computer, one_ssrf_dive, profile_of
 
 from divejson import convert
+from divejson.ssrf import _clock
 
 
 def one(attributes: str = "", body: str = "") -> dict:
@@ -115,16 +118,17 @@ def test_a_samples_clock_is_the_same_seconds_on_a_millisecond_axis(written: str,
 def test_a_clock_too_large_for_the_axis_is_not_a_time() -> None:
     """Minutes that clear `decimal_of`'s bound still take two factors to reach the axis —
     sixty, then a thousand — so the product is bounded too, and a sample the axis could not
-    carry as a double is dropped rather than written as a number no reader can read back."""
+    carry as a double is dropped rather than written as a number no reader can read back.
+
+    A measurement that long is refused for its length before the clock is read, so the
+    product's own bound is held to `_clock` directly."""
     minutes = "9" * 305
+    assert _clock(f"{minutes}:00") is None
     samples = f"<sample time='0:10 min' depth='1.0 m'/><sample time='{minutes}:00 min' depth='2.0 m'/>"
     conversion = convert(one_ssrf_computer(samples))
     depth = profile_of(conversion.document["dives"][0])["depth"]
     assert depth == {"times": [10_000], "values": [100]}
-    assert any(
-        "<sample time> is recorded in min with something that is not a number" in note.message
-        for note in conversion.notes
-    )
+    assert any(note.code == "not_a_number" and note.message.startswith("<sample time>") for note in conversion.notes)
 
 
 @pytest.mark.parametrize("written", ["66", "66:5", "1:60", "66:50:00", "1.5", "66m50s"])
@@ -191,6 +195,17 @@ def test_a_unit_the_table_does_not_carry_is_dropped_rather_than_guessed(attribut
     conversion = convert(one_ssrf_dive(f"{attribute}='{written}'"))
     assert set(conversion.document["dives"][0]) == {"uuid", "started_at"}
     assert any(note.code == "unit_unexpected" for note in conversion.notes)
+
+
+@pytest.mark.parametrize("written", ["a" * 1_000_000 + "!", "1" * 1_000_000, "1 " + "m" * 1_000_000])
+def test_a_measurement_too_long_to_be_one_is_dropped_in_linear_time(written: str) -> None:
+    """A long run of letters is where splitting off the unit used to take quadratic time."""
+    data = one_ssrf_dive(f"otu='{written}'")
+    started = time.perf_counter()
+    conversion = convert(data)
+    assert time.perf_counter() - started < 1
+    assert "otu_end" not in conversion.document["dives"][0]
+    assert any(note.code == "not_a_number" for note in conversion.notes)
 
 
 def test_a_whole_file_in_one_unrecognised_unit_reports_one_line_per_member() -> None:

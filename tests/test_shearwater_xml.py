@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import time
 import xml.etree.ElementTree as ET
 
 import pytest
@@ -185,6 +186,13 @@ def test_the_export_is_claimed_and_the_dm5_root_is_not() -> None:
 )
 def test_a_dive_root_without_the_exports_shape_is_not_claimed(head) -> None:
     assert sniff(head) is None
+
+
+def test_a_head_of_unclosed_start_tags_is_sniffed_in_linear_time() -> None:
+    head = b"<dive " * 200_000
+    started = time.perf_counter()
+    assert sniff(head) is None
+    assert time.perf_counter() - started < 1
 
 
 def test_a_declaration_that_tells_the_truth_reads_too() -> None:

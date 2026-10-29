@@ -92,8 +92,10 @@ ROOT = "dive"
 
 # The root's start tag and the first child the sniff asks for. `<dive>` is a name the DM5
 # export's root has too, there in a datacontract namespace; this root declares none of its
-# own and carries a `version`, and its first element child is `<diveLog>`.
-_START_TAG = re.compile(r"<(?:[\w.-]+:)?dive(\s[^>]*)?>", re.IGNORECASE)
+# own and carries a `version`, and its first element child is `<diveLog>`. The attributes
+# stop at a `<` as well as a `>`, which no start tag can hold, so a search tried at every
+# `<dive` reads each stretch of the head once rather than once per tag.
+_START_TAG = re.compile(r"<(?:[\w.-]+:)?dive(\s[^<>]*)?>", re.IGNORECASE)
 _DEFAULT_NAMESPACE = re.compile(r"\sxmlns\s*=")
 _VERSION = re.compile(r"\sversion\s*=")
 _DIVE_LOG = re.compile(r"<(?:[\w.-]+:)?diveLog[\s/>]")

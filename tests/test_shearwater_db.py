@@ -10,6 +10,7 @@ from __future__ import annotations
 import io
 import json
 import sqlite3
+import time
 import uuid
 import zipfile
 
@@ -473,6 +474,17 @@ def test_a_value_the_file_does_not_state_the_meaning_of_is_reported_quoted(colum
 def test_a_figure_with_its_unit_reads() -> None:
     [dive] = _dives(_logbook({"Visibility": "12.5", "AirTemperature": "-3.5C"}))
     assert (dive["visibility"], dive["air_temperature"]) == (12.5, -3.5)
+
+
+@pytest.mark.parametrize("typed", ["1" * 1_000_000 + " x\nx", "1" * 1_000_000])
+def test_a_figure_too_long_to_be_one_is_not_a_number_in_linear_time(typed: str) -> None:
+    """A long number followed by a line break is where reading a figure used to take quadratic time."""
+    data = _logbook({"Visibility": typed})
+    started = time.perf_counter()
+    conversion = _conversion(data)
+    assert time.perf_counter() - started < 1
+    assert "visibility" not in conversion.document["dives"][0]
+    assert "not_a_number" in _codes(conversion)
 
 
 def test_a_column_no_file_has_filled_waits_and_says_so_by_name() -> None:

@@ -10,9 +10,10 @@ document type declaration. `ElementTree` blocks external entities on its own but
 entity *amplification* only in recent libexpat — a several hundredfold blowup still parses
 on older ones, and that is a library-version property rather than a guarantee this
 package's `>=3.11` floor can make. Refusing the declaration is the guarantee, and it costs
-nothing real. Raising from the target's `doctype` hook aborts before expat has expanded a
-single entity reference in the content, which is what makes this a bound on amplification
-rather than a check performed after the damage.
+nothing real. The prolog is scanned for one before expat is handed a byte, so nothing is
+expanded at all: a refusal raised from expat's own `doctype` hook surfaces only once the
+buffer that carried it has been parsed to its end, entity references included. That hook
+stays, behind input fed in `_CHUNK`-sized pieces, for an encoding the scan misreads.
 
 **A tag is matched on its lowercased local name.** UDDF alone appears under four root
 shapes — two namespaces, no namespace at all, and an uppercase `<UDDF>` for 2.x — and
@@ -45,6 +46,11 @@ __all__ = [
 ]
 
 _NAME = re.compile(r"[^\s/>]+")
+_DOCTYPE = re.compile(r"<!DOCTYPE\s+([^\s\[>]+)")
+
+# What expat is fed at a time, so that a refusal from the `doctype` hook stops the parse
+# within one piece of the declaration rather than at the end of the document.
+_CHUNK = 64 * 1024
 
 
 class DoctypeRefusingTarget(ET.TreeBuilder):
@@ -56,10 +62,14 @@ class DoctypeRefusingTarget(ET.TreeBuilder):
     """
 
     def doctype(self, name: str, pubid: str | None, system: str | None) -> None:
-        raise DoctypeRefusedError(
-            f"the file declares <!DOCTYPE {name}>, and a file that declares a document type is not read, since one "
-            "can pull in content from outside the file"
-        )
+        raise _refused(name)
+
+
+def _refused(name: str) -> DoctypeRefusedError:
+    return DoctypeRefusedError(
+        f"the file declares <!DOCTYPE {name}>, and a file that declares a document type is not read, since one "
+        "can pull in content from outside the file"
+    )
 
 
 def local_name(element: ET.Element) -> str:
@@ -131,9 +141,15 @@ def parse_xml(data: bytes, *, root: str, malformed: type[ConverterError]) -> ET.
     catching one format's errors still catches this one. A `<!DOCTYPE>` raises
     `DoctypeRefusedError` regardless, which is not any one format's refusal.
     """
+    prolog = _decoded(data)
+    position = _markup(prolog, 0)
+    declaration = _DOCTYPE.match(prolog, position) if position >= 0 else None
+    if declaration is not None:
+        raise _refused(declaration[1])
     parser = ET.XMLParser(target=DoctypeRefusingTarget())
     try:
-        parser.feed(data)
+        for start in range(0, len(data), _CHUNK):
+            parser.feed(data[start : start + _CHUNK])
         found = parser.close()
     except DoctypeRefusedError:
         raise
@@ -154,36 +170,56 @@ def root_name(head: bytes) -> str | None:
     rather than refused here; refusing it is the *reader's* job, and a sniffer that raised
     would turn a hostile file into an error before anything had decided to read it.
 
-    UTF-16 is decoded from its byte-order mark because Windows tools emit it; anything else
-    is read as Latin-1, which never fails and is exactly right for the ASCII markup that
-    precedes a root element whatever the declared encoding is.
+    The bytes are decoded as `_decoded` decodes them.
     """
-    if head[:2] in (b"\xff\xfe", b"\xfe\xff"):
-        text = head.decode("utf-16", errors="replace")
-    else:
-        text = head.removeprefix(b"\xef\xbb\xbf").decode("latin-1")
-
+    text = _decoded(head)
     position = 0
+    while True:
+        position = _markup(text, position)
+        if position < 0:
+            return None
+        if text.startswith("<!", position):
+            position = _past_declaration(text, position)
+            if position < 0:
+                return None
+            continue
+        match = _NAME.match(text, position + 1)
+        return match.group().rpartition(":")[2].lower() if match else None
+
+
+def _decoded(data: bytes) -> str:
+    """XML bytes as text good enough to walk the markup before the root element.
+
+    UTF-16 is recognised as expat recognises it — from a byte-order mark, which Windows
+    tools emit, or from a zero byte in the first two, which is how a `<` opens a UTF-16
+    file that has none. Anything else is read as Latin-1, which never fails and is exactly
+    right for the ASCII markup that precedes a root element whatever the declared encoding is.
+    """
+    if data[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        return data.decode("utf-16", errors="replace")
+    if data[:1] == b"\x00":
+        return data.decode("utf-16-be", errors="replace")
+    if data[1:2] == b"\x00":
+        return data.decode("utf-16-le", errors="replace")
+    return data.removeprefix(b"\xef\xbb\xbf").decode("latin-1")
+
+
+def _markup(text: str, position: int) -> int:
+    """The offset of the next `<` from `position` that opens neither a processing
+    instruction nor a comment — a declaration or an element — or -1."""
     while True:
         position = text.find("<", position)
         if position < 0:
-            return None
-        rest = text[position:]
+            return -1
         for opening, closing in (("<?", "?>"), ("<!--", "-->")):
-            if rest.startswith(opening):
+            if text.startswith(opening, position):
                 end = text.find(closing, position + len(opening))
                 if end < 0:
-                    return None
+                    return -1
                 position = end + len(closing)
                 break
         else:
-            if rest.startswith("<!"):
-                position = _past_declaration(text, position)
-                if position < 0:
-                    return None
-                continue
-            match = _NAME.match(text, position + 1)
-            return match.group().rpartition(":")[2].lower() if match else None
+            return position
 
 
 def _past_declaration(text: str, position: int) -> int:

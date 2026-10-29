@@ -7,6 +7,17 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Reading a measurement takes linear time in every reader.** Subsurface's measured
+  attributes and the figures typed into a Shearwater Cloud logbook were split with patterns
+  that backtrack quadratically on a long run of letters or digits; both are now scanned
+  without backtracking, and a value over 64 characters is not a number and is dropped and
+  reported as one. The Shearwater Cloud XML sniff's start-tag pattern is linear too.
+- **A `<!DOCTYPE>` is refused before the parser reads anything.** The refusal used to come
+  from the parser's own hook, which surfaces only after the whole buffer has been parsed —
+  entity references in the content included. The prolog is now scanned first, and the
+  document is fed in 64 KiB pieces behind it. The scan, like the sniff's `root_name`, reads
+  UTF-16 without a byte-order mark, as the parser does.
+
 ## 0.35.0
 
 - **The readers carry the diver's heart rate, and the UDDF writer sends it back as a pulse
