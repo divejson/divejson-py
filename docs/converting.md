@@ -81,11 +81,14 @@ XML parser blocks external entities on its own, but it caps entity *amplificatio
 recent versions of the underlying library — a several-hundredfold blowup still parses on
 older ones, and that is a property of the library version rather than a guarantee the
 language makes. Refusing the declaration is the guarantee, it costs nothing real, and it
-saves taking on a hardening dependency for something one hook already settles.
+saves taking on a hardening dependency for something one check already settles.
 
-The refusal fires from the parser's doctype hook, which runs before a single entity
-reference in the content has been expanded. Every XML adapter shares one parse target, so
-the refusal is written once rather than per format.
+The refusal happens before the parser reads anything: the prolog is scanned for a
+declaration first, and a document that carries one is never handed to the parser at all. A
+refusal raised from inside the parser comes too late to bound anything, since a parser may
+report the declaration only once it has worked through the input that carried it, entity
+references included. Every XML adapter reads through one entry point, so the refusal is
+written once rather than per format.
 
 ## Units and arithmetic
 
