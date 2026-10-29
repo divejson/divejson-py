@@ -49,7 +49,8 @@ namespace and no uppercase dialect that needs it, and it costs nothing to inheri
 ### A `<!DOCTYPE>` is refused outright
 
 Subsurface has no legitimate use for a document type declaration. The refusal and its
-reasoning are `converting.md`'s, and this reader shares the parse target that carries it.
+reasoning are `converting.md`'s, and this reader parses through the entry point that carries
+it.
 
 ### Every measurement carries its unit, and an unknown one is refused
 
