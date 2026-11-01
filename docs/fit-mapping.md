@@ -525,8 +525,9 @@ because the two files do, and this one states nothing the rule could act on.
 
 ### Events — `event` (21)
 
-Events retain their own elapsed timestamps within the recorded sample span. They do not
-need a sample at the same instant. Events outside that span are still reported and dropped.
+Events retain their own nonnegative elapsed timestamps, including before the first sample
+or after the last. They do not need a sample at the same instant and do not extend the
+profile's duration. Events before the recording began are reported and dropped.
 
 | `event` (0) | into |
 | --- | --- |
@@ -633,5 +634,5 @@ after the samples keep their existing multi-session boundary.
 A privately supplied Descent export reproduces the summary-first ordering. It carries
 3,267 depth and temperature records, air and 50% oxygen gases, a decompression ceiling,
 and the computed `ndl_time`, `time_to_surface`, `po2` and `cns_load` channels. These map
-to `ndl` and `tts` in seconds, `ppo2` in hundredths of a bar and `cns` in percent.
+to `ndl` and `tts` in seconds, `ppo2` in hundredths of a bar and `cns` in tenths of a percent.
 Zero readings remain readings; invalid FIT sentinels remain absent.

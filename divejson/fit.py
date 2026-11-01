@@ -1527,12 +1527,13 @@ class _Converter:
             for name, channel in computed.items():
                 value = getattr(point, name)
                 if value is not None and value >= 0:
-                    channel.record(at, rounded(value * (100 if name == "ppo2" else 1)))
+                    scale = {"ppo2": 100, "cns": TENTHS_PER_UNIT}.get(name, 1)
+                    channel.record(at, rounded(value * scale))
             for sensor, bar in point.pressures.items():
                 if sensor in pressures and 0 <= bar <= MAX_CYLINDER_PRESSURE:
                     pressures[sensor].record(at, rounded(bar * TENTHS_PER_UNIT))
 
-        events = self.read_events(samples, where)
+        events = self.read_events(where)
         numbered = [(number, pressures[sensor]) for number, sensor in enumerate(sensors) if sensor in pressures]
         profile = samples.profile(
             {
@@ -1553,7 +1554,7 @@ class _Converter:
                 cylinder["gas_number"] = number
         return profile
 
-    def read_events(self, samples: SampleAxis, where: str) -> list[dict[str, Any]]:
+    def read_events(self, where: str) -> list[dict[str, Any]]:
         """The `event` messages that describe the dive, as §6.5 events.
 
         The one that needs work is `dive_gas_switched`, whose `data` field holds the
@@ -1577,7 +1578,6 @@ class _Converter:
             for number, index in enumerate(_native_raw(gas, "message_index") for gas in self.gases)
             if isinstance(index, int) and not isinstance(index, bool)
         }
-        ordered = samples.ordered()
         start = _native(self.scan.session, "start_time")
         origin = start if isinstance(start, datetime) else min(self.scan.points, default=None)
 
@@ -1593,11 +1593,10 @@ class _Converter:
             if not isinstance(at, datetime):
                 continue
             placed = milliseconds(Decimal(str((at - origin).total_seconds()))) if origin is not None else None
-            if placed is None or not ordered or not ordered[0][0] <= placed <= ordered[-1][0]:
+            if placed is None or placed < 0:
                 self.note(
                     where,
-                    "An event is recorded at an instant the dive's profile does not reach, so it has no place in "
-                    "it and is left out.",
+                    "An event has no recording time origin or occurs before the recording began, so it is left out.",
                     "dropped",
                     code="event_outside_profile",
                     member=f"{RECORDING}/profile/events",

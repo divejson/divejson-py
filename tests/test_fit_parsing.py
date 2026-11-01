@@ -866,15 +866,34 @@ def test_events_between_samples_keep_their_original_timestamps() -> None:
     assert "event_outside_profile" not in _codes(conversion, "dropped")
 
 
-def test_an_event_at_an_instant_the_samples_do_not_reach_is_dropped() -> None:
+@pytest.mark.parametrize("event_time", [10, 999])
+def test_events_outside_the_sample_span_keep_their_timestamps(event_time: int) -> None:
     data = dive_file(
-        _at(0, depth=30.0),
+        _at(20, depth=30.0),
         _at(60, depth=6.0),
-        _event(999, "user_marker"),
+        _event(event_time, "user_marker"),
         session={"total_elapsed_time": 60.0},
     )
     conversion = _run(data)
-    assert "events" not in profile_of(conversion.document["dives"][0])
+    profile = profile_of(conversion.document["dives"][0])
+    assert profile is not None
+    assert profile["events"] == [{"time": event_time * 1000, "type": "bookmark"}]
+    assert profile["duration"] == 60_000
+    assert profile["depth"]["times"] == [20_000, 60_000]
+    assert "event_outside_profile" not in _codes(conversion, "dropped")
+
+
+def test_an_event_before_the_recording_start_is_dropped() -> None:
+    data = dive_file(
+        _at(0, depth=30.0),
+        _at(60, depth=6.0),
+        _event(-1, "user_marker"),
+        session={"total_elapsed_time": 60.0},
+    )
+    conversion = _run(data)
+    profile = profile_of(conversion.document["dives"][0])
+    assert profile is not None
+    assert "events" not in profile
     assert "event_outside_profile" in _codes(conversion, "dropped")
 
 
@@ -1182,9 +1201,10 @@ def test_garmin_connect_samples_and_gases_survive_summary_order(summary_first):
     dive = _dive(data)
     assert dive["cylinders"][0]["oxygen"] == 21.0
     profile = profile_of(dive)
+    assert profile is not None
     assert profile["depth"]["values"] == [200, 2000]
     assert profile["temperature"]["values"] == [2200, 500]
     assert profile["ndl"]["values"] == [0, 120]
     assert profile["tts"]["values"] == [8, 60]
     assert profile["ppo2"]["values"] == [23, 63]
-    assert profile["cns"]["values"] == [0, 11]
+    assert profile["cns"]["values"] == [0, 110]
