@@ -631,8 +631,6 @@ Garmin Connect can place `session` before the sample stream. The reader detects 
 ordering and retains the following records and gases. Device exports with the summary
 after the samples keep their existing multi-session boundary.
 
-A privately supplied Descent export reproduces the summary-first ordering. It carries
-3,267 depth and temperature records, air and 50% oxygen gases, a decompression ceiling,
-and the computed `ndl_time`, `time_to_surface`, `po2` and `cns_load` channels. These map
+The native `ndl_time`, `time_to_surface`, `po2` and `cns_load` channels map
 to `ndl` and `tts` in seconds, `ppo2` in hundredths of a bar and `cns` in tenths of a percent.
 Zero readings remain readings; invalid FIT sentinels remain absent.
