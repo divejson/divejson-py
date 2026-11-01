@@ -525,6 +525,9 @@ because the two files do, and this one states nothing the rule could act on.
 
 ### Events — `event` (21)
 
+Events retain their own elapsed timestamps within the recorded sample span. They do not
+need a sample at the same instant. Events outside that span are still reported and dropped.
+
 | `event` (0) | into |
 | --- | --- |
 | `dive_gas_switched` | `gas_switch` **untested** |
@@ -600,18 +603,8 @@ which the `extensions.divejson.inferred` list is ever written.
 - **`record.vertical_speed`, `distance`, `speed`, `altitude`, `n2_load`,
   `absolute_pressure`** — §6.5 fixes the channels a profile carries, and none of these is one
   of them.
-- **`record.ndl_time`, `time_to_surface`, `cns_load`, `po2` and `next_stop_time`, and
-  `session.sub_sport`** — §6.4 now has a channel for the first four and §6.4a a `mode` the
-  last would fill, and all six stay unmapped for a different reason: **no file in hand writes
-  any of them.** Every FIT recording in `fixtures/fit/` carries `record` messages with
-  every one of these fields empty, and a mapping written against a profile listing rather than
-  a dive is the speculation this format's core rule exists to keep out. Each lands the day a
-  file arrives that has it. `gps_accuracy` is read under *Positions* although no file writes
-  it either, and is not this case: it maps onto no member, so reading it adds nothing to a
-  document, and it feeds a rule `converting.md` states for every format, which a FIT file that
-  states it should get as a Suunto app export does. `next_stop_time` appears above under *The
-  ceiling*, as the field a reader must not mistake for a ceiling; that warning stands either
-  way.
+- **`record.next_stop_time` and `session.sub_sport`** remain unmapped. The stop
+  duration is not a ceiling depth; the activity sub-sport is not the breathing mode.
 - **`dive_settings.repeat_dive_interval` (17)** — "Time between surfacing and ending the
   activity": the end-of-dive delay that keeps a session running at the surface. The
   derivation needs no setting, and no file in hand states one.
@@ -630,3 +623,15 @@ which the `extensions.divejson.inferred` list is ever written.
 input, and the document a correct reader produces from it. What each one covers, and how it
 was built, is one row per pair in [`fixtures/README.md`](../fixtures/README.md#fit); the
 rules those expectations follow are this document and [`converting.md`](converting.md).
+
+## Garmin Connect summary-first exports
+
+Garmin Connect can place `session` before the sample stream. The reader detects this
+ordering and retains the following records and gases. Device exports with the summary
+after the samples keep their existing multi-session boundary.
+
+A privately supplied Descent export reproduces the summary-first ordering. It carries
+3,267 depth and temperature records, air and 50% oxygen gases, a decompression ceiling,
+and the computed `ndl_time`, `time_to_surface`, `po2` and `cns_load` channels. These map
+to `ndl` and `tts` in seconds, `ppo2` in hundredths of a bar and `cns` in percent.
+Zero readings remain readings; invalid FIT sentinels remain absent.
