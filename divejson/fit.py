@@ -339,10 +339,6 @@ class _Point:
     ceiling: Decimal | None = None
     temperature: Decimal | None = None
     heart_rate: Decimal | None = None
-    ndl: Decimal | None = None
-    tts: Decimal | None = None
-    ppo2: Decimal | None = None
-    cns: Decimal | None = None
     latitude: Decimal | None = None
     longitude: Decimal | None = None
     # `gps_accuracy`, the receiver's stated horizontal error in metres, off the `record`
@@ -365,7 +361,6 @@ class _Scan:
     file_id: fitdecode.FitDataMessage | None = None
     session: fitdecode.FitDataMessage | None = None
     sessions: int = 0
-    summary_first: bool = False
     activity: fitdecode.FitDataMessage | None = None
     settings: fitdecode.FitDataMessage | None = None
     summaries: list[fitdecode.FitDataMessage] = field(default_factory=list)
@@ -425,15 +420,20 @@ def _scan(data: bytes) -> _Scan:
 def _collect(scan: _Scan, frame: fitdecode.FitDataMessage) -> None:
     """Route one decoded message into the scan.
 
-    Device streams put the session after its samples; Garmin Connect exports put it
-    before them. Detect that ordering before applying the multi-session boundary.
+    **Samples stop at the first `session`.** A FIT file writes its summary after the
+    samples it summarises, so anything following the first `session` belongs to a second
+    dive — and a `dive_gas` carries no timestamp to filter on, so the cut is positional.
+    The dive that a second `session` describes is reported rather than converted; see
+    `_Converter.read_dive`.
+
+    `dive_summary` and `tank_summary` sit **above** that cut, because both are written
+    after the session they describe and gating them on it would discard every one. They
+    are bounded at the second session instead.
     """
     name = frame.name
     if name == "file_id":
         scan.file_id = scan.file_id or frame
     elif name == "session":
-        if scan.sessions == 0:
-            scan.summary_first = not (scan.points or scan.gases or scan.events)
         scan.sessions += 1
         scan.session = scan.session or frame
     elif name == "activity":
@@ -449,7 +449,7 @@ def _collect(scan: _Scan, frame: fitdecode.FitDataMessage) -> None:
     elif name == "tank_summary":
         if scan.sessions < 2:
             scan.tanks.append(frame)
-    elif scan.sessions >= 2 or (scan.session is not None and not scan.summary_first):
+    elif scan.session is not None:
         return
     elif name == "dive_gas":
         scan.gases.append(frame)
@@ -506,13 +506,6 @@ def _collect_record(scan: _Scan, frame: fitdecode.FitDataMessage) -> None:
     _set(scan, point, "temperature", _number(_native(frame, "temperature")))
     # Beats per minute already, which is the channel's unit.
     _set(scan, point, "heart_rate", _number(_native(frame, "heart_rate")))
-    for channel, source in (
-        ("ndl", "ndl_time"),
-        ("tts", "time_to_surface"),
-        ("ppo2", "po2"),
-        ("cns", "cns_load"),
-    ):
-        _set(scan, point, channel, _number(_native(frame, source)))
     unfixed = point.latitude is None
     _set(scan, point, "latitude", _degrees(_native(frame, "position_lat")))
     _set(scan, point, "longitude", _degrees(_native(frame, "position_long")))
@@ -1459,6 +1452,11 @@ class _Converter:
 
     # -- the profile -------------------------------------------------------------
 
+    def time_origin(self) -> datetime | None:
+        """The shared origin for elapsed sample and event timestamps."""
+        start = _native(self.scan.session, "start_time")
+        return start if isinstance(start, datetime) else min(self.scan.points, default=None)
+
     def axis(self, where: str) -> SampleAxis:
         """The dive's time axis, offered every instant the file recorded a reading at.
 
@@ -1481,11 +1479,10 @@ class _Converter:
                 code="readings_at_one_instant",
                 member=f"{RECORDING}/profile",
             )
-        if not self.scan.points:
+        origin = self.time_origin()
+        if origin is None:
             return axis
 
-        start = _native(self.scan.session, "start_time")
-        origin = start if isinstance(start, datetime) else min(self.scan.points)
         for at, point in self.scan.points.items():
             axis.offer(milliseconds(Decimal(str((at - origin).total_seconds()))), point)
         return axis
@@ -1513,7 +1510,6 @@ class _Converter:
         ceiling = Channel("ceiling")
         temperature = Channel("temperature")
         heart_rate = Channel("heart_rate")
-        computed = {name: Channel(name) for name in ("ndl", "tts", "ppo2", "cns")}
         pressures = {sensor: Channel("pressures") for sensor in sensors}
         for at, point in samples.ordered():
             if point.depth is not None:
@@ -1524,11 +1520,6 @@ class _Converter:
                 temperature.record(at, rounded(point.temperature * HUNDREDTHS_PER_DEGREE))
             if point.heart_rate is not None:
                 heart_rate.record(at, rounded(point.heart_rate))
-            for name, channel in computed.items():
-                value = getattr(point, name)
-                if value is not None and value >= 0:
-                    scale = {"ppo2": 100, "cns": TENTHS_PER_UNIT}.get(name, 1)
-                    channel.record(at, rounded(value * scale))
             for sensor, bar in point.pressures.items():
                 if sensor in pressures and 0 <= bar <= MAX_CYLINDER_PRESSURE:
                     pressures[sensor].record(at, rounded(bar * TENTHS_PER_UNIT))
@@ -1536,13 +1527,7 @@ class _Converter:
         events = self.read_events(where)
         numbered = [(number, pressures[sensor]) for number, sensor in enumerate(sensors) if sensor in pressures]
         profile = samples.profile(
-            {
-                "depth": depth,
-                "ceiling": ceiling,
-                "temperature": temperature,
-                "heart_rate": heart_rate,
-                **computed,
-            },
+            {"depth": depth, "ceiling": ceiling, "temperature": temperature, "heart_rate": heart_rate},
             pressures=numbered,
             events=events,
         )
@@ -1578,8 +1563,7 @@ class _Converter:
             for number, index in enumerate(_native_raw(gas, "message_index") for gas in self.gases)
             if isinstance(index, int) and not isinstance(index, bool)
         }
-        start = _native(self.scan.session, "start_time")
-        origin = start if isinstance(start, datetime) else min(self.scan.points, default=None)
+        origin = self.time_origin()
 
         events: list[dict[str, Any]] = []
         for frame in self.scan.events:

@@ -857,6 +857,7 @@ def test_events_between_samples_keep_their_original_timestamps() -> None:
     )
     conversion = _run(data)
     profile = profile_of(conversion.document["dives"][0])
+    assert profile is not None
     assert profile["events"] == [
         {"time": 29_000, "type": "gas_switch", "gas_number": 1},
         {"time": 29_000, "label": "ndl_reached"},
@@ -866,7 +867,7 @@ def test_events_between_samples_keep_their_original_timestamps() -> None:
     assert "event_outside_profile" not in _codes(conversion, "dropped")
 
 
-@pytest.mark.parametrize("event_time", [10, 999])
+@pytest.mark.parametrize("event_time", [0, 10, 999])
 def test_events_outside_the_sample_span_keep_their_timestamps(event_time: int) -> None:
     data = dive_file(
         _at(20, depth=30.0),
@@ -881,6 +882,25 @@ def test_events_outside_the_sample_span_keep_their_timestamps(event_time: int) -
     assert profile["duration"] == 60_000
     assert profile["depth"]["times"] == [20_000, 60_000]
     assert "event_outside_profile" not in _codes(conversion, "dropped")
+
+
+@pytest.mark.parametrize("session_offset", [0, 10])
+def test_events_and_samples_share_the_session_start_time(session_offset: int) -> None:
+    data = dive_file(
+        _at(20, depth=30.0),
+        _at(60, depth=6.0),
+        _event(30, "user_marker"),
+        session={
+            "start_time": STARTED_AT + timedelta(seconds=session_offset),
+            "total_elapsed_time": 60.0,
+        },
+    )
+    conversion = _run(data)
+    profile = profile_of(conversion.document["dives"][0])
+    assert profile is not None
+    assert profile["events"] == [{"time": (30 - session_offset) * 1000, "type": "bookmark"}]
+    assert profile["depth"]["times"] == [(20 - session_offset) * 1000, (60 - session_offset) * 1000]
+    assert profile["duration"] == (60 - session_offset) * 1000
 
 
 def test_an_event_before_the_recording_start_is_dropped() -> None:
@@ -1168,43 +1188,3 @@ def test_its_oxygen_clock_alone_is_a_recording() -> None:
         message("session", sport="diving", start_time=STARTED_AT, total_elapsed_time=60.0, end_cns=20),
     )
     assert _dive(data)["recordings"] == [{"cns_end": 20.0}]
-
-
-@pytest.mark.parametrize("summary_first", [False, True])
-def test_garmin_connect_samples_and_gases_survive_summary_order(summary_first):
-    summary = message("session", sport="diving", start_time=STARTED_AT, total_elapsed_time=60.0)
-    samples = [
-        _gas(0, 21),
-        _at(
-            0,
-            depth=2.0,
-            temperature=22,
-            ndl_time=0,
-            time_to_surface=8,
-            po2=0.23,
-            cns_load=0,
-        ),
-        _at(
-            30,
-            depth=20.0,
-            temperature=5,
-            ndl_time=120,
-            time_to_surface=60,
-            po2=0.63,
-            cns_load=11,
-        ),
-    ]
-    data = fit_file(
-        message("file_id", type="activity", manufacturer="garmin"),
-        *([summary, *samples] if summary_first else [*samples, summary]),
-    )
-    dive = _dive(data)
-    assert dive["cylinders"][0]["oxygen"] == 21.0
-    profile = profile_of(dive)
-    assert profile is not None
-    assert profile["depth"]["values"] == [200, 2000]
-    assert profile["temperature"]["values"] == [2200, 500]
-    assert profile["ndl"]["values"] == [0, 120]
-    assert profile["tts"]["values"] == [8, 60]
-    assert profile["ppo2"]["values"] == [23, 63]
-    assert profile["cns"]["values"] == [0, 110]
