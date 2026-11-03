@@ -110,6 +110,18 @@ _READING_LABELS: dict[str, str] = {
     "ceiling": "decompression ceiling",
     "temperature": "water temperature",
     "heart_rate": "heart rate",
+    "ndl": "no-decompression time",
+    "tts": "time to surface",
+    "ppo2": "ppO₂ reading",
+    "cns": "CNS reading",
+}
+
+HUNDREDTHS_PER_BAR = 100
+SAMPLED_READOUTS: dict[str, tuple[str, int]] = {
+    "ndl": ("ndl_time", 1),
+    "tts": ("time_to_surface", 1),
+    "ppo2": ("po2", HUNDREDTHS_PER_BAR),
+    "cns": ("cns_load", TENTHS_PER_UNIT),
 }
 
 # uuid5(NAMESPACE_URL, "https://divejson.org/ns/fit"). Fixed forever: changing it would
@@ -328,17 +340,17 @@ class _Point:
     `tank_update` at one timestamp are one sample rather than two, the later of which the
     axis would drop.
 
-    `eq=False` so a point stays hashable and compares by identity. A dataclass that
-    generates `__eq__` sets `__hash__` to `None`, and these are used as dictionary keys —
-    an event finds its place by looking its own instant's point up in the axis. Identity
-    is also the comparison that means anything here: two instants that happened to record
-    the same depth are still two samples.
+    `eq=False` keeps points distinct when two instants happen to record the same readings.
     """
 
     depth: Decimal | None = None
     ceiling: Decimal | None = None
     temperature: Decimal | None = None
     heart_rate: Decimal | None = None
+    ndl: Decimal | None = None
+    tts: Decimal | None = None
+    ppo2: Decimal | None = None
+    cns: Decimal | None = None
     latitude: Decimal | None = None
     longitude: Decimal | None = None
     # `gps_accuracy`, the receiver's stated horizontal error in metres, off the `record`
@@ -351,16 +363,16 @@ class _Point:
 class _Scan:
     """Everything one pass over a FIT file keeps.
 
-    A FIT file is a stream whose summary messages come *after* the samples they summarise,
-    so there is no cheap way to read a header: the file is decoded once and this is what
-    survives it. Summaries are kept as frames, of which there are a handful; the sample
-    stream is reduced to `_Point`s as it goes past.
+    Summaries can precede or follow the samples, so the file is decoded once and this is
+    what survives it. Summaries are kept as frames; the sample stream is reduced to
+    `_Point`s as it goes past.
     """
 
     protocol: str | None = None
     file_id: fitdecode.FitDataMessage | None = None
     session: fitdecode.FitDataMessage | None = None
     sessions: int = 0
+    summary_first: bool = False
     activity: fitdecode.FitDataMessage | None = None
     settings: fitdecode.FitDataMessage | None = None
     summaries: list[fitdecode.FitDataMessage] = field(default_factory=list)
@@ -429,11 +441,23 @@ def _collect(scan: _Scan, frame: fitdecode.FitDataMessage) -> None:
     `dive_summary` and `tank_summary` sit **above** that cut, because both are written
     after the session they describe and gating them on it would discard every one. They
     are bounded at the second session instead.
+
+    Garmin Connect can put the session before all samples. That single-session ordering
+    keeps the following stream. Multiple summary-first sessions are refused: untimed gas
+    definitions cannot be assigned to a dive reliably, and silently dropping or mixing
+    their samples would produce a misleading logbook.
     """
     name = frame.name
     if name == "file_id":
         scan.file_id = scan.file_id or frame
     elif name == "session":
+        if scan.sessions == 0:
+            scan.summary_first = not (scan.points or scan.undated)
+        elif scan.summary_first:
+            raise MalformedFitError(
+                "this FIT file puts a session summary before its samples and contains multiple sessions; "
+                "their samples and gas lists cannot be separated reliably, so export each dive as a separate FIT file"
+            )
         scan.sessions += 1
         scan.session = scan.session or frame
     elif name == "activity":
@@ -449,7 +473,7 @@ def _collect(scan: _Scan, frame: fitdecode.FitDataMessage) -> None:
     elif name == "tank_summary":
         if scan.sessions < 2:
             scan.tanks.append(frame)
-    elif scan.session is not None:
+    elif scan.session is not None and not scan.summary_first:
         return
     elif name == "dive_gas":
         scan.gases.append(frame)
@@ -506,6 +530,8 @@ def _collect_record(scan: _Scan, frame: fitdecode.FitDataMessage) -> None:
     _set(scan, point, "temperature", _number(_native(frame, "temperature")))
     # Beats per minute already, which is the channel's unit.
     _set(scan, point, "heart_rate", _number(_native(frame, "heart_rate")))
+    for channel, (source, _) in SAMPLED_READOUTS.items():
+        _set(scan, point, channel, _number(_native(frame, source)))
     unfixed = point.latitude is None
     _set(scan, point, "latitude", _degrees(_native(frame, "position_lat")))
     _set(scan, point, "longitude", _degrees(_native(frame, "position_long")))
@@ -1510,6 +1536,7 @@ class _Converter:
         ceiling = Channel("ceiling")
         temperature = Channel("temperature")
         heart_rate = Channel("heart_rate")
+        readouts = {name: Channel(name) for name in SAMPLED_READOUTS}
         pressures = {sensor: Channel("pressures") for sensor in sensors}
         for at, point in samples.ordered():
             if point.depth is not None:
@@ -1520,6 +1547,10 @@ class _Converter:
                 temperature.record(at, rounded(point.temperature * HUNDREDTHS_PER_DEGREE))
             if point.heart_rate is not None:
                 heart_rate.record(at, rounded(point.heart_rate))
+            for name, channel in readouts.items():
+                value = getattr(point, name)
+                if value is not None:
+                    channel.record(at, rounded(value * SAMPLED_READOUTS[name][1]))
             for sensor, bar in point.pressures.items():
                 if sensor in pressures and 0 <= bar <= MAX_CYLINDER_PRESSURE:
                     pressures[sensor].record(at, rounded(bar * TENTHS_PER_UNIT))
@@ -1527,7 +1558,7 @@ class _Converter:
         events = self.read_events(where)
         numbered = [(number, pressures[sensor]) for number, sensor in enumerate(sensors) if sensor in pressures]
         profile = samples.profile(
-            {"depth": depth, "ceiling": ceiling, "temperature": temperature, "heart_rate": heart_rate},
+            {"depth": depth, "ceiling": ceiling, "temperature": temperature, "heart_rate": heart_rate, **readouts},
             pressures=numbered,
             events=events,
         )

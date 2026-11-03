@@ -4,12 +4,9 @@ Split from `test_fit_units.py` the way the two XML readers' test modules are: th
 is there, and what is here is which message carries which member, which one wins where two
 could, and what the report says when neither does.
 
-**Most of what is below is the only test several messages will get.** `dive_summary`,
-`tank_summary`, `tank_update` and most of `dive_gas` are Garmin's, and there is no Garmin
-file in this project — the owner supplies a Descent export after this reader lands, and
-`docs/fit-mapping.md` says so in its first paragraph. Until then these encoder-built
-messages are the evidence, and they prove the mapping rather than the device: a real file
-may still surprise this reader in ways nothing here can predict.
+The Garmin Connect fixture exercises summary-first ordering, dive summaries, gases and
+native decompression channels. Encoder-built messages below cover alternate ordering,
+missing values and collisions; tank summaries and telemetry still have no device fixture.
 """
 
 from __future__ import annotations
@@ -442,6 +439,49 @@ def test_a_second_session_is_reported_and_not_converted() -> None:
     assert len(conversion.document["dives"]) == 1
     assert conversion.document["dives"][0]["max_depth"] == 10.0
     assert any("describes 2 sessions" in text for text in _messages(conversion, "dropped"))
+
+
+@pytest.mark.parametrize("summary_first", [False, True])
+def test_samples_and_gases_survive_session_summary_order(summary_first: bool) -> None:
+    summary = message("session", sport="diving", start_time=STARTED_AT, total_elapsed_time=60.0)
+    samples = [_gas(0, 21), _at(0, depth=2.0, temperature=22), _at(30, depth=20.0, temperature=5)]
+    data = fit_file(
+        message("file_id", type="activity", manufacturer="garmin"),
+        *([summary, *samples] if summary_first else [*samples, summary]),
+    )
+    dive = _dive(data)
+    assert dive["cylinders"][0]["oxygen"] == 21.0
+    profile = profile_of(dive)
+    assert profile is not None
+    assert profile["depth"]["values"] == [200, 2000]
+    assert profile["temperature"]["values"] == [2200, 500]
+
+
+def test_gas_configuration_and_events_before_the_session_do_not_hide_summary_first_order() -> None:
+    data = fit_file(
+        message("file_id", type="activity", manufacturer="garmin"),
+        _gas(0, 21),
+        _event(0, "timer"),
+        message("session", sport="diving", start_time=STARTED_AT),
+        _at(0, depth=2.0),
+        _at(30, depth=20.0),
+    )
+    profile = profile_of(_dive(data))
+    assert profile is not None
+    assert profile["depth"]["values"] == [200, 2000]
+
+
+@pytest.mark.parametrize("samples_between_summaries", [False, True])
+def test_multiple_summary_first_sessions_request_separate_exports(samples_between_summaries: bool) -> None:
+    samples = [_gas(0, 21), _at(0, depth=2.0), _at(30, depth=20.0)]
+    second = message("session", sport="diving", start_time=STARTED_AT + timedelta(hours=2))
+    data = fit_file(
+        message("file_id", type="activity", manufacturer="garmin"),
+        message("session", sport="diving", start_time=STARTED_AT),
+        *([*samples, second] if samples_between_summaries else [second, *samples]),
+    )
+    with pytest.raises(MalformedFitError, match="export each dive as a separate FIT file"):
+        _run(data)
 
 
 # -- salinity -------------------------------------------------------------------------

@@ -6,12 +6,9 @@ a correct reader produces from it. The Python converter in this repository is th
 be run against them and deliberately not the last, so a port in another language can take
 the same directory and expect the same answers.
 
-**These inputs are the only ones in the corpus that were not hand-built**, and they
-could not have been: a FIT file cannot be reduced with a text editor, and a synthetic one
-would prove that an encoder and a decoder agree rather than that a device's file reads.
-`fixtures/README.md` records that exception. What it costs is that the files are large
-and opaque; what it buys is the only evidence in this repository that the reader works on
-bytes a watch actually wrote.
+These inputs come from device recordings. The Garmin Connect export is anonymised at
+native field boundaries, with retained reading bytes unchanged; the other files are
+committed whole. `fixtures/README.md` records each input's provenance.
 
 Two members are excluded from the comparison, and only two — `exported_at` and
 `generator`. Both are facts about the *run* rather than about the input.
@@ -37,6 +34,18 @@ OCEAN = FIXTURES / "fit" / "suunto-ocean.fit"
 D5 = FIXTURES / "fit" / "suunto-d5.fit"
 POOR_FIRST_FIX = FIXTURES / "fit" / "ocean-poor-first-fix.fit"
 HEART_RATE = FIXTURES / "fit" / "ocean-heart-rate.fit"
+GARMIN_CONNECT = FIXTURES / "fit" / "garmin-connect-summary-first.fit"
+
+
+def test_garmin_connect_keeps_its_native_profile_and_gases() -> None:
+    conversion = convert(GARMIN_CONNECT.read_bytes(), exported_at=EXPORTED_AT)
+    dive = conversion.document["dives"][0]
+    assert dive["started_at"] == "2000-01-01T00:00:00+00:00"
+    assert len(dive["cylinders"]) == 2
+    profile = profile_of(dive)
+    assert profile is not None
+    assert all(profile[channel]["values"] for channel in ("depth", "temperature", "ndl", "tts", "ppo2", "cns"))
+    assert "profile_empty" not in {note.code for note in conversion.notes}
 
 
 @pytest.mark.parametrize("source", FIT_FIXTURES, ids=lambda path: path.stem)
@@ -60,9 +69,9 @@ def test_an_inferred_note_and_a_listed_member_arrive_together(source) -> None:
     """The report's `inferred` kind and `extensions.divejson.inferred` are one decision.
 
     This is the reader that can compute a value, so the coupling has teeth here in a way it
-    does not for the two XML readers. Every file here derives its submerged time and mean depth,
-    none carrying a `dive_summary`. Either half without the other is a document saying two
-    different things about itself.
+    does not for the two XML readers. The Suunto fixtures derive time and mean depth from
+    samples, while Garmin supplies a dive summary. An inferred value without its note, or
+    a note without its listed member, would make the document disagree with its report.
     """
     conversion = convert(source.read_bytes(), exported_at=EXPORTED_AT)
     listed = conversion.document.get("extensions", {}).get(PRODUCER_KEY, {}).get(INFERRED, [])

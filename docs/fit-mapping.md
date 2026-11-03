@@ -3,15 +3,13 @@
 **Non-normative.** The specification is [`spec/divejson.md`](https://github.com/divejson/divejson/blob/main/spec/divejson.md); nothing
 here changes what a conforming document is.
 
-**Several of the messages below have never been read from a device that wrote them.**
-`dive_summary`, `tank_summary`, `tank_update` and every `dive_gas` field except
-`oxygen_content`, `helium_content`, `status` and `message_index` are Garmin's, and no
-Garmin file is in hand: every FIT file this mapping was written against is a Suunto one, and
-Suunto's exporter writes none of those four messages. What stands in for a device is
-messages built with an encoder driven by the same profile a reader decodes through, which
-proves the mapping and does not prove the device. Their rows are marked **untested** below,
-and they stay marked until a real Descent export has been converted — a pair for one is what
-`fixtures/fit/` most wants next.
+The corpus includes Suunto device exports and an anonymised Garmin Descent activity
+exported through Garmin Connect, `fixtures/fit/garmin-connect-summary-first.fit`.
+The Garmin pair exercises a session summary before its samples, native decompression
+readouts, enabled gases and dive summaries. `tank_summary` and `tank_update` still have
+no device fixture; their rows, and other unexercised fields, remain marked **untested**.
+The fixture provenance and anonymisation are documented in
+[`fixtures/README.md`](../fixtures/README.md#fit).
 
 **The rules that hold for every source format are in
 [`converting.md`](converting.md)** — leniency, identity, units and arithmetic, what a
@@ -28,8 +26,8 @@ invents its own spelling and has to be read one writer at a time.
 That cuts both ways. There is almost no unit table here, and there is no scale for a reader
 to settle — the one `resolved` finding this reader can raise is `converting.md`'s choice of
 a dive's entry or exit fix, below. What it has instead is one very sharp trap, below, and a
-file whose summary is written *after* the samples it summarises, so nothing can be read
-cheaply from a header.
+stream whose summary can precede or follow its samples, so conversion reads the whole
+file before building the dive.
 
 ## Parsing
 
@@ -74,8 +72,8 @@ profile.
 
 ### The file is decoded once, and the decode is bounded
 
-A FIT file is a stream whose `session` comes after the samples, so there is no header to
-read: the file is decoded in one pass and the messages a dive is built from are kept.
+A device can write its `session` after the samples, while Garmin Connect can move it
+before them. The file is decoded in one pass and the messages a dive is built from are kept.
 
 At most **100,000 frames** are decoded, after which the file is refused as an activity log
 rather than a dive log. Decoding is linear in frames and is the whole cost of reading a FIT,
@@ -84,9 +82,8 @@ a device really encodes a long log — is where an unbounded read hurts. The ful
 this corpus decodes to 4,339 frames for a 72-minute dive, so the cap is about 23
 times that, or roughly 28 hours of continuous logging.
 
-It **refuses rather than truncating**, because the summary comes last: stopping early and
-keeping what had arrived would discard the start time, the time in the water and the depths,
-and convert a confidently empty dive.
+It **refuses rather than truncating**: stopping early could discard the summary or part of
+the sample stream and produce an incomplete dive.
 
 **The protocol version is recorded and not gated on.** It goes into
 `extensions.divejson.fit_protocol_version` — 2.0 on every file in this corpus, which
@@ -118,10 +115,19 @@ sport other than `diving` is refused too — unless it carried depth samples, wh
 stronger evidence and costs nothing to check. `sport = diving` covers every dive sub-sport:
 single and multi-gas, gauge, apnea.
 
-A second `session` is a second dive, and is reported and not converted. The sample stream is
-cut at the first one, positionally rather than by timestamp, because a `dive_gas` carries no
-timestamp to filter on. `dive_summary` and `tank_summary` sit above that cut, both being
-written after the session they describe, and are bounded at the second session instead.
+For device streams whose first session follows the samples, a second `session` is a
+second dive and is reported and not converted. The sample stream is cut at the first
+session, positionally rather than by timestamp, because a `dive_gas` carries no timestamp
+to filter on. `dive_summary` and `tank_summary` sit above that cut, both being written after
+the session they describe, and are bounded at the second session instead.
+
+A first session before any samples identifies the summary-first ordering used by Garmin
+Connect. Its following samples and gas definitions belong to that session and are kept.
+Gas configuration or timer events before the session do not change that ordering.
+**Summary-first exports support one session only.** If another session appears, the reader
+refuses the file and asks the diver to export each dive as a separate FIT file. It cannot
+assign untimed gas definitions reliably across such sessions, and must not silently drop
+the first dive's samples or mix profiles.
 
 ## Units
 
@@ -137,7 +143,10 @@ value.
 | heart rate | `uint8` beats per minute | whole beats per minute on a §6.5 channel |
 | elapsed and timer time | `uint32` seconds scaled by 1000 | whole seconds, halves away from zero |
 | a sample's place on the axis | `uint32` whole seconds, a `record`'s `timestamp` | milliseconds on a §6.5 axis, × 1000 |
-| CNS | `uint8` percent | percent |
+| CNS summary | `uint8` percent | percent |
+| sampled CNS | `uint8` percent | tenths of a percent |
+| NDL, time to surface | `uint32` seconds | whole seconds |
+| sampled ppO₂ | `uint8` bar scaled by 100 | hundredths of a bar |
 | OTU | `uint16` "OTUs" | the same number |
 | oxygen, helium | `uint8` whole percent | whole percent |
 | coordinates | `sint32` **semicircles** | decimal degrees at six places |
@@ -241,12 +250,12 @@ FIT has no field for what a device calls itself, so §6.4b's `name` has no sourc
 | field | | into |
 | --- | --- | --- |
 | `session.start_time` (2) | | `started_at`, in the zone below |
-| `dive_summary.bottom_time` (11) **untested**, else the derivation, else `session.total_elapsed_time` (7), else `total_timer_time` (8) | | `submerged_time` |
-| `session.max_depth` (141), else `dive_summary.max_depth` (3) **untested**, else the depth samples | | `max_depth` |
-| `dive_summary.avg_depth` (2) **untested**, else the derivation, else `session.avg_depth` (140) | | `avg_depth` |
-| `dive_summary.start_cns` (5) **untested**, else `session.start_cns` (143) | | the recording's `cns_start` |
-| `dive_summary.end_cns` (6) **untested**, else `session.end_cns` (144) | | the recording's `cns_end` |
-| `dive_summary.o2_toxicity` (9) **untested**, else `session.o2_toxicity` (155) | | the recording's `otu_end` |
+| `dive_summary.bottom_time` (11), else the derivation, else `session.total_elapsed_time` (7), else `total_timer_time` (8) | | `submerged_time` |
+| `session.max_depth` (141), else `dive_summary.max_depth` (3), else the depth samples | | `max_depth` |
+| `dive_summary.avg_depth` (2), else the derivation, else `session.avg_depth` (140) | | `avg_depth` |
+| `dive_summary.start_cns` (5), else `session.start_cns` (143) | | the recording's `cns_start` |
+| `dive_summary.end_cns` (6), else `session.end_cns` (144) | | the recording's `cns_end` |
+| `dive_summary.o2_toxicity` (9), else `session.o2_toxicity` (155) | | the recording's `otu_end` |
 | `dive_settings.water_type` (4) **untested** | | the recording's `salinity` |
 
 **The session's figures are the activity's, not the dive's.** `total_elapsed_time` is the
@@ -264,15 +273,15 @@ derives its `submerged_time` and `avg_depth` by the rule in [`converting.md`](co
 yields nothing, as readings and with no mark.
 
 `dive_summary.bottom_time` is read first as the computer's own figure for the dive, which is
-the one field Subsurface's Garmin parser takes a dive time from. The profile defines it no
-further than its name, and whether a Descent's is the dive time it displays waits on a file;
-the row is untested until one arrives.
+the one field Subsurface's Garmin parser takes a dive time from. The Garmin Connect pair
+carries this field, so the mapped time comes from its dive summary rather than the longer
+session or a derivation from the sample stream.
 
 **The time in the water, the mean depth and the oxygen accounting read the summary first,
 and the maximum depth reads the session first.** On a multi-dive Garmin file the session's
 figures cover the whole activity while the `dive_summary` describes the dive being read,
 which is why the dive's own figures take the summary where there is one. A maximum has no
-surface time to leave out, so the session's is the dive's on every file in hand, and the
+surface time to leave out, so the session is preferred where it states a maximum, and the
 summary is the fallback for a device that summarises a dive in one message and not the
 other. The CNS and OTU totals, being the computer's own figures, land on the file's one
 recording (§6.4a) rather than on the dive.
@@ -320,10 +329,11 @@ nothing is scaled. They are written **both or neither** (§6.4c), so a file stat
 yields neither and a note.
 
 **`model` is read only where it states a value.** `tissue_model_type` has exactly one member
-in the FIT profile, `zhl_16c`. Four of the five recordings in `fixtures/fit/` carry a
-`dive_settings` at all, and each of those states a gradient-factor pair with no `model`
+in the FIT profile, `zhl_16c`. The four Suunto Ocean recordings in `fixtures/fit/` carry a
+`dive_settings`, and each states a gradient-factor pair with no `model`
 beside it — so each produces a `deco_model` of a pair and no family, which is the honest
-shape, while `suunto-d5.fit` writes no `dive_settings` and gets no `deco_model`. Reading
+shape, while `suunto-d5.fit` writes no `dive_settings` and gets no `deco_model`. The anonymised
+Garmin pair omits configuration messages and likewise makes no deco-model claim. Reading
 "there is only one value in the enum" as "the family must be Bühlmann" would be the
 converter deciding what the device ran, and a Suunto watch writing Garmin's format is
 exactly the file that would get it wrong: the same computer's app export names an RGBM
@@ -473,6 +483,10 @@ source defect rather than a scale to reinterpret: the profile states the unit ou
 | `next_stop_depth` (93) | | the `ceiling` channel, centimetres |
 | `temperature` (13) | | the `temperature` channel, hundredths of a degree |
 | `heart_rate` (3) | | the `heart_rate` channel, whole beats per minute |
+| `ndl_time` (96) | | the `ndl` channel, whole seconds |
+| `time_to_surface` (95) | | the `tts` channel, whole seconds |
+| `po2` (129) | | the `ppo2` channel, hundredths of a bar |
+| `cns_load` (97) | | the `cns` channel, tenths of a percent |
 | `position_lat` (0) / `position_long` (1) | | `entry_position` / `exit_position` |
 | `gps_accuracy` (31) | | which fix is the entry or the exit, under *Positions*; never written. **untested** |
 
@@ -499,6 +513,12 @@ scaled like `depth` beside it. **Not** `next_stop_time` (94), `time_to_surface` 
 A zero in it is not a ceiling, by `converting.md`'s rule: zero says the diver may surface
 rather than that an obligation sits at 0 m.
 
+The Garmin Connect fixture carries all four native decompression channels. Zero is a
+recorded value on each; FIT invalid sentinels remain absent. The decoder already returns
+`po2` in bar, so the reader multiplies by 100 for hundredths of a bar. `cns_load` is percent,
+so it is multiplied by 10 for tenths of a percent. These scales apply only to profile
+channels; the recording's CNS summary readouts remain in percent.
+
 ### Positions
 
 A `record`'s `position_lat` / `position_long` pair is a fix, and which surface interval a
@@ -509,7 +529,7 @@ is stated in.
 
 **`gps_accuracy` (31) is a fix's stated error**, a `uint8` in metres that the profile defines
 on `record`, and the reader reads it off a `record` that carries a fix. It is **untested**:
-no file in hand writes it — not one of the five recordings in `fixtures/fit/`, and not one of
+no file in hand writes it — not one of the recordings in `fixtures/fit/`, and not one of
 the 792 fix records across a personal set of 25 Suunto Ocean exports this repository does
 not carry — and whether a Garmin Descent writes it on a dive is unverified. Messages built
 with an encoder stand in for a device, as they do for the other untested rows.
@@ -525,6 +545,10 @@ because the two files do, and this one states nothing the rule could act on.
 
 ### Events — `event` (21)
 
+Events use their own timestamps on the same recording origin as the samples. They remain
+in the profile between samples, before the first sample or after the final sample, without
+extending `profile.duration`. An event before the recording origin is reported and dropped.
+
 | `event` (0) | into |
 | --- | --- |
 | `dive_gas_switched` | `gas_switch` **untested** |
@@ -536,9 +560,9 @@ A table rather than a cast: this is Garmin's vocabulary, and the other 43 member
 shared enum holds — have to come out as nothing rather than be forced into a type of this
 format's.
 
-**`timer` is the deliberate omission.** It is the only `event` any file in this corpus
-writes, and its start/stop pair says where the dive begins and ends, which §6.4's `started_at`
-and the profile's own axis already say twice over.
+**`timer` is the deliberate omission.** Its start/stop pair says where the dive begins and
+ends, which §6.4's `started_at` and the profile's own axis already say twice over. It is
+the only `event` the Suunto fixtures write; the anonymised Garmin pair omits events.
 
 `dive_gas_switched` carries the switched-to gas's **`message_index`** in `data` (3), which is
 the device's own key for a `dive_gas` entry and not the position §6.3 numbers a cylinder by.
@@ -594,24 +618,16 @@ which the `extensions.divejson.inferred` list is ever written.
   beside it until §6.4b gave a device's counter a home; it is carried now, under *Device*
   above, and a dive's `number` is still the diver's and still not this.
 - **`dive_summary.dive_number` (10)** — the same counter in a second place, **untested**:
-  no file in hand carries a `dive_summary` at all, so nothing says whether the two ever
-  disagree. libdivecomputer declares the field and ignores it, which is the answer here too
-  until a file arrives that has one.
+  the anonymised Garmin pair omits this counter, so it does not establish whether the
+  session and dive-summary counters ever disagree. libdivecomputer declares the field and
+  ignores it, which is the answer here too until a file arrives that has one.
 - **`record.vertical_speed`, `distance`, `speed`, `altitude`, `n2_load`,
   `absolute_pressure`** — §6.5 fixes the channels a profile carries, and none of these is one
   of them.
-- **`record.ndl_time`, `time_to_surface`, `cns_load`, `po2` and `next_stop_time`, and
-  `session.sub_sport`** — §6.4 now has a channel for the first four and §6.4a a `mode` the
-  last would fill, and all six stay unmapped for a different reason: **no file in hand writes
-  any of them.** Every FIT recording in `fixtures/fit/` carries `record` messages with
-  every one of these fields empty, and a mapping written against a profile listing rather than
-  a dive is the speculation this format's core rule exists to keep out. Each lands the day a
-  file arrives that has it. `gps_accuracy` is read under *Positions* although no file writes
-  it either, and is not this case: it maps onto no member, so reading it adds nothing to a
-  document, and it feeds a rule `converting.md` states for every format, which a FIT file that
-  states it should get as a Suunto app export does. `next_stop_time` appears above under *The
-  ceiling*, as the field a reader must not mistake for a ceiling; that warning stands either
-  way.
+- **`record.next_stop_time` and `session.sub_sport`** remain unmapped. The first is not a
+  depth and has no dedicated channel; the second would need a fixture-backed mapping onto
+  the recording's `mode`. Neither field is retained in the Garmin fixture. The four native
+  decompression channels above are exercised by that pair and are mapped.
 - **`dive_settings.repeat_dive_interval` (17)** — "Time between surfacing and ending the
   activity": the end-of-dive delay that keeps a session running at the surface. The
   derivation needs no setting, and no file in hand states one.
