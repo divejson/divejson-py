@@ -201,8 +201,7 @@ preserving elapsed times and message order. The reduction must remove unknown me
 identifiers, positions and user-profile messages, and document which fields survive.
 A synthetic encoding is still not evidence that a device writes a field.
 
-The Garmin Connect fixture uses
-[`scripts/anonymize-fit.py`](https://github.com/divejson/divejson/blob/main/scripts/anonymize-fit.py).
+The Garmin Connect fixture was anonymised at native field boundaries.
 It retains only the allowlisted native fields of `file_id`, `session`, `dive_summary`,
 `dive_gas` and `record`. All samples and their original order survive. Session start is
 shifted to `2000-01-01T00:00:00Z`, with the same shift applied to sample and summary
