@@ -212,16 +212,17 @@ SALINITIES = {"fresh": "fresh", "salt": "salt", "en13319": "en13319"}
 # shared enum carries — have to come out as nothing rather than be forced into a type of
 # this format's.
 #
-# `timer` is the deliberate omission. It is the only `event` any file in hand writes, and
-# its start/stop pair says where the dive begins and ends, which §6.4's `started_at` and
-# the profile's own axis already say twice over.
+# `timer` is the deliberate omission. Its start/stop pair says where the dive begins and
+# ends, which §6.4's `started_at` and the profile's own axis already say twice over. It is
+# the only `event` the Suunto fixtures write; the Garmin Connect pair also carries gas
+# switches and dive alerts.
 #
 # **`dive_alert` maps to `None`**, which here means an event with no `type` at all and the
 # device's wording as its `label` — §6.6's spelling of an unclassified event. The alert
 # names are deliberately *not* mapped onto §6.6's vocabulary, though several of them plainly
-# line up with it: no FIT file in hand carries a `dive_alert` of any kind, and this corpus
-# does not adopt a mapping no pair exercises. The Suunto app JSON reader has that table
-# because its files have the alerts.
+# line up with it. The Garmin Connect pair exercises their native labels; a mapping onto
+# this format's event types remains unadopted. The Suunto app JSON reader has that table
+# because its files exercise that mapping.
 EVENT_TYPES: dict[str, str | None] = {
     "dive_gas_switched": "gas_switch",
     "user_marker": "bookmark",
