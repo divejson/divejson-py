@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.36.0
+
 - **Breaking: the certification and course agencies gain `cdaa`, `isc` and `ise`, and give up
   `saa` and `efr`.** §6.16 of
   [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) adds the
