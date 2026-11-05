@@ -12,9 +12,9 @@ this file is about the package, whose version moves independently.
   [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) adds the
   Cave Divers Association of Australia, International Scuba Certification and InnerSpace
   Explorers, arriving with the schema. `divejson validate` refuses a document carrying either
-  retired value: the Sub-Aqua Association is a national CMAS federation, so `cmas`, and an
-  Emergency First Response card is a PADI brand's, so `padi`. No reader or writer here names an
-  agency, so nothing a converter produces moves.
+  retired value: the Sub-Aqua Association is the UK's CMAS federation, so its card is `cmas`,
+  and Emergency First Response is a brand of PADI, so its card is `padi`. No reader or writer
+  here names an agency, so nothing a converter produces moves.
 
 ## 0.35.2
 

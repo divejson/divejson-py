@@ -1,0 +1,12 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-08-28T12:00:00+00:00",
+  "certifications": [
+    {
+      "uuid": "0198a6f0-1111-7084-8000-000000000084",
+      "agency": "efr",
+      "name": "Primary Care"
+    }
+  ]
+}
