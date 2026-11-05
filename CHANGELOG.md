@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.35.2
+
 - **Garmin Connect FIT exports keep their samples when the session precedes them.**
   The reader carries the native no-decompression time and time to surface in seconds,
   ppO₂ in hundredths of a bar and CNS in tenths of a percent. Events keep their own
