@@ -7,6 +7,15 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Breaking: the certification and course agencies gain `cdaa`, `isc` and `ise`, and give up
+  `saa` and `efr`.** §6.16 of
+  [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) adds the
+  Cave Divers Association of Australia, International Scuba Certification and InnerSpace
+  Explorers, arriving with the schema. `divejson validate` refuses a document carrying either
+  retired value: the Sub-Aqua Association is a national CMAS federation, so `cmas`, and an
+  Emergency First Response card is a PADI brand's, so `padi`. No reader or writer here names an
+  agency, so nothing a converter produces moves.
+
 ## 0.35.2
 
 - **Garmin Connect FIT exports keep their samples when the session precedes them.**
