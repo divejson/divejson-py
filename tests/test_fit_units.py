@@ -41,6 +41,64 @@ def _records(*samples: tuple[int, dict]) -> tuple:
     )
 
 
+@pytest.mark.parametrize(
+    "source,channel,value,expected",
+    [
+        ("ndl_time", "ndl", 120, 120),
+        ("time_to_surface", "tts", 60, 60),
+        ("po2", "ppo2", 0.63, 63),
+        ("cns_load", "cns", 11, 110),
+        ("ndl_time", "ndl", 0, 0),
+        ("time_to_surface", "tts", 0, 0),
+        ("po2", "ppo2", 0, 0),
+        ("cns_load", "cns", 0, 0),
+    ],
+)
+def test_native_decompression_channels_use_divejson_units(
+    source: str, channel: str, value: int | float, expected: int
+) -> None:
+    data = dive_file(*_records((0, {"depth": 2.0}), (30, {source: value})))
+    profile = profile_of(_dive(data))
+    assert profile is not None
+    assert profile[channel] == {"times": [30_000], "values": [expected]}
+    assert profile["depth"]["times"] == [0]
+
+
+@pytest.mark.parametrize(
+    "source,channel,label",
+    [
+        ("ndl_time", "ndl", "no-decompression time"),
+        ("time_to_surface", "tts", "time to surface"),
+        ("po2", "ppo2", "ppO₂ reading"),
+        ("cns_load", "cns", "CNS reading"),
+    ],
+)
+def test_duplicate_decompression_readings_keep_the_first_and_name_the_quantity(
+    source: str, channel: str, label: str
+) -> None:
+    data = dive_file(*_records((0, {source: 1}), (0, {source: 2})))
+    conversion = _conversion(data)
+    assert any(
+        note.code == "readings_at_one_instant" and f"a {label} at one instant" in note.message
+        for note in conversion.notes
+    )
+    profile = profile_of(conversion.document["dives"][0])
+    assert profile is not None
+    assert len(profile[channel]["values"]) == 1
+
+
+@pytest.mark.parametrize(
+    "source,channel,sentinel",
+    [("ndl_time", "ndl", 0xFFFFFFFF), ("time_to_surface", "tts", 0xFFFFFFFF),
+     ("po2", "ppo2", 2.55), ("cns_load", "cns", 255)],
+)
+def test_native_decompression_invalid_sentinels_remain_absent(source: str, channel: str, sentinel: int | float) -> None:
+    data = dive_file(*_records((0, {"depth": 2.0, source: sentinel})))
+    profile = profile_of(_dive(data))
+    assert profile is not None
+    assert channel not in profile
+
+
 # -- the developer-field trap ---------------------------------------------------------
 
 

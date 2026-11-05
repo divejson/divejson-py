@@ -4,12 +4,9 @@ Split from `test_fit_units.py` the way the two XML readers' test modules are: th
 is there, and what is here is which message carries which member, which one wins where two
 could, and what the report says when neither does.
 
-**Most of what is below is the only test several messages will get.** `dive_summary`,
-`tank_summary`, `tank_update` and most of `dive_gas` are Garmin's, and there is no Garmin
-file in this project — the owner supplies a Descent export after this reader lands, and
-`docs/fit-mapping.md` says so in its first paragraph. Until then these encoder-built
-messages are the evidence, and they prove the mapping rather than the device: a real file
-may still surprise this reader in ways nothing here can predict.
+The Garmin Connect fixture exercises summary-first ordering, dive summaries, gases and
+native decompression channels. Encoder-built messages below cover alternate ordering,
+missing values and collisions; tank summaries and telemetry still have no device fixture.
 """
 
 from __future__ import annotations
@@ -444,6 +441,49 @@ def test_a_second_session_is_reported_and_not_converted() -> None:
     assert any("describes 2 sessions" in text for text in _messages(conversion, "dropped"))
 
 
+@pytest.mark.parametrize("summary_first", [False, True])
+def test_samples_and_gases_survive_session_summary_order(summary_first: bool) -> None:
+    summary = message("session", sport="diving", start_time=STARTED_AT, total_elapsed_time=60.0)
+    samples = [_gas(0, 21), _at(0, depth=2.0, temperature=22), _at(30, depth=20.0, temperature=5)]
+    data = fit_file(
+        message("file_id", type="activity", manufacturer="garmin"),
+        *([summary, *samples] if summary_first else [*samples, summary]),
+    )
+    dive = _dive(data)
+    assert dive["cylinders"][0]["oxygen"] == 21.0
+    profile = profile_of(dive)
+    assert profile is not None
+    assert profile["depth"]["values"] == [200, 2000]
+    assert profile["temperature"]["values"] == [2200, 500]
+
+
+def test_gas_configuration_and_events_before_the_session_do_not_hide_summary_first_order() -> None:
+    data = fit_file(
+        message("file_id", type="activity", manufacturer="garmin"),
+        _gas(0, 21),
+        _event(0, "timer"),
+        message("session", sport="diving", start_time=STARTED_AT),
+        _at(0, depth=2.0),
+        _at(30, depth=20.0),
+    )
+    profile = profile_of(_dive(data))
+    assert profile is not None
+    assert profile["depth"]["values"] == [200, 2000]
+
+
+@pytest.mark.parametrize("samples_between_summaries", [False, True])
+def test_multiple_summary_first_sessions_request_separate_exports(samples_between_summaries: bool) -> None:
+    samples = [_gas(0, 21), _at(0, depth=2.0), _at(30, depth=20.0)]
+    second = message("session", sport="diving", start_time=STARTED_AT + timedelta(hours=2))
+    data = fit_file(
+        message("file_id", type="activity", manufacturer="garmin"),
+        message("session", sport="diving", start_time=STARTED_AT),
+        *([*samples, second] if samples_between_summaries else [second, *samples]),
+    )
+    with pytest.raises(MalformedFitError, match="export each dive as a separate FIT file"):
+        _run(data)
+
+
 # -- salinity -------------------------------------------------------------------------
 
 
@@ -844,15 +884,76 @@ def test_the_timer_event_every_file_carries_is_not_an_event_of_this_format() -> 
     assert "events" not in profile_of(_dive(data))
 
 
-def test_an_event_at_an_instant_the_samples_do_not_reach_is_dropped() -> None:
+def test_events_between_samples_keep_their_original_timestamps() -> None:
     data = dive_file(
+        _gas(0, 21),
+        _gas(4, 50),
         _at(0, depth=30.0),
         _at(60, depth=6.0),
-        _event(999, "user_marker"),
+        _event(29, "dive_gas_switched", data=4),
+        _event(29, "dive_alert", data=0),
+        _event(31, "user_marker"),
         session={"total_elapsed_time": 60.0},
     )
     conversion = _run(data)
-    assert "events" not in profile_of(conversion.document["dives"][0])
+    profile = profile_of(conversion.document["dives"][0])
+    assert profile is not None
+    assert profile["events"] == [
+        {"time": 29_000, "type": "gas_switch", "gas_number": 1},
+        {"time": 29_000, "label": "ndl_reached"},
+        {"time": 31_000, "type": "bookmark"},
+    ]
+    assert profile["depth"]["times"] == [0, 60_000]
+    assert "event_outside_profile" not in _codes(conversion, "dropped")
+
+
+@pytest.mark.parametrize("event_time", [0, 10, 999])
+def test_events_outside_the_sample_span_keep_their_timestamps(event_time: int) -> None:
+    data = dive_file(
+        _at(20, depth=30.0),
+        _at(60, depth=6.0),
+        _event(event_time, "user_marker"),
+        session={"total_elapsed_time": 60.0},
+    )
+    conversion = _run(data)
+    profile = profile_of(conversion.document["dives"][0])
+    assert profile is not None
+    assert profile["events"] == [{"time": event_time * 1000, "type": "bookmark"}]
+    assert profile["duration"] == 60_000
+    assert profile["depth"]["times"] == [20_000, 60_000]
+    assert "event_outside_profile" not in _codes(conversion, "dropped")
+
+
+@pytest.mark.parametrize("session_offset", [0, 10])
+def test_events_and_samples_share_the_session_start_time(session_offset: int) -> None:
+    data = dive_file(
+        _at(20, depth=30.0),
+        _at(60, depth=6.0),
+        _event(30, "user_marker"),
+        session={
+            "start_time": STARTED_AT + timedelta(seconds=session_offset),
+            "total_elapsed_time": 60.0,
+        },
+    )
+    conversion = _run(data)
+    profile = profile_of(conversion.document["dives"][0])
+    assert profile is not None
+    assert profile["events"] == [{"time": (30 - session_offset) * 1000, "type": "bookmark"}]
+    assert profile["depth"]["times"] == [(20 - session_offset) * 1000, (60 - session_offset) * 1000]
+    assert profile["duration"] == (60 - session_offset) * 1000
+
+
+def test_an_event_before_the_recording_start_is_dropped() -> None:
+    data = dive_file(
+        _at(0, depth=30.0),
+        _at(60, depth=6.0),
+        _event(-1, "user_marker"),
+        session={"total_elapsed_time": 60.0},
+    )
+    conversion = _run(data)
+    profile = profile_of(conversion.document["dives"][0])
+    assert profile is not None
+    assert "events" not in profile
     assert "event_outside_profile" in _codes(conversion, "dropped")
 
 

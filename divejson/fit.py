@@ -110,6 +110,18 @@ _READING_LABELS: dict[str, str] = {
     "ceiling": "decompression ceiling",
     "temperature": "water temperature",
     "heart_rate": "heart rate",
+    "ndl": "no-decompression time",
+    "tts": "time to surface",
+    "ppo2": "ppO₂ reading",
+    "cns": "CNS reading",
+}
+
+HUNDREDTHS_PER_BAR = Decimal(100)
+SAMPLED_READOUTS: dict[str, tuple[str, Decimal]] = {
+    "ndl": ("ndl_time", Decimal(1)),
+    "tts": ("time_to_surface", Decimal(1)),
+    "ppo2": ("po2", HUNDREDTHS_PER_BAR),
+    "cns": ("cns_load", TENTHS_PER_UNIT),
 }
 
 # uuid5(NAMESPACE_URL, "https://divejson.org/ns/fit"). Fixed forever: changing it would
@@ -200,16 +212,17 @@ SALINITIES = {"fresh": "fresh", "salt": "salt", "en13319": "en13319"}
 # shared enum carries — have to come out as nothing rather than be forced into a type of
 # this format's.
 #
-# `timer` is the deliberate omission. It is the only `event` any file in hand writes, and
-# its start/stop pair says where the dive begins and ends, which §6.4's `started_at` and
-# the profile's own axis already say twice over.
+# `timer` is the deliberate omission. Its start/stop pair says where the dive begins and
+# ends, which §6.4's `started_at` and the profile's own axis already say twice over. It is
+# the only `event` the Suunto fixtures write; the Garmin Connect pair also carries gas
+# switches and dive alerts.
 #
 # **`dive_alert` maps to `None`**, which here means an event with no `type` at all and the
 # device's wording as its `label` — §6.6's spelling of an unclassified event. The alert
 # names are deliberately *not* mapped onto §6.6's vocabulary, though several of them plainly
-# line up with it: no FIT file in hand carries a `dive_alert` of any kind, and this corpus
-# does not adopt a mapping no pair exercises. The Suunto app JSON reader has that table
-# because its files have the alerts.
+# line up with it. The Garmin Connect pair exercises their native labels; a mapping onto
+# this format's event types remains unadopted. The Suunto app JSON reader has that table
+# because its files exercise that mapping.
 EVENT_TYPES: dict[str, str | None] = {
     "dive_gas_switched": "gas_switch",
     "user_marker": "bookmark",
@@ -328,17 +341,17 @@ class _Point:
     `tank_update` at one timestamp are one sample rather than two, the later of which the
     axis would drop.
 
-    `eq=False` so a point stays hashable and compares by identity. A dataclass that
-    generates `__eq__` sets `__hash__` to `None`, and these are used as dictionary keys —
-    an event finds its place by looking its own instant's point up in the axis. Identity
-    is also the comparison that means anything here: two instants that happened to record
-    the same depth are still two samples.
+    `eq=False` keeps points distinct when two instants happen to record the same readings.
     """
 
     depth: Decimal | None = None
     ceiling: Decimal | None = None
     temperature: Decimal | None = None
     heart_rate: Decimal | None = None
+    ndl: Decimal | None = None
+    tts: Decimal | None = None
+    ppo2: Decimal | None = None
+    cns: Decimal | None = None
     latitude: Decimal | None = None
     longitude: Decimal | None = None
     # `gps_accuracy`, the receiver's stated horizontal error in metres, off the `record`
@@ -351,16 +364,16 @@ class _Point:
 class _Scan:
     """Everything one pass over a FIT file keeps.
 
-    A FIT file is a stream whose summary messages come *after* the samples they summarise,
-    so there is no cheap way to read a header: the file is decoded once and this is what
-    survives it. Summaries are kept as frames, of which there are a handful; the sample
-    stream is reduced to `_Point`s as it goes past.
+    Summaries can precede or follow the samples, so the file is decoded once and this is
+    what survives it. Summaries are kept as frames; the sample stream is reduced to
+    `_Point`s as it goes past.
     """
 
     protocol: str | None = None
     file_id: fitdecode.FitDataMessage | None = None
     session: fitdecode.FitDataMessage | None = None
     sessions: int = 0
+    summary_first: bool = False
     activity: fitdecode.FitDataMessage | None = None
     settings: fitdecode.FitDataMessage | None = None
     summaries: list[fitdecode.FitDataMessage] = field(default_factory=list)
@@ -429,11 +442,23 @@ def _collect(scan: _Scan, frame: fitdecode.FitDataMessage) -> None:
     `dive_summary` and `tank_summary` sit **above** that cut, because both are written
     after the session they describe and gating them on it would discard every one. They
     are bounded at the second session instead.
+
+    Garmin Connect can put the session before all samples. That single-session ordering
+    keeps the following stream. Multiple summary-first sessions are refused: untimed gas
+    definitions cannot be assigned to a dive reliably, and silently dropping or mixing
+    their samples would produce a misleading logbook.
     """
     name = frame.name
     if name == "file_id":
         scan.file_id = scan.file_id or frame
     elif name == "session":
+        if scan.sessions == 0:
+            scan.summary_first = not (scan.points or scan.undated)
+        elif scan.summary_first:
+            raise MalformedFitError(
+                "this FIT file puts a session summary before its samples and contains multiple sessions; "
+                "their samples and gas lists cannot be separated reliably, so export each dive as a separate FIT file"
+            )
         scan.sessions += 1
         scan.session = scan.session or frame
     elif name == "activity":
@@ -449,7 +474,7 @@ def _collect(scan: _Scan, frame: fitdecode.FitDataMessage) -> None:
     elif name == "tank_summary":
         if scan.sessions < 2:
             scan.tanks.append(frame)
-    elif scan.session is not None:
+    elif scan.session is not None and not scan.summary_first:
         return
     elif name == "dive_gas":
         scan.gases.append(frame)
@@ -506,6 +531,8 @@ def _collect_record(scan: _Scan, frame: fitdecode.FitDataMessage) -> None:
     _set(scan, point, "temperature", _number(_native(frame, "temperature")))
     # Beats per minute already, which is the channel's unit.
     _set(scan, point, "heart_rate", _number(_native(frame, "heart_rate")))
+    for channel, (source, _) in SAMPLED_READOUTS.items():
+        _set(scan, point, channel, _number(_native(frame, source)))
     unfixed = point.latitude is None
     _set(scan, point, "latitude", _degrees(_native(frame, "position_lat")))
     _set(scan, point, "longitude", _degrees(_native(frame, "position_long")))
@@ -1452,6 +1479,11 @@ class _Converter:
 
     # -- the profile -------------------------------------------------------------
 
+    def time_origin(self) -> datetime | None:
+        """The shared origin for elapsed sample and event timestamps."""
+        start = _native(self.scan.session, "start_time")
+        return start if isinstance(start, datetime) else min(self.scan.points, default=None)
+
     def axis(self, where: str) -> SampleAxis:
         """The dive's time axis, offered every instant the file recorded a reading at.
 
@@ -1474,11 +1506,10 @@ class _Converter:
                 code="readings_at_one_instant",
                 member=f"{RECORDING}/profile",
             )
-        if not self.scan.points:
+        origin = self.time_origin()
+        if origin is None:
             return axis
 
-        start = _native(self.scan.session, "start_time")
-        origin = start if isinstance(start, datetime) else min(self.scan.points)
         for at, point in self.scan.points.items():
             axis.offer(milliseconds(Decimal(str((at - origin).total_seconds()))), point)
         return axis
@@ -1506,6 +1537,7 @@ class _Converter:
         ceiling = Channel("ceiling")
         temperature = Channel("temperature")
         heart_rate = Channel("heart_rate")
+        readouts = {name: Channel(name) for name in SAMPLED_READOUTS}
         pressures = {sensor: Channel("pressures") for sensor in sensors}
         for at, point in samples.ordered():
             if point.depth is not None:
@@ -1516,14 +1548,18 @@ class _Converter:
                 temperature.record(at, rounded(point.temperature * HUNDREDTHS_PER_DEGREE))
             if point.heart_rate is not None:
                 heart_rate.record(at, rounded(point.heart_rate))
+            for name, channel in readouts.items():
+                value = getattr(point, name)
+                if value is not None:
+                    channel.record(at, rounded(value * SAMPLED_READOUTS[name][1]))
             for sensor, bar in point.pressures.items():
                 if sensor in pressures and 0 <= bar <= MAX_CYLINDER_PRESSURE:
                     pressures[sensor].record(at, rounded(bar * TENTHS_PER_UNIT))
 
-        events = self.read_events(samples, where)
+        events = self.read_events(where)
         numbered = [(number, pressures[sensor]) for number, sensor in enumerate(sensors) if sensor in pressures]
         profile = samples.profile(
-            {"depth": depth, "ceiling": ceiling, "temperature": temperature, "heart_rate": heart_rate},
+            {"depth": depth, "ceiling": ceiling, "temperature": temperature, "heart_rate": heart_rate, **readouts},
             pressures=numbered,
             events=events,
         )
@@ -1535,7 +1571,7 @@ class _Converter:
                 cylinder["gas_number"] = number
         return profile
 
-    def read_events(self, samples: SampleAxis, where: str) -> list[dict[str, Any]]:
+    def read_events(self, where: str) -> list[dict[str, Any]]:
         """The `event` messages that describe the dive, as §6.5 events.
 
         The one that needs work is `dive_gas_switched`, whose `data` field holds the
@@ -1549,8 +1585,9 @@ class _Converter:
         happened, and saying "a gas switch, to something this file does not describe" is
         honest where guessing a position would not be.
 
-        **Untested against a real file**: the only `event` any file in hand writes is
-        `timer`, which this table deliberately does not carry.
+        The Garmin Connect fixture carries gas switches and labelled dive alerts.
+        Bookmarks still have no device fixture; the Suunto fixtures carry only `timer`,
+        which this table deliberately does not carry.
         """
         if not self.scan.events:
             return []
@@ -1559,11 +1596,7 @@ class _Converter:
             for number, index in enumerate(_native_raw(gas, "message_index") for gas in self.gases)
             if isinstance(index, int) and not isinstance(index, bool)
         }
-        # The axis is what decided which instants have a place and where each landed, so
-        # an event asks it rather than recomputing from the session's start time: a sample
-        # the axis dropped for sharing its millisecond with an earlier one is an instant the
-        # profile does not reach, and an event there has nowhere to go either.
-        places = {point: at for at, point in samples.ordered()}
+        origin = self.time_origin()
 
         events: list[dict[str, Any]] = []
         for frame in self.scan.events:
@@ -1576,13 +1609,11 @@ class _Converter:
             at = _native(frame, "timestamp")
             if not isinstance(at, datetime):
                 continue
-            point = self.scan.points.get(at)
-            placed = places.get(point) if point is not None else None
-            if placed is None:
+            placed = milliseconds(Decimal(str((at - origin).total_seconds()))) if origin is not None else None
+            if placed is None or placed < 0:
                 self.note(
                     where,
-                    "An event is recorded at an instant the dive's profile does not reach, so it has no place in "
-                    "it and is left out.",
+                    "An event has no recording time origin or occurs before the recording began, so it is left out.",
                     "dropped",
                     code="event_outside_profile",
                     member=f"{RECORDING}/profile/events",
