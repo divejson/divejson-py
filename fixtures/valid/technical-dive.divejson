@@ -636,7 +636,7 @@
     {
       "uuid": "0198a6f0-1111-7091-8000-000000000091",
       "name": "Cave 1",
-      "agency": "gue",
+      "agency": "cdaa",
       "status": "planned",
       "notes": "Booked for the southern winter; no dates confirmed yet."
     },
@@ -915,6 +915,12 @@
       "agency": "aida",
       "name": "AIDA 2 Freediver",
       "certified_on": "2024-11-09"
+    },
+    {
+      "uuid": "0198a6f0-1111-7084-8000-000000000084",
+      "agency": "isc",
+      "name": "Open Water Diver",
+      "certified_on": "2019-05-18"
     }
   ],
   "contacts": [
