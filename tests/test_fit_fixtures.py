@@ -48,6 +48,23 @@ def test_garmin_connect_keeps_its_native_profile_and_gases() -> None:
     assert "profile_empty" not in {note.code for note in conversion.notes}
 
 
+def test_garmin_connect_keeps_gas_switches_and_alerts_at_native_timestamps() -> None:
+    dive = convert(GARMIN_CONNECT.read_bytes(), exported_at=EXPORTED_AT).document["dives"][0]
+    profile = profile_of(dive)
+    assert profile is not None
+    assert profile["duration"] == 4_271_000
+    assert [cylinder["gas_number"] for cylinder in dive["cylinders"]] == [0, 1]
+    events = profile["events"]
+    assert len(events) == 38
+    assert events[0] == {"time": 0, "type": "gas_switch", "gas_number": 0}
+    assert [event for event in events if event["time"] == 1_901_000] == [
+        {"time": 1_901_000, "type": "gas_switch", "gas_number": 1},
+        {"time": 1_901_000, "label": "po2_warn"},
+        {"time": 1_901_000, "label": "gas_switch_prompted"},
+    ]
+    assert events[-1] == {"time": 4_262_000, "label": "alert_dismissed_by_timeout"}
+
+
 @pytest.mark.parametrize("source", FIT_FIXTURES, ids=lambda path: path.stem)
 def test_fixture_converts_to_its_expected_document(source) -> None:
     expected_path = source.with_suffix(".divejson")
@@ -81,11 +98,11 @@ def test_an_inferred_note_and_a_listed_member_arrive_together(source) -> None:
 
 @pytest.mark.parametrize("source", FIT_FIXTURES, ids=lambda path: path.stem)
 def test_this_reader_settles_no_scale_and_resolves_nothing_but_the_fix_taken(source) -> None:
-    """FIT states every unit in the profile, so there is no scale for a reader to decide.
+    """FIT units follow the mapping settled against the native fixture readings.
 
     That is what separates it from UDDF, whose `<o2>` and `<tankvolume>` are numbers with no
     stated unit and which therefore emits `resolved` findings. Any other `resolved` here
-    would mean this reader had started guessing at something the profile already says. The
+    would mean this reader had started guessing at something the mapping already settles. The
     one it may raise is which fix is the dive's entry or exit, where a `record`'s
     `gps_accuracy` moves it off the one nearest the deepest sample — which no file in hand
     does, none of them writing the field, so the synthetic files in `test_fit_parsing.py` are

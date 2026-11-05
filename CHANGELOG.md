@@ -7,6 +7,15 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Garmin Connect FIT exports keep their samples when the session precedes them.**
+  The reader carries the native no-decompression time and time to surface in seconds,
+  ppO₂ in hundredths of a bar and CNS in tenths of a percent. Events keep their own
+  timestamps on the samples' recording origin, including between samples and after the
+  last sample, without extending the profile duration. A summary-first export with
+  multiple sessions is refused with a request to export each dive separately, rather
+  than silently losing samples or mixing untimed gas definitions. The anonymised Garmin
+  Connect fixture covers both gases, the four channels, gas switches and dive alerts.
+
 ## 0.35.1
 
 - **Reading a measurement takes linear time in every reader.** Subsurface's measured

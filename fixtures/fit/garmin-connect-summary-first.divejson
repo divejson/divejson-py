@@ -16,11 +16,13 @@
       "cylinders": [
         {
           "oxygen": 21.0,
-          "helium": 0.0
+          "helium": 0.0,
+          "gas_number": 0
         },
         {
           "oxygen": 50.0,
-          "helium": 0.0
+          "helium": 0.0,
+          "gas_number": 1
         }
       ],
       "recordings": [
@@ -42204,7 +42206,163 @@
                 110,
                 110
               ]
-            }
+            },
+            "events": [
+              {
+                "time": 0,
+                "type": "gas_switch",
+                "gas_number": 0
+              },
+              {
+                "time": 155000,
+                "label": "ascent_critical"
+              },
+              {
+                "time": 158000,
+                "label": "alert_dismissed_by_timeout"
+              },
+              {
+                "time": 503000,
+                "label": "approaching_ndl"
+              },
+              {
+                "time": 506000,
+                "label": "alert_dismissed_by_timeout"
+              },
+              {
+                "time": 572000,
+                "label": "approaching_ndl"
+              },
+              {
+                "time": 575000,
+                "label": "alert_dismissed_by_key"
+              },
+              {
+                "time": 767000,
+                "label": "ndl_reached"
+              },
+              {
+                "time": 773000,
+                "label": "alert_dismissed_by_timeout"
+              },
+              {
+                "time": 1597000,
+                "label": "ascent_critical"
+              },
+              {
+                "time": 1599000,
+                "label": "alert_dismissed_by_timeout"
+              },
+              {
+                "time": 1644000,
+                "label": "ascent_critical"
+              },
+              {
+                "time": 1647000,
+                "label": "alert_dismissed_by_timeout"
+              },
+              {
+                "time": 1880000,
+                "label": "ascent_critical"
+              },
+              {
+                "time": 1881000,
+                "label": "alert_dismissed_by_key"
+              },
+              {
+                "time": 1901000,
+                "type": "gas_switch",
+                "gas_number": 1
+              },
+              {
+                "time": 1901000,
+                "label": "po2_warn"
+              },
+              {
+                "time": 1901000,
+                "label": "gas_switch_prompted"
+              },
+              {
+                "time": 1910000,
+                "label": "alert_dismissed_by_key"
+              },
+              {
+                "time": 1918000,
+                "label": "ascent_critical"
+              },
+              {
+                "time": 1920000,
+                "label": "alert_dismissed_by_key"
+              },
+              {
+                "time": 1934000,
+                "label": "ascent_critical"
+              },
+              {
+                "time": 1937000,
+                "label": "alert_dismissed_by_timeout"
+              },
+              {
+                "time": 1972000,
+                "label": "approaching_first_deco_stop"
+              },
+              {
+                "time": 1976000,
+                "label": "alert_dismissed_by_timeout"
+              },
+              {
+                "time": 2099000,
+                "label": "deco_stop_cleared"
+              },
+              {
+                "time": 2159000,
+                "label": "ascent_critical"
+              },
+              {
+                "time": 2162000,
+                "label": "alert_dismissed_by_timeout"
+              },
+              {
+                "time": 2376000,
+                "label": "deco_stop_cleared"
+              },
+              {
+                "time": 2489000,
+                "label": "deco_ceiling_broken"
+              },
+              {
+                "time": 2494000,
+                "label": "alert_dismissed_by_timeout"
+              },
+              {
+                "time": 2978000,
+                "label": "deco_stop_cleared"
+              },
+              {
+                "time": 2978000,
+                "label": "deco_complete"
+              },
+              {
+                "time": 2981000,
+                "label": "alert_dismissed_by_timeout"
+              },
+              {
+                "time": 3332000,
+                "label": "ascent_critical"
+              },
+              {
+                "time": 3335000,
+                "label": "alert_dismissed_by_timeout"
+              },
+              {
+                "time": 4258000,
+                "label": "near_surface"
+              },
+              {
+                "time": 4262000,
+                "label": "alert_dismissed_by_timeout"
+              }
+            ]
           }
         }
       ]

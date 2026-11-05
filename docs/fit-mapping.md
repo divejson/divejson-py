@@ -86,10 +86,10 @@ It **refuses rather than truncating**: stopping early could discard the summary 
 the sample stream and produce an incomplete dive.
 
 **The protocol version is recorded and not gated on.** It goes into
-`extensions.divejson.fit_protocol_version` — 2.0 on every file in this corpus, which
-is the closest thing FIT has to `.ssrf`'s `@version` — and nothing branches on it. What a
-reader has to agree with a writer about is the message and field numbers, and those come
-from the profile.
+`extensions.divejson.fit_protocol_version` — 1.0 on the Garmin Connect fixture and 2.0
+on the Suunto fixtures, the closest thing FIT has to `.ssrf`'s `@version` — and nothing
+branches on it. A reader and writer have to agree on message and field numbers, which
+come from the profile.
 
 Unlike the archive's `max_members` and `max_member_size`, this cap is the adapter's rather
 than the caller's. Those bound an upload; this bounds the work one already-bounded file can
@@ -131,9 +131,10 @@ the first dive's samples or mix profiles.
 
 ## Units
 
-The profile states every one, so there is nothing here for a magnitude test to settle. The
-scale factors below are the profile's own, applied by the decoder before this reader sees a
-value.
+The profile supplies the units and scale factors below, applied by the decoder before
+this reader sees a value. Its `po2` unit label is an exception: the profile says `percent`,
+but the Garmin Connect fixture records bar scaled by 100. The readings agree with its
+21% and 50% gases at the recorded depths, so `po2` is read as bar, not percent.
 
 | what | in the file | in DiveJSON |
 | --- | --- | --- |
@@ -551,9 +552,9 @@ extending `profile.duration`. An event before the recording origin is reported a
 
 | `event` (0) | into |
 | --- | --- |
-| `dive_gas_switched` | `gas_switch` **untested** |
+| `dive_gas_switched` | `gas_switch` |
 | `user_marker` | `bookmark` **untested** |
-| `dive_alert` | an event with **no `type`**, labelled **untested** |
+| `dive_alert` | an event with **no `type`**, labelled |
 
 A table rather than a cast: this is Garmin's vocabulary, and the other 43 members of its
 46-member enum — `battery`, `off_course`, `power_down`, every cycling and running alert the
@@ -562,7 +563,9 @@ format's.
 
 **`timer` is the deliberate omission.** Its start/stop pair says where the dive begins and
 ends, which §6.4's `started_at` and the profile's own axis already say twice over. It is
-the only `event` the Suunto fixtures write; the anonymised Garmin pair omits events.
+the only `event` the Suunto fixtures write. The anonymised Garmin Connect pair carries
+two gas switches, 36 dive alerts and a start/stop timer pair. All retain their native
+event fields and the same timestamp shift as the samples.
 
 `dive_gas_switched` carries the switched-to gas's **`message_index`** in `data` (3), which is
 the device's own key for a `dive_gas` entry and not the position §6.3 numbers a cylinder by.
@@ -577,9 +580,9 @@ the device's wording — `deco_ceiling_broken`, not a number — and an alert ou
 decodes to the bare integer, which is still more than "something happened". §6.6 requires a
 label on an event with no type, so an alert with nothing at all to say is dropped rather than
 failing the whole conversion. **The alert names are not mapped onto §6.6's vocabulary**,
-though several of them plainly line up with it: no FIT file in hand carries a `dive_alert` at
-all, and this corpus does not adopt a mapping no pair exercises. The Suunto app JSON reader
-has that table because its files have the alerts.
+though several of them plainly line up with it. The Garmin Connect pair exercises their
+native labels; a mapping onto this format's event types remains unadopted. The Suunto app
+JSON reader has that table because its files exercise that mapping.
 
 **`gas_number` is asserted only where something depends on it.** §6.3 calls it a label rather
 than an array index, so the cylinders are numbered when the profile carries a pressure channel

@@ -116,10 +116,10 @@ _READING_LABELS: dict[str, str] = {
     "cns": "CNS reading",
 }
 
-HUNDREDTHS_PER_BAR = 100
-SAMPLED_READOUTS: dict[str, tuple[str, int]] = {
-    "ndl": ("ndl_time", 1),
-    "tts": ("time_to_surface", 1),
+HUNDREDTHS_PER_BAR = Decimal(100)
+SAMPLED_READOUTS: dict[str, tuple[str, Decimal]] = {
+    "ndl": ("ndl_time", Decimal(1)),
+    "tts": ("time_to_surface", Decimal(1)),
     "ppo2": ("po2", HUNDREDTHS_PER_BAR),
     "cns": ("cns_load", TENTHS_PER_UNIT),
 }
@@ -1584,8 +1584,9 @@ class _Converter:
         happened, and saying "a gas switch, to something this file does not describe" is
         honest where guessing a position would not be.
 
-        **Untested against a real file**: the only `event` any file in hand writes is
-        `timer`, which this table deliberately does not carry.
+        The Garmin Connect fixture carries gas switches and labelled dive alerts.
+        Bookmarks still have no device fixture; the Suunto fixtures carry only `timer`,
+        which this table deliberately does not carry.
         """
         if not self.scan.events:
             return []
