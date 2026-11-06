@@ -5,14 +5,17 @@ on:
     # `edited` is the one that matters: it re-runs the check when a title is
     # corrected, so a failing PR goes green without an empty commit to push.
     #
-    # `synchronize` is not about the title at all - it is what would let this be
-    # a required check. A required check has to have passed on the PR's *latest*
+    # `synchronize` is not about the title at all - it is what lets this be a
+    # required check. A required check has to have passed on the PR's *latest*
     # head SHA, so without a run per push, a PR that gains a second commit would
     # sit at "Expected - waiting for status" for good. The title is read from the
     # event payload rather than from the tree, so the extra runs reach the same
-    # verdict. Nothing is required on `main` today; this keeps the option open at
-    # no cost.
+    # verdict.
     types: [opened, edited, reopened, synchronize]
+  # The merge queue tests each entry squashed onto `main` under this event, and a
+  # required check that never reports there holds the entry until the queue times
+  # it out.
+  merge_group:
 
 # The one list of types. CONTRIBUTING.md spells the same list out in prose -
 # keep the two in step.
@@ -21,6 +24,10 @@ env:
 
 jobs:
   semantic-title:
+    # Only a pull request carries a title to check. An entry in the merge queue
+    # had to pass this on its pull request to be queued, and a job skipped by
+    # `if` reports success, which is what lets the queue go on without one.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
 
     # Nothing is checked out and no API call is made - the title arrives in the

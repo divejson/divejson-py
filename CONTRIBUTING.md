@@ -186,7 +186,9 @@ specification already owns cannot be regenerated here: that change starts over t
 Use a semantic **PR title** — `<type>[(scope)][!]: <description>`, where type is one of
 `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`, `build`, `revert`.
 Pull requests are squash-merged with the title as the commit subject, so it is the only
-part of a branch that outlives the branch.
+part of a branch that outlives the branch. A branch never needs to be current with `main`:
+a maintainer adds a green pull request to the merge queue, which squashes it onto `main` as
+it then stands, runs the required checks on that result and lands it.
 
 `.github/workflows/pr-title.yml` checks the format and re-runs when a title is edited —
 a failing check is fixed by correcting the title, with nothing to push.
