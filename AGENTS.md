@@ -12,24 +12,26 @@ Verify byte equality separately from the ancestry check. A genuinely new reader 
 new mappings and pairs before the specification adopts them, as CONTRIBUTING.md describes; that
 exception does not permit changing an existing specification-owned file here.
 
-For an existing mapping change, follow the documented spec-first merge order. Schema support alone
-does not eliminate the need for a mapping or fixture change in the specification repository. Link
-companion PRs and state which merge or release each depends on. Preserve commits installed by the
-specification's CI, and re-pin to the merged specification commit before merging here.
+For an existing mapping change, follow the documented spec-first merge order. Link companion PRs
+and state which merge or release each depends on. While the specification PR's CI installs a commit
+from this branch, add new commits rather than amending or force-pushing, so the pinned commit stays
+reachable. Re-pin to the merged specification commit before merging here.
 
 ## Importer verification
 
-New mappings need shareable real-writer fixtures and expected outputs. Verify source units,
-destination scales, invalid sentinels, recording origins and multi-session behavior independently.
-For FIT changes, samples and events share one recording origin; events between samples or after the
-last sample keep their timestamps without extending sampled duration. Apply the specification's
-rules at the recording boundary. Unsupported layouts must fail explicitly instead of silently
-losing a dive's samples.
+New mappings need a shareable fixture from the real writer, with expected output. A field no file
+shows stays unmapped or is marked untested in place. Verify source units, destination scales, invalid
+sentinels, recording origins and multi-session behavior independently. For FIT changes, event
+placement follows the Events section of `docs/fit-mapping.md`. Never lose a dive's samples silently:
+report what the reader cannot carry, and refuse the file only where the mapping document says to.
 
-Keep conversion-table types accurate, use named scale factors, and separate scaling checks from
-message-ordering tests. Keep collision messages readable. Search source comments and mapping prose
-for stale factual claims when adding fixture coverage, and add the Unreleased changelog entry.
-Follow CONTRIBUTING.md's source, conformance and installed-package verification requirements.
+Annotate conversion tables with the types they hold, give scale factors a named constant, and test
+scaling separately from event or sample ordering. When a reader gains a channel, add it to the label
+table the reader uses (`_READING_LABELS` in `fit.py`, `CHANNEL_LABELS` in `series.py`), so the collision
+note names it rather than printing the raw key. Search source comments and mapping prose for stale
+factual claims when adding fixture coverage, and add the Unreleased changelog entry.
+Run the commands under CONTRIBUTING.md's "Working on the package"; the installed-wheel check runs
+in CI.
 
 For review fixes, inspect review bodies, inline comments and discussion attachments. Reconcile each
 item with the final diff, comments and PR description, including fixture provenance and validation
