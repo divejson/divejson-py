@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.37.0
+
 - **The gear types `undergarment`, `tech_shorts` and `slate`.** §6.12 of
   [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md)
   names what is worn under a drysuit for warmth, the pocket shorts worn over a suit, and
