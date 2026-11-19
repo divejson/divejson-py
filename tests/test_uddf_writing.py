@@ -902,6 +902,27 @@ def test_gear_with_no_uddf_element_of_its_own_says_so(schema) -> None:
     ]
 
 
+def test_an_undergarment_tech_shorts_and_a_slate_are_various_pieces(schema) -> None:
+    """UDDF has no element for any of the three. A `<suit>` of `<suittype>other` would read
+    back as a wetsuit, a near type substituted for the true one, so the layer and the shorts
+    go to the catch-all with the slate."""
+    source = document(
+        gear=[
+            {"uuid": GEAR_UUID, "name": "Thinsulate undersuit", "type": "undergarment"},
+            {"uuid": "0198a6f0-9999-7006-8000-000000000006", "name": "Pocket shorts", "type": "tech_shorts"},
+            {"uuid": "0198a6f0-9999-7007-8000-000000000007", "name": "Wetnotes", "type": "slate"},
+        ]
+    )
+    text = written(source, schema)
+    assert text.count("<variouspieces") == 3 and "<suit" not in text
+    assert [item["type"] for item in read_back(source)["gear"]] == ["other", "other", "other"]
+    for where, gear_type in (("gear/0", "undergarment"), ("gear/1", "tech_shorts"), ("gear/2", "slate")):
+        assert messages(source, where) == [
+            f"UDDF's equipment vocabulary does not name '{gear_type}'; the piece is written as <variouspieces>, "
+            "which reads back as 'other'"
+        ]
+
+
 def test_a_wing_is_written_as_the_buoyancy_control_device_it_is(schema) -> None:
     """UDDF's element for a BCD names the broader kind, so it says nothing false about a wing;
     the reader brings it back as the general `bcd`, and the report says the type did not

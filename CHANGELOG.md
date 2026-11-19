@@ -7,6 +7,15 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **The gear types `undergarment`, `tech_shorts` and `slate`.** §6.12 of
+  [the specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md)
+  names what is worn under a drysuit for warmth, the pocket shorts worn over a suit, and
+  anything a diver writes on underwater, and says that a `vest` is the neoprene layer worn
+  with a wetsuit, so `divejson validate` accepts the three. The UDDF writer writes each as a
+  `<variouspieces>`, which reads back as `other`, and reports the type as one that did not
+  survive; an undergarment and the shorts are not written as a `<suit>`, which the reader
+  would bring back as a wetsuit. The reader does not change.
+
 ## 0.36.0
 
 - **Breaking: the certification and course agencies gain `cdaa`, `isc` and `ise`, and give up
