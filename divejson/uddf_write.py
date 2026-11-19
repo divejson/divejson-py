@@ -134,7 +134,9 @@ _INDENT = "  "
 # instead, on the grounds that they are cutting tools; this one does not, because `<knife>`
 # asserts a knife where `<variouspieces>` asserts nothing, and a converter's job is to lose
 # the type honestly rather than to substitute a near one. An element naming the broader
-# kind, as the BCD's does for a wing, is not a near one: it says nothing false.
+# kind, as the BCD's does for a wing, is not a near one: it says nothing false. For the
+# same reason an undergarment and tech shorts are not a `<suit>` of `<suittype>other`: the
+# reader brings that suit back as a wetsuit.
 _EQUIPMENT_ELEMENT: dict[str, str] = {
     "mask": "mask",
     "snorkel": "variouspieces",
@@ -142,9 +144,11 @@ _EQUIPMENT_ELEMENT: dict[str, str] = {
     "wetsuit": "suit",
     "drysuit": "suit",
     "vest": "variouspieces",
+    "undergarment": "variouspieces",
     "hood": "variouspieces",
     "gloves": "gloves",
     "boots": "boots",
+    "tech_shorts": "variouspieces",
     "bcd": "buoyancycontroldevice",
     "backplate": "variouspieces",
     "wing": "buoyancycontroldevice",
@@ -164,6 +168,7 @@ _EQUIPMENT_ELEMENT: dict[str, str] = {
     "line_cutter": "variouspieces",
     "shears": "variouspieces",
     "compass": "compass",
+    "slate": "variouspieces",
     # `cameraType` extends `ID_TYPE` rather than `namedType`, so a `<camera>` has no
     # `<name>` at all and could carry only a nameless body-and-lens breakdown. A named
     # camera is a `<variouspieces>`, and the type is reported as not carried.
