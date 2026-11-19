@@ -3,7 +3,7 @@
   <generator>
     <name>divejson convert</name>
     <type>converter</type>
-    <version>0.34.0</version>
+    <version>0.36.0</version>
     <datetime>2026-08-28T12:00:00Z</datetime>
   </generator>
   <diver>
@@ -51,6 +51,15 @@
         </variouspieces>
         <variouspieces id="gear-0198a6f0-1111-7056-8000-000000000056">
           <name>Steel backplate</name>
+        </variouspieces>
+        <variouspieces id="gear-0198a6f0-1111-7058-8000-000000000058">
+          <name>Drysuit undergarment</name>
+        </variouspieces>
+        <variouspieces id="gear-0198a6f0-1111-7059-8000-000000000059">
+          <name>Tech shorts</name>
+        </variouspieces>
+        <variouspieces id="gear-0198a6f0-1111-705a-8000-00000000005a">
+          <name>Wetnotes</name>
         </variouspieces>
       </equipment>
       <diveinsurances>

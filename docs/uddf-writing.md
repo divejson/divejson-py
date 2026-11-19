@@ -189,7 +189,7 @@ reported.
 | `cylinder` | `tank` | itself |
 | `wetsuit`, `drysuit` | `suit`, with `<suittype>` | itself |
 | `other` | `variouspieces` | itself |
-| `snorkel`, `vest`, `hood`, `smb`, `mirror`, `whistle`, `reel`, `camera`, `line_cutter`, `shears`, `transmitter`, `backplate` | `variouspieces` | `other` |
+| `snorkel`, `vest`, `undergarment`, `hood`, `tech_shorts`, `smb`, `mirror`, `whistle`, `reel`, `slate`, `camera`, `line_cutter`, `shears`, `transmitter`, `backplate` | `variouspieces` | `other` |
 
 `camera` is in the last row for a schema reason rather than a vocabulary one: `cameraType`
 extends `ID_TYPE` rather than `namedType`, so a `<camera>` has no `<name>` at all and could
@@ -215,7 +215,10 @@ catch-all beside the SMB reads worse. A converter does not, because `<knife>` as
 knife where `<variouspieces>` asserts nothing — losing a type honestly beats substituting a
 near one, and the report is what makes the loss visible either way. An element naming the
 type's broader kind is not a near one: `<buoyancycontroldevice>` says nothing of a wing that
-is not true of it, which is why a wing goes there rather than to the catch-all.
+is not true of it, which is why a wing goes there rather than to the catch-all. The same rule
+keeps an `undergarment` and `tech_shorts` out of `<suit>`, though its `<suittype>` of `other`
+looks like room for either: a reader brings back every `<suit>` that is not a dry one as a
+`wetsuit` ([`uddf-mapping.md`](uddf-mapping.md)), a near type substituted for the true one.
 
 **`equipmentType` is an `xs:sequence`, so a logbook's gear comes back grouped by type**
 rather than in the order the document listed it. Nothing is lost by that — every piece keeps
