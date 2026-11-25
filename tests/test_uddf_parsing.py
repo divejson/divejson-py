@@ -1061,7 +1061,7 @@ def test_every_homepage_of_a_contact_is_a_link_in_file_order_each_judged_alone()
         uddf(
             "<divesite><divebase id='base'><name>Blue Hole Divers</name><contact>"
             "<homepage>https://bluehole.example/</homepage><homepage>bluehole.example</homepage>"
-            f"<homepage>{long_url}</homepage><homepage> </homepage>"
+            f"<homepage>{long_url}</homepage><homepage> </homepage><homepage>https://a.example/\ufeffb</homepage>"
             "<homepage>https://instagram.example/bluehole</homepage></contact></divebase></divesite>"
         )
     )
@@ -1071,6 +1071,7 @@ def test_every_homepage_of_a_contact_is_a_link_in_file_order_each_judged_alone()
     assert [note.code for note in conversion.notes if note.where == "divebase/0"] == [
         "link_unreadable",
         "link_too_long",
+        "link_unreadable",
     ]
 
 
