@@ -505,11 +505,14 @@ class _DeviceRecord:
 
 # What a contact goes out with, and what its address does. `roles` is carried in the sense
 # that it is reported by value rather than by name (`contact_element`).
-_CONTACT_CARRIED = frozenset({"uuid", "name", "roles", "phone", "email", "website", "address", "notes"})
+_CONTACT_CARRIED = frozenset({"uuid", "name", "roles", "phone", "email", "links", "address", "notes"})
 _ADDRESS_CARRIED = frozenset({"street", "city", "postcode", "region", "country"})
 
 # What a person goes out with as a `<buddy>`.
-_PERSON_CARRIED = frozenset({"uuid", "name", "email", "phone", "notes"})
+_PERSON_CARRIED = frozenset({"uuid", "name", "email", "phone", "links", "notes"})
+
+# What a link goes out with as a `<homepage>`, which holds an address and nothing beside it.
+_LINK_CARRIED = frozenset({"url"})
 
 # What a site goes out with: `<aliasname>`, `<geography>`'s place, pin and altitude, and
 # `<sitedata>`'s depth pair. UDDF's site has no slot for an external id, an entry, the
@@ -866,15 +869,32 @@ class _Writer:
                 "<lastname> give back",
                 "dropped",
             )
-        phone, email = person.get("phone"), person.get("email")
-        if phone or email:
-            contact = _sub(element, "contact")
-            # `contactType` is a sequence, and `<phone>` comes before `<email>` in it.
-            if phone:
-                _sub(contact, "phone", str(phone))
-            if email:
-                _sub(contact, "email", str(email))
+        self.contact_block(element, person, where)
         self.notes_of(element, where, person)
+
+    def contact_block(self, parent: ET.Element, record: dict[str, Any], where: str, *, report: bool = True) -> bool:
+        """A record's phone, email and links as one `<contact>`, and whether it was written.
+
+        `contactType` is an `xs:sequence` — `<phone>`, `<email>`, then `<homepage>` — and its
+        `<homepage>` repeats, so each link goes out as one, in the list's order. A link's
+        address is all the element holds; whatever else the entry records is reported, at the
+        entry's own path, unless `report` is off for a copy.
+        """
+        links = record.get("links") or []
+        if report:
+            for index, link in enumerate(links):
+                self.unmapped(f"{where}/links/{index}", link, _LINK_CARRIED)
+        phone, email = record.get("phone"), record.get("email")
+        if not (phone or email or links):
+            return False
+        block = _sub(parent, "contact")
+        if phone:
+            _sub(block, "phone", str(phone))
+        if email:
+            _sub(block, "email", str(email))
+        for link in links:
+            _sub(block, "homepage", str(link["url"]))
+        return True
 
     def person_link(self, before: ET.Element, dive: dict[str, Any], reference: dict[str, Any], where: str) -> None:
         """One Person Reference as a dive's `<link>`: to the person's `<buddy>`, or to its `<guide>`.
@@ -1314,7 +1334,7 @@ class _Writer:
         The three children every shape a contact goes out as shares, in the order each of
         them declares: a base, a shop and a part's copy. `report` is off for a copy, whose
         contact has already been reported where it was written as itself. One `<contact>`
-        holds whichever of the phone, the email and the website are present. That is not the
+        holds whichever of the phone, the email and the links are present. That is not the
         diver's own contact block, which `diver_element` writes on its own terms: this block is
         the record's listing, the kind printed on its sign, and the diver chose to record it.
 
@@ -1345,17 +1365,7 @@ class _Writer:
                     "the address records no country, which UDDF's <address> requires; it is not written",
                     "dropped",
                 )
-        # `contactType` is an `xs:sequence`, and this is its order.
-        fields = [
-            (tag, contact.get(member))
-            for member, tag in (("phone", "phone"), ("email", "email"), ("website", "homepage"))
-        ]
-        if any(value for _, value in fields):
-            block = _sub(element, "contact")
-            for tag, value in fields:
-                if value:
-                    _sub(block, tag, str(value))
-            wrote = True
+        wrote = self.contact_block(element, contact, where, report=report) or wrote
         for guide_id, person in guides or ():
             _sub(_sub(element, "guide", id=guide_id), "link", ref=_uddf_id("person", person))
         if report:

@@ -1034,24 +1034,67 @@ def test_a_contacts_roles_come_in_the_order_its_section_lists_them() -> None:
     assert document["contacts"][0]["roles"] == ["shop", "accommodation", "liveaboard"]
 
 
-def test_a_contacts_phone_email_and_website_are_read_on_the_owners_terms_and_the_rest_reported() -> None:
-    """One phone, one email, one website — each the first, each dropped rather than cut."""
+def test_a_contacts_phone_and_email_are_read_on_the_owners_terms_and_the_rest_reported() -> None:
+    """One phone and one email — each the first, each dropped rather than cut."""
     long_phone = "+" + "1" * 40
     document, report = contacts_of(
         "<divesite><divebase id='base'><name>Blue Hole Divers</name><aliasname>BHD</aliasname>"
         "<contact><language>en</language><phone>" + long_phone + "</phone><mobilephone>+20 100</mobilephone>"
         "<fax>+20 69</fax><email>n/a</email><email>desk@bluehole.example</email>"
-        "<homepage>bluehole.example</homepage><homepage>https://bluehole.example/</homepage></contact>"
+        "<homepage>bluehole.example</homepage></contact>"
         "<rating><ratingvalue>9</ratingvalue></rating></divebase></divesite>",
         dive_linking("base"),
     )
     (contact,) = document["contacts"]
-    assert {"phone", "email", "website"}.isdisjoint(contact)
+    assert {"phone", "email", "links"}.isdisjoint(contact)
     reported = "\n".join(message for where, message in report if where == "divebase/0")
     for said in ("<aliasname> 'BHD'", "<rating>", "<contact><language>", "<contact><fax>", "'+20 100'",
-                 "'desk@bluehole.example' is left out", "'https://bluehole.example/' is left out",
-                 "not an address", "not a full web address", "a shortened number"):
+                 "'desk@bluehole.example' is left out", "not an address", "not a full web address",
+                 "a shortened number"):
         assert said in reported
+
+
+def test_every_homepage_of_a_contact_is_a_link_in_file_order_each_judged_alone() -> None:
+    """One with no scheme and one past the bound are each dropped; the others keep their order."""
+    long_url = "https://bluehole.example/" + "a" * 500
+    conversion = convert(
+        uddf(
+            "<divesite><divebase id='base'><name>Blue Hole Divers</name><contact>"
+            "<homepage>https://bluehole.example/</homepage><homepage>bluehole.example</homepage>"
+            f"<homepage>{long_url}</homepage><homepage> </homepage>"
+            "<homepage>https://instagram.example/bluehole</homepage></contact></divebase></divesite>"
+        )
+    )
+    assert validate_document(conversion.document) == []
+    (contact,) = conversion.document["contacts"]
+    assert contact["links"] == [{"url": "https://bluehole.example/"}, {"url": "https://instagram.example/bluehole"}]
+    assert [note.code for note in conversion.notes if note.where == "divebase/0"] == [
+        "link_unreadable",
+        "link_too_long",
+    ]
+
+
+def test_a_contact_stating_its_homepages_twice_folds_in_silence_and_differing_ones_are_reported() -> None:
+    """A stay that names the base gives the list as one value: the same list adds nothing, and
+    another keeps the base's."""
+    homepages = "<homepage>https://bluehole.example/</homepage><homepage>https://instagram.example/bh</homepage>"
+
+    def folded(stay: str) -> tuple[dict, list[tuple[str, str]]]:
+        document, report = contacts_of(
+            f"<divesite><divebase id='base'><name>Blue Hole Divers</name><contact>{homepages}</contact></divebase>"
+            '</divesite><divetrip><trip id="t"><name>Spring</name><trippart><name>Dahab</name>'
+            f"<accomodation id='a'><name>Blue Hole Divers</name><contact>{stay}</contact></accomodation>"
+            "</trippart></trip></divetrip>",
+        )
+        return document, [entry for entry in report if entry[0] == "trip/0/trippart/0/accomodation"]
+
+    document, report = folded(homepages)
+    (contact,) = document["contacts"]
+    assert [link["url"] for link in contact["links"]] == ["https://bluehole.example/", "https://instagram.example/bh"]
+    assert report == []
+    document, report = folded("<homepage>https://bluehole.example/</homepage>")
+    assert len(document["contacts"][0]["links"]) == 2
+    assert any("gives its links as" in message for _, message in report)
 
 
 def test_an_address_with_no_country_is_dropped_and_its_parts_are_capped() -> None:
@@ -1139,8 +1182,9 @@ def test_a_buddy_with_no_name_is_dropped_and_every_link_to_it_with_it() -> None:
 
 
 def test_what_a_person_does_not_carry_is_reported_and_never_dropped_in_silence() -> None:
-    """The first email and the first phone are read; every other child, `<personal>`'s beyond
-    the names and `<contact>`'s beyond the three it reads are named, as a contact's are."""
+    """The first email and the first phone and every homepage are read; every other child,
+    `<personal>`'s beyond the names and `<contact>`'s beyond the four it reads are named, as a
+    contact's are."""
     document, report = contacts_of(
         buddies(
             buddy(
@@ -1162,11 +1206,13 @@ def test_what_a_person_does_not_carry_is_reported_and_never_dropped_in_silence()
     )
     (person,) = document["people"]
     assert (person["email"], person["phone"]) == ("ada@example.org", "+44 1")
+    assert person["links"] == [{"url": "https://ada.example/"}]
     reported = [message for where, message in report if where == "buddy/0"]
     for said in ("<address>", "<equipment>", "<medical>", "<education>", "<divepermissions>", "<diveinsurances>",
-                 "<personal><membership>", "<personal><birthdate>", "<contact><language>", "<contact><homepage>",
+                 "<personal><membership>", "<personal><birthdate>", "<contact><language>",
                  "'+44 2' is left out", "'ada@work.example' is left out"):
         assert sum(said in message for message in reported) == 1, said
+    assert not [message for message in reported if "homepage" in message]
     # An empty `<sex/>` records nothing, so there is nothing to report.
     assert not [message for message in reported if "<sex>" in message]
 

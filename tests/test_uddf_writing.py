@@ -1355,16 +1355,31 @@ def test_what_a_contact_holds_beyond_its_slot_is_reported_from_the_record(schema
     assert any(where == "contacts/0" and "the note is empty" in message for where, message in reported)
 
 
-def test_a_contacts_phone_email_and_website_go_out_in_the_schemas_order(schema) -> None:
-    """`contactType` is an `xs:sequence`: phone, then email, then homepage."""
+def test_a_contacts_phone_email_and_links_go_out_in_the_schemas_order(schema) -> None:
+    """`contactType` is an `xs:sequence`: phone, then email, then one homepage per link."""
     source = one_dive(contact_uuid=CONTACT_UUID)
     source["contacts"] = [
         contact(
-            roles=["dive_center"], website="https://bluehole.example/", email="desk@bluehole.example", phone="+20 69"
+            roles=["dive_center"],
+            phone="+20 69",
+            email="desk@bluehole.example",
+            links=[{"url": "https://bluehole.example/"}, {"url": "https://instagram.example/bh", "label": "Instagram"}],
         )
     ]
     text = written(source, schema)
-    assert text.index("<phone>") < text.index("<email>") < text.index("<homepage>")
+    assert text.index("<phone>") < text.index("<email>") < text.index("<homepage>https://bluehole.example/")
+    assert text.index("<homepage>https://bluehole.example/") < text.index("<homepage>https://instagram.example/bh")
+    back = read_back(source)["contacts"]
+    assert back[0]["links"] == [{"url": "https://bluehole.example/"}, {"url": "https://instagram.example/bh"}]
+    assert {**back[0], "links": source["contacts"][0]["links"]} == source["contacts"][0]
+    assert messages(source, "contacts/0/links/1") == ["UDDF has no slot for label; it is not written"]
+    assert messages(source, "contacts/0/links/0") == []
+
+
+def test_a_contact_with_links_alone_writes_its_contact_block(schema) -> None:
+    source = one_dive(contact_uuid=CONTACT_UUID)
+    source["contacts"] = [contact(roles=["dive_center"], links=[{"url": "https://bluehole.example/"}])]
+    assert "<contact>" in written(source, schema)
     assert read_back(source)["contacts"] == source["contacts"]
 
 
@@ -1442,6 +1457,31 @@ def test_people_alone_write_an_owner_that_reads_back_as_no_diver(schema) -> None
     assert '<owner id="owner">' in written(source, schema)
     back = read_back(source)
     assert "diver" not in back and back["people"] == source["people"]
+
+
+def test_a_persons_links_go_out_as_homepages_after_the_email_and_come_back_but_for_labels(schema) -> None:
+    links = [{"url": "https://ada.example/", "label": "Site"}, {"url": "https://social.example/@ada"}]
+    source = with_people(document(), person(email="ada@example.org", links=links))
+    text = written(source, schema)
+    assert text.index("<email>") < text.index("<homepage>https://ada.example/")
+    assert text.index("<homepage>https://ada.example/") < text.index("<homepage>https://social.example/@ada")
+    assert read_back(source)["people"][0]["links"] == [{"url": link["url"]} for link in links]
+    assert messages(source, "people/0/links/0") == ["UDDF has no slot for label; it is not written"]
+    assert messages(source, "people/0") == []
+
+
+def test_links_on_records_uddf_has_no_slot_for_are_reported_with_the_record(schema) -> None:
+    """A gear item's `<manufacturer>` takes a contact block, but a manual's address there would
+    say the maker's homepage is that page; a trip has no contact block at all."""
+    links = [{"url": "https://maker.example/manual.pdf", "label": "Manual"}]
+    source = document(
+        gear=[{"uuid": "0198a6f0-9999-7040-8000-000000000040", "name": "Fins", "type": "fins", "links": links}],
+        trips=[{"uuid": TRIP_UUID, "name": "Weekend", "links": links}],
+    )
+    text = written(source, schema)
+    assert "<homepage>" not in text
+    assert messages(source, "gear/0") == ["UDDF has no slot for links; it is not written"]
+    assert messages(source, "trips/0") == ["UDDF has no slot for links; it is not written"]
 
 
 def test_what_a_person_holds_beyond_its_slot_is_reported_from_the_record(schema) -> None:
