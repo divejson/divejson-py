@@ -1,0 +1,16 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-08-28T12:00:00+00:00",
+  "people": [
+    {
+      "uuid": "0198a6f0-1111-70a4-8000-0000000000a4",
+      "name": "J. Harbord",
+      "links": [
+        {
+          "label": "Social"
+        }
+      ]
+    }
+  ]
+}

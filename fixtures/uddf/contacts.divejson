@@ -106,7 +106,14 @@
       ],
       "phone": "+20 69 555 0199",
       "email": "desk@bluehole.example",
-      "website": "https://bluehole.example/",
+      "links": [
+        {
+          "url": "https://bluehole.example/"
+        },
+        {
+          "url": "https://social.example/@blueholedivers"
+        }
+      ],
       "address": {
         "street": "Mashraba",
         "city": "Dahab",

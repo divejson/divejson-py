@@ -892,7 +892,11 @@
       ],
       "phone": "+64 3 555 0187",
       "email": "desk@deepsouth.example",
-      "website": "https://deepsouth.example/",
+      "links": [
+        {
+          "url": "https://deepsouth.example/"
+        }
+      ],
       "address": {
         "street": "1 Deepwater Basin Road",
         "city": "Milford Sound",

@@ -40,6 +40,7 @@
         <email>desk@bluehole.example</email>
         <email>boats@bluehole.example</email>
         <homepage>https://bluehole.example/</homepage>
+        <homepage>https://social.example/@blueholedivers</homepage>
       </contact>
       <priceperdive currency="EUR">35</priceperdive>
       <rating>

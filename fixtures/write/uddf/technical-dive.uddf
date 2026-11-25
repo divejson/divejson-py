@@ -76,6 +76,7 @@
       <contact>
         <phone>+64 27 555 0142</phone>
         <email>jo@deepsouth.example</email>
+        <homepage>https://social.example/@jharbord</homepage>
       </contact>
       <notes>
         <para>Taught the trimix course and signs the society's cards.</para>
@@ -117,6 +118,7 @@
         <phone>+64 3 555 0187</phone>
         <email>desk@deepsouth.example</email>
         <homepage>https://deepsouth.example/</homepage>
+        <homepage>https://deepsouth.example/book?trip=fiordland</homepage>
       </contact>
       <notes>
         <para>Runs the fiord boat, fills trimix, and has bunks above the shop.</para>
@@ -168,6 +170,7 @@
             <phone>+64 3 555 0187</phone>
             <email>desk@deepsouth.example</email>
             <homepage>https://deepsouth.example/</homepage>
+            <homepage>https://deepsouth.example/book?trip=fiordland</homepage>
           </contact>
           <notes>
             <para>Runs the fiord boat, fills trimix, and has bunks above the shop.</para>

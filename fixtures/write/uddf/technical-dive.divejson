@@ -606,6 +606,15 @@
           "role": "companion"
         }
       ],
+      "links": [
+        {
+          "url": "https://fiordlandcharters.example/itinerary/2026-07",
+          "label": "Itinerary"
+        },
+        {
+          "url": "https://photos.example/albums/fiordland-tech-week"
+        }
+      ],
       "notes": "",
       "created_at": "2026-06-01T08:00:00+12:00"
     }
@@ -628,6 +637,12 @@
         {
           "person_uuid": "0198a6f0-1111-70a1-8000-0000000000a1",
           "role": "student"
+        }
+      ],
+      "links": [
+        {
+          "url": "https://learn.example/nzts/normoxic-trimix",
+          "label": "Course materials"
         }
       ],
       "notes": "Four training dives; the wall dive was the final assessment.",
@@ -799,6 +814,12 @@
       "name": "Tech drysuit",
       "brand": "Santi",
       "type": "drysuit",
+      "links": [
+        {
+          "url": "https://santi.example/manuals/drysuit.pdf",
+          "label": "Manual"
+        }
+      ],
       "rented": false,
       "dive_count": 122
     },
@@ -956,7 +977,20 @@
       ],
       "phone": "+64 3 555 0187",
       "email": "desk@deepsouth.example",
-      "website": "https://deepsouth.example/",
+      "links": [
+        {
+          "url": "https://deepsouth.example/"
+        },
+        {
+          "url": "https://deepsouth.example/book?trip=fiordland",
+          "label": "Bookings",
+          "extensions": {
+            "com.example.divekit": {
+              "pinned": true
+            }
+          }
+        }
+      ],
       "address": {
         "street": "1 Deepwater Basin Road",
         "city": "Milford Sound",
@@ -983,6 +1017,12 @@
       "name": "J. Harbord",
       "email": "jo@deepsouth.example",
       "phone": "+64 27 555 0142",
+      "links": [
+        {
+          "url": "https://social.example/@jharbord",
+          "label": "Social"
+        }
+      ],
       "notes": "Taught the trimix course and signs the society's cards.",
       "created_at": "2026-06-01T09:05:00+12:00",
       "extensions": {

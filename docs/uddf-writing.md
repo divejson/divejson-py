@@ -490,9 +490,14 @@ A contact goes out as **one element of its own**, and its roles choose which:
 | every other contact | `<divesite><divebase id="contact-<uuid>">`, before the `<site>`s |
 | `name`, `notes` | `<name>`, `<notes><para>` |
 | `address` | `<address>`, `region` as `<province>` |
-| `phone`, `email`, `website` | one `<contact>` holding `<phone>`, `<email>` and `<homepage>`, whichever are present, in that order |
+| `phone`, `email`, `links` | one `<contact>` holding `<phone>`, `<email>` and a `<homepage>` per link, whichever are present, in that order, the links in list order |
 | `dives[].contact_uuid` | `<informationbeforedive><link ref="contact-<uuid>">`, after the dive's site links |
 | `trips[].parts[].accommodation_uuid` | an `<accomodation id="accommodation-<n>">` copy of the contact inside the part, and the part's `type` |
+
+**A link goes out as its `url` alone.** `<homepage>` is an `xs:anyURI` repeated as often as
+needed and `contactType` has no element beside it, so each link is one `<homepage>` and a
+reader brings the list back in order, while every `label` is reported `dropped`. A part's
+`<accomodation>` copy carries the same `<homepage>`s, being a copy of the whole `<contact>`.
 
 **`<shop>` is the one slot that says its role back**, so a contact that is a shop and nothing
 else takes it. Every other contact — a dive center, a school, a hotel, a club, one recording
@@ -535,14 +540,14 @@ reported `dropped`: a part that comes back without its accommodation is a loss t
 where one pointing at the other branch is a wrong answer nothing would.
 
 **A name-only `<divebase>` nothing in the file points at does not come back.** A contact with
-nothing to write but its name — no address, phone, email, website or notes, its roles,
+nothing to write but its name — no address, phone, email, links or notes, its roles,
 position and `created_at` having no slot — goes out as exactly the shape
 [`uddf-mapping.md`](uddf-mapping.md) skips as a placeholder wherever no dive links it and no
 `<accomodation>` copy carries its name, and there it is reported `dropped`. The ordinary case
 is a school only a course or a card names, those records having no slot at all; the other is
 a contact only parts stay at, whose copies the rule above withholds. Everything else comes
 back: every contact a dive links or a copy names and every shop, with its name, phone, email,
-website, address and notes, and its roles as its slots imply them — and every part's
+links, address and notes, and its roles as its slots imply them — and every part's
 accommodation but the ones the rule above reports.
 
 ### People
@@ -551,7 +556,7 @@ accommodation but the ones the rule above reports.
 | --- | --- |
 | a person | `<diver><buddy id="person-<uuid>">`, after the `<owner>`, one per person in document order |
 | `name` | `personal/firstname` + `lastname`, split as below |
-| `phone`, `email` | one `<contact>` holding `<phone>` and `<email>`, whichever are present, in that order |
+| `phone`, `email`, `links` | one `<contact>` holding `<phone>`, `<email>` and a `<homepage>` per link, whichever are present, in that order, each `label` reported as a contact's is (*Contacts* above) |
 | `notes` | `<notes><para>` |
 | a dive's reference with the role `buddy`, or with none | `<informationbeforedive><link ref="person-<uuid>">` |
 | a dive's reference with the role `guide`, on a dive whose contact goes out as a `<divebase>` | a `<guide id="guide-<n>">` under that base linking the person's `<buddy>`, and a `<link>` from the dive to the guide |
@@ -894,6 +899,8 @@ writer leaves empty:
 | a site's `external_ids`, `water_type`, `entry_types` and `tags` | no slot — *Sites and trips* above |
 | `sites[].location.position` and `bbox` | a site's `<name>` is its own, so the locality gets only `<geography><location>` and that slot holds `location.name`; `<geography>`'s coordinates are the site's pin, and the box has nowhere either — *Sites and trips* above has the asymmetry with a part |
 | `contacts[].roles` | no element; *Contacts* above says when it is reported |
+| a link's `label` | `contactType`'s `<homepage>` holds an address and nothing beside it; *Contacts* above |
+| `links` on a gear item and on a trip | no slot. UDDF's `<link>` names an element in the file by its id, never an address, and the only `<homepage>`s near either record belong to somebody else's contact block — a piece's `<manufacturer>` and its purchase's `<shop>`, a part's `<accomodation>` — so a manual's address written there would say the maker's homepage is that page, and an itinerary's the hotel's. A course's go with the course |
 | `contacts[].position` | no slot: `<divebase>`, `<shop>` and `<accomodation>` carry no `<geography>`, and `addressType` holds no coordinates — only a `<site>` and a `<trippart>` have one, and a part's is where the part was |
 | `contact_uuid` on a course, a certification or a service record, and a certification's `instructor_uuid` | the record has no slot (above), and its reference goes with it |
 | `trips[].people`, `courses[].people` | `<trippart>` links only a dive base, and UDDF has no course; *People* above |
