@@ -178,7 +178,7 @@ _EMAIL = re.compile(r"\A[^@\s]+@[^@\s]+\Z")
 # An absolute URI: a scheme, a colon, and something after it, with no whitespace anywhere.
 # `xs:anyURI` admits a bare `www.example.com`, which a link's `url` does not mean and an
 # application cannot open, and prepending a scheme would be stating one the file never did.
-# U+FEFF is named because the schema's `\s` is ECMA-262's, which counts it, and Python's does not.
+# U+FEFF is named because the schema's whitespace class holds it and Python's `\s` does not.
 _ABSOLUTE_URI = re.compile(r"\A[A-Za-z][A-Za-z0-9+.\-]*:[^\s\ufeff]+\Z")
 
 # `addressType`'s children onto §6.19's members, in §6.19's order, with each one's cap.
