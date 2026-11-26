@@ -1,0 +1,16 @@
+{
+  "format": "divejson",
+  "version": "1.0",
+  "exported_at": "2026-08-28T12:00:00+00:00",
+  "trips": [
+    {
+      "uuid": "0198a6f0-1111-7032-8000-000000000032",
+      "name": "Fiordland tech week",
+      "links": [
+        {
+          "url": "https://photos.example/albums/\u0085fiordland"
+        }
+      ]
+    }
+  ]
+}

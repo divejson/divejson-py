@@ -538,15 +538,15 @@
       "items": { "$ref": "#/$defs/link" }
     },
     "link": {
-      "description": "One address for a person to open, absolute and scheme included, with an optional label. A processor never dereferences it.",
+      "description": "One address for a person to open, absolute and scheme included, with an optional label. A processor never dereferences it. The url's whitespace is spelled out because ECMA-262's \\s and Python's differ: the class is every character either counts.",
       "type": "object",
       "properties": {
         "url": {
           "type": "string",
           "format": "uri",
           "maxLength": 512,
-          "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:\\S",
-          "not": { "pattern": "\\s" }
+          "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]",
+          "not": { "pattern": "[\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]" }
         },
         "label": { "type": "string", "maxLength": 120 },
         "extensions": { "$ref": "#/$defs/extensions" }
