@@ -7,6 +7,8 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+## 0.38.0
+
 - **Breaking: every homepage of a contact and of a buddy is read as a link, and the finding
   codes `website_unreadable`, `website_too_long` and `website_beyond_first` are retired.**
   [The specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) gives
