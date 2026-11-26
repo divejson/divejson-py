@@ -7,6 +7,19 @@ this file is about the package, whose version moves independently.
 
 ## Unreleased
 
+- **Breaking: every homepage of a contact and of a buddy is read as a link, and the finding
+  codes `website_unreadable`, `website_too_long` and `website_beyond_first` are retired.**
+  [The specification](https://github.com/divejson/divejson/blob/main/spec/divejson.md) gives
+  contacts, people, courses, gear items and trips `links`, an ordered list of addresses each
+  with an optional label, and retires a contact's `website`, so `divejson validate` refuses a
+  contact carrying one. The UDDF reader reads every `<homepage>` in a contact's or a buddy's
+  `<contact>` block as a link, in file order, judging each alone: one with no scheme is
+  reported as `link_unreadable` and one past 512 characters as `link_too_long`, and the rest
+  keep their order. Nothing is left out for coming second any more, so `website_beyond_first`
+  has no replacement. The UDDF writer writes one `<homepage>` per link of a contact and of a
+  person, in list order, and reports each label, and a gear item's or a trip's links, as not
+  written.
+
 ## 0.37.0
 
 - **The gear types `undergarment`, `tech_shorts` and `slate`.** §6.12 of

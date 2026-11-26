@@ -93,6 +93,11 @@
       "name": "Mona A. Salem",
       "email": "mona@example.com",
       "phone": "+20 100 555 0177",
+      "links": [
+        {
+          "url": "https://social.example/@monasalem"
+        }
+      ],
       "notes": "Guides at Blue Hole Divers; dives a rebreather off duty."
     },
     {

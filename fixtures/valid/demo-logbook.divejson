@@ -4229,7 +4229,11 @@
       ],
       "phone": "+34 922 555 014",
       "email": "hola@bluelagoon.example",
-      "website": "https://bluelagoon.example/",
+      "links": [
+        {
+          "url": "https://bluelagoon.example/"
+        }
+      ],
       "address": {
         "street": "Calle del Muelle 8",
         "city": "Costa Adeje",

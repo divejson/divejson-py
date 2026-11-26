@@ -233,7 +233,7 @@ with the role its slot implies:
 | `address/street`, `city`, `postcode`, `province`, `country` | `contacts[].address.street`, `.city`, `.postcode`, `.region`, `.country` |
 | `contact/phone`, else `contact/mobilephone` | `contacts[].phone` — the first `<phone>`, or the first `<mobilephone>` where there is none |
 | `contact/email` | `contacts[].email` — the first |
-| `contact/homepage` | `contacts[].website` — the first |
+| `contact/homepage` | `contacts[].links[].url` — every one, in file order, and no `label` |
 | `notes/para` | `contacts[].notes`, paragraphs joined with blank lines |
 | `@id` | `contacts[].uuid`, under the one kind `contact` whichever slot it came from |
 | a dive's `informationbeforedive/link/@ref` naming a base or a shop | `dives[].contact_uuid` — *Dives* below |
@@ -274,10 +274,12 @@ cut off being a wrong one.
 
 **`<email>` and `<homepage>` are checked, not merely capped.** `<email>` takes the owner's
 guard (*Diver* above): `n/a`, a dash or a person's name is no email, and reported. A
-`<homepage>` has to be an absolute URI with its scheme, which is what §6.18's `website` means
-and what an importer can open: `xs:anyURI` admits a bare `www.example.com`, and one like that
-is dropped and reported rather than given a scheme the file never stated. A second `<email>`
-or `<homepage>`, and every phone but the one read, is reported as well.
+`<homepage>` has to be an absolute URI with its scheme, which is what a Link's `url` means
+(§6.18) and what an importer can open: `xs:anyURI` admits a bare `www.example.com`, and one
+like that is dropped and reported rather than given a scheme the file never stated. **Every
+`<homepage>` is a link**, in file order, each judged alone, so one dropped for its scheme or
+its length leaves the rest in their order; none carries a `label`, `contactType` having no
+element for one. A second `<email>`, and every phone but the one read, is reported as well.
 
 **An `<address>` with no `<country>` is dropped**, and reported. `addressType` requires the
 element and §6.19 makes it the one member an address cannot omit, so the rest of such an
@@ -296,6 +298,7 @@ has no member and is reported.
 | `personal/firstname` + `middlename` + `lastname` | `people[].name`, joined with single spaces, an empty one skipped — REQUIRED, so a buddy with no name at all is no person: it is reported, and every link to it goes with it |
 | `contact/email` | `people[].email` — the first |
 | `contact/phone`, else `contact/mobilephone` | `people[].phone` — the first `<phone>`, or the first `<mobilephone>` where there is none |
+| `contact/homepage` | `people[].links[].url` — every one, in file order, and no `label`, under a contact's rules (*Contacts* above) |
 | `notes/para` | `people[].notes`, paragraphs joined with blank lines |
 | `@id` | `people[].uuid`, under the kind `person` |
 | a dive's `informationbeforedive/link/@ref` naming a buddy | a reference in `dives[].people`, with the role `buddy` — or `student`, where the buddy carries `<student/>` |
@@ -327,14 +330,15 @@ application's to decide, so the owner is read as *Diver* above says and never as
 **Everything else a buddy carries is reported rather than dropped in silence**, the rule a
 contact's shape keeps: `<address>`, `<equipment>`, `<medical>`, `<education>`,
 `<divepermissions>` and `<diveinsurances>`, `<personal>`'s children beyond the three names,
-and, in its `<contact>`, every `<email>` and phone but the ones read, a `<homepage>`, a
-`<fax>` and a `<language>`. §6.20 carries a name, an email, a phone and notes, and names what
-it leaves out under *Deferred*. A buddy's `<equipment>` in particular is somebody else's kit,
+and, in its `<contact>`, every `<email>` and phone but the ones read, a `<fax>` and a
+`<language>`. §6.20 carries a name, an email, a phone, links and notes, and names what it
+leaves out under *Deferred*. A buddy's `<equipment>` in particular is somebody else's kit,
 and never a gear item (*Gear* below reads only the owner's).
 
 **Every string meets its member's bound**, as a contact's does: a name past 255 characters is
-cut to it and reported, and a phone past 32 or an email past 255 is dropped and reported
-instead. `<email>` takes the owner's guard (*Diver* above).
+cut to it and reported, and a phone past 32, an email past 255 or a homepage past 512 is
+dropped and reported instead. `<email>` takes the owner's guard (*Diver* above), and
+`<homepage>` a contact's check (*Contacts* above).
 
 ### Trips — `/uddf/divetrip/trip`
 
@@ -396,7 +400,8 @@ matched on its `<name>`, trimmed and case-insensitively, against every contact r
 — the bases, the shops and earlier parts' shapes — and a match adds the role its slot implies
 to that contact rather than making another. Where the contact lacks a member the shape states,
 it takes it; where both state one and they differ, the contact's stands and the shape's is
-reported. Two parts at "Grandma's house" are one contact, and a base that is also where the
+reported. `links` is one member to this rule, compared whole: a shape's homepages are taken
+where the contact has none, and reported where the contact's list is another. Two parts at "Grandma's house" are one contact, and a base that is also where the
 diver slept is one contact with both roles; two different places of one name are one contact
 too, a file giving a reader nothing else to tell them apart by. A shape that matches nothing
 is a contact of its own: an `<accomodation>` under its `@id`, like any record, and an
@@ -1008,7 +1013,7 @@ writes all three that way.
 | `<trippart @type>` | `boat`, `hotel`, `individual` or `organized`, and reported. What a part gained was a reference, not a type: the contact its `accommodation_uuid` names says whether the diver slept aboard (`liveaboard`) or ashore (`accommodation`), and `individual` and `organized` say how the trip was booked, which nothing stores ([divejson/divejson's CONTRIBUTING.md](https://github.com/divejson/divejson/blob/main/CONTRIBUTING.md#proposing-additions-to-the-data-model)). A reader that wants it has `extensions`. |
 | a contact's `<aliasname>` and `<rating>`; a base's `<priceperdive>`, `<pricedivepackage>` and `<link>`; an accommodation's `<category>` | §6.18 carries none of them, and says so under *Deferred*. Each is reported. |
 | a base's `<guide>` that no dive links | a buddy on the base's staff with no dive to have led: §6.18 defers a base's guides, and a person's role lives on a reference, which needs an occasion to sit on. Reported. A guide a dive links is read (*People* above). |
-| a buddy's `<address>`, `<equipment>`, `<medical>`, `<education>`, `<divepermissions>`, `<diveinsurances>`, its `<personal>` beyond the three names, and its `<contact><homepage>` | §6.20 carries a name, an email, a phone and notes, and names the rest under *Deferred*. Each is reported (*People* above). |
+| a buddy's `<address>`, `<equipment>`, `<medical>`, `<education>`, `<divepermissions>`, `<diveinsurances>`, and its `<personal>` beyond the three names | §6.20 carries a name, an email, a phone, links and notes, and names the rest under *Deferred*. Each is reported (*People* above). |
 | `<contact><language>`, `<fax>` on any shape a contact or a person is read from | no member. Each is reported. |
 | `<vessel>`, with its `<shiptype>`, `<marina>` and `<shipdimension>` | a boat, which §6.18 does not model: the operator is the contact and the vessel is reported. |
 | `<purchase>` | a piece of kit's price, date and shop. Its inline `<shop>` is read as a contact (*Contacts* above) and the purchase is reported — on a piece that is read; a dropped piece's goes with it (*Gear* above). |

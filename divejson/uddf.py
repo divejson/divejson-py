@@ -152,13 +152,13 @@ LITRES_THRESHOLD = Decimal(1)
 # fills the members they cap. §6.12's `serial` is 1-64 rather than the 255 its neighbours
 # share, and the reason is worth knowing: a gear serial longer than a device's (§6.4b) could
 # never equal one, and equality between the two is what says a kit item and a device are
-# one machine. A phone, an email and a website — §6.1's and §6.18's — are never cut to theirs,
-# only dropped past them: a number or an address with its end missing is a wrong one rather
-# than a short one. An address's parts are cut like a name, the postcode to a code's length.
+# one machine. A phone, an email and a link's address — §6.1's and §6.18's — are never cut to
+# theirs, only dropped past them: a number or an address with its end missing is a wrong one
+# rather than a short one. An address's parts are cut like a name, the postcode to a code's length.
 MAX_SERIAL = 64
 MAX_PHONE = 32
 MAX_EMAIL = 255
-MAX_WEBSITE = 512
+MAX_LINK_URL = 512
 MAX_POSTCODE = 32
 MIN_PO2_LIMIT = Decimal("0.4")
 MAX_PO2_LIMIT = Decimal("2.0")
@@ -175,10 +175,11 @@ MAX_ALTITUDE = 6500
 # field — `n/a`, `-`, a person's name, a sentence.
 _EMAIL = re.compile(r"\A[^@\s]+@[^@\s]+\Z")
 
-# An absolute URI: a scheme, a colon, and something after it. `xs:anyURI` admits a bare
-# `www.example.com`, which §6.18's `website` does not mean and an application cannot open,
-# and prepending a scheme would be stating one the file never did.
-_ABSOLUTE_URI = re.compile(r"\A[A-Za-z][A-Za-z0-9+.\-]*:\S+\Z")
+# An absolute URI: a scheme, a colon, and something after it, with no whitespace anywhere.
+# `xs:anyURI` admits a bare `www.example.com`, which a link's `url` does not mean and an
+# application cannot open, and prepending a scheme would be stating one the file never did.
+# U+FEFF is named because the schema's whitespace class holds it and Python's `\s` does not.
+_ABSOLUTE_URI = re.compile(r"\A[A-Za-z][A-Za-z0-9+.\-]*:[^\s\ufeff]+\Z")
 
 # `addressType`'s children onto §6.19's members, in §6.19's order, with each one's cap.
 _ADDRESS = (
@@ -204,11 +205,11 @@ _SITE_READ = {"name", "aliasname", "geography", "sitedata", "notes"}
 _GEOGRAPHY_READ = {"location", "latitude", "longitude", "altitude"}
 _SITEDATA_READ = {"minimumdepth", "maximumdepth"}
 
-# `<personal>`'s names, in the order a person's `name` joins them; a `<buddy>`'s children and
-# its `<contact>` block's that §6.20 reads. Every other one is reported, as a contact's are.
+# `<personal>`'s names, in the order a person's `name` joins them; a `<buddy>`'s children that
+# §6.20 reads. Its `<contact>` block is read as a contact's is, and every other child is
+# reported, as a contact's are.
 _NAME_PARTS = ("firstname", "middlename", "lastname")
 _PERSON_READ = {"personal", "contact", "notes", "student"}
-_PERSON_CONTACT_READ = {"phone", "mobilephone", "email"}
 
 # Where a part's diver slept, and the role each shape gives its contact. The accommodation is
 # read under both spellings — the XSD declares `<accomodation>`, the documentation writes
@@ -1015,11 +1016,11 @@ class _Converter:
     def person(self, element: ET.Element, uuid: str, name: str, where: str) -> dict[str, Any]:
         """One `<buddy>` as a person, and what §6.20 does not carry of it reported.
 
-        `<contact>`'s first email and first phone, on the owner's terms, and `<notes>`. Every
-        other child — an address, a kit list, a medical history, a certification, insurance —
-        is reported by its tag, derived from the element rather than listed, and so are
-        `<personal>`'s beyond the names and `<contact>`'s beyond the three it reads: the rule
-        `contact_contents` keeps for a contact.
+        `<contact>`'s first email and first phone, on the owner's terms, every homepage as a
+        link, and `<notes>`. Every other child — an address, a kit list, a medical history, a
+        certification, insurance — is reported by its tag, derived from the element rather
+        than listed, and so are `<personal>`'s beyond the names and `<contact>`'s beyond the
+        four it reads: the rule `contact_contents` keeps for a contact.
         """
         contact = _kid(element, "contact")
         recorded: dict[str, Any] = {
@@ -1027,6 +1028,7 @@ class _Converter:
             "name": self.capped(name, MAX_NAME, where, "the person's name"),
             "email": self.contact_email(contact, where, whose="the person"),
             "phone": self.phone(contact, where, whose="the person"),
+            "links": self.links(contact, where),
             "notes": self.notes_text(element),
         }
         for child in element:
@@ -1040,7 +1042,7 @@ class _Converter:
                 self.not_kept(where, f"<personal><{tag}>", "a buddy")
         for child in contact if contact is not None else ():
             tag = local_name(child)
-            if tag not in _PERSON_CONTACT_READ and _carries(child):
+            if tag not in _CONTACT_BLOCK_READ and _carries(child):
                 self.not_kept(where, f"<contact><{tag}>", "a buddy")
         return {member: recorded[member] for member in person_members() if recorded.get(member)}
 
@@ -1408,7 +1410,7 @@ class _Converter:
         contents = {
             "phone": self.phone(contact, where, whose="the contact"),
             "email": self.contact_email(contact, where),
-            "website": self.website(contact, where),
+            "links": self.links(contact, where),
             "address": self.address(_kid(element, "address"), where),
             "notes": self.notes_text(element),
         }
@@ -1434,42 +1436,38 @@ class _Converter:
             )
         return self.email(recorded[0], where) if recorded else None
 
-    def website(self, contact: ET.Element | None, where: str) -> str | None:
-        """The first `<homepage>`, where it is an absolute URL, reporting every other one.
+    def links(self, contact: ET.Element | None, where: str) -> list[dict[str, str]]:
+        """Every `<homepage>`, in file order, as a link, each judged alone.
 
-        Checked rather than merely capped: `xs:anyURI` admits a bare host, which §6.18's
-        `website` does not mean and nothing can open, and a scheme prepended here would be
-        one the file never stated. Past §6.18's bound it is dropped, not cut, for the reason
-        `MAX_PHONE` gives.
+        Checked rather than merely capped: `xs:anyURI` admits a bare host, which a link's `url`
+        does not mean and nothing can open, and a scheme prepended here would be one the file
+        never stated. Past the bound it is dropped, not cut, for the reason `MAX_PHONE` gives.
+        One left out leaves the rest in their order. UDDF has no label for a homepage, so none
+        is given.
         """
-        recorded = [value for value in (_text(kid) for kid in _kids(contact, "homepage")) if value]
-        if not recorded:
-            return None
-        for value in recorded[1:]:
-            self.note(
-                where, f"One website is kept, the first the contact records; {value!r} is left out.", "dropped",
-                code="website_beyond_first",
-            )
-        value = recorded[0]
-        if not _ABSOLUTE_URI.match(value):
-            self.note(
-                where,
-                f"The homepage {value!r} is not a full web address with its scheme; it is left out rather than given "
-                "one the file never stated.",
-                "dropped",
-                code="website_unreadable",
-            )
-            return None
-        if len(value) > MAX_WEBSITE:
-            self.note(
-                where,
-                f"The homepage is {len(value)} characters long, more than the {MAX_WEBSITE} kept, and a shortened "
-                "address is a wrong one; it is left out.",
-                "dropped",
-                code="website_too_long",
-            )
-            return None
-        return value
+        links: list[dict[str, str]] = []
+        for value in (_text(kid) for kid in _kids(contact, "homepage")):
+            if not value:
+                continue
+            if not _ABSOLUTE_URI.match(value):
+                self.note(
+                    where,
+                    f"The homepage {value!r} is not a full web address with its scheme; it is left out rather than "
+                    "given one the file never stated.",
+                    "dropped",
+                    code="link_unreadable",
+                )
+            elif len(value) > MAX_LINK_URL:
+                self.note(
+                    where,
+                    f"The homepage is {len(value)} characters long, more than the {MAX_LINK_URL} kept, and a "
+                    "shortened address is a wrong one; it is left out.",
+                    "dropped",
+                    code="link_too_long",
+                )
+            else:
+                links.append({"url": value})
+        return links
 
     def address(self, element: ET.Element | None, where: str) -> dict[str, str] | None:
         """An `<address>` as §6.19's Address, or nothing where it names no country.

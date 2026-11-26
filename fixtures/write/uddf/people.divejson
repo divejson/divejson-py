@@ -195,6 +195,11 @@
       "name": "Mona Salem",
       "email": "mona@example.com",
       "phone": "+20 100 555 0177",
+      "links": [
+        {
+          "url": "https://social.example/@monasalem"
+        }
+      ],
       "notes": "Guides at Blue Hole Divers.",
       "created_at": "2026-05-02T18:00:00+02:00",
       "extensions": {

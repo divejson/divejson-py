@@ -171,6 +171,13 @@ LOST: dict[str, frozenset[str]] = {
             "trips/0/people",
             "people/0/created_at",
             "people/0/extensions",
+            # A `<homepage>` holds an address and nothing beside it, so a link's label and its
+            # producer's extension do not come back; a trip has no contact block to put its
+            # links in, and the gear item's and the courses' go with the losses above.
+            "contacts/0/links/1/label",
+            "contacts/0/links/1/extensions",
+            "people/0/links/0/label",
+            "trips/0/links",
         }
     ),
     "contacts": frozenset(
